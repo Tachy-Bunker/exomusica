@@ -4,6 +4,7 @@ import { requireAuth } from "../lib/auth.js";
 import { toDayKey } from "../lib/dayKey.js";
 import { toMessageDTO } from "../lib/messageDto.js";
 import { broadcast } from "../lib/chatHub.js";
+import { sendTemplatedMail } from "../lib/emailTemplates.js";
 
 const messageInclude = {
   author: { select: { username: true, avatarUrl: true } },
@@ -127,6 +128,26 @@ export async function messageRoutes(app: FastifyInstance): Promise<void> {
       const full = await prisma.message.findUniqueOrThrow({ where: { id: message.id }, include: messageInclude });
       const dto = await toMessageDTO(full);
       broadcast(channel.slug, { type: "message.create", message: dto });
+
+      // Fire-and-forget: followers who want replies on this specific topic
+      // (global notifyFollowedReplies AND this follow's own notifyOnReply,
+      // both default true), excluding whoever just posted.
+      void (async () => {
+        const followers = await prisma.channelFollow.findMany({
+          where: { channelId: channel.id, notifyOnReply: true, userId: { not: req.user!.id } },
+          include: { user: true },
+        });
+        for (const f of followers) {
+          if (!f.user.notifyFollowedReplies || !f.user.email || f.user.isGhost) continue;
+          void sendTemplatedMail("TOPIC_REPLY", f.user.email, f.user.username, {
+            channelName: channel.name,
+            authorUsername: full.author.username,
+            messageExcerpt: contentRaw.slice(0, 200),
+            messageUrl: `https://exomusica.com/topic/${channel.slug}#m-${message.id}`,
+          });
+        }
+      })();
+
       return reply.code(201).send(dto);
     },
   );

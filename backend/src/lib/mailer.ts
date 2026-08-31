@@ -21,13 +21,13 @@ const transporter =
 /** Sends an email if SMTP is configured; otherwise logs and no-ops. Never
  *  throws — a mail failure should never take down the request that
  *  triggered it (a PM send, a reaction, a publish). */
-export async function sendMail(to: string, subject: string, text: string): Promise<void> {
+export async function sendMail(to: string, subject: string, text: string, html?: string): Promise<void> {
   if (!transporter) {
     console.warn(`[mailer] SMTP not configured — would have sent "${subject}" to ${to}`);
     return;
   }
   try {
-    await transporter.sendMail({ from: SMTP_FROM, to, subject, text });
+    await transporter.sendMail({ from: SMTP_FROM, to, subject, text, html });
   } catch (err) {
     console.error(`[mailer] failed to send "${subject}" to ${to}:`, err);
   }

@@ -28,6 +28,12 @@ export function AdminLayout() {
         <NavLink to="/admin/emoji" className={({ isActive }) => (isActive ? "active" : "")}>
           Emoji
         </NavLink>
+        <NavLink to="/admin/email-templates" className={({ isActive }) => (isActive ? "active" : "")}>
+          Email templates
+        </NavLink>
+        <NavLink to="/admin/audit-log" className={({ isActive }) => (isActive ? "active" : "")}>
+          Action log
+        </NavLink>
       </nav>
       <div>
         <Outlet />

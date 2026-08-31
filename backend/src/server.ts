@@ -21,6 +21,8 @@ import { blogRoutes } from "./routes/blog.js";
 import { pmRoutes } from "./routes/pms.js";
 import { emojiRoutes } from "./routes/emojis.js";
 import { attachmentRoutes } from "./routes/attachments.js";
+import { adminEmailRoutes } from "./routes/adminEmail.js";
+import { auditLogRoutes } from "./routes/auditLog.js";
 import { wsRoutes } from "./routes/ws.js";
 
 const app = Fastify({ logger: true });
@@ -50,6 +52,8 @@ await app.register(blogRoutes);
 await app.register(pmRoutes);
 await app.register(emojiRoutes);
 await app.register(attachmentRoutes);
+await app.register(adminEmailRoutes);
+await app.register(auditLogRoutes);
 await app.register(wsRoutes);
 
 const port = Number(process.env.PORT ?? 3001);

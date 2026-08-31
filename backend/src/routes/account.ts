@@ -7,7 +7,10 @@ export async function accountRoutes(app: FastifyInstance): Promise<void> {
   // Self view — includes email and notification prefs, unlike the public
   // /api/users/:username lookup which deliberately hides email.
   app.get("/api/account/me", { preHandler: requireAuth }, async (req, reply) => {
-    const me = await prisma.user.findUnique({ where: { id: req.user!.id } });
+    const me = await prisma.user.findUnique({
+      where: { id: req.user!.id },
+      include: { followedChannels: { include: { channel: { select: { slug: true, name: true } } } } },
+    });
     if (!me) return reply.code(404).send({ error: "no such user" });
     return {
       id: me.id,
@@ -16,16 +19,48 @@ export async function accountRoutes(app: FastifyInstance): Promise<void> {
       bio: me.bio,
       links: me.links,
       notifyWeeklySummary: me.notifyWeeklySummary,
+      notifyDailySummary: me.notifyDailySummary,
       notifyFollowedReplies: me.notifyFollowedReplies,
       notifyPrivateMessage: me.notifyPrivateMessage,
+      notifyNews: me.notifyNews,
+      notifyCallsForIdeas: me.notifyCallsForIdeas,
+      notifyCallsForArtists: me.notifyCallsForArtists,
+      followedChannels: me.followedChannels.map((f) => ({
+        slug: f.channel.slug,
+        name: f.channel.name,
+        notifyOnReply: f.notifyOnReply,
+      })),
     };
   });
 
   app.patch<{
-    Body: Partial<{ notifyWeeklySummary: boolean; notifyFollowedReplies: boolean; notifyPrivateMessage: boolean }>;
+    Body: Partial<{
+      notifyWeeklySummary: boolean;
+      notifyDailySummary: boolean;
+      notifyFollowedReplies: boolean;
+      notifyPrivateMessage: boolean;
+      notifyNews: boolean;
+      notifyCallsForIdeas: boolean;
+      notifyCallsForArtists: boolean;
+    }>;
   }>("/api/account/notifications", { preHandler: requireAuth }, async (req) => {
     return prisma.user.update({ where: { id: req.user!.id }, data: req.body ?? {} });
   });
+
+  // Per-topic override under the global notifyFollowedReplies toggle.
+  app.patch<{ Params: { slug: string }; Body: { notifyOnReply: boolean } }>(
+    "/api/channels/:slug/follow/notifications",
+    { preHandler: requireAuth },
+    async (req, reply) => {
+      const channel = await prisma.forumChannel.findUnique({ where: { slug: req.params.slug } });
+      if (!channel) return reply.code(404).send({ error: "no such channel" });
+      await prisma.channelFollow.update({
+        where: { userId_channelId: { userId: req.user!.id, channelId: channel.id } },
+        data: { notifyOnReply: req.body?.notifyOnReply ?? true },
+      });
+      return reply.code(204).send();
+    },
+  );
 
   app.patch<{ Body: { currentPassword: string; newPassword: string } }>(
     "/api/account/password",

@@ -24,6 +24,8 @@ import { AlbumsAdminPage } from "./pages/admin/AlbumsAdminPage";
 import { WikiAdminPage } from "./pages/admin/WikiAdminPage";
 import { BlogAdminPage } from "./pages/admin/BlogAdminPage";
 import { EmojiAdminPage } from "./pages/admin/EmojiAdminPage";
+import { EmailTemplatesAdminPage } from "./pages/admin/EmailTemplatesAdminPage";
+import { AuditLogAdminPage } from "./pages/admin/AuditLogAdminPage";
 
 export default function App() {
   return (
@@ -59,6 +61,8 @@ export default function App() {
                 <Route path="wiki" element={<WikiAdminPage />} />
                 <Route path="blog" element={<BlogAdminPage />} />
                 <Route path="emoji" element={<EmojiAdminPage />} />
+                <Route path="email-templates" element={<EmailTemplatesAdminPage />} />
+                <Route path="audit-log" element={<AuditLogAdminPage />} />
               </Route>
             </Route>
           </Route>

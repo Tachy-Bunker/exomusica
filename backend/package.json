@@ -10,6 +10,7 @@
     "seed": "node dist/seed.js",
     "import-discord": "node dist/import-discord.js",
     "weekly-summary": "node dist/weeklySummary.js",
+    "daily-summary": "node dist/dailySummary.js",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev"
   },

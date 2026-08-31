@@ -55,8 +55,12 @@ model User {
   storageUsedBytes      BigInt       @default(0)
   storageLimitBytes     BigInt       @default(68157440) // 65MB
   notifyWeeklySummary   Boolean      @default(true)
+  notifyDailySummary    Boolean      @default(false)
   notifyFollowedReplies Boolean      @default(true)
   notifyPrivateMessage  Boolean      @default(true)
+  notifyNews            Boolean      @default(true)
+  notifyCallsForIdeas   Boolean      @default(true)
+  notifyCallsForArtists Boolean      @default(true)
   createdAt             DateTime     @default(now())
 
   messages         Message[]
@@ -120,11 +124,12 @@ model ForumChannel {
 }
 
 model ChannelFollow {
-  userId    Int
-  channelId Int
-  user      User         @relation(fields: [userId], references: [id])
-  channel   ForumChannel @relation(fields: [channelId], references: [id])
-  createdAt DateTime     @default(now())
+  userId       Int
+  channelId    Int
+  user         User         @relation(fields: [userId], references: [id])
+  channel      ForumChannel @relation(fields: [channelId], references: [id])
+  notifyOnReply Boolean     @default(true) // per-topic override under the global notifyFollowedReplies toggle
+  createdAt    DateTime     @default(now())
 
   @@id([userId, channelId])
 }
@@ -308,6 +313,28 @@ model PrivateMessage {
   contentRaw  String    @db.Text
   sentAt      DateTime  @default(now())
   readAt      DateTime?
+}
+
+enum EmailType {
+  WEEKLY_SUMMARY
+  DAILY_SUMMARY
+  TOPIC_REPLY
+  PRIVATE_MESSAGE
+  JOIN_APPROVED
+  NEWS
+  CALL_FOR_IDEAS
+  CALL_FOR_ARTISTS
+}
+
+// Admin-editable HTML per email type. A missing row for a type just means
+// "using the built-in default" (see lib/emailTemplates.ts) — this table
+// only holds overrides, so shipping a new email type never requires a
+// migration to backfill rows.
+model EmailTemplate {
+  type      EmailType @id
+  subject   String
+  bodyHtml  String    @db.Text
+  updatedAt DateTime  @updatedAt
 }
 
 model AuditLog {

@@ -293,6 +293,12 @@ Add a line (runs every Monday at 9am server time):
 0 9 * * MON cd /home/<you>/exomusica && docker compose exec -T backend node dist/weeklySummary.js >> /home/<you>/weekly-summary.log 2>&1
 ```
 
+Daily summary is off by default (per-user opt-in), but if anyone turns it on, add a second line for it:
+
+```
+0 9 * * * cd /home/<you>/exomusica && docker compose exec -T backend node dist/dailySummary.js >> /home/<you>/daily-summary.log 2>&1
+```
+
 ## Redeploying after a code change
 
 On Windows: `git add -A && git commit -m "..." && git push`.

@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import type { FastifyInstance } from "fastify";
 import { prisma } from "../lib/prisma.js";
 import { requireAdmin } from "../lib/auth.js";
-import { sendMail } from "../lib/mailer.js";
+import { sendTemplatedMail } from "../lib/emailTemplates.js";
 
 export async function blogRoutes(app: FastifyInstance): Promise<void> {
   app.get("/api/blog", async () => {
@@ -72,11 +72,28 @@ export async function blogRoutes(app: FastifyInstance): Promise<void> {
       const post = await prisma.blogPost.findUnique({ where: { id: Number(req.params.id) } });
       if (!post || !post.publishedAt) return reply.code(400).send({ error: "post must be published first" });
 
-      const subscribers = await prisma.newsletterSubscription.findMany({ select: { email: true } });
-      for (const s of subscribers) {
-        void sendMail(s.email, `New on Exomusica: ${post.title}`, post.contentMarkdown);
+      const [subs, members] = await Promise.all([
+        prisma.newsletterSubscription.findMany({ select: { email: true } }),
+        prisma.user.findMany({ where: { notifyNews: true, isGhost: false }, select: { username: true, email: true } }),
+      ]);
+
+      const seen = new Set<string>();
+      const excerpt = post.contentMarkdown.replace(/[#*`]/g, "").slice(0, 300);
+      let notified = 0;
+
+      for (const m of members) {
+        if (!m.email || seen.has(m.email)) continue;
+        seen.add(m.email);
+        void sendTemplatedMail("NEWS", m.email, m.username, { postTitle: post.title, postExcerpt: excerpt });
+        notified++;
       }
-      return { notified: subscribers.length };
+      for (const s of subs) {
+        if (seen.has(s.email)) continue;
+        seen.add(s.email);
+        void sendTemplatedMail("NEWS", s.email, "there", { postTitle: post.title, postExcerpt: excerpt });
+        notified++;
+      }
+      return { notified };
     },
   );
 

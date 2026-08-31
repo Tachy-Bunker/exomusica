@@ -3,13 +3,26 @@ import { useNavigate } from "react-router-dom";
 import { api, ApiError } from "../lib/api";
 import { useAuth } from "../lib/auth";
 
+interface FollowedChannel {
+  slug: string;
+  name: string;
+  notifyOnReply: boolean;
+}
+
 interface Me {
   username: string;
   email: string;
   notifyWeeklySummary: boolean;
+  notifyDailySummary: boolean;
   notifyFollowedReplies: boolean;
   notifyPrivateMessage: boolean;
+  notifyNews: boolean;
+  notifyCallsForIdeas: boolean;
+  notifyCallsForArtists: boolean;
+  followedChannels: FollowedChannel[];
 }
+
+type NotifyKey = Exclude<keyof Me, "username" | "email" | "followedChannels">;
 
 export function AccountSettingsPage() {
   const { logout } = useAuth();
@@ -22,11 +35,23 @@ export function AccountSettingsPage() {
     api<Me>("/api/account/me").then(setMe);
   }, []);
 
-  async function toggleNotification(key: keyof Omit<Me, "username" | "email">) {
+  async function toggleNotification(key: NotifyKey) {
     if (!me) return;
     const next = { ...me, [key]: !me[key] };
     setMe(next);
     await api("/api/account/notifications", { method: "PATCH", body: JSON.stringify({ [key]: next[key] }) });
+  }
+
+  async function toggleTopicReply(slug: string, current: boolean) {
+    if (!me) return;
+    setMe({
+      ...me,
+      followedChannels: me.followedChannels.map((c) => (c.slug === slug ? { ...c, notifyOnReply: !current } : c)),
+    });
+    await api(`/api/channels/${slug}/follow/notifications`, {
+      method: "PATCH",
+      body: JSON.stringify({ notifyOnReply: !current }),
+    });
   }
 
   async function handlePasswordChange(e: FormEvent) {
@@ -53,6 +78,14 @@ export function AccountSettingsPage() {
 
   if (!me) return <p>Loading…</p>;
 
+  const checkbox = (key: NotifyKey, label: string) => (
+    <div className="field">
+      <label>
+        <input type="checkbox" checked={me[key] as boolean} onChange={() => toggleNotification(key)} /> {label}
+      </label>
+    </div>
+  );
+
   return (
     <div style={{ maxWidth: 420 }}>
       <h1>Account</h1>
@@ -61,38 +94,32 @@ export function AccountSettingsPage() {
       </p>
 
       <h2 style={{ fontSize: "1rem" }}>Email notifications</h2>
-      <div className="field">
-        <label>
-          <input
-            type="checkbox"
-            checked={me.notifyWeeklySummary}
-            onChange={() => toggleNotification("notifyWeeklySummary")}
-          />{" "}
-          Weekly activity summary
-        </label>
-      </div>
-      <div className="field">
-        <label>
-          <input
-            type="checkbox"
-            checked={me.notifyFollowedReplies}
-            onChange={() => toggleNotification("notifyFollowedReplies")}
-          />{" "}
-          Replies on topics I follow
-        </label>
-      </div>
-      <div className="field">
-        <label>
-          <input
-            type="checkbox"
-            checked={me.notifyPrivateMessage}
-            onChange={() => toggleNotification("notifyPrivateMessage")}
-          />{" "}
-          New private messages
-        </label>
-      </div>
+      {checkbox("notifyWeeklySummary", "Weekly activity summary")}
+      {checkbox("notifyDailySummary", "Daily activity summary")}
+      {checkbox("notifyFollowedReplies", "Replies on topics I follow")}
+      {me.notifyFollowedReplies && me.followedChannels.length > 0 && (
+        <div style={{ marginLeft: "1.2rem", marginBottom: "0.5rem" }}>
+          {me.followedChannels.map((c) => (
+            <div key={c.slug} className="field" style={{ marginBottom: "0.2rem" }}>
+              <label style={{ fontSize: "0.85rem" }}>
+                <input
+                  type="checkbox"
+                  checked={c.notifyOnReply}
+                  onChange={() => toggleTopicReply(c.slug, c.notifyOnReply)}
+                />{" "}
+                {c.name}
+              </label>
+            </div>
+          ))}
+        </div>
+      )}
+      {checkbox("notifyPrivateMessage", "New private messages")}
+      {checkbox("notifyNews", "Exomusica News")}
+      {checkbox("notifyCallsForIdeas", "Calls for ideas")}
+      {checkbox("notifyCallsForArtists", "Calls for artists")}
       <p style={{ fontSize: "0.8rem", color: "var(--text-dim)" }}>
-        These toggles save correctly, but no email actually goes out yet — no SMTP provider is wired up.
+        These toggles save correctly. Whether email actually arrives depends on SMTP being configured and working —
+        ask an admin if you're not receiving anything you expect to.
       </p>
 
       <h2 style={{ fontSize: "1rem", marginTop: "1.5rem" }}>Change password</h2>

@@ -1,7 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import { prisma } from "../lib/prisma.js";
 import { requireAuth } from "../lib/auth.js";
-import { sendMail } from "../lib/mailer.js";
+import { sendTemplatedMail } from "../lib/emailTemplates.js";
 
 export async function pmRoutes(app: FastifyInstance): Promise<void> {
   // One row per conversation partner, most recent message first. Grouped
@@ -74,11 +74,10 @@ export async function pmRoutes(app: FastifyInstance): Promise<void> {
       });
       const sender = await prisma.user.findUnique({ where: { id: req.user!.id } });
       if (other.notifyPrivateMessage && other.email) {
-        void sendMail(
-          other.email,
-          `New message from ${sender?.username ?? "someone"} on Exomusica`,
-          `${sender?.username ?? "Someone"} sent you a message:\n\n${contentRaw}\n\nReply at your Exomusica messages page.`,
-        );
+        void sendTemplatedMail("PRIVATE_MESSAGE", other.email, other.username, {
+          senderUsername: sender?.username ?? "Someone",
+          messageExcerpt: contentRaw.slice(0, 200),
+        });
       }
       return reply.code(201).send({ id: message.id, sentAt: Math.floor(message.sentAt.getTime() / 1000) });
     },
