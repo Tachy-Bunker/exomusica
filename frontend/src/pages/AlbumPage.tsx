@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { api } from "../lib/api";
 import { useAudioStore } from "../lib/audioStore";
+import { useDocumentTitle } from "../lib/useDocumentTitle";
 import type { PlayableTrackDTO } from "../lib/types";
 
 interface AlbumDetail {
@@ -27,6 +28,8 @@ export function AlbumPage() {
     if (!slug) return;
     api<AlbumDetail>(`/api/albums/${slug}`).then(setAlbum);
   }, [slug]);
+
+  useDocumentTitle(album?.title ?? "");
 
   if (!album) return <p>Loading…</p>;
 

@@ -23,7 +23,7 @@ export interface MessageDTO {
   attachmentId: number | null;
   isDeleted: boolean;
   editedAt: number | null;
-  reactions: { emojiId: number; emojiName: string; userIds: number[] }[];
+  reactions: { emojiId: number; emojiName: string; usernames: string[] }[];
   embeds: PlayableTrackDTO[];
 }
 

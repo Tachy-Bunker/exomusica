@@ -5,6 +5,7 @@ import { useAudioStore } from "../lib/audioStore";
 import type { Branch, BranchAlbum } from "../lib/types";
 import { ChannelPage } from "./ChannelPage";
 import { RootDivider } from "../components/RootDivider";
+import { useDocumentTitle } from "../lib/useDocumentTitle";
 
 export function BranchPage() {
   const { slug } = useParams<{ slug: string }>();
@@ -17,6 +18,8 @@ export function BranchPage() {
     api<Branch>(`/api/branches/${slug}`).then(setBranch);
     api<BranchAlbum[]>(`/api/branches/${slug}/albums`).then(setAlbums);
   }, [slug]);
+
+  useDocumentTitle(branch?.name ?? "");
 
   if (!branch) return <p>Loading…</p>;
 

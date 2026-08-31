@@ -1,6 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import { prisma } from "../lib/prisma.js";
 import { hashPassword, requireAdmin } from "../lib/auth.js";
+import { sendMail } from "../lib/mailer.js";
 
 interface JoinBody {
   username: string;
@@ -18,6 +19,11 @@ export async function joinRoutes(app: FastifyInstance): Promise<void> {
       return reply
         .code(400)
         .send({ error: "username, email, password, and reason are required" });
+    }
+    if (!/^[a-zA-Z0-9_.-]{3,32}$/.test(username)) {
+      return reply.code(400).send({
+        error: "username must be 3-32 characters: letters, numbers, underscore, hyphen, or period only — no spaces",
+      });
     }
     const existing = await prisma.joinRequest.findFirst({
       where: { OR: [{ username }, { email }], status: "PENDING" },
@@ -75,6 +81,11 @@ export async function joinRoutes(app: FastifyInstance): Promise<void> {
         return created;
       });
 
+      void sendMail(
+        user.email!,
+        "You're in — Exomusica",
+        `Hi ${user.username},\n\nYour Exomusica account is approved. Log in at https://exomusica.com with the username and password you signed up with.`,
+      );
       return { id: user.id, username: user.username };
     },
   );

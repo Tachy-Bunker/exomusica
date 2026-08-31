@@ -5,6 +5,9 @@ exomusica.yourdomain.tld {
 	route /ws/* {
 		reverse_proxy backend:3001
 	}
+	route /uploads/* {
+		reverse_proxy backend:3001
+	}
 	route {
 		root * /srv/frontend
 		try_files {path} /index.html

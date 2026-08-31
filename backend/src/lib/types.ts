@@ -27,6 +27,6 @@ export interface MessageDTO {
   attachments: { id: number; filename: string; url: string; sizeBytes: number }[];
   isDeleted: boolean;
   editedAt: number | null;
-  reactions: { emojiId: number; emojiName: string; userIds: number[] }[];
+  reactions: { emojiId: number; emojiName: string; usernames: string[] }[];
   embeds: PlayableTrackDTO[];
 }
