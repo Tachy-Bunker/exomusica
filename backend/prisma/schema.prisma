@@ -1,0 +1,322 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum JoinRequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum ChannelKind {
+  BRANCH
+  DISCUSSION
+}
+
+enum AudioFormat {
+  OPUS
+  MP3
+  FLAC
+  WAV
+  OGG
+  M4A
+  AAC
+}
+
+// A User row is never hard-deleted — messages must stay attributed. isGhost
+// marks an account that can't log in; ghostReason says why, since a
+// Discord-import placeholder and a real member who deleted their account
+// are both "ghosts" for attribution purposes but need different handling
+// in the admin panel (only DISCORD_IMPORT is claimable).
+enum GhostReason {
+  DISCORD_IMPORT
+  ACCOUNT_DELETED
+}
+
+model User {
+  id                    Int          @id @default(autoincrement())
+  username              String       @unique // kept forever, even for ghosts — attribution needs a name
+  email                 String?      @unique // null once a ghost: no login, no PII to leak
+  passwordHash          String?      // null for any ghost (Discord-import never had one; deleted accounts have it cleared)
+  avatarUrl             String?
+  bio                   String?
+  links                 Json?
+  isAdmin               Boolean      @default(false)
+  isGhost               Boolean      @default(false)
+  ghostReason           GhostReason?
+  claimToken            String?      @unique // only ever set for DISCORD_IMPORT ghosts
+  discordId             String?      @unique // Discord snowflake, for idempotent re-import and any future bot bridge
+  deletedAt             DateTime? // set when a real account is ghosted (self- or admin-deleted)
+  storageUsedBytes      BigInt       @default(0)
+  storageLimitBytes     BigInt       @default(68157440) // 65MB
+  notifyWeeklySummary   Boolean      @default(true)
+  notifyFollowedReplies Boolean      @default(true)
+  notifyPrivateMessage  Boolean      @default(true)
+  createdAt             DateTime     @default(now())
+
+  messages         Message[]
+  reactions        Reaction[]
+  attachments      Attachment[]
+  bookmarks        Bookmark[]
+  emojisUploaded   CustomEmoji[]
+  sentPMs          PrivateMessage[] @relation("PMSender")
+  receivedPMs      PrivateMessage[] @relation("PMRecipient")
+  followedChannels ChannelFollow[]
+  newsletterSub    NewsletterSubscription?
+  auditLogEntries  AuditLog[]
+  wikiEdits        WikiPage[]       @relation("WikiEditor")
+  blogPosts        BlogPost[]
+  reviewedJoins    JoinRequest[]    @relation("JoinReviewer")
+}
+
+model JoinRequest {
+  id           Int               @id @default(autoincrement())
+  username     String
+  email        String
+  passwordHash String
+  avatarUrl    String?
+  bio          String?
+  links        Json?
+  reason       String
+  status       JoinRequestStatus @default(PENDING)
+  reviewedById Int?
+  reviewedBy   User?             @relation("JoinReviewer", fields: [reviewedById], references: [id])
+  createdAt    DateTime          @default(now())
+}
+
+model Branch {
+  id          Int      @id @default(autoincrement())
+  slug        String   @unique
+  name        String
+  description String?
+  coverArtUrl String?
+  parentId    Int?
+  parent      Branch?  @relation("BranchTree", fields: [parentId], references: [id])
+  children    Branch[] @relation("BranchTree")
+  posX        Float? // homepage tree layout hint
+  posY        Float?
+  createdAt   DateTime @default(now())
+
+  channel ForumChannel?
+  albums  Album[]
+}
+
+model ForumChannel {
+  id        Int         @id @default(autoincrement())
+  slug      String      @unique
+  name      String
+  kind      ChannelKind
+  branchId  Int?        @unique // null for Discussion topics (not tied to a branch)
+  branch    Branch?     @relation(fields: [branchId], references: [id])
+  createdAt DateTime    @default(now())
+
+  messages Message[]
+  follows  ChannelFollow[]
+}
+
+model ChannelFollow {
+  userId    Int
+  channelId Int
+  user      User         @relation(fields: [userId], references: [id])
+  channel   ForumChannel @relation(fields: [channelId], references: [id])
+  createdAt DateTime     @default(now())
+
+  @@id([userId, channelId])
+}
+
+// id is a single global sequence shared by every forum message on the site,
+// so any message is permanently addressable as /m/<id>. See ARCHITECTURE.md
+// for the tradeoff this creates with the Discord importer.
+model Message {
+  id           Int          @id @default(autoincrement())
+  channelId    Int
+  channel      ForumChannel @relation(fields: [channelId], references: [id])
+  authorId     Int
+  author       User         @relation(fields: [authorId], references: [id])
+  createdAt    DateTime     @default(now()) // source of truth; API exposes as unix seconds
+  dayKey       DateTime     @db.Date // createdAt truncated to UTC date -> archive bucket
+  replyToId    Int?
+  replyTo      Message?     @relation("MessageReply", fields: [replyToId], references: [id])
+  replies      Message[]    @relation("MessageReply")
+  contentRaw   String       @db.Text
+  isDeleted    Boolean      @default(false)
+  editedAt     DateTime?
+  importedFrom String? // e.g. "discord:<author-id>:<timestamp>" for traceability
+
+  reactions   Reaction[]
+  bookmarks   Bookmark[]
+  attachments Attachment[]
+
+  @@index([channelId, dayKey])
+  @@index([channelId, createdAt])
+}
+
+model Reaction {
+  id        Int         @id @default(autoincrement())
+  messageId Int
+  message   Message     @relation(fields: [messageId], references: [id])
+  userId    Int
+  user      User        @relation(fields: [userId], references: [id])
+  emojiId   Int
+  emoji     CustomEmoji @relation(fields: [emojiId], references: [id])
+  createdAt DateTime    @default(now())
+
+  @@unique([messageId, userId, emojiId])
+}
+
+model CustomEmoji {
+  id              Int      @id @default(autoincrement())
+  name            String   @unique
+  imageUrl        String
+  uploadedById    Int?
+  uploadedBy      User?    @relation(fields: [uploadedById], references: [id])
+  isPaletteImport Boolean  @default(false)
+  createdAt       DateTime @default(now())
+
+  reactions Reaction[]
+}
+
+model Bookmark {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  user      User     @relation(fields: [userId], references: [id])
+  messageId Int
+  message   Message  @relation(fields: [messageId], references: [id])
+  note      String?
+  createdAt DateTime @default(now())
+
+  @@unique([userId, messageId])
+}
+
+model Attachment {
+  id          Int      @id @default(autoincrement())
+  uploaderId  Int
+  uploader    User     @relation(fields: [uploaderId], references: [id])
+  messageId   Int?
+  message     Message? @relation(fields: [messageId], references: [id])
+  filename    String
+  mimeType    String
+  sizeBytes   BigInt
+  storagePath String
+  createdAt   DateTime @default(now())
+}
+
+model Album {
+  id          Int      @id @default(autoincrement())
+  branchId    Int
+  branch      Branch   @relation(fields: [branchId], references: [id])
+  slug        String   @unique
+  title       String
+  composer    String
+  coverArtUrl String?
+  description String?  @db.Text
+  streamUrl   String?
+  downloadUrl String?
+  createdAt   DateTime @default(now())
+
+  tracks        Track[]
+  collaborators AlbumCollaborator[]
+}
+
+model Track {
+  id              Int         @id @default(autoincrement())
+  albumId         Int
+  album           Album       @relation(fields: [albumId], references: [id])
+  title           String
+  fileUrl         String
+  format          AudioFormat
+  durationSeconds Int?
+  position        Int         @default(0)
+
+  bookmarks AudioBookmark[]
+}
+
+model AudioBookmark {
+  id               Int    @id @default(autoincrement())
+  trackId          Int
+  track            Track  @relation(fields: [trackId], references: [id])
+  label            String
+  timestampSeconds Float
+}
+
+model Collaborator {
+  id         Int     @id @default(autoincrement())
+  name       String
+  role       String
+  bio        String? @db.Text
+  pictureUrl String?
+  links      Json?
+
+  albums AlbumCollaborator[]
+}
+
+model AlbumCollaborator {
+  albumId        Int
+  collaboratorId Int
+  album          Album        @relation(fields: [albumId], references: [id])
+  collaborator   Collaborator @relation(fields: [collaboratorId], references: [id])
+
+  @@id([albumId, collaboratorId])
+}
+
+model WikiPage {
+  id              Int        @id @default(autoincrement())
+  slug            String     @unique
+  parentId        Int?
+  parent          WikiPage?  @relation("WikiTree", fields: [parentId], references: [id])
+  children        WikiPage[] @relation("WikiTree")
+  title           String
+  contentMarkdown String     @db.Text
+  updatedById     Int
+  updatedBy       User       @relation("WikiEditor", fields: [updatedById], references: [id])
+  updatedAt       DateTime   @updatedAt
+}
+
+model BlogPost {
+  id              Int       @id @default(autoincrement())
+  slug            String    @unique
+  title           String
+  contentMarkdown String    @db.Text
+  coverImageUrl   String?
+  authorId        Int
+  author          User      @relation(fields: [authorId], references: [id])
+  publishedAt     DateTime?
+  createdAt       DateTime  @default(now())
+}
+
+model NewsletterSubscription {
+  id               Int      @id @default(autoincrement())
+  email            String   @unique
+  userId           Int?     @unique
+  user             User?    @relation(fields: [userId], references: [id])
+  confirmed        Boolean  @default(false)
+  unsubscribeToken String   @unique
+  createdAt        DateTime @default(now())
+}
+
+model PrivateMessage {
+  id          Int       @id @default(autoincrement())
+  senderId    Int
+  sender      User      @relation("PMSender", fields: [senderId], references: [id])
+  recipientId Int
+  recipient   User      @relation("PMRecipient", fields: [recipientId], references: [id])
+  contentRaw  String    @db.Text
+  sentAt      DateTime  @default(now())
+  readAt      DateTime?
+}
+
+model AuditLog {
+  id         Int      @id @default(autoincrement())
+  actorId    Int
+  actor      User     @relation(fields: [actorId], references: [id])
+  action     String // "message.delete", "branch.create", "join.approve", ...
+  targetType String
+  targetId   Int?
+  meta       Json?
+  createdAt  DateTime @default(now())
+}

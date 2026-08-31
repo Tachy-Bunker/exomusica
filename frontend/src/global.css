@@ -1,0 +1,468 @@
+:root {
+  /* Base */
+  --bg: #15120f; /* warm charcoal, not pure black */
+  --bg-elevated: #1e1a16;
+  --bg-inset: #0f0d0b;
+  --text: #ede7dc;
+  --text-dim: #a89d8c;
+  --border: #322b23;
+
+  /* The site has two halves — forum (talk) and music (playback) — so they
+     get two accents instead of one, used consistently as a wayfinding
+     device rather than decoration: warm = conversation, cool = audio. */
+  --accent-forum: #dda054; /* amber */
+  --accent-forum-dim: #7a5c30;
+  --accent-audio: #6bb3ac; /* seafoam */
+  --accent-audio-dim: #3a5f5b;
+  --accent-danger: #b6543f;
+
+  --font-display: "Fraunces", Georgia, serif;
+  --font-body: "Space Grotesk", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, monospace;
+
+  --radius: 10px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-body);
+  -webkit-font-smoothing: antialiased;
+}
+
+h1,
+h2,
+h3 {
+  font-family: var(--font-display);
+  font-weight: 600;
+  margin: 0 0 0.5em;
+}
+
+a {
+  color: var(--accent-forum);
+}
+
+button {
+  font-family: var(--font-body);
+  cursor: pointer;
+}
+
+.mono {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent-audio);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.001ms !important;
+    transition-duration: 0.001ms !important;
+  }
+}
+
+/* Signature divider: a single organic root-line instead of a hairline <hr>.
+   Cheap (one SVG, currentColor stroke) but it's the one recurring motif
+   tying admin screens and the public site back to "roots/branches". */
+.root-divider {
+  width: 100%;
+  height: 12px;
+  color: var(--border);
+  margin: 1.5rem 0;
+}
+
+/* --- Layout -------------------------------------------------------- */
+
+.app-shell {
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
+}
+
+.top-nav {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+  padding: 0.9rem 1.5rem;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-elevated);
+}
+
+.top-nav .brand {
+  font-family: var(--font-display);
+  font-size: 1.25rem;
+  letter-spacing: 0.02em;
+}
+
+.top-nav nav {
+  display: flex;
+  gap: 1.1rem;
+  font-size: 0.9rem;
+}
+
+.top-nav .spacer {
+  flex: 1;
+}
+
+.main-content {
+  flex: 1;
+  padding: 1.5rem;
+  padding-bottom: 6rem; /* room for the player bar */
+}
+
+/* --- Buttons & forms -------------------------------------------------- */
+
+.btn {
+  border: 1px solid var(--border);
+  background: var(--bg-inset);
+  color: var(--text);
+  border-radius: var(--radius);
+  padding: 0.5rem 0.9rem;
+  font-size: 0.9rem;
+}
+
+.btn:hover {
+  border-color: var(--accent-forum-dim);
+}
+
+.btn-primary {
+  background: var(--accent-forum-dim);
+  border-color: var(--accent-forum);
+}
+
+.btn-danger {
+  border-color: var(--accent-danger);
+  color: var(--accent-danger);
+  background: transparent;
+}
+
+input,
+textarea {
+  background: var(--bg-inset);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--text);
+  padding: 0.5rem 0.7rem;
+  font-family: var(--font-body);
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  margin-bottom: 0.9rem;
+}
+
+.field label {
+  font-size: 0.85rem;
+  color: var(--text-dim);
+}
+
+/* --- Admin -------------------------------------------------------- */
+
+.admin-layout {
+  display: grid;
+  grid-template-columns: 200px 1fr;
+  gap: 2rem;
+}
+
+.admin-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.admin-nav a {
+  color: var(--text-dim);
+  text-decoration: none;
+  padding: 0.4rem 0.6rem;
+  border-radius: var(--radius);
+}
+
+.admin-nav a.active,
+.admin-nav a:hover {
+  background: var(--bg-elevated);
+  color: var(--text);
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+
+th,
+td {
+  text-align: left;
+  padding: 0.5rem 0.6rem;
+  border-bottom: 1px solid var(--border);
+}
+
+th {
+  color: var(--text-dim);
+  font-weight: 500;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+/* --- Homepage tree -------------------------------------------------- */
+
+.tree-wrap {
+  position: relative;
+  width: 100%;
+  height: 70vh;
+  min-height: 480px;
+}
+
+.tree-core {
+  fill: var(--bg-elevated);
+  stroke: var(--border);
+}
+
+.tree-branch-path {
+  fill: none;
+  stroke: var(--border);
+  stroke-width: 2;
+}
+
+.tree-node circle {
+  fill: var(--accent-forum-dim);
+  stroke: var(--accent-forum);
+  stroke-width: 1.5;
+  transition: r 0.15s ease;
+}
+
+.tree-node:hover circle,
+.tree-node:focus circle {
+  r: 10;
+  fill: var(--accent-forum);
+}
+
+.tree-node text {
+  fill: var(--text-dim);
+  font-family: var(--font-body);
+  font-size: 11px;
+}
+
+.tree-hover-card {
+  position: absolute;
+  width: 320px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.9rem;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.4);
+  pointer-events: none;
+  z-index: 10;
+}
+
+.tree-hover-card .half {
+  padding: 0.5rem 0;
+}
+
+.tree-hover-card .half.forum {
+  border-bottom: 1px solid var(--border);
+}
+
+.tree-hover-card .half-label {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.tree-hover-card .half.forum .half-label {
+  color: var(--accent-forum);
+}
+
+.tree-hover-card .half.music .half-label {
+  color: var(--accent-audio);
+}
+
+/* --- Channel / messages -------------------------------------------------- */
+
+.message-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  max-width: 720px;
+}
+
+.message {
+  display: flex;
+  gap: 0.7rem;
+}
+
+.message .bubble {
+  background: var(--bg-elevated);
+  border-radius: var(--radius);
+  padding: 0.5rem 0.8rem;
+  flex: 1;
+}
+
+.message .meta {
+  font-size: 0.75rem;
+  color: var(--text-dim);
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 0.2rem;
+}
+
+.message .track-embed {
+  margin-top: 0.4rem;
+  border: 1px solid var(--accent-audio-dim);
+  border-radius: var(--radius);
+  padding: 0.4rem 0.6rem;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  font-size: 0.85rem;
+}
+
+.message .track-embed button {
+  background: var(--accent-audio-dim);
+  border: 1px solid var(--accent-audio);
+  border-radius: 50%;
+  width: 1.8rem;
+  height: 1.8rem;
+  color: var(--text);
+}
+
+.mention {
+  color: var(--accent-forum);
+}
+
+.emoji-inline {
+  height: 1.2em;
+  width: 1.2em;
+  vertical-align: -0.2em;
+}
+
+.emoji-picker {
+  position: absolute;
+  bottom: 100%;
+  left: 0;
+  margin-bottom: 0.4rem;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.4rem;
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  gap: 0.2rem;
+  max-width: 280px;
+  max-height: 200px;
+  overflow-y: auto;
+  z-index: 20;
+}
+
+.emoji-picker button {
+  background: transparent;
+  border: none;
+  padding: 0.2rem;
+  border-radius: 4px;
+}
+
+.emoji-picker button:hover {
+  background: var(--bg-inset);
+}
+
+.emoji-picker img {
+  width: 22px;
+  height: 22px;
+  object-fit: contain;
+}
+
+/* --- Persistent player bar -------------------------------------------------- */
+
+.player-bar {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: var(--bg-elevated);
+  border-top: 1px solid var(--accent-audio-dim);
+  z-index: 50;
+}
+
+.player-bar .collapsed {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  padding: 0.5rem 1rem;
+}
+
+.player-bar .collapsed button.play-toggle {
+  background: var(--accent-audio-dim);
+  border: 1px solid var(--accent-audio);
+  border-radius: 50%;
+  width: 2.2rem;
+  height: 2.2rem;
+  flex-shrink: 0;
+  color: var(--text);
+}
+
+.player-bar .track-info {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.player-bar .track-info .title {
+  font-size: 0.9rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.player-bar .track-info .origin {
+  font-size: 0.75rem;
+  color: var(--text-dim);
+}
+
+.player-bar .expanded {
+  padding: 0.5rem 1rem 1rem;
+  border-top: 1px solid var(--border);
+}
+
+.player-bar .seek-row {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  font-size: 0.75rem;
+}
+
+.player-bar .seek-row input[type="range"] {
+  flex: 1;
+  accent-color: var(--accent-audio);
+}
+
+.player-bar .bookmarks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-top: 0.5rem;
+}
+
+.player-bar .bookmarks button {
+  font-size: 0.75rem;
+  background: var(--bg-inset);
+  border: 1px solid var(--accent-audio-dim);
+  border-radius: 999px;
+  padding: 0.2rem 0.6rem;
+  color: var(--text-dim);
+}

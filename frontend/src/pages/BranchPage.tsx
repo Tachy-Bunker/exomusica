@@ -1,0 +1,75 @@
+import { useEffect, useState } from "react";
+import { useParams, Link } from "react-router-dom";
+import { api } from "../lib/api";
+import { useAudioStore } from "../lib/audioStore";
+import type { Branch, BranchAlbum } from "../lib/types";
+import { ChannelPage } from "./ChannelPage";
+import { RootDivider } from "../components/RootDivider";
+
+export function BranchPage() {
+  const { slug } = useParams<{ slug: string }>();
+  const [branch, setBranch] = useState<Branch | null>(null);
+  const [albums, setAlbums] = useState<BranchAlbum[]>([]);
+  const play = useAudioStore((s) => s.play);
+
+  useEffect(() => {
+    if (!slug) return;
+    api<Branch>(`/api/branches/${slug}`).then(setBranch);
+    api<BranchAlbum[]>(`/api/branches/${slug}/albums`).then(setAlbums);
+  }, [slug]);
+
+  if (!branch) return <p>Loading…</p>;
+
+  return (
+    <div>
+      <h1>{branch.name}</h1>
+      {branch.description && <p style={{ color: "var(--text-dim)", maxWidth: 640 }}>{branch.description}</p>}
+
+      <h2 style={{ fontSize: "1.1rem", color: "var(--accent-audio)" }}>Music</h2>
+      {albums.length === 0 ? (
+        <p style={{ color: "var(--text-dim)" }}>
+          No releases yet. Full album pages (streaming/download links, collaborator cards) are a Phase 3 build —
+          this shows whatever's already in the database.
+        </p>
+      ) : (
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))", gap: "1rem" }}>
+          {albums.map((a) => (
+            <div key={a.id}>
+              <Link to={`/album/${a.slug}`} style={{ display: "block", textDecoration: "none", color: "inherit" }}>
+                <div
+                  style={{
+                    aspectRatio: "1",
+                    background: a.coverArtUrl ? `url(${a.coverArtUrl}) center/cover` : "var(--bg-elevated)",
+                    borderRadius: "var(--radius)",
+                    border: "1px solid var(--border)",
+                    position: "relative",
+                  }}
+                >
+                  {a.previewTrack && (
+                    <button
+                      className="btn"
+                      style={{ position: "absolute", bottom: 8, right: 8 }}
+                      onClick={(e) => {
+                        e.preventDefault();
+                        a.previewTrack && play(a.previewTrack);
+                      }}
+                    >
+                      ▶
+                    </button>
+                  )}
+                </div>
+                <div style={{ fontSize: "0.9rem", marginTop: "0.3rem" }}>{a.title}</div>
+              </Link>
+              <div style={{ fontSize: "0.8rem", color: "var(--text-dim)" }}>{a.composer}</div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <RootDivider />
+
+      <h2 style={{ fontSize: "1.1rem", color: "var(--accent-forum)" }}>Forum</h2>
+      {branch.channel ? <ChannelPage channelSlug={branch.channel.slug} /> : <p>No topic yet.</p>}
+    </div>
+  );
+}

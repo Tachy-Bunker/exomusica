@@ -1,0 +1,13 @@
+exomusica.yourdomain.tld {
+	route /api/* {
+		reverse_proxy backend:3001
+	}
+	route /ws/* {
+		reverse_proxy backend:3001
+	}
+	route {
+		root * /srv/frontend
+		try_files {path} /index.html
+		file_server
+	}
+}
