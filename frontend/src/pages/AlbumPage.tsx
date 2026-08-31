@@ -27,6 +27,7 @@ export function AlbumPage() {
   const { slug } = useParams<{ slug: string }>();
   const [album, setAlbum] = useState<AlbumDetail | null>(null);
   const play = useAudioStore((s) => s.play);
+  const addToQueue = useAudioStore((s) => s.addToQueue);
 
   useEffect(() => {
     if (!slug) return;
@@ -81,7 +82,12 @@ export function AlbumPage() {
         </div>
       )}
 
-      <h2 style={{ fontSize: "1rem", marginTop: "1.5rem" }}>Tracks</h2>
+      <div style={{ display: "flex", alignItems: "center", gap: "0.6rem", marginTop: "1.5rem" }}>
+        <h2 style={{ fontSize: "1rem", margin: 0 }}>Tracks</h2>
+        <button className="btn" onClick={() => addToQueue(album.tracks)}>
+          Add all to queue
+        </button>
+      </div>
       <div style={{ display: "flex", flexDirection: "column", gap: "0.4rem" }}>
         {album.tracks.map((t, i) => (
           <div
@@ -97,6 +103,9 @@ export function AlbumPage() {
           >
             <button className="btn" onClick={() => play(t)}>
               ▶
+            </button>
+            <button className="btn" onClick={() => addToQueue([t])} title="Add to queue">
+              +
             </button>
             <span className="mono" style={{ color: "var(--text-dim)", fontSize: "0.8rem" }}>
               {i + 1}

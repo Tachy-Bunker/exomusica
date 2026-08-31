@@ -2,11 +2,13 @@ import { useEffect } from "react";
 import { Link, Outlet } from "react-router-dom";
 import { useAuth } from "../lib/auth";
 import { useEmojiStore } from "../lib/emojiStore";
+import { useGlobalPlayerShortcuts } from "../lib/useGlobalPlayerShortcuts";
 import { PlayerBar } from "./PlayerBar";
 
 export function Layout() {
   const { user, logout } = useAuth();
   const loadEmojis = useEmojiStore((s) => s.load);
+  useGlobalPlayerShortcuts();
 
   useEffect(() => {
     loadEmojis();

@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { api } from "../lib/api";
 import { useAudioStore } from "../lib/audioStore";
-import type { Branch, BranchAlbum } from "../lib/types";
+import type { Branch, BranchAlbum, PlayableTrackDTO } from "../lib/types";
 import { ChannelPage } from "./ChannelPage";
 import { RootDivider } from "../components/RootDivider";
 import { useDocumentTitle } from "../lib/useDocumentTitle";
@@ -12,6 +12,12 @@ export function BranchPage() {
   const [branch, setBranch] = useState<Branch | null>(null);
   const [albums, setAlbums] = useState<BranchAlbum[]>([]);
   const play = useAudioStore((s) => s.play);
+  const addToQueue = useAudioStore((s) => s.addToQueue);
+
+  async function queueAlbum(albumSlug: string) {
+    const full = await api<{ tracks: PlayableTrackDTO[] }>(`/api/albums/${albumSlug}`);
+    addToQueue(full.tracks);
+  }
 
   useEffect(() => {
     if (!slug) return;
@@ -51,7 +57,7 @@ export function BranchPage() {
                   {a.previewTrack && (
                     <button
                       className="btn"
-                      style={{ position: "absolute", bottom: 8, right: 8 }}
+                      style={{ position: "absolute", bottom: 8, right: 40 }}
                       onClick={(e) => {
                         e.preventDefault();
                         a.previewTrack && play(a.previewTrack);
@@ -60,6 +66,17 @@ export function BranchPage() {
                       ▶
                     </button>
                   )}
+                  <button
+                    className="btn"
+                    style={{ position: "absolute", bottom: 8, right: 8 }}
+                    title="Add whole album to queue"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      void queueAlbum(a.slug);
+                    }}
+                  >
+                    +
+                  </button>
                 </div>
                 <div style={{ fontSize: "0.9rem", marginTop: "0.3rem" }}>{a.title}</div>
               </Link>

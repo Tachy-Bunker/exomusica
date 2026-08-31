@@ -11,8 +11,26 @@ function formatTime(seconds: number): string {
 
 export function PlayerBar() {
   const audioRef = useRef<HTMLAudioElement>(null);
-  const { currentTrack, isPlaying, currentTime, duration, expanded, toggle, seek, setExpanded, setProgress, ended } =
-    useAudioStore();
+  const {
+    currentTrack,
+    queue,
+    history,
+    shuffle,
+    repeatMode,
+    isPlaying,
+    currentTime,
+    duration,
+    expanded,
+    toggle,
+    seek,
+    playNext,
+    playPrevious,
+    toggleShuffle,
+    cycleRepeat,
+    setExpanded,
+    setProgress,
+    ended,
+  } = useAudioStore();
 
   useEffect(() => {
     bindAudioElement(audioRef.current);
@@ -35,12 +53,14 @@ export function PlayerBar() {
       {currentTrack && (
         <>
           <div className="collapsed">
-            <button
-              className="play-toggle"
-              onClick={toggle}
-              aria-label={isPlaying ? "Pause" : "Play"}
-            >
+            <button className="btn" onClick={playPrevious} disabled={history.length === 0} title="Previous (Shift+←)">
+              ⏮
+            </button>
+            <button className="play-toggle" onClick={toggle} aria-label={isPlaying ? "Pause" : "Play"} title="Play/Pause (Space)">
               {isPlaying ? "❚❚" : "▶"}
+            </button>
+            <button className="btn" onClick={playNext} disabled={queue.length === 0} title="Next (Shift+→)">
+              ⏭
             </button>
             <div className="track-info">
               <div className="title">{currentTrack.title}</div>
@@ -49,6 +69,12 @@ export function PlayerBar() {
                 <Link to={`/album/${currentTrack.albumSlug}`}>{currentTrack.albumTitle}</Link>
               </div>
             </div>
+            <button className={`btn ${shuffle ? "btn-primary" : ""}`} onClick={toggleShuffle} title="Shuffle">
+              🔀
+            </button>
+            <button className={`btn ${repeatMode !== "off" ? "btn-primary" : ""}`} onClick={cycleRepeat} title="Repeat: off/all/one">
+              {repeatMode === "one" ? "🔂" : "🔁"}
+            </button>
             <button className="btn" onClick={() => setExpanded(!expanded)}>
               {expanded ? "Collapse" : "Expand"}
             </button>
@@ -75,6 +101,20 @@ export function PlayerBar() {
                       {b.label} · {formatTime(b.timestampSeconds)}
                     </button>
                   ))}
+                </div>
+              )}
+              {queue.length > 0 && (
+                <div style={{ marginTop: "0.6rem" }}>
+                  <div style={{ fontSize: "0.7rem", textTransform: "uppercase", color: "var(--text-dim)" }}>
+                    Up next ({queue.length})
+                  </div>
+                  <div style={{ maxHeight: 120, overflowY: "auto" }}>
+                    {queue.map((t, i) => (
+                      <div key={`${t.id}-${i}`} style={{ fontSize: "0.8rem", padding: "0.15rem 0" }}>
+                        {t.title} <span style={{ color: "var(--text-dim)" }}>— {t.albumTitle}</span>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               )}
             </div>
