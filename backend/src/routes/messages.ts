@@ -99,7 +99,9 @@ export async function messageRoutes(app: FastifyInstance): Promise<void> {
     { preHandler: requireAuth },
     async (req, reply) => {
       const { contentRaw, replyToId, attachmentIds } = req.body ?? {};
-      if (!contentRaw?.trim()) return reply.code(400).send({ error: "contentRaw is required" });
+      if (!contentRaw?.trim() && (!attachmentIds || attachmentIds.length === 0)) {
+        return reply.code(400).send({ error: "contentRaw or at least one attachment is required" });
+      }
 
       const channel = await prisma.forumChannel.findUnique({ where: { slug: req.params.slug } });
       if (!channel) return reply.code(404).send({ error: "no such channel" });

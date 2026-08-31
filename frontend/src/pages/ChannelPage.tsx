@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState, type ChangeEvent, type ClipboardEvent, type FormEvent } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useParams, useSearchParams } from "react-router-dom";
 import { api } from "../lib/api";
 import { useAuth } from "../lib/auth";
 import { useAudioStore } from "../lib/audioStore";
 import { renderMessageContent } from "../lib/formatMessage";
 import { EmojiPicker } from "../components/EmojiPicker";
+import { AttachmentPreview } from "../components/AttachmentPreview";
 import type { Emoji } from "../lib/emojiStore";
 import type { MessageDTO } from "../lib/types";
 import { useDocumentTitle } from "../lib/useDocumentTitle";
@@ -78,7 +79,17 @@ function ReactionRow({ message }: { message: MessageDTO }) {
   );
 }
 
-function MessageBody({ message, onDelete, onQuote }: { message: MessageDTO; onDelete: (id: number) => void; onQuote: (m: MessageDTO) => void }) {
+function MessageBody({
+  message,
+  onDelete,
+  onQuote,
+  onCopyLink,
+}: {
+  message: MessageDTO;
+  onDelete: (id: number) => void;
+  onQuote: (m: MessageDTO) => void;
+  onCopyLink: (m: MessageDTO) => void;
+}) {
   const { user } = useAuth();
   const play = useAudioStore((s) => s.play);
   const canModerate = user && (user.id === message.authorId || user.isAdmin);
@@ -96,20 +107,30 @@ function MessageBody({ message, onDelete, onQuote }: { message: MessageDTO; onDe
       )}
       {renderMessageContent(message.contentRaw)}
       {message.embeds.map((track) => (
-        <div className="track-embed" key={track.id}>
+        <div className="track-embed" key={track.id} onClick={(e) => e.stopPropagation()}>
           <button onClick={() => play(track)}>▶</button>
           <span>
             {track.title} — <span style={{ color: "var(--text-dim)" }}>{track.albumTitle}</span>
           </span>
         </div>
       ))}
-      <div style={{ display: "flex", gap: "0.4rem", alignItems: "center", flexWrap: "wrap" }}>
+      {message.attachments.map((a) => (
+        <AttachmentPreview key={a.id} attachment={a} />
+      ))}
+      <div
+        className="message-actions"
+        onClick={(e) => e.stopPropagation()}
+        style={{ display: "flex", gap: "0.4rem", alignItems: "center", flexWrap: "wrap" }}
+      >
         <ReactionRow message={message} />
         {user && (
           <button className="btn" style={{ padding: "0.1rem 0.45rem", fontSize: "0.75rem" }} onClick={() => onQuote(message)}>
             Quote
           </button>
         )}
+        <button className="btn" style={{ padding: "0.1rem 0.45rem", fontSize: "0.75rem" }} onClick={() => onCopyLink(message)}>
+          Copy link
+        </button>
         {canModerate && (
           <button className="btn btn-danger" style={{ padding: "0.1rem 0.45rem", fontSize: "0.75rem" }} onClick={() => onDelete(message.id)}>
             delete
@@ -121,7 +142,17 @@ function MessageBody({ message, onDelete, onQuote }: { message: MessageDTO; onDe
 }
 
 // Standard view: every message is its own bordered box with full header.
-function StandardMessage({ message, onDelete, onQuote }: { message: MessageDTO; onDelete: (id: number) => void; onQuote: (m: MessageDTO) => void }) {
+function StandardMessage({
+  message,
+  onDelete,
+  onQuote,
+  onCopyLink,
+}: {
+  message: MessageDTO;
+  onDelete: (id: number) => void;
+  onQuote: (m: MessageDTO) => void;
+  onCopyLink: (m: MessageDTO) => void;
+}) {
   return (
     <div className="message" id={`m-${message.id}`}>
       <div className="bubble">
@@ -132,7 +163,7 @@ function StandardMessage({ message, onDelete, onQuote }: { message: MessageDTO; 
           <span className="mono">{new Date(message.unixTimestamp * 1000).toLocaleString()}</span>
           {message.editedAt && <span>(edited)</span>}
         </div>
-        <MessageBody message={message} onDelete={onDelete} onQuote={onQuote} />
+        <MessageBody message={message} onDelete={onDelete} onQuote={onQuote} onCopyLink={onCopyLink} />
       </div>
     </div>
   );
@@ -140,7 +171,17 @@ function StandardMessage({ message, onDelete, onQuote }: { message: MessageDTO; 
 
 // Grouped view: one header (avatar/name/first timestamp) per consecutive
 // run from the same author, each message inside stacked without repeating it.
-function MessageGroup({ group, onDelete, onQuote }: { group: MessageDTO[]; onDelete: (id: number) => void; onQuote: (m: MessageDTO) => void }) {
+function MessageGroup({
+  group,
+  onDelete,
+  onQuote,
+  onCopyLink,
+}: {
+  group: MessageDTO[];
+  onDelete: (id: number) => void;
+  onQuote: (m: MessageDTO) => void;
+  onCopyLink: (m: MessageDTO) => void;
+}) {
   const first = group[0];
   return (
     <div className="message">
@@ -161,8 +202,8 @@ function MessageGroup({ group, onDelete, onQuote }: { group: MessageDTO[]; onDel
           <span className="mono">{new Date(first.unixTimestamp * 1000).toLocaleString()}</span>
         </div>
         {group.map((m) => (
-          <div key={m.id} id={`m-${m.id}`} style={{ marginBottom: "0.3rem" }}>
-            <MessageBody message={m} onDelete={onDelete} onQuote={onQuote} />
+          <div key={m.id} id={`m-${m.id}`}>
+            <MessageBody message={m} onDelete={onDelete} onQuote={onQuote} onCopyLink={onCopyLink} />
           </div>
         ))}
       </div>
@@ -188,6 +229,55 @@ export function ChannelPage({ channelSlug }: { channelSlug?: string } = {}) {
   const [following, setFollowing] = useState(false);
   const [channelName, setChannelName] = useState<string | null>(null);
   const [replyTarget, setReplyTarget] = useState<ReplyTarget | null>(null);
+  const [pendingAttachments, setPendingAttachments] = useState<{ id: number; filename: string }[]>([]);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [pendingScrollTo, setPendingScrollTo] = useState<number | null>(null);
+  const [searchParams] = useSearchParams();
+
+  // Landing here via a "copy link" URL (?day=YYYY-MM-DD#m-123): jump
+  // straight to that day and scroll to the message once it's loaded.
+  useEffect(() => {
+    const day = searchParams.get("day");
+    const hash = window.location.hash;
+    if (day) {
+      setSelectedDay(day);
+      setMode("day");
+    }
+    if (hash.startsWith("#m-")) {
+      setPendingScrollTo(Number(hash.slice(3)));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    if (pendingScrollTo === null) return;
+    const el = document.getElementById(`m-${pendingScrollTo}`);
+    if (el) {
+      el.scrollIntoView({ behavior: "smooth", block: "center" });
+      el.classList.add("message-highlight");
+      setTimeout(() => el.classList.remove("message-highlight"), 2000);
+      setPendingScrollTo(null);
+    }
+  }, [messages, pendingScrollTo]);
+
+  function dayKeyOf(m: MessageDTO): string {
+    return new Date(m.unixTimestamp * 1000).toISOString().slice(0, 10);
+  }
+
+  function handleCopyLink(m: MessageDTO) {
+    const today = new Date().toISOString().slice(0, 10);
+    const day = dayKeyOf(m);
+    const url = day === today
+      ? `${location.origin}/topic/${slug}#m-${m.id}`
+      : `${location.origin}/topic/${slug}?day=${day}#m-${m.id}`;
+    navigator.clipboard.writeText(url);
+  }
+
+  function jumpToMessage(m: MessageDTO) {
+    setSelectedDay(dayKeyOf(m));
+    setMode("day");
+    setPendingScrollTo(m.id);
+  }
   useDocumentTitle(channelName ?? "");
   const wsRef = useRef<WebSocket | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -248,15 +338,37 @@ export function ChannelPage({ channelSlug }: { channelSlug?: string } = {}) {
   }, [slug, mode]);
 
   async function sendMessage() {
-    if (!draft.trim() || !slug) return;
+    if ((!draft.trim() && pendingAttachments.length === 0) || !slug) return;
     const dto = await api<MessageDTO>(`/api/channels/${slug}/messages`, {
       method: "POST",
-      body: JSON.stringify({ contentRaw: draft, replyToId: replyTarget?.id }),
+      body: JSON.stringify({
+        contentRaw: draft,
+        replyToId: replyTarget?.id,
+        attachmentIds: pendingAttachments.map((a) => a.id),
+      }),
     });
     setMessages((prev) => upsertMessage(prev, dto)); // in case the WS event is delayed/missed
     setDraft("");
     setEmojiQuery(null);
     setReplyTarget(null);
+    setPendingAttachments([]);
+  }
+
+  async function handleFileSelect(e: ChangeEvent<HTMLInputElement>) {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+    const formData = new FormData();
+    for (const f of files) formData.append("files", f);
+    const result = await api<{ created: { id: number; filename: string }[] }>("/api/attachments", {
+      method: "POST",
+      body: formData,
+    });
+    setPendingAttachments((prev) => [...prev, ...result.created]);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  }
+
+  function removePendingAttachment(id: number) {
+    setPendingAttachments((prev) => prev.filter((a) => a.id !== id));
   }
 
   function handleSend(e: FormEvent) {
@@ -372,11 +484,19 @@ export function ChannelPage({ channelSlug }: { channelSlug?: string } = {}) {
 
       <div className="message-list">
         {messages.length === 0 && <p style={{ color: "var(--text-dim)" }}>Nothing here yet.</p>}
-        {displayMode === "standard"
-          ? messages.map((m) => <StandardMessage key={m.id} message={m} onDelete={handleDelete} onQuote={handleQuote} />)
-          : groupMessages(messages).map((g) => (
-              <MessageGroup key={g[0].id} group={g} onDelete={handleDelete} onQuote={handleQuote} />
-            ))}
+        {mode === "search" ? (
+          messages.map((m) => (
+            <div key={m.id} style={{ cursor: "pointer" }} onClick={() => jumpToMessage(m)} title="Jump to this message">
+              <StandardMessage message={m} onDelete={handleDelete} onQuote={handleQuote} onCopyLink={handleCopyLink} />
+            </div>
+          ))
+        ) : displayMode === "standard" ? (
+          messages.map((m) => <StandardMessage key={m.id} message={m} onDelete={handleDelete} onQuote={handleQuote} onCopyLink={handleCopyLink} />)
+        ) : (
+          groupMessages(messages).map((g) => (
+            <MessageGroup key={g[0].id} group={g} onDelete={handleDelete} onQuote={handleQuote} onCopyLink={handleCopyLink} />
+          ))
+        )}
       </div>
 
       {user && mode === "live" && (
@@ -389,8 +509,24 @@ export function ChannelPage({ channelSlug }: { channelSlug?: string } = {}) {
               </button>
             </div>
           )}
+          {pendingAttachments.length > 0 && (
+            <div style={{ display: "flex", gap: "0.4rem", flexWrap: "wrap" }}>
+              {pendingAttachments.map((a) => (
+                <span key={a.id} className="btn" style={{ fontSize: "0.75rem", padding: "0.1rem 0.4rem" }}>
+                  📎 {a.filename}{" "}
+                  <button type="button" onClick={() => removePendingAttachment(a.id)} style={{ background: "none", border: "none", cursor: "pointer" }}>
+                    ×
+                  </button>
+                </span>
+              ))}
+            </div>
+          )}
           <div style={{ display: "flex", gap: "0.5rem", position: "relative" }}>
             {emojiQuery !== null && <EmojiPicker filter={emojiQuery} onSelect={insertEmoji} />}
+            <input ref={fileInputRef} type="file" multiple onChange={handleFileSelect} style={{ display: "none" }} />
+            <button type="button" className="btn" onClick={() => fileInputRef.current?.click()} title="Attach a file">
+              📎
+            </button>
             <textarea
               ref={textareaRef}
               value={draft}

@@ -99,6 +99,7 @@ model Branch {
   name        String
   description String?
   coverArtUrl String?
+  hidden      Boolean  @default(false) // soft take-down: excluded from public listings, data untouched
   parentId    Int?
   parent      Branch?  @relation("BranchTree", fields: [parentId], references: [id])
   children    Branch[] @relation("BranchTree")
@@ -116,7 +117,7 @@ model ForumChannel {
   name      String
   kind      ChannelKind
   branchId  Int?        @unique // null for Discussion topics (not tied to a branch)
-  branch    Branch?     @relation(fields: [branchId], references: [id])
+  branch    Branch?     @relation(fields: [branchId], references: [id], onDelete: Cascade)
   createdAt DateTime    @default(now())
 
   messages Message[]
@@ -127,7 +128,7 @@ model ChannelFollow {
   userId       Int
   channelId    Int
   user         User         @relation(fields: [userId], references: [id])
-  channel      ForumChannel @relation(fields: [channelId], references: [id])
+  channel      ForumChannel @relation(fields: [channelId], references: [id], onDelete: Cascade)
   notifyOnReply Boolean     @default(true) // per-topic override under the global notifyFollowedReplies toggle
   createdAt    DateTime     @default(now())
 
@@ -140,7 +141,7 @@ model ChannelFollow {
 model Message {
   id           Int          @id @default(autoincrement())
   channelId    Int
-  channel      ForumChannel @relation(fields: [channelId], references: [id])
+  channel      ForumChannel @relation(fields: [channelId], references: [id], onDelete: Cascade)
   authorId     Int
   author       User         @relation(fields: [authorId], references: [id])
   createdAt    DateTime     @default(now()) // source of truth; API exposes as unix seconds
@@ -164,7 +165,7 @@ model Message {
 model Reaction {
   id        Int         @id @default(autoincrement())
   messageId Int
-  message   Message     @relation(fields: [messageId], references: [id])
+  message   Message     @relation(fields: [messageId], references: [id], onDelete: Cascade)
   userId    Int
   user      User        @relation(fields: [userId], references: [id])
   emojiId   Int
@@ -191,7 +192,7 @@ model Bookmark {
   userId    Int
   user      User     @relation(fields: [userId], references: [id])
   messageId Int
-  message   Message  @relation(fields: [messageId], references: [id])
+  message   Message  @relation(fields: [messageId], references: [id], onDelete: Cascade)
   note      String?
   createdAt DateTime @default(now())
 
@@ -199,22 +200,24 @@ model Bookmark {
 }
 
 model Attachment {
-  id          Int      @id @default(autoincrement())
-  uploaderId  Int
-  uploader    User     @relation(fields: [uploaderId], references: [id])
-  messageId   Int?
-  message     Message? @relation(fields: [messageId], references: [id])
-  filename    String
-  mimeType    String
-  sizeBytes   BigInt
-  storagePath String
-  createdAt   DateTime @default(now())
+  id               Int             @id @default(autoincrement())
+  uploaderId       Int
+  uploader         User            @relation(fields: [uploaderId], references: [id])
+  messageId        Int?
+  message          Message?        @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  privateMessageId Int?
+  privateMessage   PrivateMessage? @relation(fields: [privateMessageId], references: [id], onDelete: Cascade)
+  filename         String
+  mimeType         String
+  sizeBytes        BigInt
+  storagePath      String
+  createdAt        DateTime        @default(now())
 }
 
 model Album {
   id          Int      @id @default(autoincrement())
   branchId    Int
-  branch      Branch   @relation(fields: [branchId], references: [id])
+  branch      Branch   @relation(fields: [branchId], references: [id], onDelete: Cascade)
   slug        String   @unique
   title       String
   composer    String // default/primary composer shown on the album as a whole
@@ -233,7 +236,7 @@ model Album {
 model AlbumLink {
   id       Int    @id @default(autoincrement())
   albumId  Int
-  album    Album  @relation(fields: [albumId], references: [id])
+  album    Album  @relation(fields: [albumId], references: [id], onDelete: Cascade)
   label    String
   url      String
   position Int    @default(0)
@@ -242,7 +245,7 @@ model AlbumLink {
 model AlbumGalleryImage {
   id       Int    @id @default(autoincrement())
   albumId  Int
-  album    Album  @relation(fields: [albumId], references: [id])
+  album    Album  @relation(fields: [albumId], references: [id], onDelete: Cascade)
   url      String
   position Int    @default(0)
 }
@@ -250,7 +253,7 @@ model AlbumGalleryImage {
 model Track {
   id              Int         @id @default(autoincrement())
   albumId         Int
-  album           Album       @relation(fields: [albumId], references: [id])
+  album           Album       @relation(fields: [albumId], references: [id], onDelete: Cascade)
   title           String
   fileUrl         String
   format          AudioFormat
@@ -267,7 +270,7 @@ model Track {
 model TrackCollaborator {
   trackId        Int
   collaboratorId Int
-  track          Track        @relation(fields: [trackId], references: [id])
+  track          Track        @relation(fields: [trackId], references: [id], onDelete: Cascade)
   collaborator   Collaborator @relation(fields: [collaboratorId], references: [id])
 
   @@id([trackId, collaboratorId])
@@ -276,7 +279,7 @@ model TrackCollaborator {
 model AudioBookmark {
   id               Int    @id @default(autoincrement())
   trackId          Int
-  track            Track  @relation(fields: [trackId], references: [id])
+  track            Track  @relation(fields: [trackId], references: [id], onDelete: Cascade)
   label            String
   timestampSeconds Float
 }
@@ -321,7 +324,7 @@ model Collaborator {
 model AlbumCollaborator {
   albumId        Int
   collaboratorId Int
-  album          Album        @relation(fields: [albumId], references: [id])
+  album          Album        @relation(fields: [albumId], references: [id], onDelete: Cascade)
   collaborator   Collaborator @relation(fields: [collaboratorId], references: [id])
 
   @@id([albumId, collaboratorId])
@@ -371,6 +374,8 @@ model PrivateMessage {
   contentRaw  String    @db.Text
   sentAt      DateTime  @default(now())
   readAt      DateTime?
+
+  attachments Attachment[]
 }
 
 enum EmailType {

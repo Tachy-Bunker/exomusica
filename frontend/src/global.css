@@ -342,6 +342,30 @@ th {
   color: var(--text);
 }
 
+@media (hover: hover) {
+  .message-actions {
+    opacity: 0;
+    transition: opacity 0.1s ease;
+  }
+  .message:hover .message-actions,
+  .message:focus-within .message-actions {
+    opacity: 1;
+  }
+}
+
+.message-highlight {
+  animation: message-flash 2s ease;
+}
+
+@keyframes message-flash {
+  0% {
+    background: var(--accent-audio-dim);
+  }
+  100% {
+    background: transparent;
+  }
+}
+
 .mention {
   color: var(--accent-forum);
 }

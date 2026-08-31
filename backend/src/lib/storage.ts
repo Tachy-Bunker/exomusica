@@ -116,4 +116,33 @@ export async function saveSiteImage(
   return { url: `/uploads/${subfolder}/${diskName}` };
 }
 
+const ALLOWED_MEDIA_TYPES: Record<string, string> = {
+  "image/png": ".png",
+  "image/jpeg": ".jpg",
+  "image/webp": ".webp",
+  "image/gif": ".gif",
+  "audio/mpeg": ".mp3",
+  "audio/wav": ".wav",
+  "audio/ogg": ".ogg",
+  "audio/flac": ".flac",
+  "video/mp4": ".mp4",
+  "video/webm": ".webm",
+  "text/plain": ".txt",
+};
+
+/** General-purpose media upload for embedding in wiki pages, blog posts,
+ *  and anywhere else that isn't a forum message attachment or an
+ *  album/emoji/about image specifically. No user quota — admin-only. */
+export async function saveMediaFile(filename: string, mimeType: string, buffer: Buffer): Promise<{ url: string; mimeType: string }> {
+  const ext = ALLOWED_MEDIA_TYPES[mimeType] ?? path.extname(filename).toLowerCase();
+  if (!ext) {
+    throw new Error(`unsupported file type "${mimeType}"`);
+  }
+  const dir = path.join(UPLOADS_DIR, "media");
+  await mkdir(dir, { recursive: true });
+  const diskName = `${randomUUID()}${ext}`;
+  await writeFile(path.join(dir, diskName), buffer);
+  return { url: `/uploads/media/${diskName}`, mimeType };
+}
+
 export { UPLOADS_DIR };

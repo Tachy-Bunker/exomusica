@@ -21,7 +21,7 @@ export interface MessageDTO {
   replyToId: number | null;
   replyPreview: { id: number; authorUsername: string; excerpt: string } | null;
   contentRaw: string;
-  attachmentId: number | null;
+  attachments: { id: number; filename: string; url: string; sizeBytes: number }[];
   isDeleted: boolean;
   editedAt: number | null;
   reactions: { emojiId: number; emojiName: string; usernames: string[] }[];
@@ -34,6 +34,7 @@ export interface Branch {
   name: string;
   description: string | null;
   coverArtUrl: string | null;
+  hidden?: boolean; // only present on the admin listing, not the public one
   parentId: number | null;
   posX: number | null;
   posY: number | null;

@@ -1,5 +1,12 @@
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type ChangeEvent, type FormEvent } from "react";
 import { api, ApiError } from "../../lib/api";
+
+function snippetFor(mimeType: string, url: string, filename: string): string {
+  if (mimeType.startsWith("image/")) return `![${filename}](${url})`;
+  if (mimeType.startsWith("audio/")) return `@audio(${url})`;
+  if (mimeType.startsWith("video/")) return `@video(${url})`;
+  return `@file(${url})[${filename}]`;
+}
 
 interface PostSummary {
   id: number;
@@ -12,6 +19,26 @@ export function BlogAdminPage() {
   const [posts, setPosts] = useState<PostSummary[]>([]);
   const [form, setForm] = useState({ slug: "", title: "", contentMarkdown: "", publish: true });
   const [error, setError] = useState<string | null>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  async function handleMediaUpload(e: ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const formData = new FormData();
+    formData.append("file", file);
+    const result = await api<{ url: string; mimeType: string; filename: string }>("/api/admin/media", {
+      method: "POST",
+      body: formData,
+    });
+    const snippet = snippetFor(result.mimeType, result.url, result.filename);
+    const pos = textareaRef.current?.selectionStart ?? form.contentMarkdown.length;
+    setForm((f) => ({
+      ...f,
+      contentMarkdown: `${f.contentMarkdown.slice(0, pos)}\n${snippet}\n${f.contentMarkdown.slice(pos)}`,
+    }));
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  }
 
   function load() {
     api<PostSummary[]>("/api/admin/blog").then(setPosts);
@@ -52,7 +79,12 @@ export function BlogAdminPage() {
           <input placeholder="title" required value={form.title} onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))} />
         </div>
         <div className="field">
+          <div style={{ display: "flex", gap: "0.5rem", marginBottom: "0.3rem" }}>
+            <input ref={fileInputRef} type="file" onChange={handleMediaUpload} style={{ fontSize: "0.75rem" }} />
+            <span style={{ fontSize: "0.75rem", color: "var(--text-dim)" }}>Inserts the right embed snippet at your cursor.</span>
+          </div>
           <textarea
+            ref={textareaRef}
             placeholder="Markdown content…"
             rows={6}
             required

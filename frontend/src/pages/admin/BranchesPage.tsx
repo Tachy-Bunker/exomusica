@@ -6,9 +6,11 @@ export function BranchesPage() {
   const [branches, setBranches] = useState<Branch[]>([]);
   const [form, setForm] = useState({ slug: "", name: "", description: "", parentId: "" });
   const [error, setError] = useState<string | null>(null);
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [editForm, setEditForm] = useState({ name: "", description: "" });
 
   function load() {
-    api<Branch[]>("/api/branches").then(setBranches);
+    api<Branch[]>("/api/admin/branches").then(setBranches);
   }
 
   useEffect(load, []);
@@ -31,6 +33,34 @@ export function BranchesPage() {
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Something went wrong");
     }
+  }
+
+  function startEdit(b: Branch) {
+    setEditingId(b.id);
+    setEditForm({ name: b.name, description: b.description ?? "" });
+  }
+
+  async function saveEdit(id: number) {
+    await api(`/api/admin/branches/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify({ name: editForm.name, description: editForm.description }),
+    });
+    setEditingId(null);
+    load();
+  }
+
+  async function toggleHidden(b: Branch) {
+    await api(`/api/admin/branches/${b.id}`, { method: "PATCH", body: JSON.stringify({ hidden: !b.hidden }) });
+    load();
+  }
+
+  async function handleDelete(b: Branch) {
+    const confirmed = confirm(
+      `Permanently delete "${b.name}"? This removes its forum topic, every message in it, every album and track, and can't be undone. Consider hiding it instead if you're not sure.`,
+    );
+    if (!confirmed) return;
+    await api(`/api/admin/branches/${b.id}`, { method: "DELETE" });
+    load();
   }
 
   return (
@@ -93,14 +123,54 @@ export function BranchesPage() {
             <th>Name</th>
             <th>Slug</th>
             <th>Topic</th>
+            <th>Status</th>
+            <th></th>
           </tr>
         </thead>
         <tbody>
           {branches.map((b) => (
             <tr key={b.id}>
-              <td>{b.name}</td>
-              <td className="mono">{b.slug}</td>
+              {editingId === b.id ? (
+                <td colSpan={2}>
+                  <input value={editForm.name} onChange={(e) => setEditForm((f) => ({ ...f, name: e.target.value }))} style={{ marginBottom: "0.2rem" }} />
+                  <textarea
+                    rows={2}
+                    value={editForm.description}
+                    onChange={(e) => setEditForm((f) => ({ ...f, description: e.target.value }))}
+                  />
+                </td>
+              ) : (
+                <>
+                  <td>{b.name}</td>
+                  <td className="mono">{b.slug}</td>
+                </>
+              )}
               <td className="mono">{b.channel?.slug ?? "—"}</td>
+              <td>{b.hidden ? "hidden" : "visible"}</td>
+              <td style={{ whiteSpace: "nowrap" }}>
+                {editingId === b.id ? (
+                  <>
+                    <button className="btn btn-primary" onClick={() => saveEdit(b.id)}>
+                      Save
+                    </button>{" "}
+                    <button className="btn" onClick={() => setEditingId(null)}>
+                      Cancel
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <button className="btn" onClick={() => startEdit(b)}>
+                      Edit
+                    </button>{" "}
+                    <button className="btn" onClick={() => toggleHidden(b)}>
+                      {b.hidden ? "Unhide" : "Hide"}
+                    </button>{" "}
+                    <button className="btn btn-danger" onClick={() => handleDelete(b)}>
+                      Delete
+                    </button>
+                  </>
+                )}
+              </td>
             </tr>
           ))}
         </tbody>

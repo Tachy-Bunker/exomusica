@@ -24,6 +24,14 @@ function renderInline(text: string): ReactNode[] {
   return nodes;
 }
 
+// Embeds are block-level — each must be alone on its own line. Images use
+// standard markdown syntax; audio/video/generic-file have no standard
+// markdown equivalent, so they get simple custom tags instead.
+const IMAGE_LINE = /^!\[(.*?)\]\((\S+)\)$/;
+const AUDIO_LINE = /^@audio\((\S+)\)$/;
+const VIDEO_LINE = /^@video\((\S+)\)$/;
+const FILE_LINE = /^@file\((\S+)\)(?:\[(.*?)\])?$/;
+
 export function renderMarkdown(markdown: string): ReactNode {
   const lines = markdown.split("\n");
   const blocks: ReactNode[] = [];
@@ -43,6 +51,11 @@ export function renderMarkdown(markdown: string): ReactNode {
   }
 
   for (const line of lines) {
+    const image = line.match(IMAGE_LINE);
+    const audio = line.match(AUDIO_LINE);
+    const video = line.match(VIDEO_LINE);
+    const file = line.match(FILE_LINE);
+
     if (line.startsWith("# ")) {
       flushList();
       blocks.push(<h1 key={key++}>{renderInline(line.slice(2))}</h1>);
@@ -54,6 +67,23 @@ export function renderMarkdown(markdown: string): ReactNode {
       blocks.push(<h3 key={key++}>{renderInline(line.slice(4))}</h3>);
     } else if (line.startsWith("- ")) {
       listBuffer.push(line.slice(2));
+    } else if (image) {
+      flushList();
+      blocks.push(<img key={key++} src={image[2]} alt={image[1]} style={{ maxWidth: "100%", borderRadius: "var(--radius)" }} />);
+    } else if (audio) {
+      flushList();
+      blocks.push(<audio key={key++} controls src={audio[1]} style={{ display: "block", maxWidth: 400 }} />);
+    } else if (video) {
+      flushList();
+      blocks.push(<video key={key++} controls src={video[1]} style={{ display: "block", maxWidth: 480, borderRadius: "var(--radius)" }} />);
+    } else if (file) {
+      flushList();
+      const [, url, label] = file;
+      blocks.push(
+        <a key={key++} className="btn" href={url} target="_blank" rel="noreferrer" style={{ display: "inline-block", textDecoration: "none" }}>
+          📎 {label || url}
+        </a>,
+      );
     } else if (line.trim() === "") {
       flushList();
     } else {

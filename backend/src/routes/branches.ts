@@ -16,6 +16,7 @@ interface CreateBranchBody {
 export async function branchRoutes(app: FastifyInstance): Promise<void> {
   app.get("/api/branches", async () => {
     return prisma.branch.findMany({
+      where: { hidden: false },
       select: {
         id: true,
         slug: true,
@@ -27,6 +28,14 @@ export async function branchRoutes(app: FastifyInstance): Promise<void> {
         posY: true,
         channel: { select: { slug: true } },
       },
+      orderBy: { id: "asc" },
+    });
+  });
+
+  // Admin sees everything, hidden included — needed to ever unhide something.
+  app.get("/api/admin/branches", { preHandler: requireAdmin }, async () => {
+    return prisma.branch.findMany({
+      include: { channel: { select: { slug: true } } },
       orderBy: { id: "asc" },
     });
   });
@@ -95,4 +104,33 @@ export async function branchRoutes(app: FastifyInstance): Promise<void> {
       return reply.code(201).send(branch);
     },
   );
+
+  app.patch<{
+    Params: { id: string };
+    Body: Partial<{ name: string; description: string; coverArtUrl: string; hidden: boolean; posX: number; posY: number }>;
+  }>("/api/admin/branches/:id", { preHandler: requireAdmin }, async (req) => {
+    const branch = await prisma.branch.update({ where: { id: Number(req.params.id) }, data: req.body ?? {} });
+    await prisma.auditLog.create({
+      data: { actorId: req.user!.id, action: "branch.update", targetType: "Branch", targetId: branch.id, meta: req.body },
+    });
+    return branch;
+  });
+
+  // Cascades to its ForumChannel, every message in it (and their
+  // reactions/bookmarks/attachment rows), every album (tracks, links,
+  // gallery, collaborator links), and channel-follows — all handled at the
+  // database level via onDelete: Cascade, not hand-rolled deletion order
+  // here. Uploaded files on disk are not cleaned up by this — the DB rows
+  // referencing them are gone, but the files themselves stay in uploads/
+  // until removed manually. Irreversible; "hidden" is the reversible option.
+  app.delete<{ Params: { id: string } }>("/api/admin/branches/:id", { preHandler: requireAdmin }, async (req, reply) => {
+    const id = Number(req.params.id);
+    const branch = await prisma.branch.findUnique({ where: { id } });
+    if (!branch) return reply.code(404).send({ error: "no such branch" });
+    await prisma.branch.delete({ where: { id } });
+    await prisma.auditLog.create({
+      data: { actorId: req.user!.id, action: "branch.delete", targetType: "Branch", targetId: id, meta: { slug: branch.slug } },
+    });
+    return reply.code(204).send();
+  });
 }
