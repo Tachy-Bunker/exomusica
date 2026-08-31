@@ -34,6 +34,9 @@ export function AdminLayout() {
         <NavLink to="/admin/audit-log" className={({ isActive }) => (isActive ? "active" : "")}>
           Action log
         </NavLink>
+        <NavLink to="/admin/about" className={({ isActive }) => (isActive ? "active" : "")}>
+          About page
+        </NavLink>
       </nav>
       <div>
         <Outlet />

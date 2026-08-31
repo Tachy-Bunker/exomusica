@@ -92,9 +92,15 @@ const ALLOWED_IMAGE_TYPES: Record<string, string> = {
   "image/gif": ".gif",
 };
 
-/** Saves a cover-art or gallery image for an album. No user quota applies —
- *  these are admin-only site assets, same reasoning as emoji images. */
-export async function saveAlbumImage(filename: string, mimeType: string, buffer: Buffer): Promise<{ url: string }> {
+/** Saves a general site image (album cover/gallery, About-page entries).
+ *  No user quota applies — these are admin-only site assets, same
+ *  reasoning as emoji images. `subfolder` just keeps uploads/ organized. */
+export async function saveSiteImage(
+  filename: string,
+  mimeType: string,
+  buffer: Buffer,
+  subfolder: "albums" | "about",
+): Promise<{ url: string }> {
   const ext =
     ALLOWED_IMAGE_TYPES[mimeType] ??
     ([".png", ".jpg", ".jpeg", ".webp", ".gif"].includes(path.extname(filename).toLowerCase())
@@ -103,11 +109,11 @@ export async function saveAlbumImage(filename: string, mimeType: string, buffer:
   if (!ext) {
     throw new Error(`unsupported image type "${mimeType}" — PNG, JPEG, WebP, or GIF only`);
   }
-  const dir = path.join(UPLOADS_DIR, "albums");
+  const dir = path.join(UPLOADS_DIR, subfolder);
   await mkdir(dir, { recursive: true });
   const diskName = `${randomUUID()}${ext}`;
   await writeFile(path.join(dir, diskName), buffer);
-  return { url: `/uploads/albums/${diskName}` };
+  return { url: `/uploads/${subfolder}/${diskName}` };
 }
 
 export { UPLOADS_DIR };

@@ -26,6 +26,7 @@ import { BlogAdminPage } from "./pages/admin/BlogAdminPage";
 import { EmojiAdminPage } from "./pages/admin/EmojiAdminPage";
 import { EmailTemplatesAdminPage } from "./pages/admin/EmailTemplatesAdminPage";
 import { AuditLogAdminPage } from "./pages/admin/AuditLogAdminPage";
+import { AboutAdminPage } from "./pages/admin/AboutAdminPage";
 
 export default function App() {
   return (
@@ -63,6 +64,7 @@ export default function App() {
                 <Route path="emoji" element={<EmojiAdminPage />} />
                 <Route path="email-templates" element={<EmailTemplatesAdminPage />} />
                 <Route path="audit-log" element={<AuditLogAdminPage />} />
+                <Route path="about" element={<AboutAdminPage />} />
               </Route>
             </Route>
           </Route>

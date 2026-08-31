@@ -281,6 +281,30 @@ model AudioBookmark {
   timestampSeconds Float
 }
 
+enum AboutFeatureKind {
+  COLLABORATOR
+  AWARD
+  CUSTOM
+}
+
+// One ordered, admin-curated list powers the About page. A COLLABORATOR
+// entry points at a Collaborator but carries its own description/image
+// (independent of that collaborator's bio/pictureUrl used elsewhere, e.g.
+// album credits) — the About page description doesn't have to match what
+// shows on an album. AWARD and CUSTOM need no collaborator at all; this is
+// the "awards, images with a description" extensibility asked for without
+// another schema change when that's actually built.
+model AboutFeature {
+  id             Int              @id @default(autoincrement())
+  kind           AboutFeatureKind @default(COLLABORATOR)
+  collaboratorId Int?
+  collaborator   Collaborator?    @relation(fields: [collaboratorId], references: [id])
+  title          String? // required for AWARD/CUSTOM; optional override for COLLABORATOR
+  description    String?          @db.Text
+  imageUrl       String?
+  position       Int              @default(0)
+}
+
 model Collaborator {
   id         Int     @id @default(autoincrement())
   name       String
@@ -291,6 +315,7 @@ model Collaborator {
 
   albums AlbumCollaborator[]
   tracks TrackCollaborator[]
+  aboutFeatures AboutFeature[]
 }
 
 model AlbumCollaborator {

@@ -84,6 +84,13 @@ async function main() {
     update: {},
   });
 
+  const hasAboutFeature = await prisma.aboutFeature.findFirst({ where: { collaboratorId: collaborator.id } });
+  if (!hasAboutFeature) {
+    await prisma.aboutFeature.create({
+      data: { kind: "COLLABORATOR", collaboratorId: collaborator.id, position: 0 },
+    });
+  }
+
   // --- Discussion topic with a couple of sample messages --------------------
   const discussion = await prisma.forumChannel.upsert({
     where: { slug: "art-you-like" },

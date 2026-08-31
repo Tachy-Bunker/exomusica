@@ -2,7 +2,7 @@ import type { FastifyInstance } from "fastify";
 import { prisma } from "../lib/prisma.js";
 import { requireAdmin } from "../lib/auth.js";
 import { trackToDTO } from "../lib/embeds.js";
-import { saveAlbumImage } from "../lib/storage.js";
+import { saveSiteImage } from "../lib/storage.js";
 
 export async function albumRoutes(app: FastifyInstance): Promise<void> {
   app.get<{ Params: { slug: string } }>("/api/albums/:slug", async (req, reply) => {
@@ -74,7 +74,7 @@ export async function albumRoutes(app: FastifyInstance): Promise<void> {
       const file = await req.file();
       if (!file) return reply.code(400).send({ error: "no file uploaded" });
       const buffer = await file.toBuffer();
-      const { url } = await saveAlbumImage(file.filename, file.mimetype, buffer);
+      const { url } = await saveSiteImage(file.filename, file.mimetype, buffer, "albums");
       const album = await prisma.album.update({ where: { id: Number(req.params.id) }, data: { coverArtUrl: url } });
       return { coverArtUrl: album.coverArtUrl };
     },
@@ -89,7 +89,7 @@ export async function albumRoutes(app: FastifyInstance): Promise<void> {
       let position = await prisma.albumGalleryImage.count({ where: { albumId } });
       for await (const file of req.files()) {
         const buffer = await file.toBuffer();
-        const { url } = await saveAlbumImage(file.filename, file.mimetype, buffer);
+        const { url } = await saveSiteImage(file.filename, file.mimetype, buffer, "albums");
         created.push(await prisma.albumGalleryImage.create({ data: { albumId, url, position: position++ } }));
       }
       if (created.length === 0) return reply.code(400).send({ error: "no files uploaded" });

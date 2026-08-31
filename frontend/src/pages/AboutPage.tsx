@@ -1,19 +1,22 @@
 import { useEffect, useState } from "react";
 import { api } from "../lib/api";
+import { useDocumentTitle } from "../lib/useDocumentTitle";
 
-interface Collaborator {
+interface Feature {
   id: number;
-  name: string;
-  role: string;
-  bio: string | null;
-  pictureUrl: string | null;
+  kind: "COLLABORATOR" | "AWARD" | "CUSTOM";
+  title: string | null;
+  description: string | null;
+  imageUrl: string | null;
+  collaborator: { name: string; role: string; bio: string | null; pictureUrl: string | null } | null;
 }
 
 export function AboutPage() {
-  const [collaborators, setCollaborators] = useState<Collaborator[]>([]);
+  useDocumentTitle("About");
+  const [features, setFeatures] = useState<Feature[]>([]);
 
   useEffect(() => {
-    api<Collaborator[]>("/api/collaborators").then(setCollaborators);
+    api<Feature[]>("/api/about-features").then(setFeatures);
   }, []);
 
   return (
@@ -24,24 +27,30 @@ export function AboutPage() {
         their own space to talk and to release work.
       </p>
 
-      <h2 style={{ fontSize: "1.1rem" }}>Collaborators</h2>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: "1rem" }}>
-        {collaborators.map((c) => (
-          <div key={c.id} className="btn" style={{ cursor: "default", textAlign: "left" }}>
-            <div
-              style={{
-                width: 48,
-                height: 48,
-                borderRadius: "50%",
-                background: c.pictureUrl ? `url(${c.pictureUrl}) center/cover` : "var(--bg-inset)",
-                marginBottom: "0.5rem",
-              }}
-            />
-            <div style={{ fontFamily: "var(--font-display)" }}>{c.name}</div>
-            <div style={{ fontSize: "0.8rem", color: "var(--accent-forum)" }}>{c.role}</div>
-            {c.bio && <p style={{ fontSize: "0.85rem", marginTop: "0.4rem" }}>{c.bio}</p>}
-          </div>
-        ))}
+        {features.map((f) => {
+          const name = f.kind === "COLLABORATOR" ? f.title ?? f.collaborator?.name : f.title;
+          const image = f.imageUrl ?? f.collaborator?.pictureUrl;
+          const description = f.description ?? f.collaborator?.bio;
+          return (
+            <div key={f.id} className="btn" style={{ cursor: "default", textAlign: "left" }}>
+              <div
+                style={{
+                  width: 48,
+                  height: 48,
+                  borderRadius: f.kind === "COLLABORATOR" ? "50%" : "var(--radius)",
+                  background: image ? `url(${image}) center/cover` : "var(--bg-inset)",
+                  marginBottom: "0.5rem",
+                }}
+              />
+              <div style={{ fontFamily: "var(--font-display)" }}>{name}</div>
+              {f.kind === "COLLABORATOR" && f.collaborator && (
+                <div style={{ fontSize: "0.8rem", color: "var(--accent-forum)" }}>{f.collaborator.role}</div>
+              )}
+              {description && <p style={{ fontSize: "0.85rem", marginTop: "0.4rem" }}>{description}</p>}
+            </div>
+          );
+        })}
       </div>
     </div>
   );
