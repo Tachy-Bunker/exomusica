@@ -8,6 +8,7 @@ const messageInclude = {
   author: { select: { username: true, avatarUrl: true } },
   reactions: { include: { emoji: true, user: { select: { username: true } } } },
   attachments: true,
+  replyTo: { select: { id: true, contentRaw: true, author: { select: { username: true } } } },
 } as const;
 
 async function broadcastUpdatedMessage(messageId: number) {

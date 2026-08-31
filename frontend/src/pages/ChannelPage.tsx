@@ -10,6 +10,13 @@ import type { MessageDTO } from "../lib/types";
 import { useDocumentTitle } from "../lib/useDocumentTitle";
 
 type ViewMode = "live" | "day" | "search";
+type DisplayMode = "standard" | "grouped";
+
+interface ReplyTarget {
+  id: number;
+  authorUsername: string;
+  excerpt: string;
+}
 
 function upsertMessage(list: MessageDTO[], msg: MessageDTO): MessageDTO[] {
   const idx = list.findIndex((m) => m.id === msg.id);
@@ -19,10 +26,27 @@ function upsertMessage(list: MessageDTO[], msg: MessageDTO): MessageDTO[] {
   return copy;
 }
 
-function MessageRow({ message, onDelete }: { message: MessageDTO; onDelete: (id: number) => void }) {
+// Consecutive messages from the same author collapse into one visual group
+// as long as no gap between them exceeds 5 minutes — a new box starts on
+// author change or on a >5 min silence, matching Discord's convention.
+const GROUP_GAP_SECONDS = 5 * 60;
+
+function groupMessages(messages: MessageDTO[]): MessageDTO[][] {
+  const groups: MessageDTO[][] = [];
+  for (const m of messages) {
+    const last = groups[groups.length - 1];
+    const lastMsg = last?.[last.length - 1];
+    if (lastMsg && lastMsg.authorId === m.authorId && m.unixTimestamp - lastMsg.unixTimestamp <= GROUP_GAP_SECONDS) {
+      last.push(m);
+    } else {
+      groups.push([m]);
+    }
+  }
+  return groups;
+}
+
+function ReactionRow({ message }: { message: MessageDTO }) {
   const { user } = useAuth();
-  const play = useAudioStore((s) => s.play);
-  const canModerate = user && (user.id === message.authorId || user.isAdmin);
   const [pickerOpen, setPickerOpen] = useState(false);
 
   async function addReaction(emoji: Emoji) {
@@ -36,6 +60,69 @@ function MessageRow({ message, onDelete }: { message: MessageDTO; onDelete: (id:
   }
 
   return (
+    <div style={{ marginTop: "0.3rem", display: "flex", gap: "0.4rem", alignItems: "center", position: "relative" }}>
+      {message.reactions.map((r) => (
+        <span key={r.emojiId} className="btn" style={{ padding: "0.1rem 0.5rem", fontSize: "0.8rem" }} title={r.usernames.join(", ")}>
+          :{r.emojiName}: {r.usernames.length}
+        </span>
+      ))}
+      {user && (
+        <>
+          <button className="btn" style={{ padding: "0.1rem 0.45rem", fontSize: "0.8rem" }} onClick={() => setPickerOpen((v) => !v)}>
+            +
+          </button>
+          {pickerOpen && <EmojiPicker onSelect={addReaction} />}
+        </>
+      )}
+    </div>
+  );
+}
+
+function MessageBody({ message, onDelete, onQuote }: { message: MessageDTO; onDelete: (id: number) => void; onQuote: (m: MessageDTO) => void }) {
+  const { user } = useAuth();
+  const play = useAudioStore((s) => s.play);
+  const canModerate = user && (user.id === message.authorId || user.isAdmin);
+
+  if (message.isDeleted) {
+    return <em style={{ color: "var(--text-dim)" }}>message deleted</em>;
+  }
+
+  return (
+    <>
+      {message.replyPreview && (
+        <a href={`#m-${message.replyPreview.id}`} style={{ display: "block", fontSize: "0.75rem", color: "var(--text-dim)", marginBottom: "0.2rem" }}>
+          ↪ {message.replyPreview.authorUsername}: {message.replyPreview.excerpt}
+        </a>
+      )}
+      {renderMessageContent(message.contentRaw)}
+      {message.embeds.map((track) => (
+        <div className="track-embed" key={track.id}>
+          <button onClick={() => play(track)}>▶</button>
+          <span>
+            {track.title} — <span style={{ color: "var(--text-dim)" }}>{track.albumTitle}</span>
+          </span>
+        </div>
+      ))}
+      <div style={{ display: "flex", gap: "0.4rem", alignItems: "center", flexWrap: "wrap" }}>
+        <ReactionRow message={message} />
+        {user && (
+          <button className="btn" style={{ padding: "0.1rem 0.45rem", fontSize: "0.75rem" }} onClick={() => onQuote(message)}>
+            Quote
+          </button>
+        )}
+        {canModerate && (
+          <button className="btn btn-danger" style={{ padding: "0.1rem 0.45rem", fontSize: "0.75rem" }} onClick={() => onDelete(message.id)}>
+            delete
+          </button>
+        )}
+      </div>
+    </>
+  );
+}
+
+// Standard view: every message is its own bordered box with full header.
+function StandardMessage({ message, onDelete, onQuote }: { message: MessageDTO; onDelete: (id: number) => void; onQuote: (m: MessageDTO) => void }) {
+  return (
     <div className="message" id={`m-${message.id}`}>
       <div className="bubble">
         <div className="meta">
@@ -44,51 +131,40 @@ function MessageRow({ message, onDelete }: { message: MessageDTO; onDelete: (id:
           </strong>
           <span className="mono">{new Date(message.unixTimestamp * 1000).toLocaleString()}</span>
           {message.editedAt && <span>(edited)</span>}
-          {canModerate && !message.isDeleted && (
-            <button className="btn btn-danger" style={{ padding: "0 0.4rem" }} onClick={() => onDelete(message.id)}>
-              delete
-            </button>
-          )}
         </div>
-        {message.isDeleted ? (
-          <em style={{ color: "var(--text-dim)" }}>message deleted</em>
-        ) : (
-          <>
-            {renderMessageContent(message.contentRaw)}
-            {message.embeds.map((track) => (
-              <div className="track-embed" key={track.id}>
-                <button onClick={() => play(track)}>▶</button>
-                <span>
-                  {track.title} — <span style={{ color: "var(--text-dim)" }}>{track.albumTitle}</span>
-                </span>
-              </div>
-            ))}
-            <div style={{ marginTop: "0.3rem", display: "flex", gap: "0.4rem", alignItems: "center", position: "relative" }}>
-              {message.reactions.map((r) => (
-                <span
-                  key={r.emojiId}
-                  className="btn"
-                  style={{ padding: "0.1rem 0.5rem", fontSize: "0.8rem" }}
-                  title={r.usernames.join(", ")}
-                >
-                  :{r.emojiName}: {r.usernames.length}
-                </span>
-              ))}
-              {user && (
-                <>
-                  <button
-                    className="btn"
-                    style={{ padding: "0.1rem 0.45rem", fontSize: "0.8rem" }}
-                    onClick={() => setPickerOpen((v) => !v)}
-                  >
-                    +
-                  </button>
-                  {pickerOpen && <EmojiPicker onSelect={addReaction} />}
-                </>
-              )}
-            </div>
-          </>
-        )}
+        <MessageBody message={message} onDelete={onDelete} onQuote={onQuote} />
+      </div>
+    </div>
+  );
+}
+
+// Grouped view: one header (avatar/name/first timestamp) per consecutive
+// run from the same author, each message inside stacked without repeating it.
+function MessageGroup({ group, onDelete, onQuote }: { group: MessageDTO[]; onDelete: (id: number) => void; onQuote: (m: MessageDTO) => void }) {
+  const first = group[0];
+  return (
+    <div className="message">
+      <div
+        style={{
+          width: 36,
+          height: 36,
+          borderRadius: "50%",
+          flexShrink: 0,
+          background: first.authorAvatarUrl ? `url(${first.authorAvatarUrl}) center/cover` : "var(--bg-elevated)",
+        }}
+      />
+      <div className="bubble" style={{ background: "transparent", padding: 0 }}>
+        <div className="meta">
+          <strong>
+            <Link to={`/u/${first.authorUsername}`}>{first.authorUsername}</Link>
+          </strong>
+          <span className="mono">{new Date(first.unixTimestamp * 1000).toLocaleString()}</span>
+        </div>
+        {group.map((m) => (
+          <div key={m.id} id={`m-${m.id}`} style={{ marginBottom: "0.3rem" }}>
+            <MessageBody message={m} onDelete={onDelete} onQuote={onQuote} />
+          </div>
+        ))}
       </div>
     </div>
   );
@@ -99,6 +175,9 @@ export function ChannelPage({ channelSlug }: { channelSlug?: string } = {}) {
   const slug = channelSlug ?? params.slug;
   const { user } = useAuth();
   const [mode, setMode] = useState<ViewMode>("live");
+  const [displayMode, setDisplayMode] = useState<DisplayMode>(
+    () => (localStorage.getItem("exomusica_display_mode") as DisplayMode) ?? "standard",
+  );
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
   const [searchInput, setSearchInput] = useState("");
   const [activeSearch, setActiveSearch] = useState<string | null>(null);
@@ -108,9 +187,16 @@ export function ChannelPage({ channelSlug }: { channelSlug?: string } = {}) {
   const [emojiQuery, setEmojiQuery] = useState<string | null>(null);
   const [following, setFollowing] = useState(false);
   const [channelName, setChannelName] = useState<string | null>(null);
+  const [replyTarget, setReplyTarget] = useState<ReplyTarget | null>(null);
   useDocumentTitle(channelName ?? "");
   const wsRef = useRef<WebSocket | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  function toggleDisplayMode() {
+    const next = displayMode === "standard" ? "grouped" : "standard";
+    setDisplayMode(next);
+    localStorage.setItem("exomusica_display_mode", next);
+  }
 
   useEffect(() => {
     if (!slug || !user) return;
@@ -165,11 +251,12 @@ export function ChannelPage({ channelSlug }: { channelSlug?: string } = {}) {
     if (!draft.trim() || !slug) return;
     const dto = await api<MessageDTO>(`/api/channels/${slug}/messages`, {
       method: "POST",
-      body: JSON.stringify({ contentRaw: draft }),
+      body: JSON.stringify({ contentRaw: draft, replyToId: replyTarget?.id }),
     });
     setMessages((prev) => upsertMessage(prev, dto)); // in case the WS event is delayed/missed
     setDraft("");
     setEmojiQuery(null);
+    setReplyTarget(null);
   }
 
   function handleSend(e: FormEvent) {
@@ -180,6 +267,11 @@ export function ChannelPage({ channelSlug }: { channelSlug?: string } = {}) {
   async function handleDelete(id: number) {
     await api(`/api/messages/${id}`, { method: "DELETE" });
     setMessages((prev) => prev.map((m) => (m.id === id ? { ...m, isDeleted: true, contentRaw: "", embeds: [] } : m)));
+  }
+
+  function handleQuote(m: MessageDTO) {
+    setReplyTarget({ id: m.id, authorUsername: m.authorUsername, excerpt: m.contentRaw.slice(0, 80) });
+    textareaRef.current?.focus();
   }
 
   // Detects an in-progress ":partial" fragment right before the cursor and
@@ -194,7 +286,7 @@ export function ChannelPage({ channelSlug }: { channelSlug?: string } = {}) {
     setEmojiQuery(match ? match[1] : null);
   }
 
-  function handlePaste(e: React.ClipboardEvent<HTMLTextAreaElement>) {
+  function handlePaste(e: ClipboardEvent<HTMLTextAreaElement>) {
     const el = textareaRef.current;
     if (!el) return;
     const pasted = e.clipboardData.getData("text").trim();
@@ -243,6 +335,9 @@ export function ChannelPage({ channelSlug }: { channelSlug?: string } = {}) {
             {following ? "Following ✓" : "Follow"}
           </button>
         )}
+        <button className="btn" onClick={toggleDisplayMode} title="Toggle grouped consecutive messages">
+          {displayMode === "grouped" ? "Grouped view" : "Standard view"}
+        </button>
         <select
           className="btn"
           value={mode === "day" ? selectedDay ?? "" : ""}
@@ -268,11 +363,7 @@ export function ChannelPage({ channelSlug }: { channelSlug?: string } = {}) {
           }}
           style={{ display: "flex", gap: "0.4rem" }}
         >
-          <input
-            placeholder="Search this topic…"
-            value={searchInput}
-            onChange={(e) => setSearchInput(e.target.value)}
-          />
+          <input placeholder="Search this topic…" value={searchInput} onChange={(e) => setSearchInput(e.target.value)} />
           <button className="btn" type="submit">
             Search
           </button>
@@ -281,32 +372,44 @@ export function ChannelPage({ channelSlug }: { channelSlug?: string } = {}) {
 
       <div className="message-list">
         {messages.length === 0 && <p style={{ color: "var(--text-dim)" }}>Nothing here yet.</p>}
-        {messages.map((m) => (
-          <MessageRow key={m.id} message={m} onDelete={handleDelete} />
-        ))}
+        {displayMode === "standard"
+          ? messages.map((m) => <StandardMessage key={m.id} message={m} onDelete={handleDelete} onQuote={handleQuote} />)
+          : groupMessages(messages).map((g) => (
+              <MessageGroup key={g[0].id} group={g} onDelete={handleDelete} onQuote={handleQuote} />
+            ))}
       </div>
 
       {user && mode === "live" && (
-        <form onSubmit={handleSend} style={{ marginTop: "1rem", display: "flex", gap: "0.5rem", maxWidth: 720, position: "relative" }}>
-          {emojiQuery !== null && <EmojiPicker filter={emojiQuery} onSelect={insertEmoji} />}
-          <textarea
-            ref={textareaRef}
-            value={draft}
-            onChange={handleDraftChange}
-            onPaste={handlePaste}
-            onKeyDown={(e) => {
-              if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
-                e.preventDefault();
-                void sendMessage();
-              }
-            }}
-            rows={2}
-            style={{ flex: 1 }}
-            placeholder="Write a message… (**bold**, *italic*, `code`, > quote, :emoji:, Ctrl+Enter to send)"
-          />
-          <button className="btn btn-primary" type="submit">
-            Send
-          </button>
+        <form onSubmit={handleSend} style={{ marginTop: "1rem", display: "flex", flexDirection: "column", gap: "0.4rem", maxWidth: 720, position: "relative" }}>
+          {replyTarget && (
+            <div style={{ fontSize: "0.8rem", color: "var(--text-dim)", display: "flex", gap: "0.4rem", alignItems: "center" }}>
+              Replying to <strong>{replyTarget.authorUsername}</strong>: {replyTarget.excerpt}
+              <button className="btn" style={{ padding: "0 0.4rem" }} onClick={() => setReplyTarget(null)}>
+                ×
+              </button>
+            </div>
+          )}
+          <div style={{ display: "flex", gap: "0.5rem", position: "relative" }}>
+            {emojiQuery !== null && <EmojiPicker filter={emojiQuery} onSelect={insertEmoji} />}
+            <textarea
+              ref={textareaRef}
+              value={draft}
+              onChange={handleDraftChange}
+              onPaste={handlePaste}
+              onKeyDown={(e) => {
+                if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
+                  e.preventDefault();
+                  void sendMessage();
+                }
+              }}
+              rows={2}
+              style={{ flex: 1 }}
+              placeholder="Write a message… (**bold**, *italic*, `code`, > quote, :emoji:, Ctrl+Enter to send)"
+            />
+            <button className="btn btn-primary" type="submit">
+              Send
+            </button>
+          </div>
         </form>
       )}
     </div>

@@ -6,6 +6,7 @@ type MessageWithRelations = Message & {
   author: Pick<User, "username" | "avatarUrl">;
   reactions: (Reaction & { emoji: CustomEmoji; user: Pick<User, "username"> })[];
   attachments: Attachment[];
+  replyTo: (Pick<Message, "id" | "contentRaw"> & { author: Pick<User, "username"> }) | null;
 };
 
 export async function toMessageDTO(message: MessageWithRelations): Promise<MessageDTO> {
@@ -24,6 +25,9 @@ export async function toMessageDTO(message: MessageWithRelations): Promise<Messa
     authorAvatarUrl: message.author.avatarUrl,
     unixTimestamp: Math.floor(message.createdAt.getTime() / 1000),
     replyToId: message.replyToId,
+    replyPreview: message.replyTo
+      ? { id: message.replyTo.id, authorUsername: message.replyTo.author.username, excerpt: message.replyTo.contentRaw.slice(0, 80) }
+      : null,
     contentRaw: message.isDeleted ? "" : message.contentRaw,
     attachments: message.isDeleted
       ? []

@@ -19,6 +19,7 @@ export interface MessageDTO {
   authorAvatarUrl: string | null;
   unixTimestamp: number;
   replyToId: number | null;
+  replyPreview: { id: number; authorUsername: string; excerpt: string } | null;
   contentRaw: string;
   attachmentId: number | null;
   isDeleted: boolean;

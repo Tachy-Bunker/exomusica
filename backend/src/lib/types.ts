@@ -23,6 +23,7 @@ export interface MessageDTO {
   authorAvatarUrl: string | null;
   unixTimestamp: number;
   replyToId: number | null;
+  replyPreview: { id: number; authorUsername: string; excerpt: string } | null;
   contentRaw: string;
   attachments: { id: number; filename: string; url: string; sizeBytes: number }[];
   isDeleted: boolean;
