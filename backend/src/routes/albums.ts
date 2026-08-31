@@ -2,6 +2,7 @@ import type { FastifyInstance } from "fastify";
 import { prisma } from "../lib/prisma.js";
 import { requireAdmin } from "../lib/auth.js";
 import { trackToDTO } from "../lib/embeds.js";
+import { saveAlbumImage } from "../lib/storage.js";
 
 export async function albumRoutes(app: FastifyInstance): Promise<void> {
   app.get<{ Params: { slug: string } }>("/api/albums/:slug", async (req, reply) => {
@@ -10,9 +11,15 @@ export async function albumRoutes(app: FastifyInstance): Promise<void> {
       include: {
         branch: { select: { slug: true, name: true } },
         collaborators: { include: { collaborator: true } },
+        links: { orderBy: { position: "asc" } },
+        galleryImages: { orderBy: { position: "asc" } },
         tracks: {
           orderBy: { position: "asc" },
-          include: { album: { include: { branch: true } }, bookmarks: true },
+          include: {
+            album: { include: { branch: true } },
+            bookmarks: true,
+            collaborators: { include: { collaborator: true } },
+          },
         },
       },
     });
@@ -24,37 +31,29 @@ export async function albumRoutes(app: FastifyInstance): Promise<void> {
       composer: album.composer,
       coverArtUrl: album.coverArtUrl,
       description: album.description,
-      streamUrl: album.streamUrl,
-      downloadUrl: album.downloadUrl,
       branch: album.branch,
+      links: album.links,
+      gallery: album.galleryImages,
       collaborators: album.collaborators.map((c) => c.collaborator),
-      tracks: album.tracks.map(trackToDTO),
+      tracks: album.tracks.map((t) => ({
+        ...trackToDTO(t),
+        composers: t.collaborators.map((tc) => ({ id: tc.collaborator.id, name: tc.collaborator.name })),
+      })),
     };
   });
 
   app.post<{
-    Body: {
-      branchId: number;
-      slug: string;
-      title: string;
-      composer: string;
-      coverArtUrl?: string;
-      description?: string;
-      streamUrl?: string;
-      downloadUrl?: string;
-    };
+    Body: { branchId: number; slug: string; title: string; composer: string; description?: string };
   }>("/api/admin/albums", { preHandler: requireAdmin }, async (req, reply) => {
-    const { branchId, slug, title, composer, coverArtUrl, description, streamUrl, downloadUrl } = req.body ?? {};
+    const { branchId, slug, title, composer, description } = req.body ?? {};
     if (!branchId || !slug || !title || !composer) {
       return reply.code(400).send({ error: "branchId, slug, title, and composer are required" });
     }
-    const album = await prisma.album.create({
-      data: { branchId, slug, title, composer, coverArtUrl, description, streamUrl, downloadUrl },
-    });
+    const album = await prisma.album.create({ data: { branchId, slug, title, composer, description } });
     return reply.code(201).send(album);
   });
 
-  app.patch<{ Params: { id: string }; Body: Partial<{ title: string; composer: string; coverArtUrl: string; description: string; streamUrl: string; downloadUrl: string }> }>(
+  app.patch<{ Params: { id: string }; Body: Partial<{ title: string; composer: string; description: string }> }>(
     "/api/admin/albums/:id",
     { preHandler: requireAdmin },
     async (req) => {
@@ -67,6 +66,66 @@ export async function albumRoutes(app: FastifyInstance): Promise<void> {
     return reply.code(204).send();
   });
 
+  // --- Cover art + gallery ---------------------------------------------
+  app.post<{ Params: { id: string } }>(
+    "/api/admin/albums/:id/cover",
+    { preHandler: requireAdmin },
+    async (req, reply) => {
+      const file = await req.file();
+      if (!file) return reply.code(400).send({ error: "no file uploaded" });
+      const buffer = await file.toBuffer();
+      const { url } = await saveAlbumImage(file.filename, file.mimetype, buffer);
+      const album = await prisma.album.update({ where: { id: Number(req.params.id) }, data: { coverArtUrl: url } });
+      return { coverArtUrl: album.coverArtUrl };
+    },
+  );
+
+  app.post<{ Params: { id: string } }>(
+    "/api/admin/albums/:id/gallery",
+    { preHandler: requireAdmin },
+    async (req, reply) => {
+      const albumId = Number(req.params.id);
+      const created = [];
+      let position = await prisma.albumGalleryImage.count({ where: { albumId } });
+      for await (const file of req.files()) {
+        const buffer = await file.toBuffer();
+        const { url } = await saveAlbumImage(file.filename, file.mimetype, buffer);
+        created.push(await prisma.albumGalleryImage.create({ data: { albumId, url, position: position++ } }));
+      }
+      if (created.length === 0) return reply.code(400).send({ error: "no files uploaded" });
+      return reply.code(201).send(created);
+    },
+  );
+
+  app.delete<{ Params: { id: string } }>(
+    "/api/admin/gallery-images/:id",
+    { preHandler: requireAdmin },
+    async (req, reply) => {
+      await prisma.albumGalleryImage.delete({ where: { id: Number(req.params.id) } });
+      return reply.code(204).send();
+    },
+  );
+
+  // --- Streaming/download links (named, unlimited) -----------------------
+  app.post<{ Params: { id: string }; Body: { label: string; url: string } }>(
+    "/api/admin/albums/:id/links",
+    { preHandler: requireAdmin },
+    async (req, reply) => {
+      const { label, url } = req.body ?? {};
+      if (!label || !url) return reply.code(400).send({ error: "label and url are required" });
+      const albumId = Number(req.params.id);
+      const position = await prisma.albumLink.count({ where: { albumId } });
+      const link = await prisma.albumLink.create({ data: { albumId, label, url, position } });
+      return reply.code(201).send(link);
+    },
+  );
+
+  app.delete<{ Params: { id: string } }>("/api/admin/album-links/:id", { preHandler: requireAdmin }, async (req, reply) => {
+    await prisma.albumLink.delete({ where: { id: Number(req.params.id) } });
+    return reply.code(204).send();
+  });
+
+  // --- Tracks -------------------------------------------------------------
   app.post<{
     Params: { id: string };
     Body: { title: string; fileUrl: string; format: string; durationSeconds?: number; position?: number };
@@ -93,6 +152,24 @@ export async function albumRoutes(app: FastifyInstance): Promise<void> {
     return reply.code(204).send();
   });
 
+  // Full replace, not incremental add/remove — the admin UI sends the
+  // complete checked set each time, simpler than diffing on both ends.
+  app.put<{ Params: { id: string }; Body: { collaboratorIds: number[] } }>(
+    "/api/admin/tracks/:id/composers",
+    { preHandler: requireAdmin },
+    async (req, reply) => {
+      const trackId = Number(req.params.id);
+      const { collaboratorIds } = req.body ?? {};
+      await prisma.$transaction([
+        prisma.trackCollaborator.deleteMany({ where: { trackId } }),
+        prisma.trackCollaborator.createMany({
+          data: (collaboratorIds ?? []).map((collaboratorId) => ({ trackId, collaboratorId })),
+        }),
+      ]);
+      return reply.code(204).send();
+    },
+  );
+
   app.post<{ Params: { id: string }; Body: { label: string; timestampSeconds: number } }>(
     "/api/admin/tracks/:id/bookmarks",
     { preHandler: requireAdmin },
@@ -108,6 +185,7 @@ export async function albumRoutes(app: FastifyInstance): Promise<void> {
     },
   );
 
+  // --- Collaborators --------------------------------------------------------
   app.post<{ Body: { name: string; role: string; bio?: string; pictureUrl?: string } }>(
     "/api/admin/collaborators",
     { preHandler: requireAdmin },

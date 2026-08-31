@@ -5,6 +5,10 @@ import { useAudioStore } from "../lib/audioStore";
 import { useDocumentTitle } from "../lib/useDocumentTitle";
 import type { PlayableTrackDTO } from "../lib/types";
 
+interface TrackWithComposers extends PlayableTrackDTO {
+  composers: { id: number; name: string }[];
+}
+
 interface AlbumDetail {
   id: number;
   slug: string;
@@ -12,11 +16,11 @@ interface AlbumDetail {
   composer: string;
   coverArtUrl: string | null;
   description: string | null;
-  streamUrl: string | null;
-  downloadUrl: string | null;
+  links: { id: number; label: string; url: string }[];
+  gallery: { id: number; url: string }[];
   branch: { slug: string; name: string };
   collaborators: { id: number; name: string; role: string; bio: string | null; pictureUrl: string | null }[];
-  tracks: PlayableTrackDTO[];
+  tracks: TrackWithComposers[];
 }
 
 export function AlbumPage() {
@@ -52,22 +56,30 @@ export function AlbumPage() {
         <div>
           <h1 style={{ marginBottom: "0.1rem" }}>{album.title}</h1>
           <p style={{ color: "var(--text-dim)", marginTop: 0 }}>{album.composer}</p>
-          <div style={{ display: "flex", gap: "0.6rem" }}>
-            {album.streamUrl && (
-              <a className="btn" href={album.streamUrl} target="_blank" rel="noreferrer">
-                Stream elsewhere
+          <div style={{ display: "flex", gap: "0.6rem", flexWrap: "wrap" }}>
+            {album.links.map((l) => (
+              <a key={l.id} className="btn" href={l.url} target="_blank" rel="noreferrer">
+                {l.label}
               </a>
-            )}
-            {album.downloadUrl && (
-              <a className="btn" href={album.downloadUrl} target="_blank" rel="noreferrer">
-                Download
-              </a>
-            )}
+            ))}
           </div>
         </div>
       </div>
 
       {album.description && <p style={{ marginTop: "1.2rem" }}>{album.description}</p>}
+
+      {album.gallery.length > 0 && (
+        <div style={{ display: "flex", gap: "0.5rem", marginTop: "1rem", overflowX: "auto" }}>
+          {album.gallery.map((g) => (
+            <img
+              key={g.id}
+              src={g.url}
+              alt=""
+              style={{ height: 120, borderRadius: "var(--radius)", border: "1px solid var(--border)" }}
+            />
+          ))}
+        </div>
+      )}
 
       <h2 style={{ fontSize: "1rem", marginTop: "1.5rem" }}>Tracks</h2>
       <div style={{ display: "flex", flexDirection: "column", gap: "0.4rem" }}>
@@ -89,7 +101,15 @@ export function AlbumPage() {
             <span className="mono" style={{ color: "var(--text-dim)", fontSize: "0.8rem" }}>
               {i + 1}
             </span>
-            <span style={{ flex: 1 }}>{t.title}</span>
+            <span style={{ flex: 1 }}>
+              {t.title}
+              {t.composers.length > 0 && (
+                <span style={{ color: "var(--text-dim)", fontSize: "0.8rem" }}>
+                  {" "}
+                  — {t.composers.map((c) => c.name).join(", ")}
+                </span>
+              )}
+            </span>
             {t.bookmarks.length > 0 && (
               <span style={{ fontSize: "0.75rem", color: "var(--text-dim)" }}>{t.bookmarks.length} bookmarks</span>
             )}

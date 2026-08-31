@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import { api, ApiError } from "../../lib/api";
 import type { Branch } from "../../lib/types";
 
@@ -13,6 +13,17 @@ interface CollaboratorSummary {
   id: number;
   name: string;
   role: string;
+}
+
+interface AlbumDetail {
+  id: number;
+  slug: string;
+  title: string;
+  coverArtUrl: string | null;
+  links: { id: number; label: string; url: string }[];
+  gallery: { id: number; url: string }[];
+  collaborators: { id: number; name: string }[];
+  tracks: { id: number; title: string; composers: { id: number }[] }[];
 }
 
 export function AlbumsAdminPage() {
@@ -31,6 +42,12 @@ export function AlbumsAdminPage() {
   const [collabForm, setCollabForm] = useState({ albumId: 0, existingId: 0, name: "", role: "" });
   const [error, setError] = useState<string | null>(null);
 
+  const [managingSlug, setManagingSlug] = useState<string | null>(null);
+  const [detail, setDetail] = useState<AlbumDetail | null>(null);
+  const [linkForm, setLinkForm] = useState({ label: "", url: "" });
+  const coverInput = useRef<HTMLInputElement>(null);
+  const galleryInput = useRef<HTMLInputElement>(null);
+
   function loadCollaborators() {
     api<CollaboratorSummary[]>("/api/collaborators").then(setCollaborators);
   }
@@ -43,12 +60,22 @@ export function AlbumsAdminPage() {
     loadCollaborators();
   }, []);
 
-  useEffect(() => {
-    if (!selectedBranchId) return;
+  function loadAlbums() {
     const branch = branches.find((b) => b.id === selectedBranchId);
     if (!branch) return;
     api<AlbumSummary[]>(`/api/branches/${branch.slug}/albums`).then(setAlbums);
-  }, [selectedBranchId, branches]);
+  }
+
+  useEffect(loadAlbums, [selectedBranchId, branches]);
+
+  function loadDetail(slug: string) {
+    api<AlbumDetail>(`/api/albums/${slug}`).then(setDetail);
+  }
+
+  useEffect(() => {
+    if (managingSlug) loadDetail(managingSlug);
+    else setDetail(null);
+  }, [managingSlug]);
 
   async function handleCreateAlbum(e: FormEvent) {
     e.preventDefault();
@@ -60,8 +87,7 @@ export function AlbumsAdminPage() {
         body: JSON.stringify({ branchId: selectedBranchId, ...albumForm }),
       });
       setAlbumForm({ slug: "", title: "", composer: "", description: "" });
-      const branch = branches.find((b) => b.id === selectedBranchId)!;
-      api<AlbumSummary[]>(`/api/branches/${branch.slug}/albums`).then(setAlbums);
+      loadAlbums();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Something went wrong");
     }
@@ -75,6 +101,7 @@ export function AlbumsAdminPage() {
       body: JSON.stringify({ title: trackForm.title, fileUrl: trackForm.fileUrl, format: trackForm.format }),
     });
     setTrackForm({ albumId: trackForm.albumId, title: "", fileUrl: "", format: "MP3" });
+    if (managingSlug) loadDetail(managingSlug);
   }
 
   async function handleAddCollaborator(e: FormEvent) {
@@ -95,6 +122,58 @@ export function AlbumsAdminPage() {
       body: JSON.stringify({ collaboratorId }),
     });
     setCollabForm({ albumId: collabForm.albumId, existingId: 0, name: "", role: "" });
+    if (managingSlug) loadDetail(managingSlug);
+  }
+
+  async function handleCoverUpload() {
+    const file = coverInput.current?.files?.[0];
+    if (!file || !detail) return;
+    const formData = new FormData();
+    formData.append("file", file);
+    await api(`/api/admin/albums/${detail.id}/cover`, { method: "POST", body: formData });
+    loadDetail(detail.slug);
+  }
+
+  async function handleGalleryUpload() {
+    const files = galleryInput.current?.files;
+    if (!files || files.length === 0 || !detail) return;
+    const formData = new FormData();
+    for (const f of files) formData.append("files", f);
+    await api(`/api/admin/albums/${detail.id}/gallery`, { method: "POST", body: formData });
+    if (galleryInput.current) galleryInput.current.value = "";
+    loadDetail(detail.slug);
+  }
+
+  async function handleDeleteGalleryImage(id: number) {
+    if (!detail) return;
+    await api(`/api/admin/gallery-images/${id}`, { method: "DELETE" });
+    loadDetail(detail.slug);
+  }
+
+  async function handleAddLink(e: FormEvent) {
+    e.preventDefault();
+    if (!detail) return;
+    await api(`/api/admin/albums/${detail.id}/links`, { method: "POST", body: JSON.stringify(linkForm) });
+    setLinkForm({ label: "", url: "" });
+    loadDetail(detail.slug);
+  }
+
+  async function handleDeleteLink(id: number) {
+    if (!detail) return;
+    await api(`/api/admin/album-links/${id}`, { method: "DELETE" });
+    loadDetail(detail.slug);
+  }
+
+  async function handleToggleComposer(trackId: number, collaboratorId: number, currentIds: number[]) {
+    if (!detail) return;
+    const next = currentIds.includes(collaboratorId)
+      ? currentIds.filter((id) => id !== collaboratorId)
+      : [...currentIds, collaboratorId];
+    await api(`/api/admin/tracks/${trackId}/composers`, {
+      method: "PUT",
+      body: JSON.stringify({ collaboratorIds: next }),
+    });
+    loadDetail(detail.slug);
   }
 
   return (
@@ -138,6 +217,7 @@ export function AlbumsAdminPage() {
             <th>Title</th>
             <th>Composer</th>
             <th>Slug</th>
+            <th></th>
           </tr>
         </thead>
         <tbody>
@@ -146,10 +226,100 @@ export function AlbumsAdminPage() {
               <td>{a.title}</td>
               <td>{a.composer}</td>
               <td className="mono">{a.slug}</td>
+              <td>
+                <button className="btn" onClick={() => setManagingSlug(managingSlug === a.slug ? null : a.slug)}>
+                  {managingSlug === a.slug ? "Close" : "Manage"}
+                </button>
+              </td>
             </tr>
           ))}
         </tbody>
       </table>
+
+      {detail && (
+        <div style={{ border: "1px solid var(--border)", borderRadius: "var(--radius)", padding: "1rem", marginBottom: "1.5rem" }}>
+          <h2 style={{ fontSize: "1rem" }}>Managing: {detail.title}</h2>
+
+          <h3 style={{ fontSize: "0.9rem" }}>Cover art</h3>
+          {detail.coverArtUrl && <img src={detail.coverArtUrl} alt="" style={{ width: 100, height: 100, objectFit: "cover", borderRadius: "var(--radius)" }} />}
+          <div style={{ display: "flex", gap: "0.5rem", marginTop: "0.4rem" }}>
+            <input ref={coverInput} type="file" accept="image/png,image/jpeg,image/webp,image/gif" />
+            <button className="btn" onClick={handleCoverUpload}>
+              Upload cover
+            </button>
+          </div>
+
+          <h3 style={{ fontSize: "0.9rem", marginTop: "1rem" }}>Gallery</h3>
+          <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap", marginBottom: "0.4rem" }}>
+            {detail.gallery.map((g) => (
+              <div key={g.id} style={{ position: "relative" }}>
+                <img src={g.url} alt="" style={{ width: 70, height: 70, objectFit: "cover", borderRadius: "var(--radius)" }} />
+                <button
+                  className="btn btn-danger"
+                  style={{ position: "absolute", top: 2, right: 2, padding: "0 0.3rem", fontSize: "0.7rem" }}
+                  onClick={() => handleDeleteGalleryImage(g.id)}
+                >
+                  ×
+                </button>
+              </div>
+            ))}
+          </div>
+          <div style={{ display: "flex", gap: "0.5rem" }}>
+            <input ref={galleryInput} type="file" accept="image/png,image/jpeg,image/webp,image/gif" multiple />
+            <button className="btn" onClick={handleGalleryUpload}>
+              Upload to gallery
+            </button>
+          </div>
+
+          <h3 style={{ fontSize: "0.9rem", marginTop: "1rem" }}>Streaming/download links</h3>
+          {detail.links.map((l) => (
+            <div key={l.id} style={{ display: "flex", gap: "0.5rem", alignItems: "center", marginBottom: "0.2rem" }}>
+              <span style={{ fontSize: "0.85rem" }}>
+                {l.label} — <span style={{ color: "var(--text-dim)" }}>{l.url}</span>
+              </span>
+              <button className="btn btn-danger" style={{ fontSize: "0.7rem", padding: "0.1rem 0.4rem" }} onClick={() => handleDeleteLink(l.id)}>
+                remove
+              </button>
+            </div>
+          ))}
+          <form onSubmit={handleAddLink} style={{ display: "flex", gap: "0.5rem", marginTop: "0.4rem" }}>
+            <input placeholder="Label (e.g. Bandcamp)" required value={linkForm.label} onChange={(e) => setLinkForm((f) => ({ ...f, label: e.target.value }))} />
+            <input placeholder="URL" required value={linkForm.url} onChange={(e) => setLinkForm((f) => ({ ...f, url: e.target.value }))} style={{ flex: 1 }} />
+            <button className="btn" type="submit">
+              Add link
+            </button>
+          </form>
+
+          {detail.collaborators.length > 0 && (
+            <>
+              <h3 style={{ fontSize: "0.9rem", marginTop: "1rem" }}>Per-track composer</h3>
+              {detail.tracks.map((t) => (
+                <div key={t.id} style={{ marginBottom: "0.4rem" }}>
+                  <div style={{ fontSize: "0.85rem", marginBottom: "0.1rem" }}>{t.title}</div>
+                  <div style={{ display: "flex", gap: "0.8rem", flexWrap: "wrap" }}>
+                    {detail.collaborators.map((c) => (
+                      <label key={c.id} style={{ fontSize: "0.8rem" }}>
+                        <input
+                          type="checkbox"
+                          checked={t.composers.some((tc) => tc.id === c.id)}
+                          onChange={() =>
+                            handleToggleComposer(
+                              t.id,
+                              c.id,
+                              t.composers.map((tc) => tc.id),
+                            )
+                          }
+                        />{" "}
+                        {c.name}
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </>
+          )}
+        </div>
+      )}
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "2rem" }}>
         <form onSubmit={handleAddTrack}>

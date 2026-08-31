@@ -54,7 +54,6 @@ async function main() {
       title: "Half Light",
       composer: "K. Osei",
       description: "Recorded over three nights with a single contact mic and a lot of patience.",
-      streamUrl: "https://example.com/half-light", // placeholder — not a real page
     },
     update: {},
   });

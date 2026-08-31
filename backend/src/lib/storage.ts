@@ -85,4 +85,29 @@ export async function saveMessageAttachment(
   return attachment;
 }
 
+const ALLOWED_IMAGE_TYPES: Record<string, string> = {
+  "image/png": ".png",
+  "image/jpeg": ".jpg",
+  "image/webp": ".webp",
+  "image/gif": ".gif",
+};
+
+/** Saves a cover-art or gallery image for an album. No user quota applies —
+ *  these are admin-only site assets, same reasoning as emoji images. */
+export async function saveAlbumImage(filename: string, mimeType: string, buffer: Buffer): Promise<{ url: string }> {
+  const ext =
+    ALLOWED_IMAGE_TYPES[mimeType] ??
+    ([".png", ".jpg", ".jpeg", ".webp", ".gif"].includes(path.extname(filename).toLowerCase())
+      ? path.extname(filename).toLowerCase()
+      : null);
+  if (!ext) {
+    throw new Error(`unsupported image type "${mimeType}" — PNG, JPEG, WebP, or GIF only`);
+  }
+  const dir = path.join(UPLOADS_DIR, "albums");
+  await mkdir(dir, { recursive: true });
+  const diskName = `${randomUUID()}${ext}`;
+  await writeFile(path.join(dir, diskName), buffer);
+  return { url: `/uploads/albums/${diskName}` };
+}
+
 export { UPLOADS_DIR };

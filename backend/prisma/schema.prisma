@@ -217,15 +217,34 @@ model Album {
   branch      Branch   @relation(fields: [branchId], references: [id])
   slug        String   @unique
   title       String
-  composer    String
+  composer    String // default/primary composer shown on the album as a whole
   coverArtUrl String?
   description String?  @db.Text
-  streamUrl   String?
-  downloadUrl String?
   createdAt   DateTime @default(now())
 
   tracks        Track[]
   collaborators AlbumCollaborator[]
+  links         AlbumLink[]
+  galleryImages AlbumGalleryImage[]
+}
+
+// Replaces the old fixed streamUrl/downloadUrl pair — named, unlimited,
+// reorderable (Spotify, Bandcamp, archive.org, whatever else).
+model AlbumLink {
+  id       Int    @id @default(autoincrement())
+  albumId  Int
+  album    Album  @relation(fields: [albumId], references: [id])
+  label    String
+  url      String
+  position Int    @default(0)
+}
+
+model AlbumGalleryImage {
+  id       Int    @id @default(autoincrement())
+  albumId  Int
+  album    Album  @relation(fields: [albumId], references: [id])
+  url      String
+  position Int    @default(0)
 }
 
 model Track {
@@ -238,7 +257,20 @@ model Track {
   durationSeconds Int?
   position        Int         @default(0)
 
-  bookmarks AudioBookmark[]
+  bookmarks    AudioBookmark[]
+  collaborators TrackCollaborator[] // per-track composer/credit override, checkbox-selected from the album's collaborators
+}
+
+// Multi-select ("checkboxes") credit per track — a track can have more than
+// one composer when multiple collaborators worked on it specifically,
+// distinct from Album.composer which is just the album-level default.
+model TrackCollaborator {
+  trackId        Int
+  collaboratorId Int
+  track          Track        @relation(fields: [trackId], references: [id])
+  collaborator   Collaborator @relation(fields: [collaboratorId], references: [id])
+
+  @@id([trackId, collaboratorId])
 }
 
 model AudioBookmark {
@@ -258,6 +290,7 @@ model Collaborator {
   links      Json?
 
   albums AlbumCollaborator[]
+  tracks TrackCollaborator[]
 }
 
 model AlbumCollaborator {
