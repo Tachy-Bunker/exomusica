@@ -175,14 +175,11 @@ see its contents — type it directly into the file on the VPS. Leave
 `SMTP_HOST` blank if you want to hold off; anything that would send email
 just logs instead of failing.
 
-### 6. Edit the Caddyfile
-Replace the placeholder domain:
-
-```
-sed -i 's/exomusica.yourdomain.tld/exomusica.yourdomain.com/' Caddyfile
-```
-
-(using your real domain from step 1).
+### 6. Caddyfile
+Already set to `exomusica.com` — nothing to edit here for this deployment.
+If the domain ever changes, that's the one line to update, followed by a
+full rebuild (`--build`, not just `--force-recreate`) since it's baked
+into the Caddy image at build time, not read live from a mounted file.
 
 ### 7. Build and start everything
 

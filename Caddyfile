@@ -1,4 +1,4 @@
-exomusica.yourdomain.tld {
+exomusica.com {
 	route /api/* {
 		reverse_proxy backend:3001
 	}
