@@ -4,15 +4,15 @@ import type { MessageDTO } from "./types.js";
 
 type MessageWithRelations = Message & {
   author: Pick<User, "username" | "avatarUrl">;
-  reactions: (Reaction & { emoji: CustomEmoji })[];
+  reactions: (Reaction & { emoji: CustomEmoji; user: Pick<User, "username"> })[];
   attachments: Attachment[];
 };
 
 export async function toMessageDTO(message: MessageWithRelations): Promise<MessageDTO> {
-  const reactionsByEmoji = new Map<number, { emojiName: string; userIds: number[] }>();
+  const reactionsByEmoji = new Map<number, { emojiName: string; usernames: string[] }>();
   for (const r of message.reactions) {
-    const entry = reactionsByEmoji.get(r.emojiId) ?? { emojiName: r.emoji.name, userIds: [] };
-    entry.userIds.push(r.userId);
+    const entry = reactionsByEmoji.get(r.emojiId) ?? { emojiName: r.emoji.name, usernames: [] };
+    entry.usernames.push(r.user.username);
     reactionsByEmoji.set(r.emojiId, entry);
   }
 
@@ -38,7 +38,7 @@ export async function toMessageDTO(message: MessageWithRelations): Promise<Messa
     reactions: [...reactionsByEmoji.entries()].map(([emojiId, v]) => ({
       emojiId,
       emojiName: v.emojiName,
-      userIds: v.userIds,
+      usernames: v.usernames,
     })),
     embeds: message.isDeleted ? [] : await resolveTrackEmbeds(message.contentRaw),
   };

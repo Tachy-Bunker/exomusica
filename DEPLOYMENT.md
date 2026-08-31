@@ -93,8 +93,22 @@ git clone https://github.com/<you>/exomusica.git
 cd exomusica
 ```
 
-(For a private repo, you'll need a [personal access token](https://github.com/settings/tokens)
-or an SSH deploy key — GitHub's clone URL page shows both options.)
+**A private repo needs a token or key, not your GitHub password** — GitHub
+disabled plain username/password login for git operations in 2021. Two
+ways to authenticate the VPS's clone/pull, pick one:
+
+- **Personal access token** (fastest): GitHub → Settings → Developer
+  settings → Personal access tokens → Tokens (classic) → Generate new
+  token, `repo` scope. When `git clone`/`git pull` prompts for a password,
+  paste the token instead of your actual password — the username field
+  still takes your real GitHub username. Git caches it after the first use
+  (in `~/.git-credentials`, plain text — fine for a personal VPS).
+- **SSH deploy key** (cleaner for a box that only ever pulls): on the VPS,
+  `ssh-keygen -t ed25519 -C "exomusica-vps"` (accept the default path, no
+  passphrase needed for automated pulls), then `cat ~/.ssh/id_ed25519.pub`
+  and paste that into the repo's **Settings → Deploy keys → Add deploy
+  key** (read-only access is enough). Clone with the SSH URL instead of
+  HTTPS: `git clone git@github.com:<you>/exomusica.git`.
 
 ### 5. Configure environment files
 Two `.env` files, neither committed to git (`.gitignore` already excludes
@@ -105,9 +119,15 @@ cp backend/.env.example backend/.env
 ```
 
 Edit `backend/.env`:
-- `DATABASE_URL` — change the password to match what you'll set in step 6,
-  but leave `postgres:5432` as the host (that's the Docker network name, not
-  a real hostname).
+- `DATABASE_URL` — change only the password to match what you'll set in
+  step 6. **Leave the host as `postgres`** — the finished line should look
+  like `postgresql://exomusica:<your-password>@postgres:5432/exomusica`.
+  `postgres` here is the Docker Compose service name from
+  `docker-compose.yml`, not a real hostname — `localhost` will not work,
+  since from inside the backend container `localhost` means the backend
+  container itself, which has no database on it. (Yes, this is a from-
+  experience warning: the shipped `.env.example` used to say `localhost`
+  here, which was wrong and caused exactly this failure.)
 - `JWT_SECRET` — replace with a long random string (`openssl rand -hex 32`
   works).
 - `PORT` — leave as 3001.
@@ -131,7 +151,13 @@ echo "ADMIN_PASSWORD=$(openssl rand -hex 12)" >> .env
 
 If you skip this, the seed script falls back to `admin` / `changeme123` —
 fine to start, but change it immediately after first login (Account page →
-Change password).
+Change password). (The backend container loads both this root `.env` and
+`backend/.env` — that's deliberate, not a leftover: secrets specific to
+the backend service live in `backend/.env`, deploy-level values like this
+one and the Postgres password live here. If `ADMIN_USERNAME` doesn't seem
+to be taking effect when you seed, check the actual container environment
+directly — `docker compose exec backend printenv ADMIN_USERNAME` — rather
+than assuming the file content is wrong.)
 
 **Email**: still editing `backend/.env`, fill in the SMTP block with your
 real `noreply@exomusica.com` credentials:

@@ -7,7 +7,7 @@ import { broadcast } from "../lib/chatHub.js";
 
 const messageInclude = {
   author: { select: { username: true, avatarUrl: true } },
-  reactions: { include: { emoji: true } },
+  reactions: { include: { emoji: true, user: { select: { username: true } } } },
   attachments: true,
 } as const;
 

@@ -13,7 +13,9 @@ services:
   backend:
     build: ./backend
     restart: unless-stopped
-    env_file: .env
+    env_file:
+      - .env
+      - backend/.env
     depends_on: [postgres]
     volumes:
       - uploads:/app/uploads # 65MB/user quota is enforced in app code, not disk quota

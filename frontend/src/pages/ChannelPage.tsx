@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ChangeEvent, type FormEvent } from "react";
+import { useEffect, useRef, useState, type ChangeEvent, type ClipboardEvent, type FormEvent } from "react";
 import { Link, useParams } from "react-router-dom";
 import { api } from "../lib/api";
 import { useAuth } from "../lib/auth";
@@ -7,6 +7,7 @@ import { renderMessageContent } from "../lib/formatMessage";
 import { EmojiPicker } from "../components/EmojiPicker";
 import type { Emoji } from "../lib/emojiStore";
 import type { MessageDTO } from "../lib/types";
+import { useDocumentTitle } from "../lib/useDocumentTitle";
 
 type ViewMode = "live" | "day" | "search";
 
@@ -64,8 +65,13 @@ function MessageRow({ message, onDelete }: { message: MessageDTO; onDelete: (id:
             ))}
             <div style={{ marginTop: "0.3rem", display: "flex", gap: "0.4rem", alignItems: "center", position: "relative" }}>
               {message.reactions.map((r) => (
-                <span key={r.emojiId} className="btn" style={{ padding: "0.1rem 0.5rem", fontSize: "0.8rem" }}>
-                  :{r.emojiName}: {r.userIds.length}
+                <span
+                  key={r.emojiId}
+                  className="btn"
+                  style={{ padding: "0.1rem 0.5rem", fontSize: "0.8rem" }}
+                  title={r.usernames.join(", ")}
+                >
+                  :{r.emojiName}: {r.usernames.length}
                 </span>
               ))}
               {user && (
@@ -100,8 +106,27 @@ export function ChannelPage({ channelSlug }: { channelSlug?: string } = {}) {
   const [archiveDays, setArchiveDays] = useState<{ day: string; messageCount: number }[]>([]);
   const [draft, setDraft] = useState("");
   const [emojiQuery, setEmojiQuery] = useState<string | null>(null);
+  const [following, setFollowing] = useState(false);
+  const [channelName, setChannelName] = useState<string | null>(null);
+  useDocumentTitle(channelName ?? "");
   const wsRef = useRef<WebSocket | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  useEffect(() => {
+    if (!slug || !user) return;
+    api<{ following: boolean }>(`/api/channels/${slug}/follow`).then((r) => setFollowing(r.following));
+  }, [slug, user]);
+
+  async function toggleFollow() {
+    if (!slug) return;
+    await api(`/api/channels/${slug}/follow`, { method: following ? "DELETE" : "POST" });
+    setFollowing(!following);
+  }
+
+  useEffect(() => {
+    if (!slug) return;
+    api<{ name: string }>(`/api/channels/${slug}`).then((c) => setChannelName(c.name));
+  }, [slug]);
 
   useEffect(() => {
     if (!slug) return;
@@ -136,8 +161,7 @@ export function ChannelPage({ channelSlug }: { channelSlug?: string } = {}) {
     return () => ws.close();
   }, [slug, mode]);
 
-  async function handleSend(e: FormEvent) {
-    e.preventDefault();
+  async function sendMessage() {
     if (!draft.trim() || !slug) return;
     const dto = await api<MessageDTO>(`/api/channels/${slug}/messages`, {
       method: "POST",
@@ -146,6 +170,11 @@ export function ChannelPage({ channelSlug }: { channelSlug?: string } = {}) {
     setMessages((prev) => upsertMessage(prev, dto)); // in case the WS event is delayed/missed
     setDraft("");
     setEmojiQuery(null);
+  }
+
+  function handleSend(e: FormEvent) {
+    e.preventDefault();
+    void sendMessage();
   }
 
   async function handleDelete(id: number) {
@@ -163,6 +192,27 @@ export function ChannelPage({ channelSlug }: { channelSlug?: string } = {}) {
     const cursor = e.target.selectionStart ?? value.length;
     const match = value.slice(0, cursor).match(/:([a-z0-9_]*)$/i);
     setEmojiQuery(match ? match[1] : null);
+  }
+
+  function handlePaste(e: React.ClipboardEvent<HTMLTextAreaElement>) {
+    const el = textareaRef.current;
+    if (!el) return;
+    const pasted = e.clipboardData.getData("text").trim();
+    const start = el.selectionStart;
+    const end = el.selectionEnd;
+    const hasSelection = start !== end;
+    const isUrl = /^https?:\/\/\S+$/.test(pasted);
+    if (!hasSelection || !isUrl) return; // let the default paste happen
+
+    e.preventDefault();
+    const selectedText = draft.slice(start, end);
+    const next = `${draft.slice(0, start)}[${selectedText}](${pasted})${draft.slice(end)}`;
+    setDraft(next);
+    requestAnimationFrame(() => {
+      el.focus();
+      const newCursor = start + selectedText.length + pasted.length + 4;
+      el.setSelectionRange(newCursor, newCursor);
+    });
   }
 
   function insertEmoji(emoji: Emoji) {
@@ -188,6 +238,11 @@ export function ChannelPage({ channelSlug }: { channelSlug?: string } = {}) {
         <button className={`btn ${mode === "live" ? "btn-primary" : ""}`} onClick={() => setMode("live")}>
           Live
         </button>
+        {user && (
+          <button className="btn" onClick={toggleFollow}>
+            {following ? "Following ✓" : "Follow"}
+          </button>
+        )}
         <select
           className="btn"
           value={mode === "day" ? selectedDay ?? "" : ""}
@@ -238,9 +293,16 @@ export function ChannelPage({ channelSlug }: { channelSlug?: string } = {}) {
             ref={textareaRef}
             value={draft}
             onChange={handleDraftChange}
+            onPaste={handlePaste}
+            onKeyDown={(e) => {
+              if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
+                e.preventDefault();
+                void sendMessage();
+              }
+            }}
             rows={2}
             style={{ flex: 1 }}
-            placeholder="Write a message… (**bold**, *italic*, `code`, > quote, :emoji:, ...)"
+            placeholder="Write a message… (**bold**, *italic*, `code`, > quote, :emoji:, Ctrl+Enter to send)"
           />
           <button className="btn btn-primary" type="submit">
             Send

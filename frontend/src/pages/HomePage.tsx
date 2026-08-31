@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type MouseEvent, type FocusEvent } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../lib/api";
+import { useDocumentTitle } from "../lib/useDocumentTitle";
 import { useAudioStore } from "../lib/audioStore";
 import type { Branch, BranchAlbum, MessageDTO } from "../lib/types";
 import { layoutTree, type LaidOutBranch } from "../lib/treeLayout";
@@ -87,6 +88,7 @@ function BranchHoverCard({ branch, pos, wrapHeight }: { branch: Branch; pos: Hov
 }
 
 export function HomePage() {
+  useDocumentTitle("");
   const [branches, setBranches] = useState<Branch[]>([]);
   const [hoveredId, setHoveredId] = useState<number | null>(null);
   const [hoverPos, setHoverPos] = useState<HoverPos | null>(null);
