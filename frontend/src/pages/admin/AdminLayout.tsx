@@ -43,6 +43,9 @@ export function AdminLayout() {
         <NavLink to="/admin/notifications" className={({ isActive }) => (isActive ? "active" : "")}>
           Notification sounds
         </NavLink>
+        <NavLink to="/admin/guide-assets" className={({ isActive }) => (isActive ? "active" : "")}>
+          Guide assets
+        </NavLink>
       </nav>
       <div>
         <Outlet />

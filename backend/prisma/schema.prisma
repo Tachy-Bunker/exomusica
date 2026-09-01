@@ -103,6 +103,10 @@ model Branch {
   coverArtUrl String?
   hidden      Boolean  @default(false) // soft take-down: excluded from public listings, data untouched
   isAnchor    Boolean  @default(false) // true + no parent = independent anchor elsewhere on the map, not part of the central cluster
+  guideAssetId  Int?
+  guideAsset    GuideAsset? @relation(fields: [guideAssetId], references: [id])
+  voiceoverUrl  String? // audio played during the first-time intro
+  voiceoverText String? @db.Text // text shown alongside the voiceover
   fontId      Int?
   font        CustomFont? @relation(fields: [fontId], references: [id])
   parentId    Int?
@@ -482,10 +486,23 @@ model Notification {
 // Singleton row (id is always 1) — sitewide settings that aren't tied to
 // any specific branch/topic/wiki/blog. Currently just the default font
 // applied everywhere nothing more specific overrides it.
+// Admin-uploaded GIFs for the guide-character intro sequence (an "Aurora"-
+// style animated guide). A library, not a single asset, since admin may
+// want different guide animations to choose from per branch or in general.
+model GuideAsset {
+  id        Int      @id @default(autoincrement())
+  name      String   @unique
+  gifUrl    String
+  createdAt DateTime @default(now())
+
+  branches Branch[]
+}
+
 model SiteSettings {
   id             Int         @id @default(1)
   defaultFontId  Int?
   defaultFont    CustomFont? @relation(fields: [defaultFontId], references: [id])
+  ambienceUrl    String? // idle-landing ambient loop, plays when nothing else is
 }
 
 model CustomFont {

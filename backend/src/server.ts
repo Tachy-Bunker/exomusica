@@ -43,6 +43,8 @@ import { fontRoutes } from "./routes/fonts.js";
 import { notificationSoundRoutes } from "./routes/notificationSounds.js";
 import { notificationRoutes } from "./routes/notifications.js";
 import { presenceRoutes } from "./routes/presence.js";
+import { linkPreviewRoutes } from "./routes/linkPreview.js";
+import { guideAssetRoutes } from "./routes/guideAssets.js";
 import { siteSettingsRoutes } from "./routes/siteSettings.js";
 import { wsRoutes } from "./routes/ws.js";
 
@@ -86,6 +88,8 @@ await app.register(fontRoutes);
 await app.register(notificationSoundRoutes);
 await app.register(notificationRoutes);
 await app.register(presenceRoutes);
+await app.register(linkPreviewRoutes);
+await app.register(guideAssetRoutes);
 await app.register(siteSettingsRoutes);
 await app.register(wsRoutes);
 

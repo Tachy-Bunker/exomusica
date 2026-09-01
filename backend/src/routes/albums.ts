@@ -21,6 +21,24 @@ export async function albumRoutes(app: FastifyInstance): Promise<void> {
     return shuffled.map(trackToDTO);
   });
 
+  // One branch's tracks, shuffled — powers the reticle lock-on "F" action
+  // in the space map (distinct from /api/tracks/shuffle, which is sitewide).
+  app.get<{ Params: { slug: string } }>("/api/branches/:slug/tracks/shuffle", async (req, reply) => {
+    const branch = await prisma.branch.findUnique({ where: { slug: req.params.slug } });
+    if (!branch) return reply.code(404).send({ error: "no such branch" });
+    const albums = await prisma.album.findMany({ where: { branchId: branch.id }, select: { id: true } });
+    const tracks = await prisma.track.findMany({
+      where: { albumId: { in: albums.map((a) => a.id) } },
+      include: { album: { include: { branch: true } }, bookmarks: true },
+    });
+    const shuffled = [...tracks];
+    for (let i = shuffled.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+    }
+    return shuffled.map(trackToDTO);
+  });
+
   app.get<{ Params: { slug: string } }>("/api/albums/:slug", async (req, reply) => {
     const album = await prisma.album.findUnique({
       where: { slug: req.params.slug },

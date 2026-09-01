@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 import { useAudioStore } from "./audioStore";
+import { useAmbienceStore } from "./ambienceStore";
 import { isTypingTarget } from "./isTypingTarget";
 
 export function useGlobalPlayerShortcuts(): void {
@@ -7,7 +8,13 @@ export function useGlobalPlayerShortcuts(): void {
     function handleKeyDown(e: KeyboardEvent) {
       if (isTypingTarget(e.target)) return;
       const store = useAudioStore.getState();
-      if (!store.currentTrack) return;
+      if (!store.currentTrack) {
+        if (e.key === " ") {
+          e.preventDefault();
+          useAmbienceStore.getState().pauseForNow();
+        }
+        return;
+      }
 
       if (e.key === " ") {
         e.preventDefault();

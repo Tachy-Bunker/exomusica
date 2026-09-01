@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ChangeEvent, type ClipboardEvent, type FormEvent } from "react";
+import { useEffect, useRef, useState, useContext, createContext, type ChangeEvent, type ClipboardEvent, type FormEvent } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import { api } from "../lib/api";
 import { useAuth } from "../lib/auth";
@@ -6,6 +6,7 @@ import { useAudioStore } from "../lib/audioStore";
 import { renderMessageContent } from "../lib/formatMessage";
 import { EmojiPicker } from "../components/EmojiPicker";
 import { AttachmentPreview } from "../components/AttachmentPreview";
+import { LinkEmbedPreview } from "../components/LinkEmbedPreview";
 import { ArchiveCalendar } from "../components/ArchiveCalendar";
 import { SearchBox } from "../components/SearchBox";
 import { TopicSwitcher } from "../components/TopicSwitcher";
@@ -53,6 +54,8 @@ function groupMessages(messages: MessageDTO[]): MessageDTO[][] {
   }
   return groups;
 }
+
+const LinkClickContext = createContext<((url: string) => void) | undefined>(undefined);
 
 function ReactionPills({ message }: { message: MessageDTO }) {
   const emojis = useEmojiStore((s) => s.emojis);
@@ -191,7 +194,7 @@ function MessageBody({
           ↪ {message.replyPreview.authorUsername}: {message.replyPreview.excerpt}
         </a>
       )}
-      <div style={{ paddingRight: "1.6rem" }}>{renderMessageContent(message.contentRaw)}</div>
+      <div style={{ paddingRight: "1.6rem" }}>{renderMessageContent(message.contentRaw, useContext(LinkClickContext))}</div>
       {message.embeds.map((track) => (
         <div className="track-embed" key={track.id} onClick={(e) => e.stopPropagation()}>
           <button onClick={() => play(track)}>▶</button>
@@ -397,6 +400,7 @@ export function ChannelPage({ channelSlug, fillHeight }: { channelSlug?: string;
   }
   useDocumentTitle(channelName ?? "");
   const wsRef = useRef<WebSocket | null>(null);
+  const [linkPreviewUrl, setLinkPreviewUrl] = useState<string | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
@@ -576,6 +580,7 @@ export function ChannelPage({ channelSlug, fillHeight }: { channelSlug?: string;
   }
 
   return (
+    <LinkClickContext.Provider value={setLinkPreviewUrl}>
     <div style={fillHeight ? { fontFamily, display: "flex", flexDirection: "column", height: "100%", minHeight: 0 } : { fontFamily }}>
       <div style={{ display: "flex", gap: "0.6rem", marginBottom: fillHeight ? "0.6rem" : "1rem", flexWrap: "wrap", flexShrink: 0, alignItems: "center" }}>
         <TopicSwitcher label="Branches" />
@@ -620,6 +625,8 @@ export function ChannelPage({ channelSlug, fillHeight }: { channelSlug?: string;
           👁
         </button>
       </div>
+
+      {linkPreviewUrl && <LinkEmbedPreview url={linkPreviewUrl} onClose={() => setLinkPreviewUrl(null)} />}
 
       <div
         className="message-list"
@@ -711,5 +718,6 @@ export function ChannelPage({ channelSlug, fillHeight }: { channelSlug?: string;
 
       {pipWindow && slug && createPortal(<MiniChat slug={slug} channelName={channelName ?? slug} />, pipWindow.document.body)}
     </div>
+    </LinkClickContext.Provider>
   );
 }

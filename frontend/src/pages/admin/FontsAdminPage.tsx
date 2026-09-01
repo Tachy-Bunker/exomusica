@@ -29,12 +29,32 @@ export function FontsAdminPage() {
   const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [siteDefaultFontId, setSiteDefaultFontId] = useState<number | null>(null);
+  const [ambienceUrl, setAmbienceUrl] = useState<string | null>(null);
+  const ambienceInputRef = useRef<HTMLInputElement>(null);
 
   function load() {
     api<Font[]>("/api/fonts").then(setFonts);
-    api<{ defaultFontId: number | null }>("/api/site-settings").then((s) => setSiteDefaultFontId(s.defaultFontId));
+    api<{ defaultFontId: number | null; ambienceUrl: string | null }>("/api/site-settings").then((s) => {
+      setSiteDefaultFontId(s.defaultFontId);
+      setAmbienceUrl(s.ambienceUrl);
+    });
   }
   useEffect(load, []);
+
+  async function uploadAmbience() {
+    const file = ambienceInputRef.current?.files?.[0];
+    if (!file) return;
+    const formData = new FormData();
+    formData.append("file", file);
+    const result = await api<{ ambienceUrl: string }>("/api/admin/site-settings/ambience", { method: "POST", body: formData });
+    setAmbienceUrl(result.ambienceUrl);
+    if (ambienceInputRef.current) ambienceInputRef.current.value = "";
+  }
+
+  async function removeAmbience() {
+    await api("/api/admin/site-settings/ambience", { method: "DELETE" });
+    setAmbienceUrl(null);
+  }
 
   async function setSiteDefault(idStr: string) {
     const defaultFontId = idStr ? Number(idStr) : null;
@@ -86,6 +106,28 @@ export function FontsAdminPage() {
         <p style={{ fontSize: "0.75rem", color: "var(--text-dim)" }}>
           Applies everywhere nothing more specific overrides it (a branch/topic/wiki/blog font still wins where set).
         </p>
+      </div>
+
+      <div className="field" style={{ maxWidth: 420 }}>
+        <label>Idle ambience loop</label>
+        <p style={{ fontSize: "0.75rem", color: "var(--text-dim)", marginTop: 0 }}>
+          Plays on loop whenever nothing else is playing, fading in/out around real tracks. Users can turn it off via
+          the "Exo-Ambience" checkbox on the homepage.
+        </p>
+        {ambienceUrl && (
+          <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.4rem" }}>
+            <audio src={ambienceUrl} controls style={{ height: 32 }} />
+            <button className="btn btn-danger" onClick={removeAmbience}>
+              Remove
+            </button>
+          </div>
+        )}
+        <div style={{ display: "flex", gap: "0.5rem" }}>
+          <input ref={ambienceInputRef} type="file" accept="audio/mpeg,audio/wav,audio/ogg" />
+          <button className="btn btn-primary" onClick={uploadAmbience}>
+            {ambienceUrl ? "Replace" : "Upload"}
+          </button>
+        </div>
       </div>
 
       <div style={{ display: "flex", gap: "0.5rem", marginBottom: "1rem" }}>

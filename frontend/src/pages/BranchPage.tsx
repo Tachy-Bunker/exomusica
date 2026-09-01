@@ -9,6 +9,8 @@ import { useDocumentTitle } from "../lib/useDocumentTitle";
 import { useCustomFont } from "../lib/useCustomFont";
 import { useChatDockStore } from "../lib/chatDockStore";
 import { useIsDesktop } from "../lib/useIsDesktop";
+import { hasSeenBranchIntro, markBranchIntroSeen } from "../lib/branchIntroSeen";
+import { BranchIntroOverlay } from "../components/BranchIntroOverlay";
 
 export function BranchPage() {
   const { slug } = useParams<{ slug: string }>();
@@ -19,6 +21,8 @@ export function BranchPage() {
   const fontFamily = useCustomFont(branch?.font);
   const isDesktop = useIsDesktop();
   const openChat = useChatDockStore((s) => s.openChat);
+  const [showIntro, setShowIntro] = useState(false);
+  const [pendingPlayAlbumSlug, setPendingPlayAlbumSlug] = useState<string | null>(null);
 
   useEffect(() => {
     if (isDesktop && branch?.channel) {
@@ -34,11 +38,31 @@ export function BranchPage() {
   }
 
   async function playAlbum(albumSlug: string) {
+    if (branch?.guideAsset && !hasSeenBranchIntro(branch.slug)) {
+      setPendingPlayAlbumSlug(albumSlug);
+      setShowIntro(true);
+      return;
+    }
     const full = await api<{ tracks: PlayableTrackDTO[] }>(`/api/albums/${albumSlug}`);
     if (full.tracks.length === 0) return;
     const [first, ...rest] = full.tracks;
     play(first);
     addToQueue(rest);
+  }
+
+  async function afterIntro() {
+    setShowIntro(false);
+    if (branch) markBranchIntroSeen(branch.slug);
+    if (pendingPlayAlbumSlug) {
+      const slug = pendingPlayAlbumSlug;
+      setPendingPlayAlbumSlug(null);
+      const full = await api<{ tracks: PlayableTrackDTO[] }>(`/api/albums/${slug}`);
+      if (full.tracks.length > 0) {
+        const [first, ...rest] = full.tracks;
+        play(first);
+        addToQueue(rest);
+      }
+    }
   }
 
   useEffect(() => {
@@ -119,6 +143,15 @@ export function BranchPage() {
         <p style={{ color: "var(--text-dim)", fontSize: "0.9rem" }}>This topic's chat is open in the dock →</p>
       ) : (
         <ChannelPage channelSlug={branch.channel.slug} />
+      )}
+
+      {showIntro && branch.guideAsset && (
+        <BranchIntroOverlay
+          gifUrl={branch.guideAsset.gifUrl}
+          voiceoverUrl={branch.voiceoverUrl ?? null}
+          text={branch.voiceoverText ?? null}
+          onDone={afterIntro}
+        />
       )}
     </div>
   );

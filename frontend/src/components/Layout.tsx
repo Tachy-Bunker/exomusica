@@ -3,6 +3,8 @@ import { Link, Outlet } from "react-router-dom";
 import { api } from "../lib/api";
 import { useAuth } from "../lib/auth";
 import { useCustomFont } from "../lib/useCustomFont";
+import { useAmbienceStore } from "../lib/ambienceStore";
+import { useAudioStore } from "../lib/audioStore";
 import { useEmojiStore } from "../lib/emojiStore";
 import { useGlobalPlayerShortcuts } from "../lib/useGlobalPlayerShortcuts";
 import { useChatDockStore } from "../lib/chatDockStore";
@@ -37,9 +39,18 @@ export function Layout() {
 
   const [siteFont, setSiteFont] = useState<{ familyName: string; fileUrl: string; format: string } | null>(null);
   useEffect(() => {
-    api<{ defaultFont: typeof siteFont }>("/api/site-settings").then((s) => setSiteFont(s.defaultFont));
+    api<{ defaultFont: typeof siteFont; ambienceUrl: string | null }>("/api/site-settings").then((s) => {
+      setSiteFont(s.defaultFont);
+      useAmbienceStore.getState().setUrl(s.ambienceUrl);
+    });
   }, []);
   const siteFontFamily = useCustomFont(siteFont);
+
+  const currentTrack = useAudioStore((s) => s.currentTrack);
+  const setAmbienceHasMainTrack = useAmbienceStore((s) => s.setHasMainTrack);
+  useEffect(() => {
+    setAmbienceHasMainTrack(!!currentTrack);
+  }, [currentTrack, setAmbienceHasMainTrack]);
   useEffect(() => {
     if (siteFontFamily) document.documentElement.style.setProperty("--font-body", siteFontFamily);
     else document.documentElement.style.removeProperty("--font-body");
@@ -82,6 +93,7 @@ export function Layout() {
       <PlayerBar />
       <NotificationWidget offsetRight={dockOffset} />
       <ChatDock />
+      <div className="crt-overlay" />
     </div>
   );
 }

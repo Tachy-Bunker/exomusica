@@ -40,6 +40,10 @@ export interface Branch {
   font?: { familyName: string; fileUrl: string; format: string } | null;
   parentId: number | null;
   isAnchor?: boolean;
+  guideAssetId?: number | null;
+  guideAsset?: { id: number; name: string; gifUrl: string } | null;
+  voiceoverUrl?: string | null;
+  voiceoverText?: string | null;
   posX: number | null;
   posY: number | null;
   channel: { slug: string } | null;

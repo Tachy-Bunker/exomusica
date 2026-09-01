@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import { api, ApiError } from "../../lib/api";
 import type { Branch } from "../../lib/types";
 
@@ -13,11 +13,22 @@ export function BranchesPage() {
   const [form, setForm] = useState({ slug: "", name: "", description: "", parentId: "" });
   const [error, setError] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<number | null>(null);
-  const [editForm, setEditForm] = useState({ name: "", description: "", fontId: "", parentId: "", isAnchor: false });
+  const [editForm, setEditForm] = useState({
+    name: "",
+    description: "",
+    fontId: "",
+    parentId: "",
+    isAnchor: false,
+    guideAssetId: "",
+    voiceoverText: "",
+  });
+  const [guideAssets, setGuideAssets] = useState<{ id: number; name: string }[]>([]);
+  const voiceoverInputRef = useRef<HTMLInputElement>(null);
 
   function load() {
     api<Branch[]>("/api/admin/branches").then(setBranches);
     api<Font[]>("/api/fonts").then(setFonts);
+    api<{ id: number; name: string }[]>("/api/guide-assets").then(setGuideAssets);
   }
 
   useEffect(load, []);
@@ -50,6 +61,8 @@ export function BranchesPage() {
       fontId: b.fontId ? String(b.fontId) : "",
       parentId: b.parentId ? String(b.parentId) : "",
       isAnchor: !!b.isAnchor,
+      guideAssetId: b.guideAssetId ? String(b.guideAssetId) : "",
+      voiceoverText: b.voiceoverText ?? "",
     });
   }
 
@@ -62,9 +75,21 @@ export function BranchesPage() {
         fontId: editForm.fontId ? Number(editForm.fontId) : null,
         parentId: editForm.parentId ? Number(editForm.parentId) : null,
         isAnchor: editForm.isAnchor,
+        guideAssetId: editForm.guideAssetId ? Number(editForm.guideAssetId) : null,
+        voiceoverText: editForm.voiceoverText,
       }),
     });
     setEditingId(null);
+    load();
+  }
+
+  async function uploadVoiceover(branchId: number) {
+    const file = voiceoverInputRef.current?.files?.[0];
+    if (!file) return;
+    const formData = new FormData();
+    formData.append("file", file);
+    await api(`/api/admin/branches/${branchId}/voiceover`, { method: "POST", body: formData });
+    if (voiceoverInputRef.current) voiceoverInputRef.current.value = "";
     load();
   }
 
@@ -184,6 +209,32 @@ export function BranchesPage() {
                     />{" "}
                     Independent anchor (only applies with no parent)
                   </label>
+                  <select
+                    value={editForm.guideAssetId}
+                    onChange={(e) => setEditForm((f) => ({ ...f, guideAssetId: e.target.value }))}
+                    style={{ marginTop: "0.3rem" }}
+                  >
+                    <option value="">— no intro guide —</option>
+                    {guideAssets.map((g) => (
+                      <option key={g.id} value={g.id}>
+                        {g.name}
+                      </option>
+                    ))}
+                  </select>
+                  <textarea
+                    rows={2}
+                    placeholder="Voiceover text (shown during the first-time intro)"
+                    value={editForm.voiceoverText}
+                    onChange={(e) => setEditForm((f) => ({ ...f, voiceoverText: e.target.value }))}
+                    style={{ marginTop: "0.3rem" }}
+                  />
+                  <div style={{ display: "flex", gap: "0.4rem", alignItems: "center", marginTop: "0.3rem" }}>
+                    <input ref={voiceoverInputRef} type="file" accept="audio/mpeg,audio/wav,audio/ogg" style={{ fontSize: "0.75rem" }} />
+                    <button className="btn" onClick={() => uploadVoiceover(b.id)}>
+                      Upload voiceover
+                    </button>
+                    {b.voiceoverUrl && <span style={{ fontSize: "0.75rem", color: "var(--text-dim)" }}>has audio ✓</span>}
+                  </div>
                 </td>
               ) : (
                 <>

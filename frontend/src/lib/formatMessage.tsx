@@ -27,10 +27,18 @@ const INLINE_PATTERN =
 // them to real names needs a bulk id->name lookup endpoint that doesn't
 // exist yet (the current /api/users/:username route is keyed the other
 // way). Small, cheap follow-up; not done here.
-function renderInline(text: string, keyPrefix: string): ReactNode[] {
+function renderInline(text: string, keyPrefix: string, onLinkClick?: (url: string) => void): ReactNode[] {
   const nodes: ReactNode[] = [];
   let lastIndex = 0;
   let i = 0;
+
+  function linkClickHandler(url: string) {
+    if (!onLinkClick) return undefined;
+    return (e: React.MouseEvent) => {
+      e.preventDefault();
+      onLinkClick(url);
+    };
+  }
 
   // matchAll (not a manual exec loop) deliberately — it doesn't mutate the
   // shared regex's lastIndex, so recursive calls for nested formatting
@@ -42,15 +50,15 @@ function renderInline(text: string, keyPrefix: string): ReactNode[] {
     const [, bold, italic, underline, strike, code, spoiler, linkText, linkUrl, timestamp, roleId, userId, channelId, emojiName, bareUrl] =
       match;
 
-    if (bold !== undefined) nodes.push(<strong key={key}>{renderInline(bold, key)}</strong>);
-    else if (italic !== undefined) nodes.push(<em key={key}>{renderInline(italic, key)}</em>);
-    else if (underline !== undefined) nodes.push(<u key={key}>{renderInline(underline, key)}</u>);
-    else if (strike !== undefined) nodes.push(<s key={key}>{renderInline(strike, key)}</s>);
+    if (bold !== undefined) nodes.push(<strong key={key}>{renderInline(bold, key, onLinkClick)}</strong>);
+    else if (italic !== undefined) nodes.push(<em key={key}>{renderInline(italic, key, onLinkClick)}</em>);
+    else if (underline !== undefined) nodes.push(<u key={key}>{renderInline(underline, key, onLinkClick)}</u>);
+    else if (strike !== undefined) nodes.push(<s key={key}>{renderInline(strike, key, onLinkClick)}</s>);
     else if (code !== undefined) nodes.push(<code key={key}>{code}</code>);
-    else if (spoiler !== undefined) nodes.push(<Spoiler key={key}>{renderInline(spoiler, key)}</Spoiler>);
+    else if (spoiler !== undefined) nodes.push(<Spoiler key={key}>{renderInline(spoiler, key, onLinkClick)}</Spoiler>);
     else if (linkText !== undefined && linkUrl !== undefined)
       nodes.push(
-        <a key={key} href={linkUrl} target="_blank" rel="noreferrer">
+        <a key={key} href={linkUrl} target="_blank" rel="noreferrer" onClick={linkClickHandler(linkUrl)}>
           {linkText}
         </a>,
       );
@@ -89,7 +97,7 @@ function renderInline(text: string, keyPrefix: string): ReactNode[] {
       );
     } else if (bareUrl !== undefined)
       nodes.push(
-        <a key={key} href={bareUrl} target="_blank" rel="noreferrer">
+        <a key={key} href={bareUrl} target="_blank" rel="noreferrer" onClick={linkClickHandler(bareUrl)}>
           {bareUrl}
         </a>,
       );
@@ -100,7 +108,7 @@ function renderInline(text: string, keyPrefix: string): ReactNode[] {
   return nodes;
 }
 
-export function renderMessageContent(text: string): ReactNode {
+export function renderMessageContent(text: string, onLinkClick?: (url: string) => void): ReactNode {
   const lines = text.split("\n");
   return (
     <>
@@ -108,13 +116,13 @@ export function renderMessageContent(text: string): ReactNode {
         if (line.startsWith("## "))
           return (
             <h3 key={idx} style={{ margin: "0.3em 0", fontSize: "1.1rem" }}>
-              {renderInline(line.slice(3), `h${idx}`)}
+              {renderInline(line.slice(3), `h${idx}`, onLinkClick)}
             </h3>
           );
         if (line.startsWith("-# "))
           return (
             <p key={idx} style={{ fontSize: "0.75em", color: "var(--text-dim)", margin: "0.2em 0" }}>
-              {renderInline(line.slice(3), `s${idx}`)}
+              {renderInline(line.slice(3), `s${idx}`, onLinkClick)}
             </p>
           );
         if (line.startsWith("> "))
@@ -128,13 +136,13 @@ export function renderMessageContent(text: string): ReactNode {
                 color: "var(--text-dim)",
               }}
             >
-              {renderInline(line.slice(2), `q${idx}`)}
+              {renderInline(line.slice(2), `q${idx}`, onLinkClick)}
             </blockquote>
           );
         if (line.trim() === "") return <br key={idx} />;
         return (
           <p key={idx} style={{ margin: "0.2em 0" }}>
-            {renderInline(line, `p${idx}`)}
+            {renderInline(line, `p${idx}`, onLinkClick)}
           </p>
         );
       })}

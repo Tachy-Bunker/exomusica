@@ -58,7 +58,7 @@ export async function branchRoutes(app: FastifyInstance): Promise<void> {
   app.get<{ Params: { slug: string } }>("/api/branches/:slug", async (req, reply) => {
     const branch = await prisma.branch.findUnique({
       where: { slug: req.params.slug },
-      include: { channel: { select: { slug: true } }, font: true },
+      include: { channel: { select: { slug: true } }, font: true, guideAsset: true },
     });
     if (!branch) return reply.code(404).send({ error: "no such branch" });
     return branch;
@@ -132,6 +132,8 @@ export async function branchRoutes(app: FastifyInstance): Promise<void> {
       fontId: number | null;
       parentId: number | null;
       isAnchor: boolean;
+      guideAssetId: number | null;
+      voiceoverText: string;
     }>;
   }>("/api/admin/branches/:id", { preHandler: requireAdmin }, async (req) => {
     const branch = await prisma.branch.update({ where: { id: Number(req.params.id) }, data: req.body ?? {} });

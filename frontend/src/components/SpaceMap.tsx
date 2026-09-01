@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import type { Branch } from "../lib/types";
 import { useIsDesktop } from "../lib/useIsDesktop";
+import { useChatDockStore } from "../lib/chatDockStore";
+import { useAmbienceStore } from "../lib/ambienceStore";
 import { useAudioStore } from "../lib/audioStore";
 import { api } from "../lib/api";
 import type { PlayableTrackDTO } from "../lib/types";
@@ -30,6 +32,8 @@ const DAMPING = 4.5;
 const CAMERA_ACCEL = 1800;
 const CAMERA_FRICTION = 5;
 const CAMERA_MAX_SPEED = 900;
+const LOCK_RADIUS = 40; // px from screen center to start locking on
+const LOCK_TIME = 0.9; // seconds of holding a target to complete the lock
 
 function buildNodes(branches: Branch[]): MapNode[] {
   const centralOrbiters = branches.filter((b) => !b.parentId && !b.isAnchor);
@@ -107,6 +111,8 @@ export function SpaceMap({ branches, centerLabel, centerHref }: { branches: Bran
   const play = useAudioStore((s) => s.play);
   const addToQueue = useAudioStore((s) => s.addToQueue);
   const currentTrack = useAudioStore((s) => s.currentTrack);
+  const ambienceEnabled = useAmbienceStore((s) => s.enabled);
+  const setAmbienceEnabled = useAmbienceStore((s) => s.setEnabled);
 
   async function shufflePlay() {
     const tracks = await api<PlayableTrackDTO[]>("/api/tracks/shuffle");
@@ -125,18 +131,79 @@ export function SpaceMap({ branches, centerLabel, centerHref }: { branches: Bran
   const dragRef = useRef<{ startX: number; startY: number; camX: number; camY: number } | null>(null);
   const frameRef = useRef<number | undefined>(undefined);
 
+  // --- reticle lock-on ---
+  const targetNodeIdRef = useRef<number | null>(null);
+  const lockProgressRef = useRef(0);
+  const [lockedNode, setLockedNode] = useState<MapNode | null>(null);
+  const [revealedCount, setRevealedCount] = useState(0);
+  const audioCtxRef = useRef<AudioContext | null>(null);
+  const lastBeepRef = useRef(0);
+  const openChat = useChatDockStore((s) => s.openChat);
+
+  function beep(freq: number, duration: number) {
+    if (!audioCtxRef.current) audioCtxRef.current = new AudioContext();
+    const ctx = audioCtxRef.current;
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.frequency.value = freq;
+    osc.type = "sine";
+    gain.gain.setValueAtTime(0.06, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + duration);
+    osc.connect(gain).connect(ctx.destination);
+    osc.start();
+    osc.stop(ctx.currentTime + duration);
+  }
+
+  function openLockedChat() {
+    if (!lockedNode) return;
+    const branch = branches.find((b) => b.slug === lockedNode.slug);
+    if (branch?.channel) openChat(branch.channel.slug, branch.name, branch.slug);
+  }
+
+  async function shuffleLockedBranch() {
+    if (!lockedNode) return;
+    const tracks = await api<PlayableTrackDTO[]>(`/api/branches/${lockedNode.slug}/tracks/shuffle`);
+    if (tracks.length === 0) return;
+    const [first, ...rest] = tracks;
+    play(first);
+    addToQueue(rest);
+  }
+
   useEffect(() => {
     nodesRef.current = buildNodes(branches);
   }, [branches]);
 
   useEffect(() => {
+    if (!lockedNode) return;
+    setRevealedCount(0);
+    const interval = setInterval(() => {
+      setRevealedCount((prev) => {
+        if (prev >= lockedNode.name.length) {
+          clearInterval(interval);
+          return prev;
+        }
+        return prev + 1;
+      });
+    }, 45);
+    return () => clearInterval(interval);
+  }, [lockedNode]);
+
+  useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
-      if (["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(e.key)) {
-        keysRef.current.add(e.key);
+      // event.code is the physical key position, not the character it
+      // produces — "KeyW" is always the key at the WASD spot regardless of
+      // layout, so this is ZQSD on an AZERTY keyboard for free, with no
+      // separate layout detection needed.
+      if (["KeyW", "KeyA", "KeyS", "KeyD"].includes(e.code)) {
+        keysRef.current.add(e.code);
+      } else if (e.code === "KeyE") {
+        openLockedChat();
+      } else if (e.code === "KeyF") {
+        void shuffleLockedBranch();
       }
     }
     function handleKeyUp(e: KeyboardEvent) {
-      keysRef.current.delete(e.key);
+      keysRef.current.delete(e.code);
     }
     window.addEventListener("keydown", handleKeyDown);
     window.addEventListener("keyup", handleKeyUp);
@@ -154,15 +221,15 @@ export function SpaceMap({ branches, centerLabel, centerHref }: { branches: Bran
       const dt = Math.min((now - lastTime) / 1000, 0.05);
       lastTime = now;
 
-      // --- camera: keyboard acceleration + friction (inertia) ---
+      // --- camera: WASD acceleration + friction (inertia) ---
       const cam = cameraRef.current;
       const keys = keysRef.current;
       let ax = 0;
       let ay = 0;
-      if (keys.has("ArrowLeft")) ax += CAMERA_ACCEL;
-      if (keys.has("ArrowRight")) ax -= CAMERA_ACCEL;
-      if (keys.has("ArrowUp")) ay += CAMERA_ACCEL;
-      if (keys.has("ArrowDown")) ay -= CAMERA_ACCEL;
+      if (keys.has("KeyA")) ax += CAMERA_ACCEL;
+      if (keys.has("KeyD")) ax -= CAMERA_ACCEL;
+      if (keys.has("KeyW")) ay += CAMERA_ACCEL;
+      if (keys.has("KeyS")) ay -= CAMERA_ACCEL;
       if (!dragRef.current) {
         cam.vx += ax * dt;
         cam.vy += ay * dt;
@@ -226,6 +293,42 @@ export function SpaceMap({ branches, centerLabel, centerHref }: { branches: Bran
         n.y += (fy / DAMPING) * dt;
       }
 
+      // --- reticle lock-on: nearest top-level node to screen center ---
+      const box = containerRef.current;
+      if (box) {
+        const w = box.clientWidth;
+        const h = box.clientHeight;
+        let nearest: MapNode | null = null;
+        let nearestDist = LOCK_RADIUS;
+        for (const n of nodes) {
+          if (n.parentId !== null) continue;
+          const screenX = w / 2 + cam.x + n.x;
+          const screenY = h / 2 + cam.y + n.y;
+          const dist = Math.hypot(screenX - w / 2, screenY - h / 2);
+          if (dist < nearestDist) {
+            nearest = n;
+            nearestDist = dist;
+          }
+        }
+
+        if (nearest?.id !== targetNodeIdRef.current) {
+          targetNodeIdRef.current = nearest?.id ?? null;
+          lockProgressRef.current = 0;
+          setLockedNode(null);
+          setRevealedCount(0);
+        } else if (nearest && lockProgressRef.current < 1) {
+          lockProgressRef.current = Math.min(1, lockProgressRef.current + dt / LOCK_TIME);
+          if (now - lastBeepRef.current > 130) {
+            lastBeepRef.current = now;
+            beep(500 + lockProgressRef.current * 300, 0.04);
+          }
+          if (lockProgressRef.current >= 1) {
+            beep(900, 0.15);
+            setLockedNode(nearest);
+          }
+        }
+      }
+
       // Re-render roughly 30fps worth of React updates — the physics loop
       // itself still runs every animation frame for smoothness.
       frameCount++;
@@ -239,19 +342,6 @@ export function SpaceMap({ branches, centerLabel, centerHref }: { branches: Bran
       if (frameRef.current) cancelAnimationFrame(frameRef.current);
     };
   }, []);
-
-  function handleMouseDown(e: React.MouseEvent) {
-    if ((e.target as HTMLElement).closest(".space-node")) return;
-    dragRef.current = { startX: e.clientX, startY: e.clientY, camX: cameraRef.current.x, camY: cameraRef.current.y };
-  }
-  function handleMouseMove(e: React.MouseEvent) {
-    if (!dragRef.current) return;
-    cameraRef.current.x = dragRef.current.camX + (e.clientX - dragRef.current.startX);
-    cameraRef.current.y = dragRef.current.camY + (e.clientY - dragRef.current.startY);
-  }
-  function handleMouseUp() {
-    dragRef.current = null;
-  }
 
   const lastTouchRef = useRef<{ x: number; y: number; t: number } | null>(null);
   function handleTouchStart(e: React.TouchEvent) {
@@ -288,7 +378,7 @@ export function SpaceMap({ branches, centerLabel, centerHref }: { branches: Bran
   // children are skipped — they stay near their visible parent anyway, and
   // an arrow per satellite would just be clutter.
   const container = containerRef.current;
-  const compassPoints: { angle: number; label: string }[] = [];
+  const compassPoints: { angle: number; label: string; playing: boolean }[] = [];
   if (container) {
     const w = container.clientWidth;
     const h = container.clientHeight;
@@ -297,7 +387,7 @@ export function SpaceMap({ branches, centerLabel, centerHref }: { branches: Bran
       const screenX = w / 2 + cameraRef.current.x + n.x;
       const screenY = h / 2 + cameraRef.current.y + n.y;
       if (screenX < 0 || screenX > w || screenY < 0 || screenY > h) {
-        compassPoints.push({ angle: Math.atan2(screenY - h / 2, screenX - w / 2), label: n.name });
+        compassPoints.push({ angle: Math.atan2(screenY - h / 2, screenX - w / 2), label: n.name, playing: currentTrack?.branchSlug === n.slug });
       }
     }
   }
@@ -305,10 +395,6 @@ export function SpaceMap({ branches, centerLabel, centerHref }: { branches: Bran
   return (
     <div
       className="space-map"
-      onMouseDown={handleMouseDown}
-      onMouseMove={handleMouseMove}
-      onMouseUp={handleMouseUp}
-      onMouseLeave={handleMouseUp}
       onTouchStart={handleTouchStart}
       onTouchMove={handleTouchMove}
       onTouchEnd={handleTouchEnd}
@@ -359,18 +445,45 @@ export function SpaceMap({ branches, centerLabel, centerHref }: { branches: Bran
             left: `${50 + Math.cos(c.angle) * 46}%`,
             top: `${50 + Math.sin(c.angle) * 46}%`,
             transform: `translate(-50%, -50%) rotate(${c.angle}rad)`,
+            color: c.playing ? "var(--accent-audio)" : undefined,
+            textShadow: c.playing ? "0 0 6px var(--accent-audio)" : undefined,
           }}
         >
           ➤
         </div>
       ))}
 
+      {isDesktop && (
+        <div className="space-reticle">
+          <div
+            className="space-reticle-ring"
+            style={{
+              background: `conic-gradient(var(--accent-audio) ${lockProgressRef.current * 360}deg, transparent 0deg)`,
+            }}
+          />
+          <div className="space-reticle-cross" />
+        </div>
+      )}
+
+      {lockedNode && (
+        <div className="space-hud-name">
+          {lockedNode.name.slice(0, revealedCount)}
+          <span className="space-hud-cursor">▌</span>
+        </div>
+      )}
+
       <p className="space-map-hint">
-        {isDesktop ? "Arrow keys or drag to move around. Hover a node to freeze it." : "Swipe to move around. Tap a node to freeze it."}
+        {isDesktop
+          ? "WASD to fly around. Lock onto a branch, then E to open its chat or F to shuffle its music."
+          : "Swipe to move around. Tap a node to freeze it."}
       </p>
       <button className="btn btn-primary space-map-shuffle" onClick={() => void shufflePlay()}>
         🔀 Shuffle play
       </button>
+      <label className="space-map-ambience-toggle">
+        <input type="checkbox" checked={ambienceEnabled} onChange={(e) => setAmbienceEnabled(e.target.checked)} />
+        Exo-Ambience
+      </label>
     </div>
   );
 }
