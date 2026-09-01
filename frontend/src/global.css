@@ -662,16 +662,18 @@ th {
 .space-node {
   position: absolute;
   transform: translate(-50%, -50%);
-  padding: 0.35rem 0.7rem;
+  padding: calc(0.35rem * var(--space-scale, 1)) calc(0.7rem * var(--space-scale, 1));
   border-radius: 999px;
   background: var(--accent-forum-dim);
   border: 1px solid var(--accent-forum);
   color: var(--text);
-  font-size: 0.8rem;
+  font-size: calc(0.8rem * var(--space-scale, 1));
   white-space: nowrap;
   cursor: pointer;
   user-select: none;
-  transition: box-shadow 0.15s ease;
+  transition:
+    box-shadow 0.15s ease,
+    transform 0.2s ease;
 }
 
 .space-node:hover {
@@ -683,7 +685,7 @@ th {
   border-color: var(--accent-audio);
   font-family: var(--font-display);
   font-weight: 700;
-  padding: 0.6rem 1rem;
+  padding: calc(0.6rem * var(--space-scale, 1)) calc(1rem * var(--space-scale, 1));
   z-index: 2;
 }
 
@@ -773,4 +775,55 @@ th {
   background: linear-gradient(180deg, var(--accent-forum), var(--accent-audio), var(--accent-forum-dim), var(--accent-audio-dim), var(--accent-forum));
   background-size: 400% 400%;
   animation: liquid-flow 6s ease-in-out infinite;
+}
+
+.space-compass-arrow {
+  position: absolute;
+  color: var(--accent-forum);
+  font-size: 1.1rem;
+  text-shadow: 0 0 6px var(--accent-forum);
+  pointer-events: none;
+  z-index: 3;
+}
+
+.space-map-shuffle {
+  position: absolute;
+  bottom: 0.6rem;
+  right: 0.7rem;
+  z-index: 4;
+}
+
+.space-node-playing {
+  background: var(--accent-audio-dim);
+  border-color: var(--accent-audio);
+  box-shadow: 0 0 16px var(--accent-audio);
+  transform: translate(-50%, -50%) scale(1.25);
+  z-index: 5;
+}
+
+@keyframes particle-drift {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.5);
+  }
+  40% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -50%) translateY(-22px) scale(1);
+  }
+}
+
+.space-node-particle {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--accent-audio);
+  box-shadow: 0 0 4px var(--accent-audio);
+  pointer-events: none;
+  animation: particle-drift 1.8s ease-out infinite;
 }

@@ -1,6 +1,10 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import type { Branch } from "../lib/types";
+import { useIsDesktop } from "../lib/useIsDesktop";
+import { useAudioStore } from "../lib/audioStore";
+import { api } from "../lib/api";
+import type { PlayableTrackDTO } from "../lib/types";
 
 interface MapNode {
   id: number;
@@ -99,6 +103,18 @@ function buildNodes(branches: Branch[]): MapNode[] {
 
 export function SpaceMap({ branches, centerLabel, centerHref }: { branches: Branch[]; centerLabel: string; centerHref: string }) {
   const navigate = useNavigate();
+  const isDesktop = useIsDesktop();
+  const play = useAudioStore((s) => s.play);
+  const addToQueue = useAudioStore((s) => s.addToQueue);
+  const currentTrack = useAudioStore((s) => s.currentTrack);
+
+  async function shufflePlay() {
+    const tracks = await api<PlayableTrackDTO[]>("/api/tracks/shuffle");
+    if (tracks.length === 0) return;
+    const [first, ...rest] = tracks;
+    play(first);
+    addToQueue(rest);
+  }
   const containerRef = useRef<HTMLDivElement>(null);
   const nodesRef = useRef<MapNode[]>([]);
   const [renderTick, setRenderTick] = useState(0);
@@ -237,6 +253,55 @@ export function SpaceMap({ branches, centerLabel, centerHref }: { branches: Bran
     dragRef.current = null;
   }
 
+  const lastTouchRef = useRef<{ x: number; y: number; t: number } | null>(null);
+  function handleTouchStart(e: React.TouchEvent) {
+    const t = e.touches[0];
+    dragRef.current = { startX: t.clientX, startY: t.clientY, camX: cameraRef.current.x, camY: cameraRef.current.y };
+    lastTouchRef.current = { x: t.clientX, y: t.clientY, t: performance.now() };
+  }
+  function handleTouchMove(e: React.TouchEvent) {
+    if (!dragRef.current) return;
+    const t = e.touches[0];
+    cameraRef.current.x = dragRef.current.camX + (t.clientX - dragRef.current.startX);
+    cameraRef.current.y = dragRef.current.camY + (t.clientY - dragRef.current.startY);
+    lastTouchRef.current = { x: t.clientX, y: t.clientY, t: performance.now() };
+  }
+  function handleTouchEnd(e: React.TouchEvent) {
+    dragRef.current = null;
+    const last = lastTouchRef.current;
+    const t = e.changedTouches[0];
+    if (last && t) {
+      const dt = (performance.now() - last.t) / 1000 || 0.016;
+      // Flick-to-scroll: convert the final swipe speed into camera
+      // velocity, which the existing friction decay then eases out —
+      // same inertia mechanism arrow-key panning already uses.
+      cameraRef.current.vx = ((t.clientX - last.x) / dt) * 0.5;
+      cameraRef.current.vy = ((t.clientY - last.y) / dt) * 0.5;
+    }
+  }
+
+  const scale = isDesktop ? 2 : 1.5;
+
+  // Compass: top-level nodes (central-cluster + anchors) currently outside
+  // the visible container get a small arrow at the edge pointing toward
+  // them, so an anchor scattered far away is never truly "lost". Orbiting
+  // children are skipped — they stay near their visible parent anyway, and
+  // an arrow per satellite would just be clutter.
+  const container = containerRef.current;
+  const compassPoints: { angle: number; label: string }[] = [];
+  if (container) {
+    const w = container.clientWidth;
+    const h = container.clientHeight;
+    for (const n of nodesRef.current) {
+      if (n.parentId !== null) continue;
+      const screenX = w / 2 + cameraRef.current.x + n.x;
+      const screenY = h / 2 + cameraRef.current.y + n.y;
+      if (screenX < 0 || screenX > w || screenY < 0 || screenY > h) {
+        compassPoints.push({ angle: Math.atan2(screenY - h / 2, screenX - w / 2), label: n.name });
+      }
+    }
+  }
+
   return (
     <div
       className="space-map"
@@ -244,7 +309,12 @@ export function SpaceMap({ branches, centerLabel, centerHref }: { branches: Bran
       onMouseMove={handleMouseMove}
       onMouseUp={handleMouseUp}
       onMouseLeave={handleMouseUp}
+      onTouchStart={handleTouchStart}
+      onTouchMove={handleTouchMove}
+      onTouchEnd={handleTouchEnd}
       tabIndex={0}
+      ref={containerRef}
+      style={{ "--space-scale": scale } as React.CSSProperties}
     >
       <div
         className="space-map-field"
@@ -254,27 +324,53 @@ export function SpaceMap({ branches, centerLabel, centerHref }: { branches: Bran
           {centerLabel}
         </div>
 
-        {nodesRef.current.map((n) => (
-          <div
-            key={n.id}
-            className={`space-node ${n.isAnchor ? "space-node-anchor" : ""}`}
-            style={{ left: n.x, top: n.y }}
-            onMouseEnter={() => {
-              hoveredIdRef.current = n.id;
-              setHoveredId(n.id);
-            }}
-            onMouseLeave={() => {
-              hoveredIdRef.current = null;
-              setHoveredId(null);
-            }}
-            onClick={() => navigate(`/branch/${n.slug}`)}
-          >
-            {n.name}
-            {hoveredId === n.id && <span className="space-node-frozen-dot" />}
-          </div>
-        ))}
+        {nodesRef.current.map((n) => {
+          const isPlaying = currentTrack?.branchSlug === n.slug;
+          return (
+            <div
+              key={n.id}
+              className={`space-node ${n.isAnchor ? "space-node-anchor" : ""} ${isPlaying ? "space-node-playing" : ""}`}
+              style={{ left: n.x, top: n.y }}
+              onMouseEnter={() => {
+                hoveredIdRef.current = n.id;
+                setHoveredId(n.id);
+              }}
+              onMouseLeave={() => {
+                hoveredIdRef.current = null;
+                setHoveredId(null);
+              }}
+              onClick={() => navigate(`/branch/${n.slug}`)}
+            >
+              {n.name}
+              {hoveredId === n.id && <span className="space-node-frozen-dot" />}
+              {isPlaying &&
+                [0, 1, 2].map((i) => <span key={i} className="space-node-particle" style={{ animationDelay: `${i * 0.6}s` }} />)}
+            </div>
+          );
+        })}
       </div>
-      <p className="space-map-hint">Arrow keys or drag to move around. Hover a node to freeze it.</p>
+
+      {compassPoints.map((c, i) => (
+        <div
+          key={i}
+          className="space-compass-arrow"
+          title={c.label}
+          style={{
+            left: `${50 + Math.cos(c.angle) * 46}%`,
+            top: `${50 + Math.sin(c.angle) * 46}%`,
+            transform: `translate(-50%, -50%) rotate(${c.angle}rad)`,
+          }}
+        >
+          ➤
+        </div>
+      ))}
+
+      <p className="space-map-hint">
+        {isDesktop ? "Arrow keys or drag to move around. Hover a node to freeze it." : "Swipe to move around. Tap a node to freeze it."}
+      </p>
+      <button className="btn btn-primary space-map-shuffle" onClick={() => void shufflePlay()}>
+        🔀 Shuffle play
+      </button>
     </div>
   );
 }

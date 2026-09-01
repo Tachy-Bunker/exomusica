@@ -5,6 +5,22 @@ import { trackToDTO } from "../lib/embeds.js";
 import { saveSiteImage, saveGalleryFile } from "../lib/storage.js";
 
 export async function albumRoutes(app: FastifyInstance): Promise<void> {
+  // Every track site-wide, shuffled server-side — powers the homepage's
+  // "Shuffle play" button. Capped well above any realistic catalog size,
+  // just as a sanity limit rather than a real constraint.
+  app.get("/api/tracks/shuffle", async () => {
+    const tracks = await prisma.track.findMany({
+      include: { album: { include: { branch: true } }, bookmarks: true },
+      take: 500,
+    });
+    const shuffled = [...tracks];
+    for (let i = shuffled.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+    }
+    return shuffled.map(trackToDTO);
+  });
+
   app.get<{ Params: { slug: string } }>("/api/albums/:slug", async (req, reply) => {
     const album = await prisma.album.findUnique({
       where: { slug: req.params.slug },
