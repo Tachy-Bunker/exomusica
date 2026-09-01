@@ -102,6 +102,7 @@ model Branch {
   description String?
   coverArtUrl String?
   hidden      Boolean  @default(false) // soft take-down: excluded from public listings, data untouched
+  isAnchor    Boolean  @default(false) // true + no parent = independent anchor elsewhere on the map, not part of the central cluster
   fontId      Int?
   font        CustomFont? @relation(fields: [fontId], references: [id])
   parentId    Int?

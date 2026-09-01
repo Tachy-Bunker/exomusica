@@ -13,7 +13,7 @@ export function BranchesPage() {
   const [form, setForm] = useState({ slug: "", name: "", description: "", parentId: "" });
   const [error, setError] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<number | null>(null);
-  const [editForm, setEditForm] = useState({ name: "", description: "", fontId: "" });
+  const [editForm, setEditForm] = useState({ name: "", description: "", fontId: "", parentId: "", isAnchor: false });
 
   function load() {
     api<Branch[]>("/api/admin/branches").then(setBranches);
@@ -44,7 +44,13 @@ export function BranchesPage() {
 
   function startEdit(b: Branch) {
     setEditingId(b.id);
-    setEditForm({ name: b.name, description: b.description ?? "", fontId: b.fontId ? String(b.fontId) : "" });
+    setEditForm({
+      name: b.name,
+      description: b.description ?? "",
+      fontId: b.fontId ? String(b.fontId) : "",
+      parentId: b.parentId ? String(b.parentId) : "",
+      isAnchor: !!b.isAnchor,
+    });
   }
 
   async function saveEdit(id: number) {
@@ -54,6 +60,8 @@ export function BranchesPage() {
         name: editForm.name,
         description: editForm.description,
         fontId: editForm.fontId ? Number(editForm.fontId) : null,
+        parentId: editForm.parentId ? Number(editForm.parentId) : null,
+        isAnchor: editForm.isAnchor,
       }),
     });
     setEditingId(null);
@@ -157,6 +165,25 @@ export function BranchesPage() {
                       </option>
                     ))}
                   </select>
+                  <select value={editForm.parentId} onChange={(e) => setEditForm((f) => ({ ...f, parentId: e.target.value }))}>
+                    <option value="">— Join/About (center) —</option>
+                    {branches
+                      .filter((other) => other.id !== b.id)
+                      .map((other) => (
+                        <option key={other.id} value={other.id}>
+                          {other.name}
+                        </option>
+                      ))}
+                  </select>
+                  <label style={{ fontSize: "0.8rem", display: "block", marginTop: "0.2rem" }}>
+                    <input
+                      type="checkbox"
+                      checked={editForm.isAnchor}
+                      onChange={(e) => setEditForm((f) => ({ ...f, isAnchor: e.target.checked }))}
+                      disabled={!!editForm.parentId}
+                    />{" "}
+                    Independent anchor (only applies with no parent)
+                  </label>
                 </td>
               ) : (
                 <>

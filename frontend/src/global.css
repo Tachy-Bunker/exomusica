@@ -612,3 +612,25 @@ th {
   cursor: pointer;
   box-shadow: 0 0 12px var(--accent-forum-dim);
 }
+
+@keyframes presence-pulse {
+  0% {
+    box-shadow: 0 0 0 0 var(--accent-audio-dim);
+  }
+  70% {
+    box-shadow: 0 0 0 6px transparent;
+  }
+  100% {
+    box-shadow: 0 0 0 0 transparent;
+  }
+}
+
+.presence-pulse {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--accent-audio);
+  animation: presence-pulse 1.8s ease-out infinite;
+  flex-shrink: 0;
+}

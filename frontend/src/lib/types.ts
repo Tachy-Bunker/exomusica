@@ -39,6 +39,7 @@ export interface Branch {
   fontId?: number | null;
   font?: { familyName: string; fileUrl: string; format: string } | null;
   parentId: number | null;
+  isAnchor?: boolean;
   posX: number | null;
   posY: number | null;
   channel: { slug: string } | null;

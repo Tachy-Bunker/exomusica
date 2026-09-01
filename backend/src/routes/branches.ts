@@ -24,6 +24,7 @@ export async function branchRoutes(app: FastifyInstance): Promise<void> {
         description: true,
         coverArtUrl: true,
         parentId: true,
+        isAnchor: true,
         posX: true,
         posY: true,
         channel: { select: { id: true, slug: true } },
@@ -121,7 +122,17 @@ export async function branchRoutes(app: FastifyInstance): Promise<void> {
 
   app.patch<{
     Params: { id: string };
-    Body: Partial<{ name: string; description: string; coverArtUrl: string; hidden: boolean; posX: number; posY: number; fontId: number | null }>;
+    Body: Partial<{
+      name: string;
+      description: string;
+      coverArtUrl: string;
+      hidden: boolean;
+      posX: number;
+      posY: number;
+      fontId: number | null;
+      parentId: number | null;
+      isAnchor: boolean;
+    }>;
   }>("/api/admin/branches/:id", { preHandler: requireAdmin }, async (req) => {
     const branch = await prisma.branch.update({ where: { id: Number(req.params.id) }, data: req.body ?? {} });
     await prisma.auditLog.create({

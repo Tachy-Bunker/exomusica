@@ -8,6 +8,7 @@ import { EmojiPicker } from "../components/EmojiPicker";
 import { AttachmentPreview } from "../components/AttachmentPreview";
 import { ArchiveCalendar } from "../components/ArchiveCalendar";
 import { SearchBox } from "../components/SearchBox";
+import { TopicSwitcher } from "../components/TopicSwitcher";
 import { useEmojiStore, type Emoji } from "../lib/emojiStore";
 import type { MessageDTO } from "../lib/types";
 import { createPortal } from "react-dom";
@@ -479,6 +480,7 @@ export function ChannelPage({ channelSlug, fillHeight }: { channelSlug?: string;
     setEmojiQuery(null);
     setReplyTarget(null);
     setPendingAttachments([]);
+    setFollowing(true); // posting auto-follows server-side; keep the button in sync without a refetch
   }
 
   async function handleFileSelect(e: ChangeEvent<HTMLInputElement>) {
@@ -580,6 +582,7 @@ export function ChannelPage({ channelSlug, fillHeight }: { channelSlug?: string;
         <button className="btn" onClick={popOutChat} title="Open in a floating window">
           Pop out
         </button>
+        <TopicSwitcher />
         <ArchiveCalendar
           archiveDays={archiveDays}
           selectedDay={mode === "day" ? selectedDay : null}

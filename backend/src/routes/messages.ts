@@ -190,6 +190,15 @@ export async function messageRoutes(app: FastifyInstance): Promise<void> {
         });
       }
 
+      // Posting in a topic implies interest in it — auto-follow so replies
+      // trigger the normal email/notification path. upsert rather than
+      // create so this is a no-op if they already follow it.
+      await prisma.channelFollow.upsert({
+        where: { userId_channelId: { userId: req.user!.id, channelId: channel.id } },
+        create: { userId: req.user!.id, channelId: channel.id },
+        update: {},
+      });
+
       const full = await prisma.message.findUniqueOrThrow({ where: { id: message.id }, include: messageInclude });
       const dto = await toMessageDTO(full);
       broadcast(channel.slug, { type: "message.create", message: dto });
