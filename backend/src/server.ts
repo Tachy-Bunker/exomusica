@@ -1,5 +1,19 @@
 import "dotenv/config";
 import Fastify from "fastify";
+
+// Without this, an uncaught error in any fire-and-forget background task
+// (a background email, a notification insert, anything not directly
+// awaited in a request handler) crashes the entire process by Node's
+// default behavior — taking down every other in-flight request with it.
+// Individual background calls should still have their own .catch(), but
+// this is the safety net for anything that doesn't.
+process.on("unhandledRejection", (reason) => {
+  console.error("Unhandled rejection (process kept alive):", reason);
+});
+process.on("uncaughtException", (err) => {
+  console.error("Uncaught exception (process kept alive):", err);
+});
+
 import cors from "@fastify/cors";
 import websocketPlugin from "@fastify/websocket";
 import multipart from "@fastify/multipart";

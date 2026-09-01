@@ -87,7 +87,9 @@ export async function accountRoutes(app: FastifyInstance): Promise<void> {
         where: { id: req.user!.id },
         data: { passwordHash: await hashPassword(newPassword) },
       });
-      void createNotification(req.user!.id, "account_updated", "Password changed", "Your password was updated.");
+      void createNotification(req.user!.id, "account_updated", "Password changed", "Your password was updated.").catch((err) =>
+        app.log.error(err, "createNotification failed"),
+      );
       return { status: "updated" };
     },
   );

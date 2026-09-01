@@ -84,13 +84,17 @@ export async function blogRoutes(app: FastifyInstance): Promise<void> {
       for (const m of members) {
         if (!m.email || seen.has(m.email)) continue;
         seen.add(m.email);
-        void sendTemplatedMail("NEWS", m.email, m.username, { postTitle: post.title, postExcerpt: excerpt });
+        void sendTemplatedMail("NEWS", m.email, m.username, { postTitle: post.title, postExcerpt: excerpt }).catch((err) =>
+          app.log.error(err, "sendTemplatedMail failed"),
+        );
         notified++;
       }
       for (const s of subs) {
         if (seen.has(s.email)) continue;
         seen.add(s.email);
-        void sendTemplatedMail("NEWS", s.email, "there", { postTitle: post.title, postExcerpt: excerpt });
+        void sendTemplatedMail("NEWS", s.email, "there", { postTitle: post.title, postExcerpt: excerpt }).catch((err) =>
+          app.log.error(err, "sendTemplatedMail failed"),
+        );
         notified++;
       }
       return { notified };

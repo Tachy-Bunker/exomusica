@@ -76,7 +76,9 @@ export async function adminEmailRoutes(app: FastifyInstance): Promise<void> {
       let notified = 0;
       for (const r of recipients) {
         if (!r.email) continue;
-        void sendTemplatedMail(type, r.email, r.username, { subject, body: `<p>${body}</p>` });
+        void sendTemplatedMail(type, r.email, r.username, { subject, body: `<p>${body}</p>` }).catch((err) =>
+          app.log.error(err, "sendTemplatedMail failed"),
+        );
         notified++;
       }
       await prisma.auditLog.create({

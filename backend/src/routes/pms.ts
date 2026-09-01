@@ -89,7 +89,7 @@ export async function pmRoutes(app: FastifyInstance): Promise<void> {
         void sendTemplatedMail("PRIVATE_MESSAGE", other.email, other.username, {
           senderUsername: sender?.username ?? "Someone",
           messageExcerpt: (contentRaw || "(attachment)").slice(0, 200),
-        });
+        }).catch((err) => app.log.error(err, "sendTemplatedMail failed"));
       }
       return reply.code(201).send({ id: message.id, sentAt: Math.floor(message.sentAt.getTime() / 1000) });
     },

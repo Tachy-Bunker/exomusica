@@ -219,16 +219,16 @@ export async function messageRoutes(app: FastifyInstance): Promise<void> {
             `New activity in ${channel.name}`,
             `${full.author.username}: ${contentRaw.slice(0, 120)}`,
             { channelSlug: channel.slug, messageId: message.id },
-          );
+          ).catch((err) => app.log.error(err, "createNotification failed"));
           if (!f.user.notifyFollowedReplies || !f.user.email) continue;
           void sendTemplatedMail("TOPIC_REPLY", f.user.email, f.user.username, {
             channelName: channel.name,
             authorUsername: full.author.username,
             messageExcerpt: contentRaw.slice(0, 200),
             messageUrl: `https://exomusica.com/topic/${channel.slug}#m-${message.id}`,
-          });
+          }).catch((err) => app.log.error(err, "sendTemplatedMail failed"));
         }
-      })();
+      })().catch((err) => app.log.error(err, "follower-notification background task failed"));
 
       return reply.code(201).send(dto);
     },

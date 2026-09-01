@@ -83,9 +83,11 @@ export async function joinRoutes(app: FastifyInstance): Promise<void> {
       });
 
       if (user.email) {
-        void sendTemplatedMail("JOIN_APPROVED", user.email, user.username);
+        void sendTemplatedMail("JOIN_APPROVED", user.email, user.username).catch((err) => app.log.error(err, "sendTemplatedMail failed"));
       }
-      void createNotification(user.id, "join_approved", "You're in", "Your Exomusica account was approved.");
+      void createNotification(user.id, "join_approved", "You're in", "Your Exomusica account was approved.").catch((err) =>
+        app.log.error(err, "createNotification failed"),
+      );
       return { id: user.id, username: user.username };
     },
   );
