@@ -31,15 +31,33 @@ export function FontsAdminPage() {
   const [siteDefaultFontId, setSiteDefaultFontId] = useState<number | null>(null);
   const [ambienceUrl, setAmbienceUrl] = useState<string | null>(null);
   const ambienceInputRef = useRef<HTMLInputElement>(null);
+  const [scanSfxUrl, setScanSfxUrl] = useState<string | null>(null);
+  const scanSfxInputRef = useRef<HTMLInputElement>(null);
 
   function load() {
     api<Font[]>("/api/fonts").then(setFonts);
-    api<{ defaultFontId: number | null; ambienceUrl: string | null }>("/api/site-settings").then((s) => {
+    api<{ defaultFontId: number | null; ambienceUrl: string | null; scanSfxUrl: string | null }>("/api/site-settings").then((s) => {
       setSiteDefaultFontId(s.defaultFontId);
       setAmbienceUrl(s.ambienceUrl);
+      setScanSfxUrl(s.scanSfxUrl);
     });
   }
   useEffect(load, []);
+
+  async function uploadScanSfx() {
+    const file = scanSfxInputRef.current?.files?.[0];
+    if (!file) return;
+    const formData = new FormData();
+    formData.append("file", file);
+    const result = await api<{ scanSfxUrl: string }>("/api/admin/site-settings/scan-sfx", { method: "POST", body: formData });
+    setScanSfxUrl(result.scanSfxUrl);
+    if (scanSfxInputRef.current) scanSfxInputRef.current.value = "";
+  }
+
+  async function removeScanSfx() {
+    await api("/api/admin/site-settings/scan-sfx", { method: "DELETE" });
+    setScanSfxUrl(null);
+  }
 
   async function uploadAmbience() {
     const file = ambienceInputRef.current?.files?.[0];
@@ -126,6 +144,28 @@ export function FontsAdminPage() {
           <input ref={ambienceInputRef} type="file" accept="audio/mpeg,audio/wav,audio/ogg" />
           <button className="btn btn-primary" onClick={uploadAmbience}>
             {ambienceUrl ? "Replace" : "Upload"}
+          </button>
+        </div>
+      </div>
+
+      <div className="field" style={{ maxWidth: 420 }}>
+        <label>Spacemap scan loop</label>
+        <p style={{ fontSize: "0.75rem", color: "var(--text-dim)", marginTop: 0 }}>
+          Loops with a smooth fade in/out while text is being revealed in the homepage spacemap — the branch-lock
+          name reveal and the F/E/T action hint. Spacemap only, not used anywhere else.
+        </p>
+        {scanSfxUrl && (
+          <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.4rem" }}>
+            <audio src={scanSfxUrl} controls style={{ height: 32 }} />
+            <button className="btn btn-danger" onClick={removeScanSfx}>
+              Remove
+            </button>
+          </div>
+        )}
+        <div style={{ display: "flex", gap: "0.5rem" }}>
+          <input ref={scanSfxInputRef} type="file" accept="audio/mpeg,audio/wav,audio/ogg" />
+          <button className="btn btn-primary" onClick={uploadScanSfx}>
+            {scanSfxUrl ? "Replace" : "Upload"}
           </button>
         </div>
       </div>

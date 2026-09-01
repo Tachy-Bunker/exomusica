@@ -503,6 +503,7 @@ model SiteSettings {
   defaultFontId  Int?
   defaultFont    CustomFont? @relation(fields: [defaultFontId], references: [id])
   ambienceUrl    String? // idle-landing ambient loop, plays when nothing else is
+  scanSfxUrl     String? // spacemap text-reveal loop (branch lock-on + F/E/T hint)
 }
 
 model CustomFont {

@@ -110,6 +110,7 @@ export function SpaceMap({ branches, centerLabel, centerHref }: { branches: Bran
   const isDesktop = useIsDesktop();
   const play = useAudioStore((s) => s.play);
   const addToQueue = useAudioStore((s) => s.addToQueue);
+  const clearQueue = useAudioStore((s) => s.clearQueue);
   const currentTrack = useAudioStore((s) => s.currentTrack);
   const ambienceEnabled = useAmbienceStore((s) => s.enabled);
   const setAmbienceEnabled = useAmbienceStore((s) => s.setEnabled);
@@ -139,30 +140,48 @@ export function SpaceMap({ branches, centerLabel, centerHref }: { branches: Bran
   useEffect(() => {
     lockedNodeRef.current = lockedNode;
   }, [lockedNode]);
+  const branchesRef = useRef<Branch[]>(branches);
+  useEffect(() => {
+    branchesRef.current = branches;
+  }, [branches]);
   const [revealedCount, setRevealedCount] = useState(0);
   const [actionRevealedCount, setActionRevealedCount] = useState(0);
-  const audioCtxRef = useRef<AudioContext | null>(null);
-  const lastBeepRef = useRef(0);
   const openChat = useChatDockStore((s) => s.openChat);
 
-  function beep(freq: number, duration: number) {
-    if (!audioCtxRef.current) audioCtxRef.current = new AudioContext();
-    const ctx = audioCtxRef.current;
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-    osc.frequency.value = freq;
-    osc.type = "sine";
-    gain.gain.setValueAtTime(0.06, ctx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + duration);
-    osc.connect(gain).connect(ctx.destination);
-    osc.start();
-    osc.stop(ctx.currentTime + duration);
+  const scanSfxAudioRef = useRef<HTMLAudioElement | null>(null);
+  const [scanSfxUrl, setScanSfxUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    api<{ scanSfxUrl: string | null }>("/api/site-settings").then((s) => setScanSfxUrl(s.scanSfxUrl));
+  }, []);
+
+  function fadeScanSfx(target: number) {
+    const audio = scanSfxAudioRef.current;
+    if (!audio) return;
+    const steps = 15;
+    const start = audio.volume;
+    let i = 0;
+    const interval = setInterval(() => {
+      i++;
+      audio.volume = Math.max(0, Math.min(1, start + ((target - start) * i) / steps));
+      if (i >= steps) {
+        clearInterval(interval);
+        audio.volume = target;
+        if (target === 0) audio.pause();
+      }
+    }, 400 / steps);
+  }
+
+  function viewLockedDetails() {
+    const node = lockedNodeRef.current;
+    if (!node) return;
+    navigate(`/branch/${node.slug}`);
   }
 
   function openLockedChat() {
     const node = lockedNodeRef.current;
     if (!node) return;
-    const branch = branches.find((b) => b.slug === node.slug);
+    const branch = branchesRef.current.find((b) => b.slug === node.slug);
     if (branch?.channel) openChat(branch.channel.slug, branch.name, branch.slug);
   }
 
@@ -171,6 +190,7 @@ export function SpaceMap({ branches, centerLabel, centerHref }: { branches: Bran
     if (!node) return;
     const tracks = await api<PlayableTrackDTO[]>(`/api/branches/${node.slug}/tracks/shuffle`);
     if (tracks.length === 0) return;
+    clearQueue();
     const [first, ...rest] = tracks;
     play(first);
     addToQueue(rest);
@@ -180,7 +200,7 @@ export function SpaceMap({ branches, centerLabel, centerHref }: { branches: Bran
     nodesRef.current = buildNodes(branches);
   }, [branches]);
 
-  const ACTION_HINT = "F = play  |  E = chat";
+  const ACTION_HINT = "F = play  |  E = chat  |  T = details";
 
   useEffect(() => {
     if (!lockedNode) return;
@@ -214,6 +234,29 @@ export function SpaceMap({ branches, centerLabel, centerHref }: { branches: Bran
   }, [lockedNode, revealedCount]);
 
   useEffect(() => {
+    if (!scanSfxUrl) return;
+    const isRevealing = !!lockedNode && (revealedCount < lockedNode.name.length || actionRevealedCount < ACTION_HINT.length);
+
+    if (isRevealing) {
+      let audio = scanSfxAudioRef.current;
+      if (!audio || audio.src !== scanSfxUrl) {
+        audio?.pause();
+        audio = new Audio(scanSfxUrl);
+        audio.loop = true;
+        audio.volume = 0;
+        scanSfxAudioRef.current = audio;
+      }
+      if (audio.paused) {
+        audio.volume = 0;
+        audio.play().catch(() => {});
+      }
+      fadeScanSfx(0.4);
+    } else {
+      fadeScanSfx(0);
+    }
+  }, [scanSfxUrl, lockedNode, revealedCount, actionRevealedCount]);
+
+  useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
       // event.code is the physical key position, not the character it
       // produces — "KeyW" is always the key at the WASD spot regardless of
@@ -225,6 +268,8 @@ export function SpaceMap({ branches, centerLabel, centerHref }: { branches: Bran
         openLockedChat();
       } else if (e.code === "KeyF") {
         void shuffleLockedBranch();
+      } else if (e.code === "KeyT") {
+        viewLockedDetails();
       }
     }
     function handleKeyUp(e: KeyboardEvent) {
@@ -326,7 +371,6 @@ export function SpaceMap({ branches, centerLabel, centerHref }: { branches: Bran
         let nearest: MapNode | null = null;
         let nearestDist = LOCK_RADIUS;
         for (const n of nodes) {
-          if (n.parentId !== null) continue;
           const screenX = w / 2 + cam.x + n.x;
           const screenY = h / 2 + cam.y + n.y;
           const dist = Math.hypot(screenX - w / 2, screenY - h / 2);
@@ -343,12 +387,7 @@ export function SpaceMap({ branches, centerLabel, centerHref }: { branches: Bran
           setRevealedCount(0);
         } else if (nearest && lockProgressRef.current < 1) {
           lockProgressRef.current = Math.min(1, lockProgressRef.current + dt / LOCK_TIME);
-          if (now - lastBeepRef.current > 130) {
-            lastBeepRef.current = now;
-            beep(500 + lockProgressRef.current * 300, 0.04);
-          }
           if (lockProgressRef.current >= 1) {
-            beep(900, 0.15);
             setLockedNode(nearest);
           }
         }
@@ -506,7 +545,9 @@ export function SpaceMap({ branches, centerLabel, centerHref }: { branches: Bran
                     ? { color: "var(--accent-audio)" }
                     : ACTION_HINT[i] === "E"
                       ? { color: "var(--accent-forum)" }
-                      : undefined
+                      : ACTION_HINT[i] === "T"
+                        ? { color: "var(--accent-danger)" }
+                        : undefined
                 }
               >
                 {ch}

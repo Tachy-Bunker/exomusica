@@ -136,7 +136,34 @@ export function NotificationWidget({ offsetRight = 0 }: { offsetRight?: number }
   }
 
   return (
-    <div style={{ position: "fixed", bottom: "5rem", right: `calc(1rem + ${offsetRight}px)`, zIndex: 40 }}>
+    <div style={{ position: "fixed", top: "4.4rem", right: `calc(1rem + ${offsetRight}px)`, zIndex: 40 }}>
+      <button
+        className="btn btn-primary"
+        onClick={handleOpen}
+        style={{ borderRadius: "50%", width: "2.6rem", height: "2.6rem", position: "relative" }}
+        title="Notifications"
+      >
+        🔔
+        {unread > 0 && (
+          <span
+            style={{
+              position: "absolute",
+              top: -4,
+              right: -4,
+              background: "var(--accent-danger)",
+              borderRadius: "50%",
+              width: 18,
+              height: 18,
+              fontSize: "0.65rem",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            {unread}
+          </span>
+        )}
+      </button>
       {open && (
         <div
           style={{
@@ -146,7 +173,7 @@ export function NotificationWidget({ offsetRight = 0 }: { offsetRight?: number }
             background: "var(--bg-elevated)",
             border: "1px solid var(--border)",
             borderRadius: "var(--radius)",
-            marginBottom: "0.5rem",
+            marginTop: "0.5rem",
             boxShadow: "0 12px 30px rgba(0,0,0,0.4)",
           }}
         >
@@ -190,33 +217,6 @@ export function NotificationWidget({ offsetRight = 0 }: { offsetRight?: number }
           ))}
         </div>
       )}
-      <button
-        className="btn btn-primary"
-        onClick={handleOpen}
-        style={{ borderRadius: "50%", width: "2.6rem", height: "2.6rem", position: "relative" }}
-        title="Notifications"
-      >
-        🔔
-        {unread > 0 && (
-          <span
-            style={{
-              position: "absolute",
-              top: -4,
-              right: -4,
-              background: "var(--accent-danger)",
-              borderRadius: "50%",
-              width: 18,
-              height: 18,
-              fontSize: "0.65rem",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-            }}
-          >
-            {unread}
-          </span>
-        )}
-      </button>
     </div>
   );
 }

@@ -16,6 +16,7 @@ interface AudioState {
 
   play: (track: PlayableTrackDTO) => void;
   addToQueue: (tracks: PlayableTrackDTO[]) => void;
+  clearQueue: () => void;
   playNext: () => void;
   playPrevious: () => void;
   toggleShuffle: () => void;
@@ -64,6 +65,7 @@ export const useAudioStore = create<AudioState>((set, get) => ({
   },
 
   addToQueue: (tracks) => set((s) => ({ queue: [...s.queue, ...(s.shuffle ? shuffleArray(tracks) : tracks)] })),
+  clearQueue: () => set({ queue: [] }),
 
   playNext: () => {
     const { queue, currentTrack, history, repeatMode } = get();
