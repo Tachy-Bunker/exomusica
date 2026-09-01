@@ -5,6 +5,7 @@ import { useIsDesktop } from "../lib/useIsDesktop";
 import { useChatDockStore } from "../lib/chatDockStore";
 import { useAmbienceStore } from "../lib/ambienceStore";
 import { GaplessLoop } from "../lib/GaplessLoop";
+import { Joystick } from "./Joystick";
 import { useAudioStore } from "../lib/audioStore";
 import { api } from "../lib/api";
 import type { PlayableTrackDTO } from "../lib/types";
@@ -128,6 +129,7 @@ export function SpaceMap({ branches, centerLabel, centerHref }: { branches: Bran
   const [renderTick, setRenderTick] = useState(0);
   const cameraRef = useRef({ x: 0, y: 0, vx: 0, vy: 0 });
   const keysRef = useRef<Set<string>>(new Set());
+  const joystickVectorRef = useRef({ x: 0, y: 0 });
   const hoveredIdRef = useRef<number | null>(null);
   const [hoveredId, setHoveredId] = useState<number | null>(null);
   const dragRef = useRef<{ startX: number; startY: number; camX: number; camY: number } | null>(null);
@@ -164,22 +166,26 @@ export function SpaceMap({ branches, centerLabel, centerHref }: { branches: Bran
     return () => scanSfxRef.current?.dispose();
   }, []);
 
+  function enterCenter() {
+    if (lockedNodeRef.current?.id === -1) navigate(centerHref);
+  }
+
   function viewLockedDetails() {
     const node = lockedNodeRef.current;
-    if (!node) return;
+    if (!node || node.id === -1) return;
     navigate(`/branch/${node.slug}`);
   }
 
   function openLockedChat() {
     const node = lockedNodeRef.current;
-    if (!node) return;
+    if (!node || node.id === -1) return;
     const branch = branchesRef.current.find((b) => b.slug === node.slug);
     if (branch?.channel) openChat(branch.channel.slug, branch.name, branch.slug);
   }
 
   async function shuffleLockedBranch() {
     const node = lockedNodeRef.current;
-    if (!node) return;
+    if (!node || node.id === -1) return;
     const tracks = await api<PlayableTrackDTO[]>(`/api/branches/${node.slug}/tracks/shuffle`);
     if (tracks.length === 0) return;
     clearQueue();
@@ -192,7 +198,14 @@ export function SpaceMap({ branches, centerLabel, centerHref }: { branches: Bran
     nodesRef.current = buildNodes(branches);
   }, [branches]);
 
-  const ACTION_HINT = "F = play  |  E = chat  |  T = details";
+  const ACTION_SEGMENTS = [
+    { text: "Chat", color: "var(--accent-forum)", action: openLockedChat },
+    { text: "  |  ", color: undefined, action: null },
+    { text: "Play", color: "var(--accent-audio)", action: () => void shuffleLockedBranch() },
+    { text: "  |  ", color: undefined, action: null },
+    { text: "Details", color: "var(--accent-danger)", action: viewLockedDetails },
+  ] as const;
+  const ACTION_HINT = ACTION_SEGMENTS.map((s) => s.text).join("");
 
   useEffect(() => {
     if (!lockedNode) return;
@@ -258,6 +271,8 @@ export function SpaceMap({ branches, centerLabel, centerHref }: { branches: Bran
         void shuffleLockedBranch();
       } else if (e.code === "KeyT") {
         viewLockedDetails();
+      } else if (e.code === "Enter") {
+        enterCenter();
       }
     }
     function handleKeyUp(e: KeyboardEvent) {
@@ -288,6 +303,8 @@ export function SpaceMap({ branches, centerLabel, centerHref }: { branches: Bran
       if (keys.has("KeyD")) ax -= CAMERA_ACCEL;
       if (keys.has("KeyW")) ay += CAMERA_ACCEL;
       if (keys.has("KeyS")) ay -= CAMERA_ACCEL;
+      ax -= joystickVectorRef.current.x * CAMERA_ACCEL;
+      ay -= joystickVectorRef.current.y * CAMERA_ACCEL;
       if (!dragRef.current) {
         cam.vx += ax * dt;
         cam.vy += ay * dt;
@@ -351,13 +368,33 @@ export function SpaceMap({ branches, centerLabel, centerHref }: { branches: Bran
         n.y += (fy / DAMPING) * dt;
       }
 
-      // --- reticle lock-on: nearest top-level node to screen center ---
+      // --- reticle lock-on: nearest top-level node (or the center) to screen center ---
       const box = containerRef.current;
       if (box) {
         const w = box.clientWidth;
         const h = box.clientHeight;
         let nearest: MapNode | null = null;
         let nearestDist = LOCK_RADIUS;
+
+        const centerDist = Math.hypot(cam.x, cam.y);
+        if (centerDist < nearestDist) {
+          nearestDist = centerDist;
+          nearest = {
+            id: -1,
+            slug: "",
+            name: centerLabel,
+            parentId: null,
+            isAnchor: false,
+            x: 0,
+            y: 0,
+            homeX: 0,
+            homeY: 0,
+            angle: 0,
+            orbitRadius: 0,
+            orbitSpeed: 0,
+            wanderSeed: 0,
+          };
+        }
         for (const n of nodes) {
           const screenX = w / 2 + cam.x + n.x;
           const screenY = h / 2 + cam.y + n.y;
@@ -395,31 +432,11 @@ export function SpaceMap({ branches, centerLabel, centerHref }: { branches: Bran
     };
   }, []);
 
-  const lastTouchRef = useRef<{ x: number; y: number; t: number } | null>(null);
-  function handleTouchStart(e: React.TouchEvent) {
-    const t = e.touches[0];
-    dragRef.current = { startX: t.clientX, startY: t.clientY, camX: cameraRef.current.x, camY: cameraRef.current.y };
-    lastTouchRef.current = { x: t.clientX, y: t.clientY, t: performance.now() };
+  function handleJoystickMove(x: number, y: number) {
+    joystickVectorRef.current = { x, y };
   }
-  function handleTouchMove(e: React.TouchEvent) {
-    if (!dragRef.current) return;
-    const t = e.touches[0];
-    cameraRef.current.x = dragRef.current.camX + (t.clientX - dragRef.current.startX);
-    cameraRef.current.y = dragRef.current.camY + (t.clientY - dragRef.current.startY);
-    lastTouchRef.current = { x: t.clientX, y: t.clientY, t: performance.now() };
-  }
-  function handleTouchEnd(e: React.TouchEvent) {
-    dragRef.current = null;
-    const last = lastTouchRef.current;
-    const t = e.changedTouches[0];
-    if (last && t) {
-      const dt = (performance.now() - last.t) / 1000 || 0.016;
-      // Flick-to-scroll: convert the final swipe speed into camera
-      // velocity, which the existing friction decay then eases out —
-      // same inertia mechanism arrow-key panning already uses.
-      cameraRef.current.vx = ((t.clientX - last.x) / dt) * 0.5;
-      cameraRef.current.vy = ((t.clientY - last.y) / dt) * 0.5;
-    }
+  function handleJoystickRelease() {
+    joystickVectorRef.current = { x: 0, y: 0 };
   }
 
   const scale = isDesktop ? 2 : 1.5;
@@ -444,22 +461,42 @@ export function SpaceMap({ branches, centerLabel, centerHref }: { branches: Bran
     }
   }
 
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const wrapperRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleFsChange() {
+      setIsFullscreen(!!document.fullscreenElement);
+    }
+    document.addEventListener("fullscreenchange", handleFsChange);
+    return () => document.removeEventListener("fullscreenchange", handleFsChange);
+  }, []);
+
+  function toggleFullscreen() {
+    if (document.fullscreenElement) {
+      document.exitFullscreen().catch(() => {});
+    } else {
+      wrapperRef.current?.requestFullscreen().catch(() => {});
+    }
+  }
+
   return (
-    <div
-      className="space-map"
-      onTouchStart={handleTouchStart}
-      onTouchMove={handleTouchMove}
-      onTouchEnd={handleTouchEnd}
-      tabIndex={0}
-      ref={containerRef}
-      style={{ "--space-scale": scale } as React.CSSProperties}
-    >
+    <div className="space-map-wrapper" ref={wrapperRef}>
       <div
-        className="space-map-field"
-        style={{ transform: `translate(${cameraRef.current.x}px, ${cameraRef.current.y}px)` }}
+        className="space-map"
+        tabIndex={0}
+        ref={containerRef}
+        style={{ "--space-scale": scale } as React.CSSProperties}
       >
-        <div className="space-node space-node-center" onClick={() => navigate(centerHref)} style={{ left: 0, top: 0 }}>
-          {centerLabel}
+        <button className="btn space-map-fullscreen" onClick={toggleFullscreen} title={isFullscreen ? "Exit fullscreen" : "Fullscreen"}>
+          {isFullscreen ? "⤡" : "⤢"}
+        </button>
+        <div
+          className="space-map-field"
+          style={{ transform: `translate(${cameraRef.current.x}px, ${cameraRef.current.y}px)` }}
+        >
+          <div className="space-node space-node-center" onClick={() => navigate(centerHref)} style={{ left: 0, top: 0 }}>
+            {centerLabel}
         </div>
 
         {nodesRef.current.map((n) => {
@@ -523,73 +560,72 @@ export function SpaceMap({ branches, centerLabel, centerHref }: { branches: Bran
       )}
       {lockedNode && revealedCount >= lockedNode.name.length && actionRevealedCount > 0 && (
         <div className="space-hud-action">
-          {ACTION_HINT.slice(0, actionRevealedCount)
-            .split("")
-            .map((ch, i) => (
-              <span
-                key={i}
-                style={
-                  ACTION_HINT[i] === "F"
-                    ? { color: "var(--accent-audio)" }
-                    : ACTION_HINT[i] === "E"
-                      ? { color: "var(--accent-forum)" }
-                      : ACTION_HINT[i] === "T"
-                        ? { color: "var(--accent-danger)" }
-                        : undefined
-                }
-              >
-                {ch}
-              </span>
-            ))}
+          {lockedNode.id === -1 ? (
+            <span
+              className="space-hud-action-link"
+              style={{ color: "var(--accent-audio)" }}
+              onClick={(e) => {
+                e.stopPropagation();
+                enterCenter();
+              }}
+            >
+              {"Enter".slice(0, actionRevealedCount)}
+            </span>
+          ) : (
+            (() => {
+            let offset = 0;
+            return ACTION_SEGMENTS.map((seg, i) => {
+              const segStart = offset;
+              const segEnd = offset + seg.text.length;
+              offset = segEnd;
+              if (actionRevealedCount >= segEnd && seg.action) {
+                return (
+                  <span
+                    key={i}
+                    className="space-hud-action-link"
+                    style={{ color: seg.color }}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      seg.action!();
+                    }}
+                  >
+                    {seg.text}
+                  </span>
+                );
+              }
+              const visible = Math.max(0, Math.min(seg.text.length, actionRevealedCount - segStart));
+              return (
+                <span key={i} style={{ color: seg.color }}>
+                  {seg.text.slice(0, visible)}
+                </span>
+              );
+            });
+          })()
+          )}
           {actionRevealedCount < ACTION_HINT.length && <span className="space-hud-cursor">▌</span>}
         </div>
       )}
 
       {!isDesktop && (
-        <div className="space-map-dpad">
-          <button
-            className="space-map-dpad-btn space-map-dpad-up"
-            onTouchStart={() => keysRef.current.add("KeyW")}
-            onTouchEnd={() => keysRef.current.delete("KeyW")}
-          >
-            ▲
-          </button>
-          <button
-            className="space-map-dpad-btn space-map-dpad-left"
-            onTouchStart={() => keysRef.current.add("KeyA")}
-            onTouchEnd={() => keysRef.current.delete("KeyA")}
-          >
-            ◀
-          </button>
-          <button
-            className="space-map-dpad-btn space-map-dpad-right"
-            onTouchStart={() => keysRef.current.add("KeyD")}
-            onTouchEnd={() => keysRef.current.delete("KeyD")}
-          >
-            ▶
-          </button>
-          <button
-            className="space-map-dpad-btn space-map-dpad-down"
-            onTouchStart={() => keysRef.current.add("KeyS")}
-            onTouchEnd={() => keysRef.current.delete("KeyS")}
-          >
-            ▼
-          </button>
+        <div className="space-joystick-backdrop">
+          <Joystick onMove={handleJoystickMove} onRelease={handleJoystickRelease} />
         </div>
       )}
 
-      <p className="space-map-hint">
-        {isDesktop
-          ? "WASD to aim into a branch."
-          : "Swipe to move around. Tap a node to freeze it."}
-      </p>
-      <button className="btn btn-primary space-map-shuffle" onClick={() => void shufflePlay()}>
-        🔀 Shuffle play
-      </button>
-      <label className="space-map-ambience-toggle">
-        <input type="checkbox" checked={ambienceEnabled} onChange={(e) => setAmbienceEnabled(e.target.checked)} />
-        Exo-Ambience
-      </label>
+      {isDesktop && <p className="space-map-hint">WASD to aim into a branch.</p>}
+      </div>
+
+      <div className="space-map-controls">
+        <button className="btn btn-primary space-map-shuffle" onClick={() => void shufflePlay()}>
+          🔀 Shuffle play
+        </button>
+        <button
+          className={`space-map-ambience-toggle ${ambienceEnabled ? "space-map-ambience-toggle-on" : ""}`}
+          onClick={() => setAmbienceEnabled(!ambienceEnabled)}
+        >
+          🌫 Exo-Ambience {ambienceEnabled ? "On" : "Off"}
+        </button>
+      </div>
     </div>
   );
 }
