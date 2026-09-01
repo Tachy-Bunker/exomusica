@@ -2,7 +2,7 @@ import type { FastifyInstance } from "fastify";
 import { prisma } from "../lib/prisma.js";
 import { requireAdmin } from "../lib/auth.js";
 import { trackToDTO } from "../lib/embeds.js";
-import { saveSiteImage } from "../lib/storage.js";
+import { saveSiteImage, saveGalleryFile } from "../lib/storage.js";
 
 export async function albumRoutes(app: FastifyInstance): Promise<void> {
   app.get<{ Params: { slug: string } }>("/api/albums/:slug", async (req, reply) => {
@@ -89,7 +89,7 @@ export async function albumRoutes(app: FastifyInstance): Promise<void> {
       let position = await prisma.albumGalleryImage.count({ where: { albumId } });
       for await (const file of req.files()) {
         const buffer = await file.toBuffer();
-        const { url } = await saveSiteImage(file.filename, file.mimetype, buffer, "albums");
+        const { url } = await saveGalleryFile(file.filename, file.mimetype, buffer);
         created.push(await prisma.albumGalleryImage.create({ data: { albumId, url, position: position++ } }));
       }
       if (created.length === 0) return reply.code(400).send({ error: "no files uploaded" });

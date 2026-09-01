@@ -71,14 +71,23 @@ export function AlbumPage() {
 
       {album.gallery.length > 0 && (
         <div style={{ display: "flex", gap: "0.5rem", marginTop: "1rem", overflowX: "auto" }}>
-          {album.gallery.map((g) => (
-            <img
-              key={g.id}
-              src={g.url}
-              alt=""
-              style={{ height: 120, borderRadius: "var(--radius)", border: "1px solid var(--border)" }}
-            />
-          ))}
+          {album.gallery.map((g) =>
+            /\.(mp4|mov)$/i.test(g.url) ? (
+              <video
+                key={g.id}
+                src={g.url}
+                controls
+                style={{ height: 120, borderRadius: "var(--radius)", border: "1px solid var(--border)" }}
+              />
+            ) : (
+              <img
+                key={g.id}
+                src={g.url}
+                alt=""
+                style={{ height: 120, borderRadius: "var(--radius)", border: "1px solid var(--border)" }}
+              />
+            ),
+          )}
         </div>
       )}
 

@@ -9,9 +9,9 @@ import { AboutPage } from "./pages/AboutPage";
 import { WikiPage } from "./pages/WikiPage";
 import { NewsPage } from "./pages/NewsPage";
 import { DiscussionIndexPage } from "./pages/DiscussionIndexPage";
+import { TopicPage } from "./pages/TopicPage";
 import { BranchPage } from "./pages/BranchPage";
 import { AlbumPage } from "./pages/AlbumPage";
-import { ChannelPage } from "./pages/ChannelPage";
 import { ProfilePage } from "./pages/ProfilePage";
 import { PMsPage } from "./pages/PMsPage";
 import { AccountSettingsPage } from "./pages/AccountSettingsPage";
@@ -47,7 +47,7 @@ export default function App() {
             <Route path="discussion" element={<DiscussionIndexPage />} />
             <Route path="branch/:slug" element={<BranchPage />} />
             <Route path="album/:slug" element={<AlbumPage />} />
-            <Route path="topic/:slug" element={<ChannelPage />} />
+            <Route path="topic/:slug" element={<TopicPage />} />
             <Route path="u/:username" element={<ProfilePage />} />
             <Route path="pms" element={<PMsPage />} />
             <Route path="pms/:username" element={<PMsPage />} />

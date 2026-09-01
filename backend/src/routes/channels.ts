@@ -7,7 +7,7 @@ export async function channelRoutes(app: FastifyInstance): Promise<void> {
     return prisma.forumChannel.findMany({
       where: req.query.kind ? { kind: req.query.kind } : undefined,
       include: { font: true },
-      orderBy: { createdAt: "asc" },
+      orderBy: [{ position: "asc" }, { createdAt: "asc" }],
     });
   });
 
@@ -20,13 +20,12 @@ export async function channelRoutes(app: FastifyInstance): Promise<void> {
     return channel;
   });
 
-  app.patch<{ Params: { id: string }; Body: Partial<{ name: string; fontId: number | null }> }>(
-    "/api/admin/channels/:id",
-    { preHandler: requireAdmin },
-    async (req) => {
-      return prisma.forumChannel.update({ where: { id: Number(req.params.id) }, data: req.body ?? {} });
-    },
-  );
+  app.patch<{
+    Params: { id: string };
+    Body: Partial<{ name: string; description: string; category: string; position: number; fontId: number | null }>;
+  }>("/api/admin/channels/:id", { preHandler: requireAdmin }, async (req) => {
+    return prisma.forumChannel.update({ where: { id: Number(req.params.id) }, data: req.body ?? {} });
+  });
 
   // Powers the "follow" button — ChannelFollow already existed (it's what
   // weeklySummary.ts reads from) but nothing ever wrote to it.
@@ -71,16 +70,16 @@ export async function channelRoutes(app: FastifyInstance): Promise<void> {
 
   // Discussion topics (Art You Like, Science, Primal Taste Theory, ...) have
   // no branch — branch topics come from POST /api/admin/branches instead.
-  app.post<{ Body: { slug: string; name: string } }>(
+  app.post<{ Body: { slug: string; name: string; description?: string; category?: string } }>(
     "/api/admin/channels",
     { preHandler: requireAdmin },
     async (req, reply) => {
-      const { slug, name } = req.body ?? {};
+      const { slug, name, description, category } = req.body ?? {};
       if (!slug || !name) {
         return reply.code(400).send({ error: "slug and name are required" });
       }
       const channel = await prisma.forumChannel.create({
-        data: { slug, name, kind: "DISCUSSION" },
+        data: { slug, name, description, category, kind: "DISCUSSION" },
       });
       await prisma.auditLog.create({
         data: { actorId: req.user!.id, action: "channel.create", targetType: "ForumChannel", targetId: channel.id },

@@ -40,11 +40,15 @@ export function Layout() {
     api<{ defaultFont: typeof siteFont }>("/api/site-settings").then((s) => setSiteFont(s.defaultFont));
   }, []);
   const siteFontFamily = useCustomFont(siteFont);
+  useEffect(() => {
+    if (siteFontFamily) document.documentElement.style.setProperty("--font-body", siteFontFamily);
+    else document.documentElement.style.removeProperty("--font-body");
+  }, [siteFontFamily]);
 
   return (
     <div
       className="app-shell"
-      style={{ "--dock-offset": `${dockOffset}px`, ...(siteFontFamily ? { "--font-body": siteFontFamily } : {}) } as React.CSSProperties}
+      style={{ "--dock-offset": `${dockOffset}px` } as React.CSSProperties}
     >
       <header className="top-nav">
         <Link to="/" className="brand">

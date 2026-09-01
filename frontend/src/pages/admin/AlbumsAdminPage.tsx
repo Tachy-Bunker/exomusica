@@ -336,7 +336,11 @@ export function AlbumsAdminPage() {
           <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap", marginBottom: "0.4rem" }}>
             {detail.gallery.map((g) => (
               <div key={g.id} style={{ position: "relative" }}>
-                <img src={g.url} alt="" style={{ width: 70, height: 70, objectFit: "cover", borderRadius: "var(--radius)" }} />
+                {/\.(mp4|mov)$/i.test(g.url) ? (
+                  <video src={g.url} muted style={{ width: 70, height: 70, objectFit: "cover", borderRadius: "var(--radius)" }} />
+                ) : (
+                  <img src={g.url} alt="" style={{ width: 70, height: 70, objectFit: "cover", borderRadius: "var(--radius)" }} />
+                )}
                 <button
                   className="btn btn-danger"
                   style={{ position: "absolute", top: 2, right: 2, padding: "0 0.3rem", fontSize: "0.7rem" }}
@@ -348,7 +352,12 @@ export function AlbumsAdminPage() {
             ))}
           </div>
           <div style={{ display: "flex", gap: "0.5rem" }}>
-            <input ref={galleryInput} type="file" accept="image/png,image/jpeg,image/webp,image/gif,image/bmp" multiple />
+            <input
+              ref={galleryInput}
+              type="file"
+              accept="image/png,image/jpeg,image/webp,image/gif,image/bmp,video/mp4,video/quicktime"
+              multiple
+            />
             <button className="btn" onClick={handleGalleryUpload}>
               Upload to gallery
             </button>

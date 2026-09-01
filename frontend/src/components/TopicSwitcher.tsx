@@ -12,7 +12,7 @@ interface SwitchableBranch {
   channel: { slug: string } | null;
 }
 
-export function TopicSwitcher() {
+export function TopicSwitcher({ label = "Switch topic" }: { label?: string }) {
   const [open, setOpen] = useState(false);
   const [branches, setBranches] = useState<SwitchableBranch[]>([]);
   const [query, setQuery] = useState("");
@@ -54,7 +54,7 @@ export function TopicSwitcher() {
   return (
     <div ref={containerRef} style={{ position: "relative", display: "inline-block" }}>
       <button className="btn" onClick={() => setOpen((v) => !v)}>
-        Switch topic
+        {label}
       </button>
       {open && (
         <div

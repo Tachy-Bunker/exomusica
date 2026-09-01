@@ -708,3 +708,69 @@ th {
   color: var(--text-dim);
   pointer-events: none;
 }
+
+@keyframes liquid-flow {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+.liquid-gradient {
+  background: linear-gradient(120deg, var(--accent-forum), var(--accent-audio), var(--accent-forum-dim), var(--accent-audio-dim), var(--accent-forum));
+  background-size: 400% 400%;
+  animation: liquid-flow 6s ease-in-out infinite;
+}
+
+.space-map {
+  border: 3px solid transparent;
+  background:
+    linear-gradient(var(--bg-inset), var(--bg-inset)) padding-box,
+    linear-gradient(120deg, var(--accent-forum), var(--accent-audio), var(--accent-forum-dim), var(--accent-audio-dim), var(--accent-forum)) border-box;
+  background-size:
+    auto,
+    400% 400%;
+  animation: liquid-flow 6s ease-in-out infinite;
+}
+
+.player-bar {
+  border-top: none !important;
+}
+
+.player-bar::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: linear-gradient(120deg, var(--accent-forum), var(--accent-audio), var(--accent-forum-dim), var(--accent-audio-dim), var(--accent-forum));
+  background-size: 400% 400%;
+  animation: liquid-flow 6s ease-in-out infinite;
+}
+
+.dock-resize-handle {
+  position: absolute;
+  left: -6px;
+  top: 0;
+  bottom: 0;
+  width: 12px;
+  cursor: col-resize;
+}
+
+.dock-resize-handle::after {
+  content: "";
+  position: absolute;
+  left: 5px;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: linear-gradient(180deg, var(--accent-forum), var(--accent-audio), var(--accent-forum-dim), var(--accent-audio-dim), var(--accent-forum));
+  background-size: 400% 400%;
+  animation: liquid-flow 6s ease-in-out infinite;
+}

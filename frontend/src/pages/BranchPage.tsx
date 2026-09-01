@@ -22,7 +22,7 @@ export function BranchPage() {
 
   useEffect(() => {
     if (isDesktop && branch?.channel) {
-      openChat(branch.channel.slug, branch.name);
+      openChat(branch.channel.slug, branch.name, branch.slug);
     }
     // Deliberately not closing on unmount — the dock is meant to persist
     // across navigation until the user closes it themselves.

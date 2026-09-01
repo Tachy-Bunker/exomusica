@@ -117,15 +117,18 @@ model Branch {
 }
 
 model ForumChannel {
-  id        Int         @id @default(autoincrement())
-  slug      String      @unique
-  name      String
-  kind      ChannelKind
-  branchId  Int?        @unique // null for Discussion topics (not tied to a branch)
-  branch    Branch?     @relation(fields: [branchId], references: [id], onDelete: Cascade)
-  fontId    Int?
-  font      CustomFont? @relation(fields: [fontId], references: [id])
-  createdAt DateTime    @default(now())
+  id          Int         @id @default(autoincrement())
+  slug        String      @unique
+  name        String
+  description String?
+  category    String?
+  position    Int         @default(0)
+  kind        ChannelKind
+  branchId    Int?        @unique // null for Discussion topics (not tied to a branch)
+  branch      Branch?     @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  fontId      Int?
+  font        CustomFont? @relation(fields: [fontId], references: [id])
+  createdAt   DateTime    @default(now())
 
   messages Message[]
   follows  ChannelFollow[]

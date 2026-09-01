@@ -9,6 +9,7 @@ interface Props {
   archiveDays: ArchiveDay[];
   selectedDay: string | null;
   onSelect: (day: string) => void;
+  label?: string;
 }
 
 function pad(n: number): string {
@@ -19,7 +20,7 @@ function toKey(y: number, m: number, d: number): string {
   return `${y}-${pad(m + 1)}-${pad(d)}`;
 }
 
-export function ArchiveCalendar({ archiveDays, selectedDay, onSelect }: Props) {
+export function ArchiveCalendar({ archiveDays, selectedDay, onSelect, label = "Browse archive…" }: Props) {
   const [open, setOpen] = useState(false);
   const activeDays = useRef<Set<string>>(new Set());
   const sortedActiveDays = useRef<string[]>([]);
@@ -85,7 +86,7 @@ export function ArchiveCalendar({ archiveDays, selectedDay, onSelect }: Props) {
   return (
     <div ref={containerRef} style={{ position: "relative", display: "inline-block" }}>
       <button className="btn" onClick={() => setOpen((v) => !v)}>
-        {selectedDay ? `📅 ${selectedDay}` : "📅 Browse archive…"}
+        {selectedDay ? `📅 ${selectedDay}` : `📅 ${label}`}
       </button>
 
       {open && (

@@ -286,6 +286,16 @@ export function ChannelPage({ channelSlug, fillHeight }: { channelSlug?: string;
   const [displayMode, setDisplayMode] = useState<DisplayMode>(
     () => (localStorage.getItem("exomusica_display_mode") as DisplayMode) ?? "standard",
   );
+  const [messageFontSize, setMessageFontSize] = useState<number>(
+    () => Number(localStorage.getItem("exomusica_message_font_size")) || 100,
+  );
+  function adjustFontSize(delta: number) {
+    setMessageFontSize((prev) => {
+      const next = Math.min(160, Math.max(70, prev + delta));
+      localStorage.setItem("exomusica_message_font_size", String(next));
+      return next;
+    });
+  }
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
   const [activeSearch, setActiveSearch] = useState<string | null>(null);
   const [messages, setMessages] = useState<MessageDTO[]>([]);
@@ -567,23 +577,16 @@ export function ChannelPage({ channelSlug, fillHeight }: { channelSlug?: string;
 
   return (
     <div style={fillHeight ? { fontFamily, display: "flex", flexDirection: "column", height: "100%", minHeight: 0 } : { fontFamily }}>
-      <div style={{ display: "flex", gap: "0.6rem", marginBottom: fillHeight ? "0.6rem" : "1rem", flexWrap: "wrap", flexShrink: 0 }}>
+      <div style={{ display: "flex", gap: "0.6rem", marginBottom: fillHeight ? "0.6rem" : "1rem", flexWrap: "wrap", flexShrink: 0, alignItems: "center" }}>
+        <TopicSwitcher label="Branches" />
         <button className={`btn ${mode === "live" ? "btn-primary" : ""}`} onClick={() => setMode("live")}>
           Live
-        </button>
-        {user && (
-          <button className="btn" onClick={toggleFollow}>
-            {following ? "Following ✓" : "Follow"}
-          </button>
-        )}
-        <button className="btn" onClick={toggleDisplayMode} title="Toggle grouped consecutive messages">
-          {displayMode === "grouped" ? "Grouped view" : "Standard view"}
         </button>
         <button className="btn" onClick={popOutChat} title="Open in a floating window">
           Pop out
         </button>
-        <TopicSwitcher />
         <ArchiveCalendar
+          label="Past chats"
           archiveDays={archiveDays}
           selectedDay={mode === "day" ? selectedDay : null}
           onSelect={(day) => {
@@ -600,9 +603,31 @@ export function ChannelPage({ channelSlug, fillHeight }: { channelSlug?: string;
             }}
           />
         )}
+        <div style={{ display: "flex", alignItems: "center", gap: "0.2rem" }} title="Message text size">
+          <button className="btn" style={{ padding: "0.1rem 0.5rem" }} onClick={() => adjustFontSize(-10)}>
+            −
+          </button>
+          <button className="btn" style={{ padding: "0.1rem 0.5rem" }} onClick={() => adjustFontSize(10)}>
+            +
+          </button>
+        </div>
+        {user && (
+          <button className="btn" onClick={toggleFollow}>
+            {following ? "Following ✓" : "Follow"}
+          </button>
+        )}
+        <button className="btn" onClick={toggleDisplayMode} title={displayMode === "grouped" ? "Switch to standard view" : "Switch to grouped view"}>
+          👁
+        </button>
       </div>
 
-      <div className="message-list" style={fillHeight ? { flex: 1, minHeight: 0, overflowY: "auto", maxWidth: "none" } : undefined}>
+      <div
+        className="message-list"
+        style={{
+          fontSize: `${messageFontSize}%`,
+          ...(fillHeight ? { flex: 1, minHeight: 0, overflowY: "auto" as const, maxWidth: "none" } : {}),
+        }}
+      >
         {messages.length === 0 && <p style={{ color: "var(--text-dim)" }}>Nothing here yet.</p>}
         {mode === "search" ? (
           messages.map((m) => (

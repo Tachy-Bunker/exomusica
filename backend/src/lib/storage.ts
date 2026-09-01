@@ -202,3 +202,23 @@ export async function saveSoundFile(filename: string, mimeType: string, buffer: 
 }
 
 export { UPLOADS_DIR };
+
+const ALLOWED_GALLERY_VIDEO_TYPES: Record<string, string> = {
+  "video/mp4": ".mp4",
+  "video/quicktime": ".mov",
+};
+
+/** Album gallery items specifically can be images OR short video clips
+ *  (MOV/MP4) — cover art stays image-only via saveSiteImage above. */
+export async function saveGalleryFile(filename: string, mimeType: string, buffer: Buffer): Promise<{ url: string; kind: "image" | "video" }> {
+  const videoExt = ALLOWED_GALLERY_VIDEO_TYPES[mimeType] ?? (path.extname(filename).toLowerCase() === ".mov" || path.extname(filename).toLowerCase() === ".mp4" ? path.extname(filename).toLowerCase() : null);
+  if (videoExt) {
+    const dir = path.join(UPLOADS_DIR, "albums");
+    await mkdir(dir, { recursive: true });
+    const diskName = `${randomUUID()}${videoExt}`;
+    await writeFile(path.join(dir, diskName), buffer);
+    return { url: `/uploads/albums/${diskName}`, kind: "video" };
+  }
+  const { url } = await saveSiteImage(filename, mimeType, buffer, "albums");
+  return { url, kind: "image" };
+}
