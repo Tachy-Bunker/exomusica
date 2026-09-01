@@ -3,7 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { api } from "../lib/api";
 import { useDocumentTitle } from "../lib/useDocumentTitle";
 import { useAudioStore } from "../lib/audioStore";
-import type { Branch, BranchAlbum, MessageDTO } from "../lib/types";
+import type { Branch, BranchAlbum, MessageDTO, PlayableTrackDTO } from "../lib/types";
 import { layoutTree, type LaidOutBranch } from "../lib/treeLayout";
 
 const WIDTH = 900;
@@ -19,6 +19,15 @@ function BranchHoverCard({ branch, pos, wrapHeight }: { branch: Branch; pos: Hov
   const [messages, setMessages] = useState<MessageDTO[] | null>(null);
   const [albums, setAlbums] = useState<BranchAlbum[] | null>(null);
   const play = useAudioStore((s) => s.play);
+  const addToQueue = useAudioStore((s) => s.addToQueue);
+
+  async function playAlbum(albumSlug: string) {
+    const full = await api<{ tracks: PlayableTrackDTO[] }>(`/api/albums/${albumSlug}`);
+    if (full.tracks.length === 0) return;
+    const [first, ...rest] = full.tracks;
+    play(first);
+    addToQueue(rest);
+  }
 
   useEffect(() => {
     let cancelled = false;
@@ -75,7 +84,8 @@ function BranchHoverCard({ branch, pos, wrapHeight }: { branch: Branch; pos: Hov
               <button
                 className="btn"
                 style={{ pointerEvents: "auto", padding: "0.15rem 0.5rem", fontSize: "0.75rem" }}
-                onClick={() => a.previewTrack && play(a.previewTrack)}
+                title="Play album"
+                onClick={() => void playAlbum(a.slug)}
               >
                 ▶
               </button>

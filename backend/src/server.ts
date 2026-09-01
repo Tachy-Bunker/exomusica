@@ -30,7 +30,12 @@ import { notificationSoundRoutes } from "./routes/notificationSounds.js";
 import { notificationRoutes } from "./routes/notifications.js";
 import { wsRoutes } from "./routes/ws.js";
 
-const app = Fastify({ logger: true });
+// Fastify's own default body limit is 1MB, applied before multipart even
+// parses anything — this was the real ceiling blocking larger uploads
+// (cover art, gallery images, message attachments), not anything in
+// multipart's own config. Raised for the whole app, not just admin routes,
+// since Fastify's bodyLimit isn't naturally scoped per-route by auth.
+const app = Fastify({ logger: true, bodyLimit: 10 * 1024 * 1024 });
 
 await app.register(cors, { origin: true });
 await app.register(websocketPlugin);

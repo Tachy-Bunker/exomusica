@@ -6,7 +6,7 @@ import { useAudioStore } from "../lib/audioStore";
 import { renderMessageContent } from "../lib/formatMessage";
 import { EmojiPicker } from "../components/EmojiPicker";
 import { AttachmentPreview } from "../components/AttachmentPreview";
-import type { Emoji } from "../lib/emojiStore";
+import { useEmojiStore, type Emoji } from "../lib/emojiStore";
 import type { MessageDTO } from "../lib/types";
 import { createPortal } from "react-dom";
 import { useDocumentTitle } from "../lib/useDocumentTitle";
@@ -49,34 +49,98 @@ function groupMessages(messages: MessageDTO[]): MessageDTO[][] {
   return groups;
 }
 
-function ReactionRow({ message }: { message: MessageDTO }) {
+function ReactionPills({ message }: { message: MessageDTO }) {
+  const emojis = useEmojiStore((s) => s.emojis);
+  if (message.reactions.length === 0) return null;
+  return (
+    <div style={{ display: "flex", gap: "0.3rem", flexWrap: "wrap", marginTop: "0.35rem" }} onClick={(e) => e.stopPropagation()}>
+      {message.reactions.map((r) => {
+        const known = emojis.find((e) => e.name === r.emojiName);
+        return (
+          <span key={r.emojiId} className="reaction-pill" title={r.usernames.join(", ")}>
+            {known ? <img src={known.imageUrl} alt={r.emojiName} className="emoji-inline" /> : `:${r.emojiName}:`} {r.usernames.length}
+          </span>
+        );
+      })}
+    </div>
+  );
+}
+
+function MessageMenu({
+  message,
+  onDelete,
+  onQuote,
+  onCopyLink,
+  canModerate,
+}: {
+  message: MessageDTO;
+  onDelete: (id: number) => void;
+  onQuote: (m: MessageDTO) => void;
+  onCopyLink: (m: MessageDTO) => void;
+  canModerate: boolean;
+}) {
   const { user } = useAuth();
-  const [pickerOpen, setPickerOpen] = useState(false);
+  const [open, setOpen] = useState(false);
+  const [reacting, setReacting] = useState(false);
 
   async function addReaction(emoji: Emoji) {
-    setPickerOpen(false);
-    await api(`/api/messages/${message.id}/reactions`, {
-      method: "POST",
-      body: JSON.stringify({ emojiId: emoji.id }),
-    });
+    setReacting(false);
+    setOpen(false);
+    await api(`/api/messages/${message.id}/reactions`, { method: "POST", body: JSON.stringify({ emojiId: emoji.id }) });
     // No local optimistic update needed — the live channel is subscribed to
     // message.update events, which this reaction triggers server-side.
   }
 
   return (
-    <div style={{ marginTop: "0.3rem", display: "flex", gap: "0.4rem", alignItems: "center", position: "relative" }}>
-      {message.reactions.map((r) => (
-        <span key={r.emojiId} className="btn" style={{ padding: "0.1rem 0.5rem", fontSize: "0.8rem" }} title={r.usernames.join(", ")}>
-          :{r.emojiName}: {r.usernames.length}
-        </span>
-      ))}
-      {user && (
-        <>
-          <button className="btn" style={{ padding: "0.1rem 0.45rem", fontSize: "0.8rem" }} onClick={() => setPickerOpen((v) => !v)}>
-            +
+    <div className="message-menu" onClick={(e) => e.stopPropagation()}>
+      <button className="btn message-menu-trigger" onClick={() => setOpen((v) => !v)} title="More">
+        ⋮
+      </button>
+      {open && (
+        <div className="message-menu-dropdown">
+          {user && (
+            <div style={{ position: "relative" }}>
+              <button className="btn" style={{ width: "100%", textAlign: "left" }} onClick={() => setReacting((v) => !v)}>
+                React
+              </button>
+              {reacting && <EmojiPicker onSelect={addReaction} />}
+            </div>
+          )}
+          {user && (
+            <button
+              className="btn"
+              style={{ width: "100%", textAlign: "left" }}
+              onClick={() => {
+                setOpen(false);
+                onQuote(message);
+              }}
+            >
+              Quote
+            </button>
+          )}
+          <button
+            className="btn"
+            style={{ width: "100%", textAlign: "left" }}
+            onClick={() => {
+              setOpen(false);
+              onCopyLink(message);
+            }}
+          >
+            Copy link
           </button>
-          {pickerOpen && <EmojiPicker onSelect={addReaction} />}
-        </>
+          {canModerate && (
+            <button
+              className="btn btn-danger"
+              style={{ width: "100%", textAlign: "left" }}
+              onClick={() => {
+                setOpen(false);
+                onDelete(message.id);
+              }}
+            >
+              Delete
+            </button>
+          )}
+        </div>
       )}
     </div>
   );
@@ -95,20 +159,21 @@ function MessageBody({
 }) {
   const { user } = useAuth();
   const play = useAudioStore((s) => s.play);
-  const canModerate = user && (user.id === message.authorId || user.isAdmin);
+  const canModerate = !!user && (user.id === message.authorId || user.isAdmin);
 
   if (message.isDeleted) {
     return <em style={{ color: "var(--text-dim)" }}>message deleted</em>;
   }
 
   return (
-    <>
+    <div style={{ position: "relative" }}>
+      <MessageMenu message={message} onDelete={onDelete} onQuote={onQuote} onCopyLink={onCopyLink} canModerate={canModerate} />
       {message.replyPreview && (
         <a href={`#m-${message.replyPreview.id}`} style={{ display: "block", fontSize: "0.75rem", color: "var(--text-dim)", marginBottom: "0.2rem" }}>
           ↪ {message.replyPreview.authorUsername}: {message.replyPreview.excerpt}
         </a>
       )}
-      {renderMessageContent(message.contentRaw)}
+      <div style={{ paddingRight: "1.6rem" }}>{renderMessageContent(message.contentRaw)}</div>
       {message.embeds.map((track) => (
         <div className="track-embed" key={track.id} onClick={(e) => e.stopPropagation()}>
           <button onClick={() => play(track)}>▶</button>
@@ -120,27 +185,8 @@ function MessageBody({
       {message.attachments.map((a) => (
         <AttachmentPreview key={a.id} attachment={a} />
       ))}
-      <div
-        className="message-actions"
-        onClick={(e) => e.stopPropagation()}
-        style={{ display: "flex", gap: "0.4rem", alignItems: "center", flexWrap: "wrap" }}
-      >
-        <ReactionRow message={message} />
-        {user && (
-          <button className="btn" style={{ padding: "0.1rem 0.45rem", fontSize: "0.75rem" }} onClick={() => onQuote(message)}>
-            Quote
-          </button>
-        )}
-        <button className="btn" style={{ padding: "0.1rem 0.45rem", fontSize: "0.75rem" }} onClick={() => onCopyLink(message)}>
-          Copy link
-        </button>
-        {canModerate && (
-          <button className="btn btn-danger" style={{ padding: "0.1rem 0.45rem", fontSize: "0.75rem" }} onClick={() => onDelete(message.id)}>
-            delete
-          </button>
-        )}
-      </div>
-    </>
+      <ReactionPills message={message} />
+    </div>
   );
 }
 
@@ -313,8 +359,13 @@ export function ChannelPage({ channelSlug }: { channelSlug?: string } = {}) {
   }
 
   function jumpToMessage(m: MessageDTO) {
-    setSelectedDay(dayKeyOf(m));
-    setMode("day");
+    const today = new Date().toISOString().slice(0, 10);
+    if (dayKeyOf(m) === today) {
+      setMode("live");
+    } else {
+      setSelectedDay(dayKeyOf(m));
+      setMode("day");
+    }
     setPendingScrollTo(m.id);
   }
   useDocumentTitle(channelName ?? "");
@@ -359,15 +410,6 @@ export function ChannelPage({ channelSlug }: { channelSlug?: string } = {}) {
     api<MessageDTO[]>(`/api/channels/${slug}/messages?${params}`).then(setMessages);
   }, [slug, mode, selectedDay, activeSearch]);
 
-  const [otherTopicSoundUrl, setOtherTopicSoundUrl] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (!user) return;
-    api<{ key: string; soundUrl: string | null }[]>("/api/account/sound-prefs").then((prefs) => {
-      setOtherTopicSoundUrl(prefs.find((p) => p.key === "message_other_topic")?.soundUrl ?? null);
-    });
-  }, [user]);
-
   // Only the live view stays subscribed — browsing history or search
   // shouldn't be interrupted by new messages arriving underneath you.
   useEffect(() => {
@@ -377,12 +419,7 @@ export function ChannelPage({ channelSlug }: { channelSlug?: string } = {}) {
     wsRef.current = ws;
     ws.onmessage = (ev) => {
       const event = JSON.parse(ev.data);
-      if (event.type === "message.create") {
-        setMessages((prev) => upsertMessage(prev, event.message));
-        if (!following && otherTopicSoundUrl && event.message.authorId !== user?.id) {
-          new Audio(otherTopicSoundUrl).play().catch(() => {});
-        }
-      } else if (event.type === "message.update") {
+      if (event.type === "message.create" || event.type === "message.update") {
         setMessages((prev) => upsertMessage(prev, event.message));
       } else if (event.type === "message.delete") {
         setMessages((prev) =>
@@ -391,7 +428,7 @@ export function ChannelPage({ channelSlug }: { channelSlug?: string } = {}) {
       }
     };
     return () => ws.close();
-  }, [slug, mode, following, otherTopicSoundUrl, user]);
+  }, [slug, mode]);
 
   async function sendMessage() {
     if ((!draft.trim() && pendingAttachments.length === 0) || !slug) return;

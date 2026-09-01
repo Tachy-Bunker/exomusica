@@ -344,15 +344,62 @@ th {
   color: var(--text);
 }
 
+.message-menu {
+  position: absolute;
+  top: 0;
+  right: 0;
+}
+
+.message-menu-trigger {
+  padding: 0.05rem 0.4rem;
+  font-size: 0.9rem;
+  line-height: 1;
+}
+
 @media (hover: hover) {
-  .message-actions {
+  .message-menu-trigger {
     opacity: 0;
     transition: opacity 0.1s ease;
   }
-  .message:hover .message-actions,
-  .message:focus-within .message-actions {
+  .message:hover .message-menu-trigger,
+  .message:focus-within .message-menu-trigger,
+  .message-menu-trigger:focus {
     opacity: 1;
   }
+}
+
+.message-menu-dropdown {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.3rem;
+  min-width: 120px;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.4);
+}
+
+.reaction-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  background: var(--bg-inset);
+  border: 1px solid var(--accent-audio-dim);
+  border-radius: 999px;
+  padding: 0.1rem 0.5rem;
+  font-size: 0.75rem;
+  cursor: default;
+}
+
+.reaction-pill img {
+  width: 14px;
+  height: 14px;
+  object-fit: contain;
 }
 
 .message-highlight {

@@ -7,6 +7,14 @@ import { createNotification } from "../lib/notify.js";
 export async function accountRoutes(app: FastifyInstance): Promise<void> {
   // Self view — includes email and notification prefs, unlike the public
   // /api/users/:username lookup which deliberately hides email.
+  app.get("/api/account/followed-channels", { preHandler: requireAuth }, async (req) => {
+    const follows = await prisma.channelFollow.findMany({
+      where: { userId: req.user!.id },
+      include: { channel: { select: { slug: true } } },
+    });
+    return follows.map((f) => f.channel.slug);
+  });
+
   app.get("/api/account/me", { preHandler: requireAuth }, async (req, reply) => {
     const me = await prisma.user.findUnique({
       where: { id: req.user!.id },

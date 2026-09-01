@@ -15,12 +15,30 @@ interface Notification {
   createdAt: string;
 }
 
+interface RecentMessage {
+  id: number;
+  channelSlug: string;
+  channelName: string;
+  authorUsername: string;
+  excerpt: string;
+  unixTimestamp: number;
+}
+
 interface SoundPref {
   key: string;
   soundUrl: string | null;
 }
 
 const POLL_MS = 20000;
+
+// Shared by the widget's own click-to-jump and by ChannelPage's — a message
+// still on today's UTC date is still in the live feed, not yet archived,
+// so jumping to it should land in live mode, not force a day-archive view.
+function jumpUrl(channelSlug: string, unixTimestamp: number, messageId: number): string {
+  const day = new Date(unixTimestamp * 1000).toISOString().slice(0, 10);
+  const today = new Date().toISOString().slice(0, 10);
+  return day === today ? `/topic/${channelSlug}#m-${messageId}` : `/topic/${channelSlug}?day=${day}#m-${messageId}`;
+}
 
 export function NotificationWidget() {
   const { user } = useAuth();
@@ -29,8 +47,11 @@ export function NotificationWidget() {
   const hidden = useNotificationWidgetVisibility((s) => s.hidden);
   const setHidden = useNotificationWidgetVisibility((s) => s.setHidden);
   const [notifications, setNotifications] = useState<Notification[]>([]);
-  const seenIds = useRef<Set<number>>(new Set());
+  const [recent, setRecent] = useState<RecentMessage[]>([]);
+  const seenNotificationIds = useRef<Set<number>>(new Set());
+  const seenRecentIds = useRef<Set<number>>(new Set());
   const soundPrefs = useRef<Map<string, string | null>>(new Map());
+  const followedSlugs = useRef<Set<string>>(new Set());
   const hasLoadedOnce = useRef(false);
 
   useEffect(() => {
@@ -38,24 +59,48 @@ export function NotificationWidget() {
     api<SoundPref[]>("/api/account/sound-prefs").then((prefs) => {
       soundPrefs.current = new Map(prefs.map((p) => [p.key, p.soundUrl]));
     });
+    api<string[]>("/api/account/followed-channels").then((slugs) => {
+      followedSlugs.current = new Set(slugs);
+    });
   }, [user]);
 
   useEffect(() => {
     if (!user) return;
+    const username = user.username;
     let cancelled = false;
 
     async function poll() {
-      const list = await api<Notification[]>("/api/notifications");
+      const [notifList, recentList] = await Promise.all([
+        api<Notification[]>("/api/notifications"),
+        api<RecentMessage[]>("/api/recent-messages?limit=3"),
+      ]);
       if (cancelled) return;
-      for (const n of list) {
-        if (hasLoadedOnce.current && !seenIds.current.has(n.id)) {
+
+      for (const n of notifList) {
+        if (hasLoadedOnce.current && !seenNotificationIds.current.has(n.id)) {
           const soundUrl = soundPrefs.current.get(n.eventKey);
           if (soundUrl) new Audio(soundUrl).play().catch(() => {});
         }
-        seenIds.current.add(n.id);
+        seenNotificationIds.current.add(n.id);
       }
+
+      // Unfollowed-topic attention ping — site-wide, not tied to whichever
+      // page you're currently on, since the whole point is to get your
+      // attention when you're looking at something else entirely.
+      for (const m of recentList) {
+        const isNew = hasLoadedOnce.current && !seenRecentIds.current.has(m.id);
+        const isOwnPost = m.authorUsername === username;
+        const isFollowed = followedSlugs.current.has(m.channelSlug);
+        if (isNew && !isOwnPost && !isFollowed) {
+          const soundUrl = soundPrefs.current.get("message_other_topic");
+          if (soundUrl) new Audio(soundUrl).play().catch(() => {});
+        }
+        seenRecentIds.current.add(m.id);
+      }
+
       hasLoadedOnce.current = true;
-      setNotifications(list);
+      setNotifications(notifList);
+      setRecent(recentList);
     }
 
     poll();
@@ -78,11 +123,16 @@ export function NotificationWidget() {
     }
   }
 
-  function handleClick(n: Notification) {
+  function handleNotificationClick(n: Notification) {
     setOpen(false);
     if (n.channelSlug && n.messageId) {
-      navigate(`/topic/${n.channelSlug}?day=${new Date(n.createdAt).toISOString().slice(0, 10)}#m-${n.messageId}`);
+      navigate(jumpUrl(n.channelSlug, Math.floor(new Date(n.createdAt).getTime() / 1000), n.messageId));
     }
+  }
+
+  function handleRecentClick(m: RecentMessage) {
+    setOpen(false);
+    navigate(jumpUrl(m.channelSlug, m.unixTimestamp, m.id));
   }
 
   return (
@@ -91,7 +141,7 @@ export function NotificationWidget() {
         <div
           style={{
             width: 300,
-            maxHeight: 360,
+            maxHeight: 420,
             overflowY: "auto",
             background: "var(--bg-elevated)",
             border: "1px solid var(--border)",
@@ -102,20 +152,15 @@ export function NotificationWidget() {
         >
           <div style={{ display: "flex", justifyContent: "space-between", padding: "0.5rem 0.7rem", borderBottom: "1px solid var(--border)" }}>
             <strong style={{ fontSize: "0.85rem" }}>Notifications</strong>
-            <button
-              className="btn"
-              style={{ padding: "0 0.4rem", fontSize: "0.7rem" }}
-              onClick={() => setHidden(true)}
-              title="Hide this widget"
-            >
+            <button className="btn" style={{ padding: "0 0.4rem", fontSize: "0.7rem" }} onClick={() => setHidden(true)} title="Hide this widget">
               Hide
             </button>
           </div>
-          {notifications.length === 0 && <p style={{ padding: "0.7rem", fontSize: "0.8rem", color: "var(--text-dim)" }}>Nothing yet.</p>}
+          {notifications.length === 0 && <p style={{ padding: "0.7rem 0.7rem 0.3rem", fontSize: "0.8rem", color: "var(--text-dim)" }}>Nothing yet.</p>}
           {notifications.map((n) => (
             <div
               key={n.id}
-              onClick={() => handleClick(n)}
+              onClick={() => handleNotificationClick(n)}
               style={{
                 padding: "0.5rem 0.7rem",
                 borderBottom: "1px solid var(--border)",
@@ -125,6 +170,22 @@ export function NotificationWidget() {
             >
               <div style={{ fontWeight: 600 }}>{n.title}</div>
               <div style={{ color: "var(--text-dim)" }}>{n.body}</div>
+            </div>
+          ))}
+
+          <div style={{ padding: "0.4rem 0.7rem", fontSize: "0.7rem", textTransform: "uppercase", color: "var(--text-dim)", borderTop: "1px solid var(--border)" }}>
+            Recent activity — any topic
+          </div>
+          {recent.map((m) => (
+            <div
+              key={m.id}
+              onClick={() => handleRecentClick(m)}
+              style={{ padding: "0.5rem 0.7rem", borderBottom: "1px solid var(--border)", cursor: "pointer", fontSize: "0.8rem" }}
+            >
+              <div style={{ color: "var(--text-dim)", fontSize: "0.7rem" }}>{m.channelName}</div>
+              <div>
+                <strong>{m.authorUsername}</strong>: {m.excerpt}
+              </div>
             </div>
           ))}
         </div>

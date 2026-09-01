@@ -119,7 +119,7 @@ export function AboutAdminPage() {
           </div>
           <input
             type="file"
-            accept="image/png,image/jpeg,image/webp,image/gif"
+            accept="image/png,image/jpeg,image/webp,image/gif,image/bmp"
             ref={(el) => {
               fileInputs.current[f.id] = el;
             }}

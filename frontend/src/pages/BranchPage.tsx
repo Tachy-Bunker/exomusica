@@ -21,6 +21,14 @@ export function BranchPage() {
     addToQueue(full.tracks);
   }
 
+  async function playAlbum(albumSlug: string) {
+    const full = await api<{ tracks: PlayableTrackDTO[] }>(`/api/albums/${albumSlug}`);
+    if (full.tracks.length === 0) return;
+    const [first, ...rest] = full.tracks;
+    play(first);
+    addToQueue(rest);
+  }
+
   useEffect(() => {
     if (!slug) return;
     api<Branch>(`/api/branches/${slug}`).then(setBranch);
@@ -61,9 +69,10 @@ export function BranchPage() {
                     <button
                       className="btn"
                       style={{ position: "absolute", bottom: 8, right: 40 }}
+                      title="Play album"
                       onClick={(e) => {
                         e.preventDefault();
-                        a.previewTrack && play(a.previewTrack);
+                        void playAlbum(a.slug);
                       }}
                     >
                       ▶

@@ -79,6 +79,27 @@ export async function messageRoutes(app: FastifyInstance): Promise<void> {
     },
   );
 
+  // Site-wide, any channel, regardless of follow status — powers the
+  // notification widget's "recent activity" section and the client-side
+  // check for whether an unfollowed-topic message deserves a sound.
+  app.get<{ Querystring: { limit?: string } }>("/api/recent-messages", async (req) => {
+    const limit = Math.min(Number(req.query.limit ?? 3), 20);
+    const messages = await prisma.message.findMany({
+      where: { isDeleted: false },
+      orderBy: { createdAt: "desc" },
+      take: limit,
+      include: { author: { select: { username: true } }, channel: { select: { slug: true, name: true } } },
+    });
+    return messages.map((m) => ({
+      id: m.id,
+      channelSlug: m.channel.slug,
+      channelName: m.channel.name,
+      authorUsername: m.author.username,
+      excerpt: m.contentRaw.slice(0, 120),
+      unixTimestamp: Math.floor(m.createdAt.getTime() / 1000),
+    }));
+  });
+
   app.get("/api/channels/:slug/archive", async (req, reply) => {
     const { slug } = req.params as { slug: string };
     const channel = await prisma.forumChannel.findUnique({ where: { slug } });

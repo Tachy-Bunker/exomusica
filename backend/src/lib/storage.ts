@@ -90,6 +90,8 @@ const ALLOWED_IMAGE_TYPES: Record<string, string> = {
   "image/jpeg": ".jpg",
   "image/webp": ".webp",
   "image/gif": ".gif",
+  "image/bmp": ".bmp",
+  "image/x-ms-bmp": ".bmp", // browsers are inconsistent about which of these two they send for BMP
 };
 
 /** Saves a general site image (album cover/gallery, About-page entries).
@@ -103,7 +105,7 @@ export async function saveSiteImage(
 ): Promise<{ url: string }> {
   const ext =
     ALLOWED_IMAGE_TYPES[mimeType] ??
-    ([".png", ".jpg", ".jpeg", ".webp", ".gif"].includes(path.extname(filename).toLowerCase())
+    ([".png", ".jpg", ".jpeg", ".webp", ".gif", ".bmp"].includes(path.extname(filename).toLowerCase())
       ? path.extname(filename).toLowerCase()
       : null);
   if (!ext) {

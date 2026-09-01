@@ -19,6 +19,8 @@ interface AlbumDetail {
   id: number;
   slug: string;
   title: string;
+  composer: string;
+  description: string | null;
   coverArtUrl: string | null;
   links: { id: number; label: string; url: string }[];
   gallery: { id: number; url: string }[];
@@ -47,6 +49,8 @@ export function AlbumsAdminPage() {
   const [linkForm, setLinkForm] = useState({ label: "", url: "" });
   const [editingTrackId, setEditingTrackId] = useState<number | null>(null);
   const [trackEditForm, setTrackEditForm] = useState({ title: "", fileUrl: "", format: "MP3" });
+  const [editingAlbumInfo, setEditingAlbumInfo] = useState(false);
+  const [albumEditForm, setAlbumEditForm] = useState({ title: "", composer: "", description: "" });
   const coverInput = useRef<HTMLInputElement>(null);
   const galleryInput = useRef<HTMLInputElement>(null);
 
@@ -78,6 +82,20 @@ export function AlbumsAdminPage() {
     if (managingSlug) loadDetail(managingSlug);
     else setDetail(null);
   }, [managingSlug]);
+
+  function startEditAlbumInfo() {
+    if (!detail) return;
+    setAlbumEditForm({ title: detail.title, composer: detail.composer, description: detail.description ?? "" });
+    setEditingAlbumInfo(true);
+  }
+
+  async function saveAlbumInfo() {
+    if (!detail) return;
+    await api(`/api/admin/albums/${detail.id}`, { method: "PATCH", body: JSON.stringify(albumEditForm) });
+    setEditingAlbumInfo(false);
+    loadDetail(detail.slug);
+    loadAlbums();
+  }
 
   async function handleCreateAlbum(e: FormEvent) {
     e.preventDefault();
@@ -270,10 +288,45 @@ export function AlbumsAdminPage() {
         <div style={{ border: "1px solid var(--border)", borderRadius: "var(--radius)", padding: "1rem", marginBottom: "1.5rem" }}>
           <h2 style={{ fontSize: "1rem" }}>Managing: {detail.title}</h2>
 
+          {editingAlbumInfo ? (
+            <div style={{ maxWidth: 420, marginBottom: "1rem" }}>
+              <div className="field">
+                <input value={albumEditForm.title} onChange={(e) => setAlbumEditForm((f) => ({ ...f, title: e.target.value }))} placeholder="title" />
+              </div>
+              <div className="field">
+                <input value={albumEditForm.composer} onChange={(e) => setAlbumEditForm((f) => ({ ...f, composer: e.target.value }))} placeholder="composer" />
+              </div>
+              <div className="field">
+                <textarea
+                  rows={2}
+                  value={albumEditForm.description}
+                  onChange={(e) => setAlbumEditForm((f) => ({ ...f, description: e.target.value }))}
+                  placeholder="description"
+                />
+              </div>
+              <button className="btn btn-primary" onClick={saveAlbumInfo}>
+                Save
+              </button>{" "}
+              <button className="btn" onClick={() => setEditingAlbumInfo(false)}>
+                Cancel
+              </button>
+            </div>
+          ) : (
+            <div style={{ marginBottom: "1rem" }}>
+              <p style={{ fontSize: "0.85rem", color: "var(--text-dim)", marginBottom: "0.3rem" }}>
+                {detail.composer}
+                {detail.description ? ` — ${detail.description}` : ""}
+              </p>
+              <button className="btn" onClick={startEditAlbumInfo}>
+                Edit title / composer / description
+              </button>
+            </div>
+          )}
+
           <h3 style={{ fontSize: "0.9rem" }}>Cover art</h3>
           {detail.coverArtUrl && <img src={detail.coverArtUrl} alt="" style={{ width: 100, height: 100, objectFit: "cover", borderRadius: "var(--radius)" }} />}
           <div style={{ display: "flex", gap: "0.5rem", marginTop: "0.4rem" }}>
-            <input ref={coverInput} type="file" accept="image/png,image/jpeg,image/webp,image/gif" />
+            <input ref={coverInput} type="file" accept="image/png,image/jpeg,image/webp,image/gif,image/bmp" />
             <button className="btn" onClick={handleCoverUpload}>
               Upload cover
             </button>
@@ -295,7 +348,7 @@ export function AlbumsAdminPage() {
             ))}
           </div>
           <div style={{ display: "flex", gap: "0.5rem" }}>
-            <input ref={galleryInput} type="file" accept="image/png,image/jpeg,image/webp,image/gif" multiple />
+            <input ref={galleryInput} type="file" accept="image/png,image/jpeg,image/webp,image/gif,image/bmp" multiple />
             <button className="btn" onClick={handleGalleryUpload}>
               Upload to gallery
             </button>
