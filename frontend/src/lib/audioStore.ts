@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import type { PlayableTrackDTO } from "./types";
+import { useAmbienceStore } from "./ambienceStore";
 
 type RepeatMode = "off" | "all" | "one";
 
@@ -62,6 +63,7 @@ export const useAudioStore = create<AudioState>((set, get) => ({
     }
     audioEl?.play().catch(() => set({ isPlaying: false }));
     set({ isPlaying: true });
+    useAmbienceStore.getState().setEnabled(false);
   },
 
   addToQueue: (tracks) => set((s) => ({ queue: [...s.queue, ...(s.shuffle ? shuffleArray(tracks) : tracks)] })),

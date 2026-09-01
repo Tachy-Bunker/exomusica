@@ -55,7 +55,7 @@ export function ChatDock() {
         position: "fixed",
         top: "3.6rem",
         right: 0,
-        bottom: 0,
+        bottom: "var(--player-height, 0px)",
         width,
         background: "var(--bg)",
         borderLeft: "1px solid var(--border)",

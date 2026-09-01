@@ -8,6 +8,16 @@ export function useGlobalPlayerShortcuts(): void {
     function handleKeyDown(e: KeyboardEvent) {
       if (isTypingTarget(e.target)) return;
       const store = useAudioStore.getState();
+
+      if (e.code === "KeyL") {
+        store.cycleRepeat();
+        return;
+      }
+      if (e.code === "KeyK") {
+        store.toggleShuffle();
+        return;
+      }
+
       if (!store.currentTrack) {
         if (e.key === " ") {
           e.preventDefault();

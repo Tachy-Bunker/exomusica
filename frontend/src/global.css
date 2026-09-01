@@ -123,7 +123,7 @@ button {
 .main-content {
   flex: 1;
   padding: 1.5rem;
-  padding-bottom: 6rem; /* room for the player bar */
+  padding-bottom: calc(1.5rem + var(--player-height, 0px));
 }
 
 /* --- Buttons & forms -------------------------------------------------- */
@@ -667,7 +667,7 @@ th {
 .homepage-fill {
   display: flex;
   flex-direction: column;
-  height: calc(100dvh - 3.6rem - 7.5rem); /* nav height, main-content's own padding */
+  height: calc(100dvh - 3.6rem - 3rem - var(--player-height, 0px));
 }
 
 .space-map {

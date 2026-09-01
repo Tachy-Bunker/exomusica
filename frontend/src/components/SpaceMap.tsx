@@ -203,13 +203,15 @@ export function SpaceMap({ branches, centerLabel, centerHref }: { branches: Bran
   }, [branches]);
 
   const ACTION_SEGMENTS = [
-    { text: "Chat", color: "var(--accent-forum)", action: openLockedChat },
+    { text: isDesktop ? "Chat (E)" : "Chat", color: "var(--accent-forum)", action: openLockedChat },
     { text: "  |  ", color: undefined, action: null },
-    { text: "Play", color: "var(--accent-audio)", action: () => void shuffleLockedBranch() },
+    { text: isDesktop ? "Play (F)" : "Play", color: "var(--accent-audio)", action: () => void shuffleLockedBranch() },
     { text: "  |  ", color: undefined, action: null },
-    { text: "Details", color: "var(--accent-danger)", action: viewLockedDetails },
+    { text: isDesktop ? "Details (T)" : "Details", color: "var(--accent-danger)", action: viewLockedDetails },
   ] as const;
   const ACTION_HINT = ACTION_SEGMENTS.map((s) => s.text).join("");
+  const CENTER_ACTION_TEXT = isDesktop ? "Enter (Enter)" : "Enter";
+  const currentActionLength = lockedNode?.id === -1 ? CENTER_ACTION_TEXT.length : ACTION_HINT.length;
 
   useEffect(() => {
     if (!lockedNode) return;
@@ -232,7 +234,7 @@ export function SpaceMap({ branches, centerLabel, centerHref }: { branches: Bran
     setActionRevealedCount(0);
     const interval = setInterval(() => {
       setActionRevealedCount((prev) => {
-        if (prev >= ACTION_HINT.length) {
+        if (prev >= currentActionLength) {
           clearInterval(interval);
           return prev;
         }
@@ -245,7 +247,7 @@ export function SpaceMap({ branches, centerLabel, centerHref }: { branches: Bran
   const wasRevealingRef = useRef(false);
   useEffect(() => {
     if (!scanSfxUrl) return;
-    const isRevealing = !!lockedNode && (revealedCount < lockedNode.name.length || actionRevealedCount < ACTION_HINT.length);
+    const isRevealing = !!lockedNode && (revealedCount < lockedNode.name.length || actionRevealedCount < currentActionLength);
     if (isRevealing === wasRevealingRef.current) return; // no state change — don't re-trigger the fade
     wasRevealingRef.current = isRevealing;
 
@@ -277,6 +279,8 @@ export function SpaceMap({ branches, centerLabel, centerHref }: { branches: Bran
         viewLockedDetails();
       } else if (e.code === "Enter") {
         enterCenter();
+      } else if (e.code === "KeyR") {
+        cameraRef.current = { x: 0, y: 0, vx: 0, vy: 0 };
       }
     }
     function handleKeyUp(e: KeyboardEvent) {
@@ -583,7 +587,7 @@ export function SpaceMap({ branches, centerLabel, centerHref }: { branches: Bran
                 enterCenter();
               }}
             >
-              {"Enter".slice(0, actionRevealedCount)}
+              {CENTER_ACTION_TEXT.slice(0, actionRevealedCount)}
             </span>
           ) : (
             (() => {
@@ -616,7 +620,7 @@ export function SpaceMap({ branches, centerLabel, centerHref }: { branches: Bran
             });
           })()
           )}
-          {actionRevealedCount < ACTION_HINT.length && <span className="space-hud-cursor">▌</span>}
+          {actionRevealedCount < currentActionLength && <span className="space-hud-cursor">▌</span>}
         </div>
       )}
 

@@ -147,7 +147,7 @@ export function NotificationWidget({ offsetRight = 0 }: { offsetRight?: number }
         right: `calc(1rem + ${offsetRight}px)`,
         ...(isHomepage
           ? isDesktop
-            ? { bottom: "1.2rem" }
+            ? { bottom: "calc(1.2rem + var(--player-height, 0px))" }
             : { top: "4rem" }
           : { top: "4.4rem" }),
       }}

@@ -1,7 +1,6 @@
 import { useEffect, useRef } from "react";
 import { Link } from "react-router-dom";
 import { bindAudioElement, useAudioStore } from "../lib/audioStore";
-import { useAmbienceStore } from "../lib/ambienceStore";
 
 function formatTime(seconds: number): string {
   if (!Number.isFinite(seconds)) return "0:00";
@@ -12,6 +11,7 @@ function formatTime(seconds: number): string {
 
 export function PlayerBar() {
   const audioRef = useRef<HTMLAudioElement>(null);
+  const wrapperRef = useRef<HTMLDivElement>(null);
   const {
     currentTrack,
     queue,
@@ -33,27 +33,28 @@ export function PlayerBar() {
     ended,
   } = useAudioStore();
 
-  const ambienceEnabled = useAmbienceStore((s) => s.enabled);
-  const ambienceUrl = useAmbienceStore((s) => s.url);
-  const pauseAmbience = useAmbienceStore((s) => s.pauseForNow);
-  const showAmbienceBar = !currentTrack && ambienceEnabled && !!ambienceUrl;
-
   useEffect(() => {
     bindAudioElement(audioRef.current);
     return () => bindAudioElement(null);
   }, []);
 
+  // Real measured height, not a guess — every layout consumer (main content
+  // padding, the homepage's height calc) reads this instead of assuming a
+  // fixed player height, so nothing ever sits hidden behind it regardless
+  // of collapsed/expanded state or queue length.
+  useEffect(() => {
+    const el = wrapperRef.current;
+    if (!el) return;
+    const observer = new ResizeObserver(() => {
+      const height = currentTrack ? el.getBoundingClientRect().height : 0;
+      document.documentElement.style.setProperty("--player-height", `${height}px`);
+    });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [currentTrack]);
+
   return (
-    <div
-      className="player-bar"
-      style={
-        currentTrack
-          ? { display: "block" }
-          : showAmbienceBar
-            ? { display: "flex", alignItems: "center", gap: "0.6rem", padding: "0.5rem 1rem" }
-            : { display: "none" }
-      }
-    >
+    <div className="player-bar" ref={wrapperRef} style={{ display: currentTrack ? "block" : "none" }}>
       {/* This element is created once and never unmounts across route
           changes — that's the entire mechanism behind "playback survives
           navigation". No special persistence logic needed beyond living
@@ -64,15 +65,6 @@ export function PlayerBar() {
         onLoadedMetadata={(e) => setProgress(e.currentTarget.currentTime, e.currentTarget.duration || 0)}
         onEnded={ended}
       />
-
-      {!currentTrack && showAmbienceBar && (
-        <>
-          <span style={{ fontSize: "0.85rem", color: "var(--text-dim)" }}>🌫 Ambient loop</span>
-          <button className="btn" onClick={pauseAmbience}>
-            Pause
-          </button>
-        </>
-      )}
 
       {currentTrack && (
         <>
