@@ -16,6 +16,8 @@ interface Me {
   username: string;
   email: string;
   avatarUrl: string | null;
+  bio: string | null;
+  links: { label: string; url: string }[] | null;
   notifyWeeklySummary: boolean;
   notifyDailySummary: boolean;
   notifyFollowedReplies: boolean;
@@ -56,6 +58,36 @@ export function AccountSettingsPage() {
   const setProfileAvatarUrl = useProfileStore((s) => s.setAvatarUrl);
   const avatarInputRef = useRef<HTMLInputElement>(null);
   const [avatarError, setAvatarError] = useState<string | null>(null);
+  const [profileSaved, setProfileSaved] = useState(false);
+
+  function updateMeField(patch: Partial<Me>) {
+    setMe((prev) => (prev ? { ...prev, ...patch } : prev));
+  }
+
+  function updateLink(index: number, patch: Partial<{ label: string; url: string }>) {
+    if (!me) return;
+    const links = [...(me.links ?? [])];
+    links[index] = { ...links[index], ...patch };
+    updateMeField({ links });
+  }
+
+  function addLink() {
+    updateMeField({ links: [...(me?.links ?? []), { label: "", url: "" }] });
+  }
+
+  function removeLink(index: number) {
+    updateMeField({ links: (me?.links ?? []).filter((_, i) => i !== index) });
+  }
+
+  async function saveProfile() {
+    if (!me) return;
+    await api("/api/account/profile", {
+      method: "PATCH",
+      body: JSON.stringify({ bio: me.bio, links: (me.links ?? []).filter((l) => l.label.trim() && l.url.trim()) }),
+    });
+    setProfileSaved(true);
+    setTimeout(() => setProfileSaved(false), 2000);
+  }
 
   async function uploadAvatar() {
     const file = avatarInputRef.current?.files?.[0];
@@ -169,6 +201,31 @@ export function AccountSettingsPage() {
           {avatarError && <p style={{ fontSize: "0.75rem", color: "var(--accent-danger)" }}>{avatarError}</p>}
         </div>
       </div>
+
+      <h2 style={{ fontSize: "1rem" }}>Bio & links</h2>
+      <div className="field">
+        <label>Bio</label>
+        <textarea rows={3} value={me.bio ?? ""} onChange={(e) => updateMeField({ bio: e.target.value })} />
+      </div>
+      <div className="field">
+        <label>Links</label>
+        {(me.links ?? []).map((l, i) => (
+          <div key={i} style={{ display: "flex", gap: "0.3rem", marginBottom: "0.2rem" }}>
+            <input placeholder="label" value={l.label} onChange={(e) => updateLink(i, { label: e.target.value })} style={{ width: "35%" }} />
+            <input placeholder="https://…" value={l.url} onChange={(e) => updateLink(i, { url: e.target.value })} style={{ flex: 1 }} />
+            <button className="btn" onClick={() => removeLink(i)}>
+              ×
+            </button>
+          </div>
+        ))}
+        <button className="btn" onClick={addLink}>
+          Add link
+        </button>
+      </div>
+      <button className="btn btn-primary" onClick={saveProfile}>
+        Save bio & links
+      </button>
+      {profileSaved && <span style={{ marginLeft: "0.6rem", fontSize: "0.85rem", color: "var(--accent-audio)" }}>Saved ✓</span>}
 
       <h2 style={{ fontSize: "1rem" }}>Email notifications</h2>
       {checkbox("notifyWeeklySummary", "Weekly activity summary")}

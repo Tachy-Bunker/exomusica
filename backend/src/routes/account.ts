@@ -77,6 +77,14 @@ export async function accountRoutes(app: FastifyInstance): Promise<void> {
     return prisma.user.update({ where: { id: req.user!.id }, data: req.body ?? {} });
   });
 
+  app.patch<{ Body: Partial<{ bio: string; links: { label: string; url: string }[] }> }>(
+    "/api/account/profile",
+    { preHandler: requireAuth },
+    async (req) => {
+      return prisma.user.update({ where: { id: req.user!.id }, data: req.body ?? {} });
+    },
+  );
+
   // Per-topic override under the global notifyFollowedReplies toggle.
   app.patch<{ Params: { slug: string }; Body: { notifyOnReply: boolean } }>(
     "/api/channels/:slug/follow/notifications",

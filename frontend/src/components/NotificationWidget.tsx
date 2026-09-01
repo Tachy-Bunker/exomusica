@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { api } from "../lib/api";
 import { useAuth } from "../lib/auth";
 import { useNotificationWidgetVisibility } from "../lib/notificationWidgetVisibility";
+import { useIsDesktop } from "../lib/useIsDesktop";
 
 interface Notification {
   id: number;
@@ -43,6 +44,9 @@ function jumpUrl(channelSlug: string, unixTimestamp: number, messageId: number):
 export function NotificationWidget({ offsetRight = 0 }: { offsetRight?: number }) {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+  const isDesktop = useIsDesktop();
+  const isHomepage = location.pathname === "/";
   const [open, setOpen] = useState(false);
   const hidden = useNotificationWidgetVisibility((s) => s.hidden);
   const setHidden = useNotificationWidgetVisibility((s) => s.setHidden);
@@ -136,7 +140,18 @@ export function NotificationWidget({ offsetRight = 0 }: { offsetRight?: number }
   }
 
   return (
-    <div style={{ position: "fixed", top: "4.4rem", right: `calc(1rem + ${offsetRight}px)`, zIndex: 40 }}>
+    <div
+      style={{
+        position: "fixed",
+        zIndex: 40,
+        right: `calc(1rem + ${offsetRight}px)`,
+        ...(isHomepage
+          ? isDesktop
+            ? { bottom: "1.2rem" }
+            : { top: "4rem" }
+          : { top: "4.4rem" }),
+      }}
+    >
       <button
         className="btn btn-primary"
         onClick={handleOpen}
@@ -167,13 +182,15 @@ export function NotificationWidget({ offsetRight = 0 }: { offsetRight?: number }
       {open && (
         <div
           style={{
+            position: "absolute",
+            right: 0,
+            ...(isHomepage && isDesktop ? { bottom: "calc(100% + 0.5rem)" } : { top: "calc(100% + 0.5rem)" }),
             width: 300,
             maxHeight: 420,
             overflowY: "auto",
             background: "var(--bg-elevated)",
             border: "1px solid var(--border)",
             borderRadius: "var(--radius)",
-            marginTop: "0.5rem",
             boxShadow: "0 12px 30px rgba(0,0,0,0.4)",
           }}
         >

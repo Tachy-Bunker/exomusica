@@ -664,11 +664,17 @@ th {
   flex-shrink: 0;
 }
 
+.homepage-fill {
+  display: flex;
+  flex-direction: column;
+  height: calc(100dvh - 3.6rem - 7.5rem); /* nav height, main-content's own padding */
+}
+
 .space-map {
   position: relative;
   width: 100%;
-  height: 70vh;
-  min-height: 480px;
+  flex: 1;
+  min-height: 0;
   overflow: hidden;
   background: var(--bg-inset);
   border-radius: var(--radius);
@@ -819,6 +825,8 @@ th {
   display: flex;
   flex-direction: column;
   gap: 0.6rem;
+  flex: 1;
+  min-height: 0;
 }
 
 .space-map:fullscreen {
@@ -1115,4 +1123,22 @@ th {
   border: 1px solid var(--accent-forum);
   box-shadow: 0 0 10px var(--accent-forum);
   transition: none;
+}
+
+.space-donate-top {
+  position: fixed;
+  top: 4rem;
+  left: 1rem;
+  z-index: 41;
+  background: linear-gradient(135deg, var(--accent-forum), var(--accent-audio));
+  color: var(--bg);
+  font-weight: 700;
+  border: none;
+}
+
+.space-donate-bottom {
+  background: linear-gradient(135deg, var(--accent-forum), var(--accent-audio));
+  color: var(--bg);
+  font-weight: 700;
+  border: none;
 }
