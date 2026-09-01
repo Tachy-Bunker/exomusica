@@ -6,6 +6,7 @@ export async function channelRoutes(app: FastifyInstance): Promise<void> {
   app.get<{ Querystring: { kind?: "BRANCH" | "DISCUSSION" } }>("/api/channels", async (req) => {
     return prisma.forumChannel.findMany({
       where: req.query.kind ? { kind: req.query.kind } : undefined,
+      include: { font: true },
       orderBy: { createdAt: "asc" },
     });
   });
@@ -13,11 +14,19 @@ export async function channelRoutes(app: FastifyInstance): Promise<void> {
   app.get<{ Params: { slug: string } }>("/api/channels/:slug", async (req, reply) => {
     const channel = await prisma.forumChannel.findUnique({
       where: { slug: req.params.slug },
-      include: { branch: { select: { slug: true, name: true } } },
+      include: { branch: { select: { slug: true, name: true } }, font: true },
     });
     if (!channel) return reply.code(404).send({ error: "no such channel" });
     return channel;
   });
+
+  app.patch<{ Params: { id: string }; Body: Partial<{ name: string; fontId: number | null }> }>(
+    "/api/admin/channels/:id",
+    { preHandler: requireAdmin },
+    async (req) => {
+      return prisma.forumChannel.update({ where: { id: Number(req.params.id) }, data: req.body ?? {} });
+    },
+  );
 
   // Powers the "follow" button — ChannelFollow already existed (it's what
   // weeklySummary.ts reads from) but nothing ever wrote to it.

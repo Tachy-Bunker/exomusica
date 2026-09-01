@@ -35,6 +35,8 @@ export interface Branch {
   description: string | null;
   coverArtUrl: string | null;
   hidden?: boolean; // only present on the admin listing, not the public one
+  fontId?: number | null;
+  font?: { familyName: string; fileUrl: string; format: string } | null;
   parentId: number | null;
   posX: number | null;
   posY: number | null;

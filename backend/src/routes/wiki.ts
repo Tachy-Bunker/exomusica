@@ -11,7 +11,7 @@ export async function wikiRoutes(app: FastifyInstance): Promise<void> {
   });
 
   app.get<{ Params: { slug: string } }>("/api/wiki/:slug", async (req, reply) => {
-    const page = await prisma.wikiPage.findUnique({ where: { slug: req.params.slug } });
+    const page = await prisma.wikiPage.findUnique({ where: { slug: req.params.slug }, include: { font: true } });
     if (!page) return reply.code(404).send({ error: "no such page" });
     return page;
   });
@@ -31,7 +31,7 @@ export async function wikiRoutes(app: FastifyInstance): Promise<void> {
     },
   );
 
-  app.patch<{ Params: { id: string }; Body: Partial<{ title: string; contentMarkdown: string; parentId: number }> }>(
+  app.patch<{ Params: { id: string }; Body: Partial<{ title: string; contentMarkdown: string; parentId: number; fontId: number | null }> }>(
     "/api/admin/wiki/:id",
     { preHandler: requireAdmin },
     async (req) => {

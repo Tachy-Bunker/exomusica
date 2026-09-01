@@ -13,10 +13,17 @@ interface PostSummary {
   slug: string;
   title: string;
   publishedAt: string | null;
+  fontId: number | null;
+}
+
+interface Font {
+  id: number;
+  name: string;
 }
 
 export function BlogAdminPage() {
   const [posts, setPosts] = useState<PostSummary[]>([]);
+  const [fonts, setFonts] = useState<Font[]>([]);
   const [form, setForm] = useState({ slug: "", title: "", contentMarkdown: "", publish: true });
   const [error, setError] = useState<string | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -42,9 +49,18 @@ export function BlogAdminPage() {
 
   function load() {
     api<PostSummary[]>("/api/admin/blog").then(setPosts);
+    api<Font[]>("/api/fonts").then(setFonts);
   }
 
   useEffect(load, []);
+
+  async function changeFont(post: PostSummary, fontIdStr: string) {
+    await api(`/api/admin/blog/${post.id}`, {
+      method: "PATCH",
+      body: JSON.stringify({ fontId: fontIdStr ? Number(fontIdStr) : null }),
+    });
+    load();
+  }
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -125,7 +141,15 @@ export function BlogAdminPage() {
                   <button className="btn" onClick={() => notifySubscribers(p)}>
                     Notify subscribers
                   </button>
-                )}
+                )}{" "}
+                <select value={p.fontId ?? ""} onChange={(e) => changeFont(p, e.target.value)} style={{ fontSize: "0.8rem" }}>
+                  <option value="">— default font —</option>
+                  {fonts.map((f) => (
+                    <option key={f.id} value={f.id}>
+                      {f.name}
+                    </option>
+                  ))}
+                </select>
               </td>
             </tr>
           ))}

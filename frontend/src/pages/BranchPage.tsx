@@ -6,6 +6,7 @@ import type { Branch, BranchAlbum, PlayableTrackDTO } from "../lib/types";
 import { ChannelPage } from "./ChannelPage";
 import { RootDivider } from "../components/RootDivider";
 import { useDocumentTitle } from "../lib/useDocumentTitle";
+import { useCustomFont } from "../lib/useCustomFont";
 
 export function BranchPage() {
   const { slug } = useParams<{ slug: string }>();
@@ -13,6 +14,7 @@ export function BranchPage() {
   const [albums, setAlbums] = useState<BranchAlbum[]>([]);
   const play = useAudioStore((s) => s.play);
   const addToQueue = useAudioStore((s) => s.addToQueue);
+  const fontFamily = useCustomFont(branch?.font);
 
   async function queueAlbum(albumSlug: string) {
     const full = await api<{ tracks: PlayableTrackDTO[] }>(`/api/albums/${albumSlug}`);
@@ -30,9 +32,10 @@ export function BranchPage() {
   if (!branch) return <p>Loading…</p>;
 
   return (
-    <div>
+    <div style={{ fontFamily }}>
       <h1>{branch.name}</h1>
       {branch.description && <p style={{ color: "var(--text-dim)", maxWidth: 640 }}>{branch.description}</p>}
+
 
       <h2 style={{ fontSize: "1.1rem", color: "var(--accent-audio)" }}>Music</h2>
       {albums.length === 0 ? (

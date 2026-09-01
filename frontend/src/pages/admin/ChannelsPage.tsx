@@ -3,17 +3,26 @@ import { Link } from "react-router-dom";
 import { api, ApiError } from "../../lib/api";
 
 interface ChannelSummary {
+  id: number;
   slug: string;
+  name: string;
+  fontId: number | null;
+}
+
+interface Font {
+  id: number;
   name: string;
 }
 
 export function ChannelsPage() {
   const [topics, setTopics] = useState<ChannelSummary[]>([]);
+  const [fonts, setFonts] = useState<Font[]>([]);
   const [form, setForm] = useState({ slug: "", name: "" });
   const [error, setError] = useState<string | null>(null);
 
   function load() {
     api<ChannelSummary[]>("/api/channels?kind=DISCUSSION").then(setTopics);
+    api<Font[]>("/api/fonts").then(setFonts);
   }
 
   useEffect(load, []);
@@ -28,6 +37,14 @@ export function ChannelsPage() {
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Something went wrong");
     }
+  }
+
+  async function changeFont(topic: ChannelSummary, fontIdStr: string) {
+    await api(`/api/admin/channels/${topic.id}`, {
+      method: "PATCH",
+      body: JSON.stringify({ fontId: fontIdStr ? Number(fontIdStr) : null }),
+    });
+    load();
   }
 
   return (
@@ -67,7 +84,15 @@ export function ChannelsPage() {
             <Link to={`/topic/${t.slug}`}>{t.name}</Link>{" "}
             <span className="mono" style={{ color: "var(--text-dim)", fontSize: "0.8rem" }}>
               /{t.slug}
-            </span>
+            </span>{" "}
+            <select value={t.fontId ?? ""} onChange={(e) => changeFont(t, e.target.value)} style={{ fontSize: "0.8rem" }}>
+              <option value="">— default font —</option>
+              {fonts.map((f) => (
+                <option key={f.id} value={f.id}>
+                  {f.name}
+                </option>
+              ))}
+            </select>
           </li>
         ))}
       </ul>

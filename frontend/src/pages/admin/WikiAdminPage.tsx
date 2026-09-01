@@ -18,12 +18,19 @@ interface WikiSummary {
 
 interface WikiFull extends WikiSummary {
   contentMarkdown: string;
+  fontId: number | null;
 }
 
-const EMPTY_FORM = { slug: "", title: "", contentMarkdown: "", parentId: "" };
+interface Font {
+  id: number;
+  name: string;
+}
+
+const EMPTY_FORM = { slug: "", title: "", contentMarkdown: "", parentId: "", fontId: "" };
 
 export function WikiAdminPage() {
   const [pages, setPages] = useState<WikiSummary[]>([]);
+  const [fonts, setFonts] = useState<Font[]>([]);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [form, setForm] = useState(EMPTY_FORM);
   const [error, setError] = useState<string | null>(null);
@@ -51,6 +58,7 @@ export function WikiAdminPage() {
 
   function load() {
     api<WikiSummary[]>("/api/wiki").then(setPages);
+    api<Font[]>("/api/fonts").then(setFonts);
   }
 
   useEffect(load, []);
@@ -63,6 +71,7 @@ export function WikiAdminPage() {
       title: full.title,
       contentMarkdown: full.contentMarkdown,
       parentId: full.parentId ? String(full.parentId) : "",
+      fontId: full.fontId ? String(full.fontId) : "",
     });
   }
 
@@ -76,10 +85,11 @@ export function WikiAdminPage() {
     setError(null);
     try {
       const parentId = form.parentId ? Number(form.parentId) : undefined;
+      const fontId = form.fontId ? Number(form.fontId) : null;
       if (editingId) {
         await api(`/api/admin/wiki/${editingId}`, {
           method: "PATCH",
-          body: JSON.stringify({ title: form.title, contentMarkdown: form.contentMarkdown, parentId }),
+          body: JSON.stringify({ title: form.title, contentMarkdown: form.contentMarkdown, parentId, fontId }),
         });
       } else {
         await api("/api/admin/wiki", {
@@ -131,6 +141,19 @@ export function WikiAdminPage() {
               ))}
           </select>
         </div>
+        {editingId && (
+          <div className="field">
+            <label>Font (only settable once a page exists)</label>
+            <select value={form.fontId} onChange={(e) => setForm((f) => ({ ...f, fontId: e.target.value }))}>
+              <option value="">— site default font —</option>
+              {fonts.map((f) => (
+                <option key={f.id} value={f.id}>
+                  {f.name}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
         <div className="field">
           <div style={{ display: "flex", gap: "0.5rem", marginBottom: "0.3rem" }}>
             <input ref={fileInputRef} type="file" onChange={handleMediaUpload} style={{ fontSize: "0.75rem" }} />

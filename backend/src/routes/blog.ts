@@ -14,7 +14,7 @@ export async function blogRoutes(app: FastifyInstance): Promise<void> {
   });
 
   app.get<{ Params: { slug: string } }>("/api/blog/:slug", async (req, reply) => {
-    const post = await prisma.blogPost.findUnique({ where: { slug: req.params.slug } });
+    const post = await prisma.blogPost.findUnique({ where: { slug: req.params.slug }, include: { font: true } });
     if (!post || !post.publishedAt) return reply.code(404).send({ error: "no such post" });
     return post;
   });
@@ -45,7 +45,7 @@ export async function blogRoutes(app: FastifyInstance): Promise<void> {
 
   app.patch<{
     Params: { id: string };
-    Body: Partial<{ title: string; contentMarkdown: string; coverImageUrl: string; publish: boolean }>;
+    Body: Partial<{ title: string; contentMarkdown: string; coverImageUrl: string; publish: boolean; fontId: number | null }>;
   }>("/api/admin/blog/:id", { preHandler: requireAdmin }, async (req) => {
     const { publish, ...rest } = req.body ?? {};
     return prisma.blogPost.update({

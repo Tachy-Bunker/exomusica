@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { api } from "../lib/api";
 import { renderMarkdown } from "../lib/markdown";
+import { useCustomFont, type FontInfo } from "../lib/useCustomFont";
 
 interface WikiSummary {
   id: number;
@@ -12,12 +13,14 @@ interface WikiSummary {
 
 interface WikiFull extends WikiSummary {
   contentMarkdown: string;
+  font: FontInfo | null;
 }
 
 export function WikiPage() {
   const { slug } = useParams<{ slug?: string }>();
   const [pages, setPages] = useState<WikiSummary[]>([]);
   const [current, setCurrent] = useState<WikiFull | null>(null);
+  const fontFamily = useCustomFont(current?.font);
 
   useEffect(() => {
     api<WikiSummary[]>("/api/wiki").then(setPages);
@@ -54,7 +57,7 @@ export function WikiPage() {
             ))}
         </ul>
       </nav>
-      <div>
+      <div style={{ fontFamily }}>
         {!slug && <p style={{ color: "var(--text-dim)" }}>Pick a page from the list.</p>}
         {slug && !current && <p>Loading…</p>}
         {current && renderMarkdown(current.contentMarkdown)}

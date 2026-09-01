@@ -100,6 +100,8 @@ model Branch {
   description String?
   coverArtUrl String?
   hidden      Boolean  @default(false) // soft take-down: excluded from public listings, data untouched
+  fontId      Int?
+  font        CustomFont? @relation(fields: [fontId], references: [id])
   parentId    Int?
   parent      Branch?  @relation("BranchTree", fields: [parentId], references: [id])
   children    Branch[] @relation("BranchTree")
@@ -118,6 +120,8 @@ model ForumChannel {
   kind      ChannelKind
   branchId  Int?        @unique // null for Discussion topics (not tied to a branch)
   branch    Branch?     @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  fontId    Int?
+  font      CustomFont? @relation(fields: [fontId], references: [id])
   createdAt DateTime    @default(now())
 
   messages Message[]
@@ -338,6 +342,8 @@ model WikiPage {
   children        WikiPage[] @relation("WikiTree")
   title           String
   contentMarkdown String     @db.Text
+  fontId          Int?
+  font            CustomFont? @relation(fields: [fontId], references: [id])
   updatedById     Int
   updatedBy       User       @relation("WikiEditor", fields: [updatedById], references: [id])
   updatedAt       DateTime   @updatedAt
@@ -349,6 +355,8 @@ model BlogPost {
   title           String
   contentMarkdown String    @db.Text
   coverImageUrl   String?
+  fontId          Int?
+  font            CustomFont? @relation(fields: [fontId], references: [id])
   authorId        Int
   author          User      @relation(fields: [authorId], references: [id])
   publishedAt     DateTime?
@@ -398,6 +406,23 @@ model EmailTemplate {
   subject   String
   bodyHtml  String    @db.Text
   updatedAt DateTime  @updatedAt
+}
+
+// Admin-uploaded fonts (OTF/TTF/WOFF/WOFF2), assignable per-branch,
+// per-topic, per-wiki-page, or per-blog-post — each of those four gets its
+// own optional fontId rather than one global "site font" choice.
+model CustomFont {
+  id         Int      @id @default(autoincrement())
+  name       String   @unique // display name shown in admin, e.g. "Anomaly Mono"
+  familyName String   @unique // sanitized CSS font-family value, derived from name
+  fileUrl    String
+  format     String // "opentype" | "truetype" | "woff" | "woff2" — goes straight into the @font-face src
+  createdAt  DateTime @default(now())
+
+  branches  Branch[]
+  channels  ForumChannel[]
+  wikiPages WikiPage[]
+  blogPosts BlogPost[]
 }
 
 model AuditLog {

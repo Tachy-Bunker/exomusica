@@ -44,6 +44,7 @@ export async function pmRoutes(app: FastifyInstance): Promise<void> {
         ],
       },
       orderBy: { sentAt: "asc" },
+      include: { attachments: true },
     });
 
     await prisma.privateMessage.updateMany({
@@ -56,27 +57,38 @@ export async function pmRoutes(app: FastifyInstance): Promise<void> {
       fromMe: m.senderId === me,
       contentRaw: m.contentRaw,
       sentAt: Math.floor(m.sentAt.getTime() / 1000),
+      attachments: m.attachments.map((a) => ({ id: a.id, filename: a.filename, url: a.storagePath, sizeBytes: Number(a.sizeBytes) })),
     }));
   });
 
-  app.post<{ Params: { username: string }; Body: { contentRaw: string } }>(
+  app.post<{ Params: { username: string }; Body: { contentRaw: string; attachmentIds?: number[] } }>(
     "/api/pms/:username",
     { preHandler: requireAuth },
     async (req, reply) => {
-      const contentRaw = req.body?.contentRaw;
-      if (!contentRaw?.trim()) return reply.code(400).send({ error: "contentRaw is required" });
+      const { contentRaw, attachmentIds } = req.body ?? {};
+      if (!contentRaw?.trim() && (!attachmentIds || attachmentIds.length === 0)) {
+        return reply.code(400).send({ error: "contentRaw or at least one attachment is required" });
+      }
       const other = await prisma.user.findUnique({ where: { username: req.params.username } });
       if (!other) return reply.code(404).send({ error: "no such user" });
       if (other.id === req.user!.id) return reply.code(400).send({ error: "can't message yourself" });
 
       const message = await prisma.privateMessage.create({
-        data: { senderId: req.user!.id, recipientId: other.id, contentRaw },
+        data: { senderId: req.user!.id, recipientId: other.id, contentRaw: contentRaw ?? "" },
       });
+
+      if (attachmentIds && attachmentIds.length > 0) {
+        await prisma.attachment.updateMany({
+          where: { id: { in: attachmentIds }, uploaderId: req.user!.id, messageId: null, privateMessageId: null },
+          data: { privateMessageId: message.id },
+        });
+      }
+
       const sender = await prisma.user.findUnique({ where: { id: req.user!.id } });
       if (other.notifyPrivateMessage && other.email) {
         void sendTemplatedMail("PRIVATE_MESSAGE", other.email, other.username, {
           senderUsername: sender?.username ?? "Someone",
-          messageExcerpt: contentRaw.slice(0, 200),
+          messageExcerpt: (contentRaw || "(attachment)").slice(0, 200),
         });
       }
       return reply.code(201).send({ id: message.id, sentAt: Math.floor(message.sentAt.getTime() / 1000) });

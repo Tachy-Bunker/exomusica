@@ -2,6 +2,7 @@ import { useEffect, useState, type FormEvent } from "react";
 import { useParams, Link } from "react-router-dom";
 import { api, ApiError } from "../lib/api";
 import { renderMarkdown } from "../lib/markdown";
+import { useCustomFont, type FontInfo } from "../lib/useCustomFont";
 
 interface PostSummary {
   id: number;
@@ -13,6 +14,7 @@ interface PostSummary {
 
 interface PostFull extends PostSummary {
   contentMarkdown: string;
+  font: FontInfo | null;
 }
 
 function NewsletterForm() {
@@ -46,6 +48,7 @@ export function NewsPage() {
   const { slug } = useParams<{ slug?: string }>();
   const [posts, setPosts] = useState<PostSummary[]>([]);
   const [current, setCurrent] = useState<PostFull | null>(null);
+  const fontFamily = useCustomFont(current?.font);
 
   useEffect(() => {
     api<PostSummary[]>("/api/blog").then(setPosts);
@@ -61,7 +64,7 @@ export function NewsPage() {
 
   if (slug) {
     return (
-      <div style={{ maxWidth: 640 }}>
+      <div style={{ maxWidth: 640, fontFamily }}>
         <Link to="/news" style={{ fontSize: "0.85rem" }}>
           ← News
         </Link>

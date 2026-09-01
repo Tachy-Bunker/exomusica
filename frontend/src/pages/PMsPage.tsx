@@ -1,6 +1,7 @@
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type ChangeEvent, type FormEvent } from "react";
 import { useParams, Link } from "react-router-dom";
 import { api } from "../lib/api";
+import { AttachmentPreview } from "../components/AttachmentPreview";
 
 interface Conversation {
   partner: string;
@@ -14,6 +15,7 @@ interface ThreadMessage {
   fromMe: boolean;
   contentRaw: string;
   sentAt: number;
+  attachments: { id: number; filename: string; url: string; sizeBytes: number }[];
 }
 
 export function PMsPage() {
@@ -21,6 +23,8 @@ export function PMsPage() {
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [thread, setThread] = useState<ThreadMessage[]>([]);
   const [draft, setDraft] = useState("");
+  const [pendingAttachments, setPendingAttachments] = useState<{ id: number; filename: string }[]>([]);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   function loadConversations() {
     api<Conversation[]>("/api/pms").then(setConversations);
@@ -38,11 +42,28 @@ export function PMsPage() {
 
   async function handleSend(e: FormEvent) {
     e.preventDefault();
-    if (!draft.trim() || !username) return;
-    await api(`/api/pms/${username}`, { method: "POST", body: JSON.stringify({ contentRaw: draft }) });
+    if ((!draft.trim() && pendingAttachments.length === 0) || !username) return;
+    await api(`/api/pms/${username}`, {
+      method: "POST",
+      body: JSON.stringify({ contentRaw: draft, attachmentIds: pendingAttachments.map((a) => a.id) }),
+    });
     setDraft("");
+    setPendingAttachments([]);
     api<ThreadMessage[]>(`/api/pms/${username}`).then(setThread);
     loadConversations();
+  }
+
+  async function handleFileSelect(e: ChangeEvent<HTMLInputElement>) {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+    const formData = new FormData();
+    for (const f of files) formData.append("files", f);
+    const result = await api<{ created: { id: number; filename: string }[] }>("/api/attachments", {
+      method: "POST",
+      body: formData,
+    });
+    setPendingAttachments((prev) => [...prev, ...result.created]);
+    if (fileInputRef.current) fileInputRef.current.value = "";
   }
 
   return (
@@ -82,10 +103,33 @@ export function PMsPage() {
                   }}
                 >
                   {m.contentRaw}
+                  {m.attachments.map((a) => (
+                    <AttachmentPreview key={a.id} attachment={a} />
+                  ))}
                 </div>
               ))}
             </div>
+            {pendingAttachments.length > 0 && (
+              <div style={{ display: "flex", gap: "0.4rem", flexWrap: "wrap", marginBottom: "0.4rem" }}>
+                {pendingAttachments.map((a) => (
+                  <span key={a.id} className="btn" style={{ fontSize: "0.75rem", padding: "0.1rem 0.4rem" }}>
+                    📎 {a.filename}{" "}
+                    <button
+                      type="button"
+                      onClick={() => setPendingAttachments((prev) => prev.filter((p) => p.id !== a.id))}
+                      style={{ background: "none", border: "none", cursor: "pointer" }}
+                    >
+                      ×
+                    </button>
+                  </span>
+                ))}
+              </div>
+            )}
             <form onSubmit={handleSend} style={{ display: "flex", gap: "0.5rem" }}>
+              <input ref={fileInputRef} type="file" multiple onChange={handleFileSelect} style={{ display: "none" }} />
+              <button type="button" className="btn" onClick={() => fileInputRef.current?.click()} title="Attach a file">
+                📎
+              </button>
               <input value={draft} onChange={(e) => setDraft(e.target.value)} style={{ flex: 1 }} placeholder="Message…" />
               <button className="btn btn-primary" type="submit">
                 Send

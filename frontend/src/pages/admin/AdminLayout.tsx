@@ -37,6 +37,9 @@ export function AdminLayout() {
         <NavLink to="/admin/about" className={({ isActive }) => (isActive ? "active" : "")}>
           About page
         </NavLink>
+        <NavLink to="/admin/fonts" className={({ isActive }) => (isActive ? "active" : "")}>
+          Fonts
+        </NavLink>
       </nav>
       <div>
         <Outlet />

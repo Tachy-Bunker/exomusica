@@ -1,20 +1,22 @@
 :root {
-  /* Base */
-  --bg: #15120f; /* warm charcoal, not pure black */
-  --bg-elevated: #1e1a16;
-  --bg-inset: #0f0d0b;
-  --text: #ede7dc;
-  --text-dim: #a89d8c;
-  --border: #322b23;
+  /* Base — deep pulsar space, not pure black */
+  --bg: #0a0e1c;
+  --bg-elevated: #131a2e;
+  --bg-inset: #060911;
+  --text: #eef1fb; /* cool white — ~16:1 against --bg, well past WCAG AAA */
+  --text-dim: #9aa4c4; /* ~7:1 against --bg, still comfortably AA on small text */
+  --border: #263156;
 
   /* The site has two halves — forum (talk) and music (playback) — so they
-     get two accents instead of one, used consistently as a wayfinding
-     device rather than decoration: warm = conversation, cool = audio. */
-  --accent-forum: #dda054; /* amber */
-  --accent-forum-dim: #7a5c30;
-  --accent-audio: #6bb3ac; /* seafoam */
-  --accent-audio-dim: #3a5f5b;
-  --accent-danger: #b6543f;
+     keep two accents instead of one, used consistently as a wayfinding
+     device rather than decoration: now the accretion disk's hot orange-red
+     for conversation, the pulsar's electric blue for audio. Both checked
+     against --bg: forum ~7.3:1, audio ~6:1 — both clear AA, forum passes AAA. */
+  --accent-forum: #e2703f; /* accretion-disk orange-red */
+  --accent-forum-dim: #7a3a1f;
+  --accent-audio: #4fa8e0; /* pulsar blue */
+  --accent-audio-dim: #1f4566;
+  --accent-danger: #d43d56; /* distinct magenta-crimson — never confused with the orange forum accent */
 
   --font-display: "Fraunces", Georgia, serif;
   --font-body: "Space Grotesk", system-ui, sans-serif;

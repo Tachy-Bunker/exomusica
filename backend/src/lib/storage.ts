@@ -145,4 +145,39 @@ export async function saveMediaFile(filename: string, mimeType: string, buffer: 
   return { url: `/uploads/media/${diskName}`, mimeType };
 }
 
+const ALLOWED_FONT_TYPES: Record<string, string> = {
+  "font/otf": "opentype",
+  "font/ttf": "truetype",
+  "font/woff": "woff",
+  "font/woff2": "woff2",
+  "application/vnd.ms-opentype": "opentype",
+  "application/x-font-opentype": "opentype",
+  "application/x-font-ttf": "truetype",
+  "application/octet-stream": "", // browsers often send this for font files; fall back to extension
+};
+
+const FONT_EXT_FORMAT: Record<string, string> = {
+  ".otf": "opentype",
+  ".ttf": "truetype",
+  ".woff": "woff",
+  ".woff2": "woff2",
+};
+
+/** Saves an admin-uploaded font file. Returns the public URL and the CSS
+ *  @font-face format string it needs (not guessable from mimetype alone —
+ *  browsers are inconsistent about what mimetype they send for fonts, so
+ *  the file extension is the more reliable signal here). */
+export async function saveFontFile(filename: string, mimeType: string, buffer: Buffer): Promise<{ url: string; format: string }> {
+  const ext = path.extname(filename).toLowerCase();
+  const format = FONT_EXT_FORMAT[ext] ?? ALLOWED_FONT_TYPES[mimeType];
+  if (!format) {
+    throw new Error(`unsupported font type — use OTF, TTF, WOFF, or WOFF2`);
+  }
+  const dir = path.join(UPLOADS_DIR, "fonts");
+  await mkdir(dir, { recursive: true });
+  const diskName = `${randomUUID()}${ext || ".font"}`;
+  await writeFile(path.join(dir, diskName), buffer);
+  return { url: `/uploads/fonts/${diskName}`, format };
+}
+
 export { UPLOADS_DIR };

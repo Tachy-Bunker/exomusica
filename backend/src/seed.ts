@@ -1,5 +1,9 @@
 import { PrismaClient } from "@prisma/client";
 import argon2 from "argon2";
+import { mkdir, copyFile } from "node:fs/promises";
+import { existsSync } from "node:fs";
+import path from "node:path";
+import { UPLOADS_DIR } from "./lib/storage.js";
 
 const prisma = new PrismaClient();
 
@@ -145,6 +149,30 @@ async function main() {
     },
     update: {},
   });
+
+  // --- Starter font library ---------------------------------------------
+  const FONTS_TO_SEED = [
+    { name: "Anomaly Mono", file: "AnomalyMono-Regular.otf" },
+    { name: "Cozette", file: "CozetteVector.otf" },
+  ];
+  const seedAssetsDir = path.join(process.cwd(), "seed-assets", "fonts");
+  for (const { name, file } of FONTS_TO_SEED) {
+    const existing = await prisma.customFont.findUnique({ where: { name } });
+    if (existing) continue;
+    const sourcePath = path.join(seedAssetsDir, file);
+    if (!existsSync(sourcePath)) continue; // seed-assets not present in this build — skip quietly
+
+    const fontsDir = path.join(UPLOADS_DIR, "fonts");
+    await mkdir(fontsDir, { recursive: true });
+    const ext = path.extname(file);
+    const diskName = `${name.toLowerCase().replace(/\s+/g, "-")}${ext}`;
+    await copyFile(sourcePath, path.join(fontsDir, diskName));
+
+    const familyName = `exo-font-${name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "")}`;
+    await prisma.customFont.create({
+      data: { name, familyName, fileUrl: `/uploads/fonts/${diskName}`, format: "opentype" },
+    });
+  }
 
   console.log("Seed complete.");
 }

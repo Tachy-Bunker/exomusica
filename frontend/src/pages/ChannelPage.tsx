@@ -9,6 +9,7 @@ import { AttachmentPreview } from "../components/AttachmentPreview";
 import type { Emoji } from "../lib/emojiStore";
 import type { MessageDTO } from "../lib/types";
 import { useDocumentTitle } from "../lib/useDocumentTitle";
+import { useCustomFont, type FontInfo } from "../lib/useCustomFont";
 
 type ViewMode = "live" | "day" | "search";
 type DisplayMode = "standard" | "grouped";
@@ -228,6 +229,8 @@ export function ChannelPage({ channelSlug }: { channelSlug?: string } = {}) {
   const [emojiQuery, setEmojiQuery] = useState<string | null>(null);
   const [following, setFollowing] = useState(false);
   const [channelName, setChannelName] = useState<string | null>(null);
+  const [channelFont, setChannelFont] = useState<FontInfo | null>(null);
+  const fontFamily = useCustomFont(channelFont);
   const [replyTarget, setReplyTarget] = useState<ReplyTarget | null>(null);
   const [pendingAttachments, setPendingAttachments] = useState<{ id: number; filename: string }[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -301,7 +304,10 @@ export function ChannelPage({ channelSlug }: { channelSlug?: string } = {}) {
 
   useEffect(() => {
     if (!slug) return;
-    api<{ name: string }>(`/api/channels/${slug}`).then((c) => setChannelName(c.name));
+    api<{ name: string; font: FontInfo | null }>(`/api/channels/${slug}`).then((c) => {
+      setChannelName(c.name);
+      setChannelFont(c.font);
+    });
   }, [slug]);
 
   useEffect(() => {
@@ -437,7 +443,7 @@ export function ChannelPage({ channelSlug }: { channelSlug?: string } = {}) {
   }
 
   return (
-    <div>
+    <div style={{ fontFamily }}>
       <div style={{ display: "flex", gap: "0.6rem", marginBottom: "1rem", flexWrap: "wrap" }}>
         <button className={`btn ${mode === "live" ? "btn-primary" : ""}`} onClick={() => setMode("live")}>
           Live

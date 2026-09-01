@@ -43,7 +43,7 @@ export async function branchRoutes(app: FastifyInstance): Promise<void> {
   app.get<{ Params: { slug: string } }>("/api/branches/:slug", async (req, reply) => {
     const branch = await prisma.branch.findUnique({
       where: { slug: req.params.slug },
-      include: { channel: { select: { slug: true } } },
+      include: { channel: { select: { slug: true } }, font: true },
     });
     if (!branch) return reply.code(404).send({ error: "no such branch" });
     return branch;
@@ -107,7 +107,7 @@ export async function branchRoutes(app: FastifyInstance): Promise<void> {
 
   app.patch<{
     Params: { id: string };
-    Body: Partial<{ name: string; description: string; coverArtUrl: string; hidden: boolean; posX: number; posY: number }>;
+    Body: Partial<{ name: string; description: string; coverArtUrl: string; hidden: boolean; posX: number; posY: number; fontId: number | null }>;
   }>("/api/admin/branches/:id", { preHandler: requireAdmin }, async (req) => {
     const branch = await prisma.branch.update({ where: { id: Number(req.params.id) }, data: req.body ?? {} });
     await prisma.auditLog.create({

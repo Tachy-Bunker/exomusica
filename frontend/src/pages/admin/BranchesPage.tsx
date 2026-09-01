@@ -2,15 +2,22 @@ import { useEffect, useState, type FormEvent } from "react";
 import { api, ApiError } from "../../lib/api";
 import type { Branch } from "../../lib/types";
 
+interface Font {
+  id: number;
+  name: string;
+}
+
 export function BranchesPage() {
   const [branches, setBranches] = useState<Branch[]>([]);
+  const [fonts, setFonts] = useState<Font[]>([]);
   const [form, setForm] = useState({ slug: "", name: "", description: "", parentId: "" });
   const [error, setError] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<number | null>(null);
-  const [editForm, setEditForm] = useState({ name: "", description: "" });
+  const [editForm, setEditForm] = useState({ name: "", description: "", fontId: "" });
 
   function load() {
     api<Branch[]>("/api/admin/branches").then(setBranches);
+    api<Font[]>("/api/fonts").then(setFonts);
   }
 
   useEffect(load, []);
@@ -37,13 +44,17 @@ export function BranchesPage() {
 
   function startEdit(b: Branch) {
     setEditingId(b.id);
-    setEditForm({ name: b.name, description: b.description ?? "" });
+    setEditForm({ name: b.name, description: b.description ?? "", fontId: b.fontId ? String(b.fontId) : "" });
   }
 
   async function saveEdit(id: number) {
     await api(`/api/admin/branches/${id}`, {
       method: "PATCH",
-      body: JSON.stringify({ name: editForm.name, description: editForm.description }),
+      body: JSON.stringify({
+        name: editForm.name,
+        description: editForm.description,
+        fontId: editForm.fontId ? Number(editForm.fontId) : null,
+      }),
     });
     setEditingId(null);
     load();
@@ -138,6 +149,14 @@ export function BranchesPage() {
                     value={editForm.description}
                     onChange={(e) => setEditForm((f) => ({ ...f, description: e.target.value }))}
                   />
+                  <select value={editForm.fontId} onChange={(e) => setEditForm((f) => ({ ...f, fontId: e.target.value }))}>
+                    <option value="">— site default font —</option>
+                    {fonts.map((f) => (
+                      <option key={f.id} value={f.id}>
+                        {f.name}
+                      </option>
+                    ))}
+                  </select>
                 </td>
               ) : (
                 <>

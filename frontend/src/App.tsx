@@ -27,6 +27,7 @@ import { EmojiAdminPage } from "./pages/admin/EmojiAdminPage";
 import { EmailTemplatesAdminPage } from "./pages/admin/EmailTemplatesAdminPage";
 import { AuditLogAdminPage } from "./pages/admin/AuditLogAdminPage";
 import { AboutAdminPage } from "./pages/admin/AboutAdminPage";
+import { FontsAdminPage } from "./pages/admin/FontsAdminPage";
 
 export default function App() {
   return (
@@ -65,6 +66,7 @@ export default function App() {
                 <Route path="email-templates" element={<EmailTemplatesAdminPage />} />
                 <Route path="audit-log" element={<AuditLogAdminPage />} />
                 <Route path="about" element={<AboutAdminPage />} />
+                <Route path="fonts" element={<FontsAdminPage />} />
               </Route>
             </Route>
           </Route>
