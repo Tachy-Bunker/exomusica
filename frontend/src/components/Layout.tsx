@@ -3,6 +3,9 @@ import { Link, Outlet } from "react-router-dom";
 import { useAuth } from "../lib/auth";
 import { useEmojiStore } from "../lib/emojiStore";
 import { useGlobalPlayerShortcuts } from "../lib/useGlobalPlayerShortcuts";
+import { useChatDockStore } from "../lib/chatDockStore";
+import { useIsDesktop } from "../lib/useIsDesktop";
+import { ChatDock } from "./ChatDock";
 import { NotificationWidget } from "./NotificationWidget";
 import { PlayerBar } from "./PlayerBar";
 
@@ -11,12 +14,20 @@ export function Layout() {
   const loadEmojis = useEmojiStore((s) => s.load);
   useGlobalPlayerShortcuts();
 
+  const isDesktop = useIsDesktop();
+  const dockOpen = useChatDockStore((s) => !!s.openChannelSlug);
+  const dockCollapsed = useChatDockStore((s) => s.collapsed);
+  const dockWidth = useChatDockStore((s) => s.width);
+  // The player bar and notification widget "nudge" out of the dock's way
+  // automatically — nobody has to manually rearrange anything.
+  const dockOffset = isDesktop && dockOpen && !dockCollapsed ? dockWidth : 0;
+
   useEffect(() => {
     loadEmojis();
   }, [loadEmojis]);
 
   return (
-    <div className="app-shell">
+    <div className="app-shell" style={{ "--dock-offset": `${dockOffset}px` } as React.CSSProperties}>
       <header className="top-nav">
         <Link to="/" className="brand">
           Exomusica
@@ -42,12 +53,13 @@ export function Layout() {
         )}
       </header>
 
-      <main className="main-content">
+      <main className="main-content" style={{ marginRight: dockOffset }}>
         <Outlet />
       </main>
 
       <PlayerBar />
-      <NotificationWidget />
+      <NotificationWidget offsetRight={dockOffset} />
+      <ChatDock />
     </div>
   );
 }

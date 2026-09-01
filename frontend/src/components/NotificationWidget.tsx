@@ -40,7 +40,7 @@ function jumpUrl(channelSlug: string, unixTimestamp: number, messageId: number):
   return day === today ? `/topic/${channelSlug}#m-${messageId}` : `/topic/${channelSlug}?day=${day}#m-${messageId}`;
 }
 
-export function NotificationWidget() {
+export function NotificationWidget({ offsetRight = 0 }: { offsetRight?: number }) {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
@@ -136,7 +136,7 @@ export function NotificationWidget() {
   }
 
   return (
-    <div style={{ position: "fixed", bottom: "5rem", right: "1rem", zIndex: 40 }}>
+    <div style={{ position: "fixed", bottom: "5rem", right: `calc(1rem + ${offsetRight}px)`, zIndex: 40 }}>
       {open && (
         <div
           style={{

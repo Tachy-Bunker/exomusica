@@ -6,6 +6,7 @@ import { toMessageDTO } from "../lib/messageDto.js";
 import { broadcast } from "../lib/chatHub.js";
 import { sendTemplatedMail } from "../lib/emailTemplates.js";
 import { createNotification } from "../lib/notify.js";
+import { parseSearchQuery } from "../lib/searchQuery.js";
 
 const messageInclude = {
   author: { select: { username: true, avatarUrl: true } },
@@ -33,21 +34,48 @@ export async function messageRoutes(app: FastifyInstance): Promise<void> {
 
       // --- search: scoped to this channel, most recent match first --------
       if (q) {
-        const rows = await prisma.$queryRaw<{ id: number }[]>`
-          SELECT id FROM "Message"
-          WHERE "channelId" = ${channel.id}
-            AND "isDeleted" = false
-            AND to_tsvector('english', "contentRaw") @@ plainto_tsquery('english', ${q})
-          ORDER BY "createdAt" DESC
-          LIMIT ${limit}
-        `;
-        const messages = await prisma.message.findMany({
-          where: { id: { in: rows.map((r) => r.id) } },
-          include: messageInclude,
+        const parsed = parseSearchQuery(q);
+
+        const textSearchIds = parsed.text
+          ? (
+              await prisma.$queryRaw<{ id: number }[]>`
+                SELECT id FROM "Message"
+                WHERE "channelId" = ${channel.id}
+                  AND "isDeleted" = false
+                  AND to_tsvector('english', "contentRaw") @@ plainto_tsquery('english', ${parsed.text})
+                ORDER BY "createdAt" DESC
+                LIMIT ${limit}
+              `
+            ).map((r) => r.id)
+          : null;
+        if (textSearchIds && textSearchIds.length === 0) return []; // free text matched nothing — has:/from: can't narrow further
+
+        const author = parsed.fromUsername ? await prisma.user.findUnique({ where: { username: parsed.fromUsername } }) : null;
+        if (parsed.fromUsername && !author) return []; // named user doesn't exist — no point querying
+
+        const hasConditions = parsed.hasFilters.map((h) => {
+          if (h === "link") return { contentRaw: { contains: "http" } };
+          if (h === "sound") {
+            return {
+              OR: [{ attachments: { some: { mimeType: { startsWith: "audio/" } } } }, { contentRaw: { contains: "track:" } }],
+            };
+          }
+          return { attachments: { some: { mimeType: { startsWith: `${h}/` } } } }; // image/ or video/
         });
-        const byId = new Map(messages.map((m) => [m.id, m]));
-        const ordered = rows.map((r) => byId.get(r.id)).filter((m): m is NonNullable<typeof m> => !!m);
-        return Promise.all(ordered.map(toMessageDTO));
+
+        const messages = await prisma.message.findMany({
+          where: {
+            channelId: channel.id,
+            isDeleted: false,
+            ...(textSearchIds ? { id: { in: textSearchIds } } : {}),
+            ...(author ? { authorId: author.id } : {}),
+            ...(hasConditions.length > 0 ? { AND: hasConditions } : {}),
+          },
+          include: messageInclude,
+          orderBy: { createdAt: "desc" },
+          take: limit,
+        });
+        return Promise.all(messages.map(toMessageDTO));
       }
 
       // --- archived day view: the whole day, chronological ----------------
@@ -98,6 +126,18 @@ export async function messageRoutes(app: FastifyInstance): Promise<void> {
       excerpt: m.contentRaw.slice(0, 120),
       unixTimestamp: Math.floor(m.createdAt.getTime() / 1000),
     }));
+  });
+
+  // Distinct authors in this channel — powers the from: search autocomplete.
+  app.get<{ Params: { slug: string } }>("/api/channels/:slug/participants", async (req, reply) => {
+    const channel = await prisma.forumChannel.findUnique({ where: { slug: req.params.slug } });
+    if (!channel) return reply.code(404).send({ error: "no such channel" });
+    const rows = await prisma.message.findMany({
+      where: { channelId: channel.id, isDeleted: false },
+      select: { author: { select: { username: true } } },
+      distinct: ["authorId"],
+    });
+    return rows.map((r) => r.author.username);
   });
 
   app.get("/api/channels/:slug/archive", async (req, reply) => {

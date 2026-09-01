@@ -6,6 +6,8 @@ import { useAudioStore } from "../lib/audioStore";
 import { renderMessageContent } from "../lib/formatMessage";
 import { EmojiPicker } from "../components/EmojiPicker";
 import { AttachmentPreview } from "../components/AttachmentPreview";
+import { ArchiveCalendar } from "../components/ArchiveCalendar";
+import { SearchBox } from "../components/SearchBox";
 import { useEmojiStore, type Emoji } from "../lib/emojiStore";
 import type { MessageDTO } from "../lib/types";
 import { createPortal } from "react-dom";
@@ -269,7 +271,6 @@ export function ChannelPage({ channelSlug }: { channelSlug?: string } = {}) {
     () => (localStorage.getItem("exomusica_display_mode") as DisplayMode) ?? "standard",
   );
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
-  const [searchInput, setSearchInput] = useState("");
   const [activeSearch, setActiveSearch] = useState<string | null>(null);
   const [messages, setMessages] = useState<MessageDTO[]>([]);
   const [archiveDays, setArchiveDays] = useState<{ day: string; messageCount: number }[]>([]);
@@ -546,36 +547,23 @@ export function ChannelPage({ channelSlug }: { channelSlug?: string } = {}) {
         <button className="btn" onClick={popOutChat} title="Open in a floating window">
           Pop out
         </button>
-        <select
-          className="btn"
-          value={mode === "day" ? selectedDay ?? "" : ""}
-          onChange={(e) => {
-            setSelectedDay(e.target.value);
+        <ArchiveCalendar
+          archiveDays={archiveDays}
+          selectedDay={mode === "day" ? selectedDay : null}
+          onSelect={(day) => {
+            setSelectedDay(day);
             setMode("day");
           }}
-        >
-          <option value="" disabled>
-            Browse archive…
-          </option>
-          {archiveDays.map((d) => (
-            <option key={d.day} value={d.day}>
-              {d.day} ({d.messageCount})
-            </option>
-          ))}
-        </select>
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            setActiveSearch(searchInput);
-            setMode("search");
-          }}
-          style={{ display: "flex", gap: "0.4rem" }}
-        >
-          <input placeholder="Search this topic…" value={searchInput} onChange={(e) => setSearchInput(e.target.value)} />
-          <button className="btn" type="submit">
-            Search
-          </button>
-        </form>
+        />
+        {slug && (
+          <SearchBox
+            channelSlug={slug}
+            onSearch={(query) => {
+              setActiveSearch(query);
+              setMode("search");
+            }}
+          />
+        )}
       </div>
 
       <div className="message-list">

@@ -7,6 +7,8 @@ import { ChannelPage } from "./ChannelPage";
 import { RootDivider } from "../components/RootDivider";
 import { useDocumentTitle } from "../lib/useDocumentTitle";
 import { useCustomFont } from "../lib/useCustomFont";
+import { useChatDockStore } from "../lib/chatDockStore";
+import { useIsDesktop } from "../lib/useIsDesktop";
 
 export function BranchPage() {
   const { slug } = useParams<{ slug: string }>();
@@ -15,6 +17,10 @@ export function BranchPage() {
   const play = useAudioStore((s) => s.play);
   const addToQueue = useAudioStore((s) => s.addToQueue);
   const fontFamily = useCustomFont(branch?.font);
+  const isDesktop = useIsDesktop();
+  const openChat = useChatDockStore((s) => s.openChat);
+  const dockedSlug = useChatDockStore((s) => s.openChannelSlug);
+  const isThisChatOpen = !!branch?.channel && dockedSlug === branch.channel.slug;
 
   async function queueAlbum(albumSlug: string) {
     const full = await api<{ tracks: PlayableTrackDTO[] }>(`/api/albums/${albumSlug}`);
@@ -101,7 +107,20 @@ export function BranchPage() {
       <RootDivider />
 
       <h2 style={{ fontSize: "1.1rem", color: "var(--accent-forum)" }}>Forum</h2>
-      {branch.channel ? <ChannelPage channelSlug={branch.channel.slug} /> : <p>No topic yet.</p>}
+      {!branch.channel ? (
+        <p>No topic yet.</p>
+      ) : isDesktop ? (
+        <div>
+          <p style={{ color: "var(--text-dim)", fontSize: "0.9rem" }}>
+            {isThisChatOpen ? "This topic's chat is open in the dock →" : "Open this topic in the persistent chat dock."}
+          </p>
+          <button className="btn btn-primary" onClick={() => openChat(branch.channel!.slug, branch.name)} disabled={isThisChatOpen}>
+            {isThisChatOpen ? "Chat is open" : "Open chat"}
+          </button>
+        </div>
+      ) : (
+        <ChannelPage channelSlug={branch.channel.slug} />
+      )}
     </div>
   );
 }
