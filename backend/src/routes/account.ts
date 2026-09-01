@@ -117,6 +117,44 @@ export async function accountRoutes(app: FastifyInstance): Promise<void> {
 
   // Public profile — everything except email (spec: accounts can see each
   // other's info except email).
+  app.get<{ Params: { id: string } }>("/api/admin/users/:id", { preHandler: requireAdmin }, async (req, reply) => {
+    const user = await prisma.user.findUnique({
+      where: { id: Number(req.params.id) },
+      select: {
+        id: true,
+        username: true,
+        email: true,
+        avatarUrl: true,
+        bio: true,
+        links: true,
+        isAdmin: true,
+        isGhost: true,
+        createdAt: true,
+      },
+    });
+    if (!user) return reply.code(404).send({ error: "no such user" });
+    return user;
+  });
+
+  app.patch<{
+    Params: { id: string };
+    Body: Partial<{ username: string; bio: string; links: Record<string, string>; isAdmin: boolean }>;
+  }>("/api/admin/users/:id", { preHandler: requireAdmin }, async (req) => {
+    return prisma.user.update({ where: { id: Number(req.params.id) }, data: req.body ?? {} });
+  });
+
+  app.post<{ Params: { id: string } }>("/api/admin/users/:id/avatar", { preHandler: requireAdmin, bodyLimit: 1024 * 1024 }, async (req, reply) => {
+    const file = await req.file();
+    if (!file) return reply.code(400).send({ error: "no file uploaded" });
+    if (!["image/jpeg", "image/png", "image/webp"].includes(file.mimetype)) {
+      return reply.code(400).send({ error: "only JPG, PNG, or WEBP images are supported" });
+    }
+    const buffer = await file.toBuffer();
+    const { url } = await saveSiteImage(file.filename, file.mimetype, buffer, "avatars");
+    await prisma.user.update({ where: { id: Number(req.params.id) }, data: { avatarUrl: url } });
+    return { avatarUrl: url };
+  });
+
   app.get<{ Querystring: { q?: string } }>(
     "/api/admin/users",
     { preHandler: requireAdmin },
