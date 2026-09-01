@@ -224,6 +224,12 @@ export function AlbumsAdminPage() {
     loadDetail(detail.slug);
   }
 
+  async function clearTrackComposers(trackId: number) {
+    if (!detail) return;
+    await api(`/api/admin/tracks/${trackId}/composers`, { method: "PUT", body: JSON.stringify({ collaboratorIds: [] }) });
+    loadDetail(detail.slug);
+  }
+
   return (
     <div>
       <h1>Albums</h1>
@@ -447,7 +453,14 @@ export function AlbumsAdminPage() {
               <h3 style={{ fontSize: "0.9rem", marginTop: "1rem" }}>Per-track composer</h3>
               {detail.tracks.map((t) => (
                 <div key={t.id} style={{ marginBottom: "0.4rem" }}>
-                  <div style={{ fontSize: "0.85rem", marginBottom: "0.1rem" }}>{t.title}</div>
+                  <div style={{ fontSize: "0.85rem", marginBottom: "0.1rem", display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                    {t.title}
+                    {t.composers.length > 0 && (
+                      <button className="btn" style={{ fontSize: "0.7rem", padding: "0 0.4rem" }} onClick={() => clearTrackComposers(t.id)}>
+                        Clear composer
+                      </button>
+                    )}
+                  </div>
                   <div style={{ display: "flex", gap: "0.8rem", flexWrap: "wrap" }}>
                     {detail.collaborators.map((c) => (
                       <label key={c.id} style={{ fontSize: "0.8rem" }}>

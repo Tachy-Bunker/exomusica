@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { parseVoiceoverLines } from "../lib/voiceoverLines";
 
 interface Props {
   gifUrl: string;
@@ -10,9 +11,11 @@ interface Props {
 export function BranchIntroOverlay({ gifUrl, voiceoverUrl, text, onDone }: Props) {
   const [visible, setVisible] = useState(false);
   const audioRef = useRef<HTMLAudioElement>(null);
+  const lines = useRef(parseVoiceoverLines(text ?? "")).current;
+  const [lineIndex, setLineIndex] = useState(0);
+  const [revealedCount, setRevealedCount] = useState(0);
 
   useEffect(() => {
-    // Fade in on mount, then start the voiceover once the fade has visibly begun.
     const t = setTimeout(() => setVisible(true), 20);
     return () => clearTimeout(t);
   }, []);
@@ -23,10 +26,36 @@ export function BranchIntroOverlay({ gifUrl, voiceoverUrl, text, onDone }: Props
     }
   }, [visible, voiceoverUrl]);
 
+  // Sequences through the timed lines — each character reveals evenly
+  // across that line's own duration, then advances to the next line once
+  // the duration elapses (a fixed timer, not just "reveal finished", so
+  // timing stays accurate to what was authored even for very short lines).
+  useEffect(() => {
+    if (!visible || lines.length === 0) return;
+    const line = lines[lineIndex];
+    setRevealedCount(0);
+    const charInterval = (line.duration * 1000) / Math.max(line.text.length, 1);
+    const charTimer = setInterval(() => {
+      setRevealedCount((prev) => Math.min(prev + 1, line.text.length));
+    }, charInterval);
+    const advanceTimer = setTimeout(() => {
+      clearInterval(charTimer);
+      if (lineIndex < lines.length - 1) setLineIndex((i) => i + 1);
+      else if (!voiceoverUrl) dismiss(); // no audio to wait on — end after the last line
+    }, line.duration * 1000);
+    return () => {
+      clearInterval(charTimer);
+      clearTimeout(advanceTimer);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [visible, lineIndex]);
+
   function dismiss() {
     setVisible(false);
-    setTimeout(onDone, 300); // let the fade-out finish before unmounting
+    setTimeout(onDone, 300);
   }
+
+  const currentLine = lines[lineIndex];
 
   return (
     <div
@@ -58,7 +87,15 @@ export function BranchIntroOverlay({ gifUrl, voiceoverUrl, text, onDone }: Props
           transition: "transform 0.3s ease",
         }}
       />
-      {text && <p style={{ maxWidth: 560, textAlign: "center", fontSize: "1rem", color: "var(--text)", padding: "0 1rem" }}>{text}</p>}
+      {currentLine && (
+        <p
+          className="mono"
+          style={{ maxWidth: 560, minHeight: "1.6em", textAlign: "center", fontSize: "1rem", color: "var(--text)", padding: "0 1rem" }}
+        >
+          {currentLine.text.slice(0, revealedCount)}
+          {revealedCount < currentLine.text.length && <span className="space-hud-cursor">▌</span>}
+        </p>
+      )}
       {voiceoverUrl && <audio ref={audioRef} src={voiceoverUrl} onEnded={dismiss} />}
       <p style={{ fontSize: "0.75rem", color: "var(--text-dim)" }}>Click anywhere to continue</p>
     </div>

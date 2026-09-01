@@ -32,7 +32,7 @@ const DAMPING = 4.5;
 const CAMERA_ACCEL = 1800;
 const CAMERA_FRICTION = 5;
 const CAMERA_MAX_SPEED = 900;
-const LOCK_RADIUS = 40; // px from screen center to start locking on
+const LOCK_RADIUS = 58; // px from screen center to start locking on
 const LOCK_TIME = 0.9; // seconds of holding a target to complete the lock
 
 function buildNodes(branches: Branch[]): MapNode[] {
@@ -135,7 +135,12 @@ export function SpaceMap({ branches, centerLabel, centerHref }: { branches: Bran
   const targetNodeIdRef = useRef<number | null>(null);
   const lockProgressRef = useRef(0);
   const [lockedNode, setLockedNode] = useState<MapNode | null>(null);
+  const lockedNodeRef = useRef<MapNode | null>(null);
+  useEffect(() => {
+    lockedNodeRef.current = lockedNode;
+  }, [lockedNode]);
   const [revealedCount, setRevealedCount] = useState(0);
+  const [actionRevealedCount, setActionRevealedCount] = useState(0);
   const audioCtxRef = useRef<AudioContext | null>(null);
   const lastBeepRef = useRef(0);
   const openChat = useChatDockStore((s) => s.openChat);
@@ -155,14 +160,16 @@ export function SpaceMap({ branches, centerLabel, centerHref }: { branches: Bran
   }
 
   function openLockedChat() {
-    if (!lockedNode) return;
-    const branch = branches.find((b) => b.slug === lockedNode.slug);
+    const node = lockedNodeRef.current;
+    if (!node) return;
+    const branch = branches.find((b) => b.slug === node.slug);
     if (branch?.channel) openChat(branch.channel.slug, branch.name, branch.slug);
   }
 
   async function shuffleLockedBranch() {
-    if (!lockedNode) return;
-    const tracks = await api<PlayableTrackDTO[]>(`/api/branches/${lockedNode.slug}/tracks/shuffle`);
+    const node = lockedNodeRef.current;
+    if (!node) return;
+    const tracks = await api<PlayableTrackDTO[]>(`/api/branches/${node.slug}/tracks/shuffle`);
     if (tracks.length === 0) return;
     const [first, ...rest] = tracks;
     play(first);
@@ -173,9 +180,12 @@ export function SpaceMap({ branches, centerLabel, centerHref }: { branches: Bran
     nodesRef.current = buildNodes(branches);
   }, [branches]);
 
+  const ACTION_HINT = "F = play  |  E = chat";
+
   useEffect(() => {
     if (!lockedNode) return;
     setRevealedCount(0);
+    setActionRevealedCount(0);
     const interval = setInterval(() => {
       setRevealedCount((prev) => {
         if (prev >= lockedNode.name.length) {
@@ -187,6 +197,21 @@ export function SpaceMap({ branches, centerLabel, centerHref }: { branches: Bran
     }, 45);
     return () => clearInterval(interval);
   }, [lockedNode]);
+
+  useEffect(() => {
+    if (!lockedNode || revealedCount < lockedNode.name.length) return;
+    setActionRevealedCount(0);
+    const interval = setInterval(() => {
+      setActionRevealedCount((prev) => {
+        if (prev >= ACTION_HINT.length) {
+          clearInterval(interval);
+          return prev;
+        }
+        return prev + 1;
+      });
+    }, 30);
+    return () => clearInterval(interval);
+  }, [lockedNode, revealedCount]);
 
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
@@ -250,7 +275,7 @@ export function SpaceMap({ branches, centerLabel, centerHref }: { branches: Bran
       const t = now / 1000;
 
       for (const n of nodes) {
-        if (n.id === hoveredIdRef.current) continue; // frozen while hovered
+        if (n.id === hoveredIdRef.current || n.id === targetNodeIdRef.current) continue; // frozen while hovered or under the reticle
 
         if (n.parentId !== null) {
           const parent = byId.get(n.parentId);
@@ -453,28 +478,80 @@ export function SpaceMap({ branches, centerLabel, centerHref }: { branches: Bran
         </div>
       ))}
 
-      {isDesktop && (
-        <div className="space-reticle">
-          <div
-            className="space-reticle-ring"
-            style={{
-              background: `conic-gradient(var(--accent-audio) ${lockProgressRef.current * 360}deg, transparent 0deg)`,
-            }}
-          />
-          <div className="space-reticle-cross" />
-        </div>
-      )}
+      <div className="space-reticle">
+        <div
+          className="space-reticle-ring"
+          style={{
+            background: `conic-gradient(var(--accent-audio) ${lockProgressRef.current * 360}deg, transparent 0deg)`,
+          }}
+        />
+        <div className="space-reticle-cross" />
+      </div>
 
       {lockedNode && (
         <div className="space-hud-name">
           {lockedNode.name.slice(0, revealedCount)}
-          <span className="space-hud-cursor">▌</span>
+          {revealedCount < lockedNode.name.length && <span className="space-hud-cursor">▌</span>}
+        </div>
+      )}
+      {lockedNode && revealedCount >= lockedNode.name.length && actionRevealedCount > 0 && (
+        <div className="space-hud-action">
+          {ACTION_HINT.slice(0, actionRevealedCount)
+            .split("")
+            .map((ch, i) => (
+              <span
+                key={i}
+                style={
+                  ACTION_HINT[i] === "F"
+                    ? { color: "var(--accent-audio)" }
+                    : ACTION_HINT[i] === "E"
+                      ? { color: "var(--accent-forum)" }
+                      : undefined
+                }
+              >
+                {ch}
+              </span>
+            ))}
+          {actionRevealedCount < ACTION_HINT.length && <span className="space-hud-cursor">▌</span>}
+        </div>
+      )}
+
+      {!isDesktop && (
+        <div className="space-map-dpad">
+          <button
+            className="space-map-dpad-btn space-map-dpad-up"
+            onTouchStart={() => keysRef.current.add("KeyW")}
+            onTouchEnd={() => keysRef.current.delete("KeyW")}
+          >
+            ▲
+          </button>
+          <button
+            className="space-map-dpad-btn space-map-dpad-left"
+            onTouchStart={() => keysRef.current.add("KeyA")}
+            onTouchEnd={() => keysRef.current.delete("KeyA")}
+          >
+            ◀
+          </button>
+          <button
+            className="space-map-dpad-btn space-map-dpad-right"
+            onTouchStart={() => keysRef.current.add("KeyD")}
+            onTouchEnd={() => keysRef.current.delete("KeyD")}
+          >
+            ▶
+          </button>
+          <button
+            className="space-map-dpad-btn space-map-dpad-down"
+            onTouchStart={() => keysRef.current.add("KeyS")}
+            onTouchEnd={() => keysRef.current.delete("KeyS")}
+          >
+            ▼
+          </button>
         </div>
       )}
 
       <p className="space-map-hint">
         {isDesktop
-          ? "WASD to fly around. Lock onto a branch, then E to open its chat or F to shuffle its music."
+          ? "WASD to aim into a branch."
           : "Swipe to move around. Tap a node to freeze it."}
       </p>
       <button className="btn btn-primary space-map-shuffle" onClick={() => void shufflePlay()}>

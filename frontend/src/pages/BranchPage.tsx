@@ -9,7 +9,6 @@ import { useDocumentTitle } from "../lib/useDocumentTitle";
 import { useCustomFont } from "../lib/useCustomFont";
 import { useChatDockStore } from "../lib/chatDockStore";
 import { useIsDesktop } from "../lib/useIsDesktop";
-import { hasSeenBranchIntro, markBranchIntroSeen } from "../lib/branchIntroSeen";
 import { BranchIntroOverlay } from "../components/BranchIntroOverlay";
 
 export function BranchPage() {
@@ -38,7 +37,7 @@ export function BranchPage() {
   }
 
   async function playAlbum(albumSlug: string) {
-    if (branch?.guideAsset && !hasSeenBranchIntro(branch.slug)) {
+    if (branch?.guideAsset) {
       setPendingPlayAlbumSlug(albumSlug);
       setShowIntro(true);
       return;
@@ -52,7 +51,6 @@ export function BranchPage() {
 
   async function afterIntro() {
     setShowIntro(false);
-    if (branch) markBranchIntroSeen(branch.slug);
     if (pendingPlayAlbumSlug) {
       const slug = pendingPlayAlbumSlug;
       setPendingPlayAlbumSlug(null);

@@ -44,7 +44,7 @@ export function Layout() {
       useAmbienceStore.getState().setUrl(s.ambienceUrl);
     });
   }, []);
-  const siteFontFamily = useCustomFont(siteFont);
+  useCustomFont(siteFont); // still needed for its @font-face injection side effect
 
   const currentTrack = useAudioStore((s) => s.currentTrack);
   const setAmbienceHasMainTrack = useAmbienceStore((s) => s.setHasMainTrack);
@@ -52,9 +52,15 @@ export function Layout() {
     setAmbienceHasMainTrack(!!currentTrack);
   }, [currentTrack, setAmbienceHasMainTrack]);
   useEffect(() => {
-    if (siteFontFamily) document.documentElement.style.setProperty("--font-body", siteFontFamily);
+    // Deliberately using siteFont.familyName directly here, not
+    // siteFontFamily below — that value's own fallback chain ends in
+    // var(--font-body), which is exactly the property being set. Assigning
+    // that in would make --font-body reference itself: an invalid CSS
+    // custom property that silently falls back to the browser default
+    // instead of the chosen font.
+    if (siteFont) document.documentElement.style.setProperty("--font-body", `"${siteFont.familyName}"`);
     else document.documentElement.style.removeProperty("--font-body");
-  }, [siteFontFamily]);
+  }, [siteFont]);
 
   return (
     <div
