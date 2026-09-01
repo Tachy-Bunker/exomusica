@@ -10,6 +10,7 @@ import { LinkEmbedPreview } from "../components/LinkEmbedPreview";
 import { ArchiveCalendar } from "../components/ArchiveCalendar";
 import { SearchBox } from "../components/SearchBox";
 import { TopicSwitcher } from "../components/TopicSwitcher";
+import { useIsDesktop } from "../lib/useIsDesktop";
 import { useEmojiStore, type Emoji } from "../lib/emojiStore";
 import type { MessageDTO } from "../lib/types";
 import { createPortal } from "react-dom";
@@ -285,6 +286,7 @@ export function ChannelPage({ channelSlug, fillHeight }: { channelSlug?: string;
   const params = useParams<{ slug: string }>();
   const slug = channelSlug ?? params.slug;
   const { user } = useAuth();
+  const isDesktop = useIsDesktop();
   const [mode, setMode] = useState<ViewMode>("live");
   const [displayMode, setDisplayMode] = useState<DisplayMode>(
     () => (localStorage.getItem("exomusica_display_mode") as DisplayMode) ?? "standard",
@@ -449,7 +451,16 @@ export function ChannelPage({ channelSlug, fillHeight }: { channelSlug?: string;
     const params = new URLSearchParams();
     if (mode === "day" && selectedDay) params.set("day", selectedDay);
     if (mode === "search" && activeSearch) params.set("q", activeSearch);
-    api<MessageDTO[]>(`/api/channels/${slug}/messages?${params}`).then(setMessages);
+    api<MessageDTO[]>(`/api/channels/${slug}/messages?${params}`).then((data) => {
+      setMessages(data);
+      if (mode === "live" && data.length > 0) {
+        const last = data[data.length - 1];
+        // Wait a tick for the DOM to actually contain the new messages before scrolling to one.
+        requestAnimationFrame(() => {
+          document.getElementById(`m-${last.id}`)?.scrollIntoView({ block: "end" });
+        });
+      }
+    });
   }, [slug, mode, selectedDay, activeSearch]);
 
   const reportViewing = usePresenceStore((s) => s.reportViewing);
@@ -583,13 +594,15 @@ export function ChannelPage({ channelSlug, fillHeight }: { channelSlug?: string;
     <LinkClickContext.Provider value={setLinkPreviewUrl}>
     <div style={fillHeight ? { fontFamily, display: "flex", flexDirection: "column", height: "100%", minHeight: 0 } : { fontFamily }}>
       <div className="channel-toolbar" style={{ display: "flex", gap: "0.6rem", marginBottom: fillHeight ? "0.6rem" : "1rem", flexWrap: "wrap", flexShrink: 0, alignItems: "center" }}>
-        <TopicSwitcher label="Branches" />
+        <TopicSwitcher />
         <button className={`btn ${mode === "live" ? "btn-primary" : ""}`} onClick={() => setMode("live")}>
           Live
         </button>
-        <button className="btn" onClick={popOutChat} title="Open in a floating window">
-          Pop out
-        </button>
+        {isDesktop && (
+          <button className="btn" onClick={popOutChat} title="Open in a floating window">
+            ↗ Pop out
+          </button>
+        )}
         <ArchiveCalendar
           label="Past chats"
           archiveDays={archiveDays}
@@ -706,10 +719,10 @@ export function ChannelPage({ channelSlug, fillHeight }: { channelSlug?: string;
                 // textarea's own default behavior, which inserts a newline.
               }}
               rows={2}
-              style={{ flex: 1 }}
+              style={{ flex: 1, fontSize: `${messageFontSize}%` }}
               placeholder="Write a message… (**bold**, *italic*, `code`, > quote, :emoji:, Enter to send, Shift/Ctrl+Enter for a new line)"
             />
-            <button className="btn btn-primary" type="submit">
+            <button className="btn btn-primary" type="submit" style={{ fontSize: `${messageFontSize}%` }}>
               Send
             </button>
           </div>

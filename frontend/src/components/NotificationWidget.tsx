@@ -4,6 +4,13 @@ import { api } from "../lib/api";
 import { useAuth } from "../lib/auth";
 import { useNotificationWidgetVisibility } from "../lib/notificationWidgetVisibility";
 import { useIsDesktop } from "../lib/useIsDesktop";
+import { useVolumeMixerStore } from "../lib/volumeMixerStore";
+
+function playNotificationSound(url: string) {
+  const audio = new Audio(url);
+  audio.volume = useVolumeMixerStore.getState().notifications;
+  audio.play().catch(() => {});
+}
 
 interface Notification {
   id: number;
@@ -83,7 +90,7 @@ export function NotificationWidget({ offsetRight = 0 }: { offsetRight?: number }
       for (const n of notifList) {
         if (hasLoadedOnce.current && !seenNotificationIds.current.has(n.id)) {
           const soundUrl = soundPrefs.current.get(n.eventKey);
-          if (soundUrl) new Audio(soundUrl).play().catch(() => {});
+          if (soundUrl) playNotificationSound(soundUrl);
         }
         seenNotificationIds.current.add(n.id);
       }
@@ -97,7 +104,7 @@ export function NotificationWidget({ offsetRight = 0 }: { offsetRight?: number }
         const isFollowed = followedSlugs.current.has(m.channelSlug);
         if (isNew && !isOwnPost && !isFollowed) {
           const soundUrl = soundPrefs.current.get("message_other_topic");
-          if (soundUrl) new Audio(soundUrl).play().catch(() => {});
+          if (soundUrl) playNotificationSound(soundUrl);
         }
         seenRecentIds.current.add(m.id);
       }

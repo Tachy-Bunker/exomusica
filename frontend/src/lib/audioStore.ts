@@ -33,6 +33,13 @@ interface AudioState {
 let audioEl: HTMLAudioElement | null = null;
 export function bindAudioElement(el: HTMLAudioElement | null): void {
   audioEl = el;
+  if (audioEl) audioEl.volume = musicVolume;
+}
+
+let musicVolume = 1;
+export function setMusicVolume(v: number): void {
+  musicVolume = v;
+  if (audioEl) audioEl.volume = v;
 }
 
 function shuffleArray<T>(arr: T[]): T[] {

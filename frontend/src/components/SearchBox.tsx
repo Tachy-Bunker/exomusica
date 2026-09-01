@@ -10,6 +10,7 @@ interface Suggestion {
 }
 
 export function SearchBox({ channelSlug, onSearch }: { channelSlug: string; onSearch: (query: string) => void }) {
+  const [open, setOpen] = useState(false);
   const [value, setValue] = useState("");
   const [participants, setParticipants] = useState<string[]>([]);
   const [suggestion, setSuggestion] = useState<Suggestion | null>(null);
@@ -42,10 +43,22 @@ export function SearchBox({ channelSlug, onSearch }: { channelSlug: string; onSe
     requestAnimationFrame(() => el?.focus());
   }
 
+  useEffect(() => {
+    if (open) inputRef.current?.focus();
+  }, [open]);
+
   function handleSubmit(e: FormEvent) {
     e.preventDefault();
     setSuggestion(null);
     onSearch(value);
+  }
+
+  if (!open) {
+    return (
+      <button type="button" className="btn" onClick={() => setOpen(true)} title="Search this topic">
+        🔎
+      </button>
+    );
   }
 
   const options =
@@ -94,6 +107,9 @@ export function SearchBox({ channelSlug, onSearch }: { channelSlug: string; onSe
       />
       <button className="btn" type="submit">
         Search
+      </button>
+      <button type="button" className="btn" onClick={() => setOpen(false)} title="Close search">
+        ×
       </button>
     </form>
   );

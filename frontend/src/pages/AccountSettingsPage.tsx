@@ -5,6 +5,7 @@ import { useAuth } from "../lib/auth";
 import { useNotificationWidgetVisibility } from "../lib/notificationWidgetVisibility";
 import { useProfileStore } from "../lib/profileStore";
 import { Avatar } from "../components/Avatar";
+import { useVolumeMixerStore } from "../lib/volumeMixerStore";
 
 interface FollowedChannel {
   slug: string;
@@ -59,6 +60,14 @@ export function AccountSettingsPage() {
   const avatarInputRef = useRef<HTMLInputElement>(null);
   const [avatarError, setAvatarError] = useState<string | null>(null);
   const [profileSaved, setProfileSaved] = useState(false);
+  const mixer = useVolumeMixerStore();
+  const [mixerSaved, setMixerSaved] = useState(false);
+
+  async function saveMixer() {
+    await mixer.save();
+    setMixerSaved(true);
+    setTimeout(() => setMixerSaved(false), 2000);
+  }
 
   function updateMeField(patch: Partial<Me>) {
     setMe((prev) => (prev ? { ...prev, ...patch } : prev));
@@ -226,6 +235,42 @@ export function AccountSettingsPage() {
         Save bio & links
       </button>
       {profileSaved && <span style={{ marginLeft: "0.6rem", fontSize: "0.85rem", color: "var(--accent-audio)" }}>Saved ✓</span>}
+
+      <h2 style={{ fontSize: "1rem", marginTop: "1.5rem" }}>Sound mixer</h2>
+      <p style={{ fontSize: "0.75rem", color: "var(--text-dim)", marginTop: 0 }}>
+        Independent volume for notification pings, UI sound effects (like the spacemap scan), and music (tracks and
+        the idle ambience loop).
+      </p>
+      <div className="field">
+        <label>Notifications — {Math.round(mixer.notifications * 100)}%</label>
+        <input
+          type="range"
+          min={0}
+          max={1}
+          step={0.05}
+          value={mixer.notifications}
+          onChange={(e) => mixer.setVolume("notifications", Number(e.target.value))}
+        />
+      </div>
+      <div className="field">
+        <label>Sound effects — {Math.round(mixer.sfx * 100)}%</label>
+        <input type="range" min={0} max={1} step={0.05} value={mixer.sfx} onChange={(e) => mixer.setVolume("sfx", Number(e.target.value))} />
+      </div>
+      <div className="field">
+        <label>Music — {Math.round(mixer.music * 100)}%</label>
+        <input
+          type="range"
+          min={0}
+          max={1}
+          step={0.05}
+          value={mixer.music}
+          onChange={(e) => mixer.setVolume("music", Number(e.target.value))}
+        />
+      </div>
+      <button className="btn btn-primary" onClick={saveMixer}>
+        Save mixer
+      </button>
+      {mixerSaved && <span style={{ marginLeft: "0.6rem", fontSize: "0.85rem", color: "var(--accent-audio)" }}>Saved ✓</span>}
 
       <h2 style={{ fontSize: "1rem" }}>Email notifications</h2>
       {checkbox("notifyWeeklySummary", "Weekly activity summary")}

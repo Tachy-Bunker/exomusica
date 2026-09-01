@@ -1,6 +1,5 @@
 import { useRef, useState } from "react";
 
-const BASE_RADIUS = 44;
 const KNOB_RADIUS = 20;
 
 export function Joystick({ onMove, onRelease }: { onMove: (dx: number, dy: number) => void; onRelease: () => void }) {
@@ -12,18 +11,19 @@ export function Joystick({ onMove, onRelease }: { onMove: (dx: number, dy: numbe
     const base = baseRef.current;
     if (!base) return;
     const rect = base.getBoundingClientRect();
+    const baseRadius = rect.width / 2; // actual rendered size — the base is vmin-sized now, not a fixed px constant
     const centerX = rect.left + rect.width / 2;
     const centerY = rect.top + rect.height / 2;
     let dx = touch.clientX - centerX;
     let dy = touch.clientY - centerY;
     const dist = Math.hypot(dx, dy);
-    if (dist > BASE_RADIUS) {
-      dx = (dx / dist) * BASE_RADIUS;
-      dy = (dy / dist) * BASE_RADIUS;
+    if (dist > baseRadius) {
+      dx = (dx / dist) * baseRadius;
+      dy = (dy / dist) * baseRadius;
     }
     setKnobOffset({ x: dx, y: dy });
     // Normalized -1..1 per axis, proportional to how far the stick is pushed.
-    onMove(dx / BASE_RADIUS, dy / BASE_RADIUS);
+    onMove(dx / baseRadius, dy / baseRadius);
   }
 
   function handleTouchStart(e: React.TouchEvent) {

@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { useVolumeMixerStore } from "./volumeMixerStore";
 
 const FADE_MS = 1500;
 const TARGET_VOLUME = 0.35;
@@ -46,7 +47,7 @@ function reevaluate() {
       audio.volume = 0;
       audio.play().catch(() => {});
     }
-    fadeTo(audio, TARGET_VOLUME);
+    fadeTo(audio, TARGET_VOLUME * useVolumeMixerStore.getState().music);
   } else if (state.audio && !state.audio.paused) {
     fadeTo(state.audio, 0);
   }

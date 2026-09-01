@@ -5,6 +5,7 @@ import { useAuth } from "../lib/auth";
 import { useCustomFont } from "../lib/useCustomFont";
 import { useAmbienceStore } from "../lib/ambienceStore";
 import { useProfileStore } from "../lib/profileStore";
+import { useVolumeMixerStore } from "../lib/volumeMixerStore";
 import { Avatar } from "./Avatar";
 import { useAudioStore } from "../lib/audioStore";
 import { useEmojiStore } from "../lib/emojiStore";
@@ -49,6 +50,11 @@ export function Layout() {
     return () => clearInterval(interval);
   }, [user, refreshProfile]);
 
+  const loadVolumeMixer = useVolumeMixerStore((s) => s.load);
+  useEffect(() => {
+    if (user) loadVolumeMixer();
+  }, [user, loadVolumeMixer]);
+
   const [siteFont, setSiteFont] = useState<{ familyName: string; fileUrl: string; format: string } | null>(null);
   useEffect(() => {
     api<{ defaultFont: typeof siteFont; ambienceUrl: string | null }>("/api/site-settings").then((s) => {
@@ -86,7 +92,7 @@ export function Layout() {
     >
       <header className="top-nav">
         <Link to="/" className="brand">
-          Exomusica
+          ⩽ Exomusica ⪖
         </Link>
         <nav>
           <Link to="/wiki">Wiki</Link>

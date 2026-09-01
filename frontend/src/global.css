@@ -1091,10 +1091,10 @@ th {
 
 .space-joystick-backdrop {
   position: absolute;
-  bottom: 1.2rem;
-  left: 1.2rem;
-  width: 130px;
-  height: 130px;
+  bottom: 0.4rem;
+  left: 0.4rem;
+  width: 28vmin;
+  height: 28vmin;
   border-radius: 50%;
   background: rgba(6, 9, 17, 0.55);
   display: flex;
@@ -1105,8 +1105,8 @@ th {
 
 .space-joystick-base {
   position: relative;
-  width: 100px;
-  height: 100px;
+  width: 76%;
+  height: 76%;
   border-radius: 50%;
   border: 1px solid var(--accent-forum);
   background: rgba(0, 0, 0, 0.2);
@@ -1127,8 +1127,9 @@ th {
 
 .space-donate-top {
   position: fixed;
-  top: 4rem;
-  left: 1rem;
+  top: 4.6rem;
+  left: 50%;
+  transform: translateX(-50%);
   z-index: 41;
   background: linear-gradient(135deg, var(--accent-forum), var(--accent-audio));
   color: var(--bg);
@@ -1141,4 +1142,14 @@ th {
   color: var(--bg);
   font-weight: 700;
   border: none;
+}
+
+.channel-toolbar {
+  opacity: 0.55;
+  transition: opacity 0.15s ease;
+}
+
+.channel-toolbar:hover,
+.channel-toolbar:focus-within {
+  opacity: 1;
 }

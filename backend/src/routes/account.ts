@@ -48,6 +48,9 @@ export async function accountRoutes(app: FastifyInstance): Promise<void> {
       email: me.email,
       bio: me.bio,
       links: me.links,
+      volumeNotifications: me.volumeNotifications,
+      volumeSfx: me.volumeSfx,
+      volumeMusic: me.volumeMusic,
       notifyWeeklySummary: me.notifyWeeklySummary,
       notifyDailySummary: me.notifyDailySummary,
       notifyFollowedReplies: me.notifyFollowedReplies,
@@ -76,6 +79,19 @@ export async function accountRoutes(app: FastifyInstance): Promise<void> {
   }>("/api/account/notifications", { preHandler: requireAuth }, async (req) => {
     return prisma.user.update({ where: { id: req.user!.id }, data: req.body ?? {} });
   });
+
+  app.patch<{ Body: Partial<{ volumeNotifications: number; volumeSfx: number; volumeMusic: number }> }>(
+    "/api/account/volume-mixer",
+    { preHandler: requireAuth },
+    async (req) => {
+      const clamp = (v: number) => Math.max(0, Math.min(1, v));
+      const data: Record<string, number> = {};
+      if (req.body?.volumeNotifications !== undefined) data.volumeNotifications = clamp(req.body.volumeNotifications);
+      if (req.body?.volumeSfx !== undefined) data.volumeSfx = clamp(req.body.volumeSfx);
+      if (req.body?.volumeMusic !== undefined) data.volumeMusic = clamp(req.body.volumeMusic);
+      return prisma.user.update({ where: { id: req.user!.id }, data });
+    },
+  );
 
   app.patch<{ Body: Partial<{ bio: string; links: { label: string; url: string }[] }> }>(
     "/api/account/profile",

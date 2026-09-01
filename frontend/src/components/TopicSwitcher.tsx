@@ -12,9 +12,17 @@ interface SwitchableBranch {
   channel: { slug: string } | null;
 }
 
-export function TopicSwitcher({ label = "Switch topic" }: { label?: string }) {
+interface SwitchableTopic {
+  slug: string;
+  name: string;
+  category: string | null;
+  position: number;
+}
+
+export function TopicSwitcher({ label = "Location" }: { label?: string }) {
   const [open, setOpen] = useState(false);
   const [branches, setBranches] = useState<SwitchableBranch[]>([]);
+  const [topics, setTopics] = useState<SwitchableTopic[]>([]);
   const [query, setQuery] = useState("");
   const containerRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
@@ -23,7 +31,9 @@ export function TopicSwitcher({ label = "Switch topic" }: { label?: string }) {
   const viewersByChannel = usePresenceStore((s) => s.viewersByChannel);
 
   useEffect(() => {
-    if (open) api<SwitchableBranch[]>("/api/branches").then(setBranches);
+    if (!open) return;
+    api<SwitchableBranch[]>("/api/branches").then(setBranches);
+    api<SwitchableTopic[]>("/api/channels?kind=DISCUSSION").then(setTopics);
   }, [open]);
 
   useEffect(() => {
@@ -35,7 +45,7 @@ export function TopicSwitcher({ label = "Switch topic" }: { label?: string }) {
     return () => document.removeEventListener("mousedown", handleOutsideClick);
   }, [open]);
 
-  const filtered = branches
+  const filteredBranches = branches
     .filter((b) => !!b.channel)
     .filter((b) => b.name.toLowerCase().includes(query.toLowerCase()))
     .sort((a, b) => {
@@ -44,11 +54,31 @@ export function TopicSwitcher({ label = "Switch topic" }: { label?: string }) {
       return bt - at; // most recent activity first, by default
     });
 
-  function select(b: SwitchableBranch) {
+  const filteredTopics = topics
+    .filter((t) => t.name.toLowerCase().includes(query.toLowerCase()))
+    .sort((a, b) => a.position - b.position); // admin-defined order
+
+  // Group topics by category, preserving each category's own admin-defined
+  // order (categories appear in the order their first topic appears).
+  const topicsByCategory = new Map<string, SwitchableTopic[]>();
+  for (const t of filteredTopics) {
+    const key = t.category ?? "";
+    if (!topicsByCategory.has(key)) topicsByCategory.set(key, []);
+    topicsByCategory.get(key)!.push(t);
+  }
+
+  function selectBranch(b: SwitchableBranch) {
     setOpen(false);
     setQuery("");
-    if (isDesktop) openChat(b.channel!.slug, b.name);
+    if (isDesktop) openChat(b.channel!.slug, b.name, b.slug);
     else navigate(`/branch/${b.slug}`);
+  }
+
+  function selectTopic(t: SwitchableTopic) {
+    setOpen(false);
+    setQuery("");
+    if (isDesktop) openChat(t.slug, t.name);
+    else navigate(`/topic/${t.slug}`);
   }
 
   return (
@@ -67,8 +97,8 @@ export function TopicSwitcher({ label = "Switch topic" }: { label?: string }) {
             border: "1px solid var(--border)",
             borderRadius: "var(--radius)",
             padding: "0.4rem",
-            width: 240,
-            maxHeight: 320,
+            width: 260,
+            maxHeight: 360,
             overflowY: "auto",
             zIndex: 30,
             boxShadow: "0 12px 30px rgba(0,0,0,0.4)",
@@ -76,19 +106,28 @@ export function TopicSwitcher({ label = "Switch topic" }: { label?: string }) {
         >
           <input
             autoFocus
-            placeholder="Search branches…"
+            placeholder="Search…"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             style={{ width: "100%", marginBottom: "0.3rem" }}
           />
-          {filtered.length === 0 && <p style={{ fontSize: "0.8rem", color: "var(--text-dim)" }}>No matches.</p>}
-          {filtered.map((b) => {
+
+          {filteredBranches.length === 0 && filteredTopics.length === 0 && (
+            <p style={{ fontSize: "0.8rem", color: "var(--text-dim)" }}>No matches.</p>
+          )}
+
+          {filteredBranches.length > 0 && (
+            <div style={{ fontSize: "0.7rem", textTransform: "uppercase", color: "var(--text-dim)", margin: "0.3rem 0 0.15rem" }}>
+              Branches
+            </div>
+          )}
+          {filteredBranches.map((b) => {
             const hasViewers = !!b.channel && viewersByChannel.has(b.channel.slug);
             return (
               <button
                 key={b.slug}
                 className="btn"
-                onClick={() => select(b)}
+                onClick={() => selectBranch(b)}
                 style={{ display: "flex", alignItems: "center", gap: "0.4rem", width: "100%", textAlign: "left", marginBottom: "0.15rem" }}
               >
                 {hasViewers && <span className="presence-pulse" title="Someone's here" />}
@@ -96,6 +135,28 @@ export function TopicSwitcher({ label = "Switch topic" }: { label?: string }) {
               </button>
             );
           })}
+
+          {[...topicsByCategory.entries()].map(([category, items]) => (
+            <div key={category || "uncategorized"}>
+              <div style={{ fontSize: "0.7rem", textTransform: "uppercase", color: "var(--text-dim)", margin: "0.5rem 0 0.15rem" }}>
+                {category || "Forum topics"}
+              </div>
+              {items.map((t) => {
+                const hasViewers = viewersByChannel.has(t.slug);
+                return (
+                  <button
+                    key={t.slug}
+                    className="btn"
+                    onClick={() => selectTopic(t)}
+                    style={{ display: "flex", alignItems: "center", gap: "0.4rem", width: "100%", textAlign: "left", marginBottom: "0.15rem" }}
+                  >
+                    {hasViewers && <span className="presence-pulse" title="Someone's here" />}
+                    {t.name}
+                  </button>
+                );
+              })}
+            </div>
+          ))}
         </div>
       )}
     </div>

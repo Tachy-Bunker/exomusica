@@ -54,6 +54,9 @@ model User {
   deletedAt             DateTime? // set when a real account is ghosted (self- or admin-deleted)
   storageUsedBytes      BigInt       @default(0)
   storageLimitBytes     BigInt       @default(68157440) // 65MB
+  volumeNotifications   Float        @default(0.8)
+  volumeSfx             Float        @default(1.0)
+  volumeMusic           Float        @default(1.0)
   notifyWeeklySummary   Boolean      @default(true)
   notifyDailySummary    Boolean      @default(false)
   notifyFollowedReplies Boolean      @default(true)

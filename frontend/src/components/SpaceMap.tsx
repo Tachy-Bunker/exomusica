@@ -2,10 +2,12 @@ import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import type { Branch } from "../lib/types";
 import { useIsDesktop } from "../lib/useIsDesktop";
+import { isTypingTarget } from "../lib/isTypingTarget";
 import { useChatDockStore } from "../lib/chatDockStore";
 import { useAmbienceStore } from "../lib/ambienceStore";
 import { GaplessLoop } from "../lib/GaplessLoop";
 import { Joystick } from "./Joystick";
+import { useVolumeMixerStore } from "../lib/volumeMixerStore";
 import { useAudioStore } from "../lib/audioStore";
 import { api } from "../lib/api";
 import type { PlayableTrackDTO } from "../lib/types";
@@ -256,7 +258,7 @@ export function SpaceMap({ branches, centerLabel, centerHref }: { branches: Bran
 
     if (isRevealing) {
       loop.play(scanSfxUrl).then(() => {
-        if (wasRevealingRef.current) loop.fadeTo(0.4); // still wanted by the time loading finished
+        if (wasRevealingRef.current) loop.fadeTo(0.4 * useVolumeMixerStore.getState().sfx); // still wanted by the time loading finished
       });
     } else {
       loop.fadeTo(0);
@@ -265,6 +267,7 @@ export function SpaceMap({ branches, centerLabel, centerHref }: { branches: Bran
 
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
+      if (isTypingTarget(e.target)) return;
       // event.code is the physical key position, not the character it
       // produces — "KeyW" is always the key at the WASD spot regardless of
       // layout, so this is ZQSD on an AZERTY keyboard for free, with no
