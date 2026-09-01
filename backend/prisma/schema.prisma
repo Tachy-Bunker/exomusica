@@ -76,6 +76,8 @@ model User {
   wikiEdits        WikiPage[]       @relation("WikiEditor")
   blogPosts        BlogPost[]
   reviewedJoins    JoinRequest[]    @relation("JoinReviewer")
+  soundPrefs       UserSoundPref[]
+  notifications    Notification[]
 }
 
 model JoinRequest {
@@ -411,6 +413,68 @@ model EmailTemplate {
 // Admin-uploaded fonts (OTF/TTF/WOFF/WOFF2), assignable per-branch,
 // per-topic, per-wiki-page, or per-blog-post — each of those four gets its
 // own optional fontId rather than one global "site font" choice.
+// Admin-uploaded notification sounds, assignable as the default for any
+// NotificationEvent and overridable per-user in account settings.
+model NotificationSound {
+  id        Int      @id @default(autoincrement())
+  name      String   @unique
+  fileUrl   String
+  format    String
+  createdAt DateTime @default(now())
+
+  defaultForEvents NotificationEvent[]
+  userPrefs        UserSoundPref[]
+}
+
+// Admin can create as many of these as they want ("any number... for
+// events") — key is what application code actually fires by; label is
+// what the user sees in their preferences. Four are seeded (see seed.ts):
+// message_followed_topic, message_other_topic, join_approved,
+// account_updated — those four are the ones real code paths trigger today.
+// Extra events an admin creates beyond those four are valid, storable, and
+// selectable in preferences, but nothing fires them automatically yet —
+// there's no code path wired to an arbitrary new key.
+model NotificationEvent {
+  id             Int                @id @default(autoincrement())
+  key            String             @unique
+  label          String
+  defaultSoundId Int?
+  defaultSound   NotificationSound? @relation(fields: [defaultSoundId], references: [id])
+
+  userPrefs UserSoundPref[]
+}
+
+// Presence of a row = user has an override. soundId null on an existing
+// row = explicitly muted. No row at all = "use the event's default sound".
+model UserSoundPref {
+  userId  Int
+  eventId Int
+  user    User               @relation(fields: [userId], references: [id])
+  event   NotificationEvent  @relation(fields: [eventId], references: [id])
+  soundId Int?
+  sound   NotificationSound? @relation(fields: [soundId], references: [id])
+
+  @@id([userId, eventId])
+}
+
+// Persistent per-user inbox — powers the notification widget (so it has
+// history across reloads, not just whatever arrived while connected) and
+// is what the personal WebSocket channel pushes as it's created.
+model Notification {
+  id          Int      @id @default(autoincrement())
+  userId      Int
+  user        User     @relation(fields: [userId], references: [id])
+  eventKey    String
+  channelSlug String?
+  messageId   Int?
+  title       String
+  body        String
+  read        Boolean  @default(false)
+  createdAt   DateTime @default(now())
+
+  @@index([userId, createdAt])
+}
+
 model CustomFont {
   id         Int      @id @default(autoincrement())
   name       String   @unique // display name shown in admin, e.g. "Anomaly Mono"

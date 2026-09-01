@@ -28,6 +28,7 @@ import { EmailTemplatesAdminPage } from "./pages/admin/EmailTemplatesAdminPage";
 import { AuditLogAdminPage } from "./pages/admin/AuditLogAdminPage";
 import { AboutAdminPage } from "./pages/admin/AboutAdminPage";
 import { FontsAdminPage } from "./pages/admin/FontsAdminPage";
+import { NotificationsAdminPage } from "./pages/admin/NotificationsAdminPage";
 
 export default function App() {
   return (
@@ -67,6 +68,7 @@ export default function App() {
                 <Route path="audit-log" element={<AuditLogAdminPage />} />
                 <Route path="about" element={<AboutAdminPage />} />
                 <Route path="fonts" element={<FontsAdminPage />} />
+                <Route path="notifications" element={<NotificationsAdminPage />} />
               </Route>
             </Route>
           </Route>

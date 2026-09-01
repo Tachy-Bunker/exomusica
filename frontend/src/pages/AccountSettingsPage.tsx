@@ -2,6 +2,7 @@ import { useEffect, useState, type FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import { api, ApiError } from "../lib/api";
 import { useAuth } from "../lib/auth";
+import { useNotificationWidgetVisibility } from "../lib/notificationWidgetVisibility";
 
 interface FollowedChannel {
   slug: string;
@@ -24,16 +25,54 @@ interface Me {
 
 type NotifyKey = Exclude<keyof Me, "username" | "email" | "followedChannels">;
 
+interface SoundPref {
+  eventId: number;
+  key: string;
+  label: string;
+  hasOverride: boolean;
+  soundId: number | null;
+  soundUrl: string | null;
+}
+
+interface Sound {
+  id: number;
+  name: string;
+  fileUrl: string;
+}
+
 export function AccountSettingsPage() {
   const { logout } = useAuth();
   const navigate = useNavigate();
   const [me, setMe] = useState<Me | null>(null);
   const [passwords, setPasswords] = useState({ current: "", next: "" });
   const [passwordMsg, setPasswordMsg] = useState<string | null>(null);
+  const [soundPrefs, setSoundPrefs] = useState<SoundPref[]>([]);
+  const [sounds, setSounds] = useState<Sound[]>([]);
+  const widgetHidden = useNotificationWidgetVisibility((s) => s.hidden);
+  const setWidgetHidden = useNotificationWidgetVisibility((s) => s.setHidden);
 
   useEffect(() => {
     api<Me>("/api/account/me").then(setMe);
+    api<SoundPref[]>("/api/account/sound-prefs").then(setSoundPrefs);
+    api<Sound[]>("/api/notification-sounds").then(setSounds);
   }, []);
+
+  async function changeSoundPref(eventId: number, soundIdStr: string) {
+    if (soundIdStr === "__default__") {
+      await api(`/api/account/sound-prefs/${eventId}`, { method: "DELETE" });
+    } else {
+      await api(`/api/account/sound-prefs/${eventId}`, {
+        method: "PUT",
+        body: JSON.stringify({ soundId: soundIdStr ? Number(soundIdStr) : null }),
+      });
+    }
+    api<SoundPref[]>("/api/account/sound-prefs").then(setSoundPrefs);
+  }
+
+  function previewSound(url: string | null) {
+    if (url) new Audio(url).play().catch(() => {});
+  }
+
 
   async function toggleNotification(key: NotifyKey) {
     if (!me) return;
@@ -121,6 +160,35 @@ export function AccountSettingsPage() {
         These toggles save correctly. Whether email actually arrives depends on SMTP being configured and working —
         ask an admin if you're not receiving anything you expect to.
       </p>
+
+      <h2 style={{ fontSize: "1rem", marginTop: "1.5rem" }}>Notification sounds</h2>
+      {soundPrefs.map((p) => (
+        <div key={p.eventId} className="field" style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+          <label style={{ flex: 1, fontSize: "0.85rem" }}>{p.label}</label>
+          <select
+            value={p.hasOverride ? (p.soundId ?? "") : "__default__"}
+            onChange={(e) => changeSoundPref(p.eventId, e.target.value)}
+            style={{ fontSize: "0.8rem" }}
+          >
+            <option value="__default__">Site default</option>
+            <option value="">Off</option>
+            {sounds.map((s) => (
+              <option key={s.id} value={s.id}>
+                {s.name}
+              </option>
+            ))}
+          </select>
+          <button className="btn" style={{ padding: "0.1rem 0.5rem" }} onClick={() => previewSound(p.soundUrl)} disabled={!p.soundUrl}>
+            ▶
+          </button>
+        </div>
+      ))}
+      <div className="field">
+        <label>
+          <input type="checkbox" checked={!widgetHidden} onChange={(e) => setWidgetHidden(!e.target.checked)} /> Show the
+          notification widget
+        </label>
+      </div>
 
       <h2 style={{ fontSize: "1rem", marginTop: "1.5rem" }}>Change password</h2>
       <form onSubmit={handlePasswordChange}>

@@ -180,4 +180,23 @@ export async function saveFontFile(filename: string, mimeType: string, buffer: B
   return { url: `/uploads/fonts/${diskName}`, format };
 }
 
+const ALLOWED_SOUND_TYPES: Record<string, string> = {
+  "audio/mpeg": ".mp3",
+  "audio/wav": ".wav",
+  "audio/ogg": ".ogg",
+};
+
+/** Saves an admin-uploaded notification sound clip. */
+export async function saveSoundFile(filename: string, mimeType: string, buffer: Buffer): Promise<{ url: string }> {
+  const ext = ALLOWED_SOUND_TYPES[mimeType] ?? path.extname(filename).toLowerCase();
+  if (![".mp3", ".wav", ".ogg"].includes(ext)) {
+    throw new Error("unsupported sound type — use MP3, WAV, or OGG");
+  }
+  const dir = path.join(UPLOADS_DIR, "sounds");
+  await mkdir(dir, { recursive: true });
+  const diskName = `${randomUUID()}${ext}`;
+  await writeFile(path.join(dir, diskName), buffer);
+  return { url: `/uploads/sounds/${diskName}` };
+}
+
 export { UPLOADS_DIR };

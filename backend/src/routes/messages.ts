@@ -5,6 +5,7 @@ import { toDayKey } from "../lib/dayKey.js";
 import { toMessageDTO } from "../lib/messageDto.js";
 import { broadcast } from "../lib/chatHub.js";
 import { sendTemplatedMail } from "../lib/emailTemplates.js";
+import { createNotification } from "../lib/notify.js";
 
 const messageInclude = {
   author: { select: { username: true, avatarUrl: true } },
@@ -141,7 +142,15 @@ export async function messageRoutes(app: FastifyInstance): Promise<void> {
           include: { user: true },
         });
         for (const f of followers) {
-          if (!f.user.notifyFollowedReplies || !f.user.email || f.user.isGhost) continue;
+          if (f.user.isGhost) continue;
+          void createNotification(
+            f.userId,
+            "message_followed_topic",
+            `New activity in ${channel.name}`,
+            `${full.author.username}: ${contentRaw.slice(0, 120)}`,
+            { channelSlug: channel.slug, messageId: message.id },
+          );
+          if (!f.user.notifyFollowedReplies || !f.user.email) continue;
           void sendTemplatedMail("TOPIC_REPLY", f.user.email, f.user.username, {
             channelName: channel.name,
             authorUsername: full.author.username,

@@ -2,6 +2,7 @@ import type { FastifyInstance } from "fastify";
 import { prisma } from "../lib/prisma.js";
 import { requireAuth, requireAdmin, hashPassword, verifyPassword } from "../lib/auth.js";
 import { ghostifyUser } from "../services/accountService.js";
+import { createNotification } from "../lib/notify.js";
 
 export async function accountRoutes(app: FastifyInstance): Promise<void> {
   // Self view — includes email and notification prefs, unlike the public
@@ -78,6 +79,7 @@ export async function accountRoutes(app: FastifyInstance): Promise<void> {
         where: { id: req.user!.id },
         data: { passwordHash: await hashPassword(newPassword) },
       });
+      void createNotification(req.user!.id, "account_updated", "Password changed", "Your password was updated.");
       return { status: "updated" };
     },
   );

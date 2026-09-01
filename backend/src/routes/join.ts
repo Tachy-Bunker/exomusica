@@ -2,6 +2,7 @@ import type { FastifyInstance } from "fastify";
 import { prisma } from "../lib/prisma.js";
 import { hashPassword, requireAdmin } from "../lib/auth.js";
 import { sendTemplatedMail } from "../lib/emailTemplates.js";
+import { createNotification } from "../lib/notify.js";
 
 interface JoinBody {
   username: string;
@@ -84,6 +85,7 @@ export async function joinRoutes(app: FastifyInstance): Promise<void> {
       if (user.email) {
         void sendTemplatedMail("JOIN_APPROVED", user.email, user.username);
       }
+      void createNotification(user.id, "join_approved", "You're in", "Your Exomusica account was approved.");
       return { id: user.id, username: user.username };
     },
   );

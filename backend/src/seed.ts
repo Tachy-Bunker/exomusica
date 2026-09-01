@@ -174,6 +174,17 @@ async function main() {
     });
   }
 
+  // --- Default notification events (no sound assigned yet) ------------------
+  const DEFAULT_EVENTS = [
+    { key: "message_followed_topic", label: "New message in a topic you follow" },
+    { key: "message_other_topic", label: "New message in a topic you don't follow (while viewing it live)" },
+    { key: "join_approved", label: "Your join request was approved" },
+    { key: "account_updated", label: "Your account was updated" },
+  ];
+  for (const e of DEFAULT_EVENTS) {
+    await prisma.notificationEvent.upsert({ where: { key: e.key }, create: e, update: {} });
+  }
+
   console.log("Seed complete.");
 }
 

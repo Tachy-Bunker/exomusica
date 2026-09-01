@@ -3,6 +3,7 @@ import { Link, Outlet } from "react-router-dom";
 import { useAuth } from "../lib/auth";
 import { useEmojiStore } from "../lib/emojiStore";
 import { useGlobalPlayerShortcuts } from "../lib/useGlobalPlayerShortcuts";
+import { NotificationWidget } from "./NotificationWidget";
 import { PlayerBar } from "./PlayerBar";
 
 export function Layout() {
@@ -46,6 +47,7 @@ export function Layout() {
       </main>
 
       <PlayerBar />
+      <NotificationWidget />
     </div>
   );
 }

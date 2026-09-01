@@ -8,8 +8,10 @@ import { EmojiPicker } from "../components/EmojiPicker";
 import { AttachmentPreview } from "../components/AttachmentPreview";
 import type { Emoji } from "../lib/emojiStore";
 import type { MessageDTO } from "../lib/types";
+import { createPortal } from "react-dom";
 import { useDocumentTitle } from "../lib/useDocumentTitle";
 import { useCustomFont, type FontInfo } from "../lib/useCustomFont";
+import { MiniChat } from "../components/MiniChat";
 
 type ViewMode = "live" | "day" | "search";
 type DisplayMode = "standard" | "grouped";
@@ -234,7 +236,41 @@ export function ChannelPage({ channelSlug }: { channelSlug?: string } = {}) {
   const [replyTarget, setReplyTarget] = useState<ReplyTarget | null>(null);
   const [pendingAttachments, setPendingAttachments] = useState<{ id: number; filename: string }[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [pipWindow, setPipWindow] = useState<Window | null>(null);
   const [pendingScrollTo, setPendingScrollTo] = useState<number | null>(null);
+
+  async function popOutChat() {
+    if (!slug) return;
+    // Document Picture-in-Picture: a real always-on-top window, enforced by
+    // the browser, that stays visible over *any* application — not just
+    // other browser tabs. Chrome/Edge only; Firefox and Safari fall back to
+    // a plain popup, which is still a separate OS window but can't be
+    // forced above other apps (no website can do that, by design).
+    const dpip = (window as unknown as { documentPictureInPicture?: { requestWindow: (opts: { width: number; height: number }) => Promise<Window> } }).documentPictureInPicture;
+    if (dpip) {
+      const pip = await dpip.requestWindow({ width: 340, height: 480 });
+      [...document.styleSheets].forEach((sheet) => {
+        try {
+          const rules = [...sheet.cssRules].map((r) => r.cssText).join("\n");
+          const style = pip.document.createElement("style");
+          style.textContent = rules;
+          pip.document.head.appendChild(style);
+        } catch {
+          if (sheet.href) {
+            const link = pip.document.createElement("link");
+            link.rel = "stylesheet";
+            link.href = sheet.href;
+            pip.document.head.appendChild(link);
+          }
+        }
+      });
+      pip.document.body.style.margin = "0";
+      pip.addEventListener("pagehide", () => setPipWindow(null));
+      setPipWindow(pip);
+    } else {
+      window.open(`/topic/${slug}`, "_blank", "popup=1,width=380,height=560");
+    }
+  }
   const [searchParams] = useSearchParams();
 
   // Landing here via a "copy link" URL (?day=YYYY-MM-DD#m-123): jump
@@ -323,6 +359,15 @@ export function ChannelPage({ channelSlug }: { channelSlug?: string } = {}) {
     api<MessageDTO[]>(`/api/channels/${slug}/messages?${params}`).then(setMessages);
   }, [slug, mode, selectedDay, activeSearch]);
 
+  const [otherTopicSoundUrl, setOtherTopicSoundUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!user) return;
+    api<{ key: string; soundUrl: string | null }[]>("/api/account/sound-prefs").then((prefs) => {
+      setOtherTopicSoundUrl(prefs.find((p) => p.key === "message_other_topic")?.soundUrl ?? null);
+    });
+  }, [user]);
+
   // Only the live view stays subscribed — browsing history or search
   // shouldn't be interrupted by new messages arriving underneath you.
   useEffect(() => {
@@ -332,7 +377,12 @@ export function ChannelPage({ channelSlug }: { channelSlug?: string } = {}) {
     wsRef.current = ws;
     ws.onmessage = (ev) => {
       const event = JSON.parse(ev.data);
-      if (event.type === "message.create" || event.type === "message.update") {
+      if (event.type === "message.create") {
+        setMessages((prev) => upsertMessage(prev, event.message));
+        if (!following && otherTopicSoundUrl && event.message.authorId !== user?.id) {
+          new Audio(otherTopicSoundUrl).play().catch(() => {});
+        }
+      } else if (event.type === "message.update") {
         setMessages((prev) => upsertMessage(prev, event.message));
       } else if (event.type === "message.delete") {
         setMessages((prev) =>
@@ -341,7 +391,7 @@ export function ChannelPage({ channelSlug }: { channelSlug?: string } = {}) {
       }
     };
     return () => ws.close();
-  }, [slug, mode]);
+  }, [slug, mode, following, otherTopicSoundUrl, user]);
 
   async function sendMessage() {
     if ((!draft.trim() && pendingAttachments.length === 0) || !slug) return;
@@ -456,6 +506,9 @@ export function ChannelPage({ channelSlug }: { channelSlug?: string } = {}) {
         <button className="btn" onClick={toggleDisplayMode} title="Toggle grouped consecutive messages">
           {displayMode === "grouped" ? "Grouped view" : "Standard view"}
         </button>
+        <button className="btn" onClick={popOutChat} title="Open in a floating window">
+          Pop out
+        </button>
         <select
           className="btn"
           value={mode === "day" ? selectedDay ?? "" : ""}
@@ -554,6 +607,8 @@ export function ChannelPage({ channelSlug }: { channelSlug?: string } = {}) {
           </div>
         </form>
       )}
+
+      {pipWindow && slug && createPortal(<MiniChat slug={slug} channelName={channelName ?? slug} />, pipWindow.document.body)}
     </div>
   );
 }
