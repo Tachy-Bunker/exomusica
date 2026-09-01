@@ -8,6 +8,7 @@ export interface PlayableTrackDTO {
   fileUrl: string;
   format: string;
   durationSeconds: number | null;
+  position: number;
   albumTitle: string;
   albumSlug: string;
   composer: string;

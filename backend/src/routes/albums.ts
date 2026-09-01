@@ -134,18 +134,50 @@ export async function albumRoutes(app: FastifyInstance): Promise<void> {
     if (!title || !fileUrl || !format) {
       return reply.code(400).send({ error: "title, fileUrl, and format are required" });
     }
+    const albumId = Number(req.params.id);
+    const resolvedPosition = position ?? (await prisma.track.count({ where: { albumId } }));
     const track = await prisma.track.create({
       data: {
-        albumId: Number(req.params.id),
+        albumId,
         title,
         fileUrl,
         format: format as never, // validated against the AudioFormat enum by Prisma at the DB layer
         durationSeconds,
-        position: position ?? 0,
+        position: resolvedPosition,
       },
     });
     return reply.code(201).send(track);
   });
+
+  app.patch<{
+    Params: { id: string };
+    Body: Partial<{ title: string; fileUrl: string; format: string; durationSeconds: number }>;
+  }>("/api/admin/tracks/:id", { preHandler: requireAdmin }, async (req) => {
+    return prisma.track.update({
+      where: { id: Number(req.params.id) },
+      data: req.body as never, // format, if present, is validated against the AudioFormat enum at the DB layer
+    });
+  });
+
+  // Swaps two tracks' positions — same pattern as About-feature reordering:
+  // move one item up/down at a time rather than sending a full reordered list.
+  app.post<{ Body: { idA: number; idB: number } }>(
+    "/api/admin/tracks/swap",
+    { preHandler: requireAdmin },
+    async (req, reply) => {
+      const { idA, idB } = req.body ?? {};
+      const [a, b] = await Promise.all([
+        prisma.track.findUnique({ where: { id: idA } }),
+        prisma.track.findUnique({ where: { id: idB } }),
+      ]);
+      if (!a || !b) return reply.code(404).send({ error: "track not found" });
+      await prisma.$transaction([
+        prisma.track.update({ where: { id: a.id }, data: { position: b.position } }),
+        prisma.track.update({ where: { id: b.id }, data: { position: a.position } }),
+      ]);
+      return reply.code(204).send();
+    },
+  );
 
   app.delete<{ Params: { id: string } }>("/api/admin/tracks/:id", { preHandler: requireAdmin }, async (req, reply) => {
     await prisma.track.delete({ where: { id: Number(req.params.id) } });

@@ -23,7 +23,7 @@ interface AlbumDetail {
   links: { id: number; label: string; url: string }[];
   gallery: { id: number; url: string }[];
   collaborators: { id: number; name: string }[];
-  tracks: { id: number; title: string; composers: { id: number }[] }[];
+  tracks: { id: number; title: string; fileUrl: string; format: string; position: number; composers: { id: number }[] }[];
 }
 
 export function AlbumsAdminPage() {
@@ -45,6 +45,8 @@ export function AlbumsAdminPage() {
   const [managingSlug, setManagingSlug] = useState<string | null>(null);
   const [detail, setDetail] = useState<AlbumDetail | null>(null);
   const [linkForm, setLinkForm] = useState({ label: "", url: "" });
+  const [editingTrackId, setEditingTrackId] = useState<number | null>(null);
+  const [trackEditForm, setTrackEditForm] = useState({ title: "", fileUrl: "", format: "MP3" });
   const coverInput = useRef<HTMLInputElement>(null);
   const galleryInput = useRef<HTMLInputElement>(null);
 
@@ -101,6 +103,34 @@ export function AlbumsAdminPage() {
       body: JSON.stringify({ title: trackForm.title, fileUrl: trackForm.fileUrl, format: trackForm.format }),
     });
     setTrackForm({ albumId: trackForm.albumId, title: "", fileUrl: "", format: "MP3" });
+    if (managingSlug) loadDetail(managingSlug);
+  }
+
+  function startEditTrack(t: { id: number; title: string; fileUrl: string; format: string }) {
+    setEditingTrackId(t.id);
+    setTrackEditForm({ title: t.title, fileUrl: t.fileUrl, format: t.format });
+  }
+
+  async function saveTrackEdit(id: number) {
+    await api(`/api/admin/tracks/${id}`, { method: "PATCH", body: JSON.stringify(trackEditForm) });
+    setEditingTrackId(null);
+    if (managingSlug) loadDetail(managingSlug);
+  }
+
+  async function moveTrack(index: number, direction: -1 | 1) {
+    if (!detail) return;
+    const other = detail.tracks[index + direction];
+    if (!other) return;
+    await api("/api/admin/tracks/swap", {
+      method: "POST",
+      body: JSON.stringify({ idA: detail.tracks[index].id, idB: other.id }),
+    });
+    loadDetail(detail.slug);
+  }
+
+  async function deleteTrack(id: number) {
+    if (!confirm("Delete this track?")) return;
+    await api(`/api/admin/tracks/${id}`, { method: "DELETE" });
     if (managingSlug) loadDetail(managingSlug);
   }
 
@@ -289,6 +319,66 @@ export function AlbumsAdminPage() {
               Add link
             </button>
           </form>
+
+          <h3 style={{ fontSize: "0.9rem", marginTop: "1rem" }}>Tracks</h3>
+          {detail.tracks.length === 0 && <p style={{ fontSize: "0.85rem", color: "var(--text-dim)" }}>No tracks yet.</p>}
+          {detail.tracks.map((t, i) => (
+            <div key={t.id} style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.3rem" }}>
+              <div style={{ display: "flex", flexDirection: "column" }}>
+                <button className="btn" style={{ padding: "0 0.3rem" }} onClick={() => moveTrack(i, -1)} disabled={i === 0}>
+                  ↑
+                </button>
+                <button
+                  className="btn"
+                  style={{ padding: "0 0.3rem" }}
+                  onClick={() => moveTrack(i, 1)}
+                  disabled={i === detail.tracks.length - 1}
+                >
+                  ↓
+                </button>
+              </div>
+              {editingTrackId === t.id ? (
+                <>
+                  <input
+                    value={trackEditForm.title}
+                    onChange={(e) => setTrackEditForm((f) => ({ ...f, title: e.target.value }))}
+                    style={{ flex: 1 }}
+                  />
+                  <input
+                    value={trackEditForm.fileUrl}
+                    onChange={(e) => setTrackEditForm((f) => ({ ...f, fileUrl: e.target.value }))}
+                    style={{ flex: 2 }}
+                  />
+                  <select value={trackEditForm.format} onChange={(e) => setTrackEditForm((f) => ({ ...f, format: e.target.value }))}>
+                    {["OPUS", "MP3", "FLAC", "WAV", "OGG", "M4A", "AAC"].map((f) => (
+                      <option key={f} value={f}>
+                        {f}
+                      </option>
+                    ))}
+                  </select>
+                  <button className="btn btn-primary" onClick={() => saveTrackEdit(t.id)}>
+                    Save
+                  </button>
+                  <button className="btn" onClick={() => setEditingTrackId(null)}>
+                    Cancel
+                  </button>
+                </>
+              ) : (
+                <>
+                  <span style={{ flex: 1, fontSize: "0.85rem" }}>{t.title}</span>
+                  <span className="mono" style={{ fontSize: "0.75rem", color: "var(--text-dim)", flex: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    {t.fileUrl}
+                  </span>
+                  <button className="btn" onClick={() => startEditTrack(t)}>
+                    Edit
+                  </button>
+                  <button className="btn btn-danger" onClick={() => deleteTrack(t.id)}>
+                    Delete
+                  </button>
+                </>
+              )}
+            </div>
+          ))}
 
           {detail.collaborators.length > 0 && (
             <>

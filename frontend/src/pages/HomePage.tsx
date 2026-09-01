@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type MouseEvent, type FocusEvent } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { api } from "../lib/api";
 import { useDocumentTitle } from "../lib/useDocumentTitle";
 import { useAudioStore } from "../lib/audioStore";
@@ -89,6 +89,7 @@ function BranchHoverCard({ branch, pos, wrapHeight }: { branch: Branch; pos: Hov
 
 export function HomePage() {
   useDocumentTitle("");
+  const navigate = useNavigate();
   const [branches, setBranches] = useState<Branch[]>([]);
   const [hoveredId, setHoveredId] = useState<number | null>(null);
   const [hoverPos, setHoverPos] = useState<HoverPos | null>(null);
@@ -141,7 +142,7 @@ export function HomePage() {
               onMouseEnter={(e) => activate(e, b)}
               onMouseLeave={() => setHoveredId((id) => (id === b.id ? null : id))}
               onFocus={(e) => activate(e, b)}
-              onClick={(e) => (hoveredId === b.id ? setHoveredId(null) : activate(e, b))}
+              onClick={() => navigate(`/branch/${b.slug}`)}
               style={{ cursor: "pointer" }}
             >
               <circle r={7} />

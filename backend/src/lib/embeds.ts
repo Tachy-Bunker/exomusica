@@ -17,6 +17,7 @@ export function trackToDTO(t: TrackWithRelations): PlayableTrackDTO {
     fileUrl: t.fileUrl,
     format: t.format,
     durationSeconds: t.durationSeconds,
+    position: t.position,
     albumTitle: t.album.title,
     albumSlug: t.album.slug,
     composer: t.album.composer,
