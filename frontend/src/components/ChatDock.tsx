@@ -89,8 +89,8 @@ export function ChatDock() {
           </button>
         </div>
       </div>
-      <div style={{ flex: 1, overflowY: "auto", padding: "0.6rem" }}>
-        <ChannelPage channelSlug={openChannelSlug} />
+      <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column", padding: "0 0.6rem 0.6rem" }}>
+        <ChannelPage channelSlug={openChannelSlug} fillHeight />
       </div>
     </div>
   );

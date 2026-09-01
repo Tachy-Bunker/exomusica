@@ -28,6 +28,8 @@ import { mediaRoutes } from "./routes/media.js";
 import { fontRoutes } from "./routes/fonts.js";
 import { notificationSoundRoutes } from "./routes/notificationSounds.js";
 import { notificationRoutes } from "./routes/notifications.js";
+import { presenceRoutes } from "./routes/presence.js";
+import { siteSettingsRoutes } from "./routes/siteSettings.js";
 import { wsRoutes } from "./routes/ws.js";
 
 // Fastify's own default body limit is 1MB, applied before multipart even
@@ -69,6 +71,8 @@ await app.register(mediaRoutes);
 await app.register(fontRoutes);
 await app.register(notificationSoundRoutes);
 await app.register(notificationRoutes);
+await app.register(presenceRoutes);
+await app.register(siteSettingsRoutes);
 await app.register(wsRoutes);
 
 const port = Number(process.env.PORT ?? 3001);

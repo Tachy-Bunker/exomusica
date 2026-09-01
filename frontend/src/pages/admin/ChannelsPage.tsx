@@ -49,7 +49,7 @@ export function ChannelsPage() {
 
   return (
     <div>
-      <h1>Discussion topics</h1>
+      <h1>Forum topics</h1>
 
       <form onSubmit={handleSubmit} style={{ maxWidth: 380, marginBottom: "2rem" }}>
         <div className="field">

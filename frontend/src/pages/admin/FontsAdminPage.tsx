@@ -28,11 +28,19 @@ export function FontsAdminPage() {
   const [name, setName] = useState("");
   const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [siteDefaultFontId, setSiteDefaultFontId] = useState<number | null>(null);
 
   function load() {
     api<Font[]>("/api/fonts").then(setFonts);
+    api<{ defaultFontId: number | null }>("/api/site-settings").then((s) => setSiteDefaultFontId(s.defaultFontId));
   }
   useEffect(load, []);
+
+  async function setSiteDefault(idStr: string) {
+    const defaultFontId = idStr ? Number(idStr) : null;
+    await api("/api/admin/site-settings", { method: "PATCH", body: JSON.stringify({ defaultFontId }) });
+    setSiteDefaultFontId(defaultFontId);
+  }
 
   async function handleUpload() {
     const file = fileInputRef.current?.files?.[0];
@@ -64,6 +72,21 @@ export function FontsAdminPage() {
         Upload OTF, TTF, WOFF, or WOFF2 files. Once uploaded, assign one to any branch, discussion topic, wiki page,
         or blog post from that item's edit screen — each picks independently from this library.
       </p>
+
+      <div className="field" style={{ maxWidth: 360 }}>
+        <label>Sitewide default font</label>
+        <select value={siteDefaultFontId ?? ""} onChange={(e) => setSiteDefault(e.target.value)}>
+          <option value="">— built-in default (Space Grotesk) —</option>
+          {fonts.map((f) => (
+            <option key={f.id} value={f.id}>
+              {f.name}
+            </option>
+          ))}
+        </select>
+        <p style={{ fontSize: "0.75rem", color: "var(--text-dim)" }}>
+          Applies everywhere nothing more specific overrides it (a branch/topic/wiki/blog font still wins where set).
+        </p>
+      </div>
 
       <div style={{ display: "flex", gap: "0.5rem", marginBottom: "1rem" }}>
         <input placeholder="Display name (optional — defaults to filename)" value={name} onChange={(e) => setName(e.target.value)} style={{ flex: 1 }} />

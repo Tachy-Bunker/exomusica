@@ -10,7 +10,7 @@ interface ChannelSummary {
 }
 
 export function DiscussionIndexPage() {
-  useDocumentTitle("Discussion");
+  useDocumentTitle("Forums");
   const [topics, setTopics] = useState<ChannelSummary[]>([]);
   const [branches, setBranches] = useState<Branch[]>([]);
 
@@ -21,7 +21,7 @@ export function DiscussionIndexPage() {
 
   return (
     <div>
-      <h1>Discussion</h1>
+      <h1>Forums</h1>
 
       <h2 style={{ fontSize: "1rem", color: "var(--accent-forum)" }}>Topics</h2>
       {topics.length === 0 && <p style={{ color: "var(--text-dim)" }}>No topics yet.</p>}

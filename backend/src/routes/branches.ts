@@ -15,7 +15,7 @@ interface CreateBranchBody {
 
 export async function branchRoutes(app: FastifyInstance): Promise<void> {
   app.get("/api/branches", async () => {
-    return prisma.branch.findMany({
+    const branches = await prisma.branch.findMany({
       where: { hidden: false },
       select: {
         id: true,
@@ -26,10 +26,24 @@ export async function branchRoutes(app: FastifyInstance): Promise<void> {
         parentId: true,
         posX: true,
         posY: true,
-        channel: { select: { slug: true } },
+        channel: { select: { id: true, slug: true } },
       },
       orderBy: { id: "asc" },
     });
+
+    const channelIds = branches.map((b) => b.channel?.id).filter((id): id is number => id != null);
+    const lastActivity = await prisma.message.groupBy({
+      by: ["channelId"],
+      where: { channelId: { in: channelIds }, isDeleted: false },
+      _max: { createdAt: true },
+    });
+    const lastActivityByChannel = new Map<number, Date | null>(lastActivity.map((l) => [l.channelId, l._max.createdAt]));
+
+    return branches.map((b) => ({
+      ...b,
+      channel: b.channel ? { slug: b.channel.slug } : null,
+      lastActivityAt: b.channel ? (lastActivityByChannel.get(b.channel.id)?.toISOString() ?? null) : null,
+    }));
   });
 
   // Admin sees everything, hidden included — needed to ever unhide something.

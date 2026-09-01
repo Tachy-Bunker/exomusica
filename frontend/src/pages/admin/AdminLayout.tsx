@@ -11,7 +11,7 @@ export function AdminLayout() {
           Branches
         </NavLink>
         <NavLink to="/admin/channels" className={({ isActive }) => (isActive ? "active" : "")}>
-          Discussion topics
+          Forum topics
         </NavLink>
         <NavLink to="/admin/users" className={({ isActive }) => (isActive ? "active" : "")}>
           Users

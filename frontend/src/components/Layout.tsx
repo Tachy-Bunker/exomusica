@@ -1,12 +1,16 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Link, Outlet } from "react-router-dom";
+import { api } from "../lib/api";
 import { useAuth } from "../lib/auth";
+import { useCustomFont } from "../lib/useCustomFont";
 import { useEmojiStore } from "../lib/emojiStore";
 import { useGlobalPlayerShortcuts } from "../lib/useGlobalPlayerShortcuts";
 import { useChatDockStore } from "../lib/chatDockStore";
+import { usePresenceStore } from "../lib/presenceStore";
 import { useIsDesktop } from "../lib/useIsDesktop";
 import { ChatDock } from "./ChatDock";
 import { NotificationWidget } from "./NotificationWidget";
+import { OnlineOrbs } from "./OnlineOrbs";
 import { PlayerBar } from "./PlayerBar";
 
 export function Layout() {
@@ -26,19 +30,33 @@ export function Layout() {
     loadEmojis();
   }, [loadEmojis]);
 
+  const connectPresence = usePresenceStore((s) => s.connect);
+  useEffect(() => {
+    if (user) connectPresence();
+  }, [user, connectPresence]);
+
+  const [siteFont, setSiteFont] = useState<{ familyName: string; fileUrl: string; format: string } | null>(null);
+  useEffect(() => {
+    api<{ defaultFont: typeof siteFont }>("/api/site-settings").then((s) => setSiteFont(s.defaultFont));
+  }, []);
+  const siteFontFamily = useCustomFont(siteFont);
+
   return (
-    <div className="app-shell" style={{ "--dock-offset": `${dockOffset}px` } as React.CSSProperties}>
+    <div
+      className="app-shell"
+      style={{ "--dock-offset": `${dockOffset}px`, ...(siteFontFamily ? { "--font-body": siteFontFamily } : {}) } as React.CSSProperties}
+    >
       <header className="top-nav">
         <Link to="/" className="brand">
           Exomusica
         </Link>
         <nav>
-          <Link to="/about">About</Link>
           <Link to="/wiki">Wiki</Link>
           <Link to="/news">News</Link>
-          <Link to="/discussion">Discussion</Link>
+          <Link to="/discussion">Forums</Link>
         </nav>
         <div className="spacer" />
+        {user && <OnlineOrbs />}
         {user ? (
           <>
             {user.isAdmin && <Link to="/admin">Admin</Link>}

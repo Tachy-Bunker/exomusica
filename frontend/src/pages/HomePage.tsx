@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type MouseEvent, type FocusEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { api } from "../lib/api";
+import { useAuth } from "../lib/auth";
 import { useDocumentTitle } from "../lib/useDocumentTitle";
 import { useAudioStore } from "../lib/audioStore";
 import type { Branch, BranchAlbum, MessageDTO, PlayableTrackDTO } from "../lib/types";
@@ -100,6 +101,7 @@ function BranchHoverCard({ branch, pos, wrapHeight }: { branch: Branch; pos: Hov
 export function HomePage() {
   useDocumentTitle("");
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [branches, setBranches] = useState<Branch[]>([]);
   const [hoveredId, setHoveredId] = useState<number | null>(null);
   const [hoverPos, setHoverPos] = useState<HoverPos | null>(null);
@@ -129,9 +131,22 @@ export function HomePage() {
 
   return (
     <div>
-      <p style={{ maxWidth: 560, color: "var(--text-dim)" }}>
-        Hover a branch to preview its topic and releases. Tap on mobile.
-      </p>
+      <details className="homepage-intro">
+        <summary>About Exomusica</summary>
+        <div className="body">
+          <p>
+            Exomusica is a collective that creates accessible experimental music.
+            <br />
+            You are free to join the collective, as a listener, a musician, or researcher!
+          </p>
+          <button
+            className="donate-btn"
+            onClick={() => window.open("https://paypal.me/tachybunker", "_blank", "popup=1,width=460,height=640")}
+          >
+            💛 Donate
+          </button>
+        </div>
+      </details>
 
       <div className="tree-wrap" ref={wrapRef}>
         <svg viewBox={`0 0 ${WIDTH} ${HEIGHT}`} width="100%" height="100%" preserveAspectRatio="xMidYMid meet">
@@ -156,15 +171,17 @@ export function HomePage() {
               style={{ cursor: "pointer" }}
             >
               <circle r={7} />
-              <text y={22} textAnchor="middle">
-                {b.name}
-              </text>
+              <g className="tree-node-rotate" style={{ animationDelay: `${(b.id % 7) * 0.4}s` }}>
+                <text y={22} textAnchor="middle">
+                  {b.name}
+                </text>
+              </g>
             </g>
           ))}
         </svg>
 
         <Link
-          to="/join"
+          to={user ? "/about" : "/join"}
           className="btn btn-primary"
           style={{
             position: "absolute",
@@ -174,7 +191,7 @@ export function HomePage() {
             textDecoration: "none",
           }}
         >
-          Join
+          {user ? "About" : "Join"}
         </Link>
 
         {hovered && hoverPos && (

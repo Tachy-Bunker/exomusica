@@ -19,8 +19,14 @@ export function BranchPage() {
   const fontFamily = useCustomFont(branch?.font);
   const isDesktop = useIsDesktop();
   const openChat = useChatDockStore((s) => s.openChat);
-  const dockedSlug = useChatDockStore((s) => s.openChannelSlug);
-  const isThisChatOpen = !!branch?.channel && dockedSlug === branch.channel.slug;
+
+  useEffect(() => {
+    if (isDesktop && branch?.channel) {
+      openChat(branch.channel.slug, branch.name);
+    }
+    // Deliberately not closing on unmount — the dock is meant to persist
+    // across navigation until the user closes it themselves.
+  }, [isDesktop, branch?.channel, branch?.name, openChat]);
 
   async function queueAlbum(albumSlug: string) {
     const full = await api<{ tracks: PlayableTrackDTO[] }>(`/api/albums/${albumSlug}`);
@@ -110,14 +116,7 @@ export function BranchPage() {
       {!branch.channel ? (
         <p>No topic yet.</p>
       ) : isDesktop ? (
-        <div>
-          <p style={{ color: "var(--text-dim)", fontSize: "0.9rem" }}>
-            {isThisChatOpen ? "This topic's chat is open in the dock →" : "Open this topic in the persistent chat dock."}
-          </p>
-          <button className="btn btn-primary" onClick={() => openChat(branch.channel!.slug, branch.name)} disabled={isThisChatOpen}>
-            {isThisChatOpen ? "Chat is open" : "Open chat"}
-          </button>
-        </div>
+        <p style={{ color: "var(--text-dim)", fontSize: "0.9rem" }}>This topic's chat is open in the dock →</p>
       ) : (
         <ChannelPage channelSlug={branch.channel.slug} />
       )}

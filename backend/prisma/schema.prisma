@@ -475,6 +475,15 @@ model Notification {
   @@index([userId, createdAt])
 }
 
+// Singleton row (id is always 1) — sitewide settings that aren't tied to
+// any specific branch/topic/wiki/blog. Currently just the default font
+// applied everywhere nothing more specific overrides it.
+model SiteSettings {
+  id             Int         @id @default(1)
+  defaultFontId  Int?
+  defaultFont    CustomFont? @relation(fields: [defaultFontId], references: [id])
+}
+
 model CustomFont {
   id         Int      @id @default(autoincrement())
   name       String   @unique // display name shown in admin, e.g. "Anomaly Mono"
@@ -483,10 +492,11 @@ model CustomFont {
   format     String // "opentype" | "truetype" | "woff" | "woff2" — goes straight into the @font-face src
   createdAt  DateTime @default(now())
 
-  branches  Branch[]
-  channels  ForumChannel[]
-  wikiPages WikiPage[]
-  blogPosts BlogPost[]
+  branches     Branch[]
+  channels     ForumChannel[]
+  wikiPages    WikiPage[]
+  blogPosts    BlogPost[]
+  siteSettings SiteSettings[]
 }
 
 model AuditLog {

@@ -539,3 +539,76 @@ th {
   padding: 0.2rem 0.6rem;
   color: var(--text-dim);
 }
+
+.online-orb {
+  position: absolute;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 35%, var(--accent-audio), var(--accent-forum));
+  box-shadow: 0 0 6px var(--accent-audio);
+  pointer-events: none;
+}
+
+@keyframes node-sway {
+  0%,
+  100% {
+    transform: rotate(-4deg);
+  }
+  50% {
+    transform: rotate(4deg);
+  }
+}
+
+.tree-node-rotate {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: node-sway 4.5s ease-in-out infinite;
+}
+
+.homepage-intro {
+  max-width: 560px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-elevated);
+  margin-bottom: 0.75rem;
+  overflow: hidden;
+}
+
+.homepage-intro summary {
+  cursor: pointer;
+  padding: 0.6rem 0.9rem;
+  font-family: var(--font-display);
+  list-style: none;
+}
+
+.homepage-intro summary::-webkit-details-marker {
+  display: none;
+}
+
+.homepage-intro summary::before {
+  content: "▸ ";
+  color: var(--accent-forum);
+}
+
+.homepage-intro[open] summary::before {
+  content: "▾ ";
+}
+
+.homepage-intro .body {
+  padding: 0 0.9rem 0.9rem;
+  color: var(--text-dim);
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
+.donate-btn {
+  background: linear-gradient(135deg, var(--accent-forum), var(--accent-audio));
+  color: var(--bg);
+  font-weight: 700;
+  border: none;
+  border-radius: 999px;
+  padding: 0.4rem 1rem;
+  cursor: pointer;
+  box-shadow: 0 0 12px var(--accent-forum-dim);
+}

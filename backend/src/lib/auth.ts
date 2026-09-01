@@ -20,6 +20,17 @@ export function signToken(user: AuthedUser): string {
   return jwt.sign(user, JWT_SECRET, { expiresIn: "30d" });
 }
 
+/** Verifies a raw token string, returning the decoded user or null. Used
+ *  by the presence WebSocket route, which gets its token via query string
+ *  since browsers can't attach custom headers to a WS handshake. */
+export function verifyToken(token: string): AuthedUser | null {
+  try {
+    return jwt.verify(token, JWT_SECRET) as AuthedUser;
+  } catch {
+    return null;
+  }
+}
+
 /** Attach req.user from a Bearer token, or reply 401. */
 export async function requireAuth(req: FastifyRequest, reply: FastifyReply): Promise<void> {
   const header = req.headers.authorization;

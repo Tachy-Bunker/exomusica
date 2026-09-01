@@ -1,11 +1,6 @@
 import { useEffect } from "react";
 import { useAudioStore } from "./audioStore";
-
-function isTypingTarget(el: EventTarget | null): boolean {
-  if (!(el instanceof HTMLElement)) return false;
-  const tag = el.tagName;
-  return tag === "INPUT" || tag === "TEXTAREA" || el.isContentEditable;
-}
+import { isTypingTarget } from "./isTypingTarget";
 
 export function useGlobalPlayerShortcuts(): void {
   useEffect(() => {

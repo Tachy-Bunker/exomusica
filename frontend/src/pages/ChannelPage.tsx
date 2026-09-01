@@ -12,6 +12,8 @@ import { useEmojiStore, type Emoji } from "../lib/emojiStore";
 import type { MessageDTO } from "../lib/types";
 import { createPortal } from "react-dom";
 import { useDocumentTitle } from "../lib/useDocumentTitle";
+import { isTypingTarget } from "../lib/isTypingTarget";
+import { usePresenceStore } from "../lib/presenceStore";
 import { useCustomFont, type FontInfo } from "../lib/useCustomFont";
 import { MiniChat } from "../components/MiniChat";
 
@@ -84,6 +86,19 @@ function MessageMenu({
   const { user } = useAuth();
   const [open, setOpen] = useState(false);
   const [reacting, setReacting] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    function handleOutsideClick(e: MouseEvent) {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setOpen(false);
+        setReacting(false);
+      }
+    }
+    document.addEventListener("mousedown", handleOutsideClick);
+    return () => document.removeEventListener("mousedown", handleOutsideClick);
+  }, [open]);
 
   async function addReaction(emoji: Emoji) {
     setReacting(false);
@@ -94,7 +109,7 @@ function MessageMenu({
   }
 
   return (
-    <div className="message-menu" onClick={(e) => e.stopPropagation()}>
+    <div className="message-menu" ref={menuRef} onClick={(e) => e.stopPropagation()}>
       <button className="btn message-menu-trigger" onClick={() => setOpen((v) => !v)} title="More">
         ⋮
       </button>
@@ -262,7 +277,7 @@ function MessageGroup({
   );
 }
 
-export function ChannelPage({ channelSlug }: { channelSlug?: string } = {}) {
+export function ChannelPage({ channelSlug, fillHeight }: { channelSlug?: string; fillHeight?: boolean } = {}) {
   const params = useParams<{ slug: string }>();
   const slug = channelSlug ?? params.slug;
   const { user } = useAuth();
@@ -373,6 +388,17 @@ export function ChannelPage({ channelSlug }: { channelSlug?: string } = {}) {
   const wsRef = useRef<WebSocket | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
+  useEffect(() => {
+    if (!user) return;
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key !== "Enter" || isTypingTarget(e.target)) return;
+      e.preventDefault();
+      textareaRef.current?.focus();
+    }
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [user]);
+
   function toggleDisplayMode() {
     const next = displayMode === "standard" ? "grouped" : "standard";
     setDisplayMode(next);
@@ -410,6 +436,13 @@ export function ChannelPage({ channelSlug }: { channelSlug?: string } = {}) {
     if (mode === "search" && activeSearch) params.set("q", activeSearch);
     api<MessageDTO[]>(`/api/channels/${slug}/messages?${params}`).then(setMessages);
   }, [slug, mode, selectedDay, activeSearch]);
+
+  const reportViewing = usePresenceStore((s) => s.reportViewing);
+  useEffect(() => {
+    if (!slug) return;
+    reportViewing(mode === "live" ? slug : null);
+    return () => reportViewing(null);
+  }, [slug, mode, reportViewing]);
 
   // Only the live view stays subscribed — browsing history or search
   // shouldn't be interrupted by new messages arriving underneath you.
@@ -531,8 +564,8 @@ export function ChannelPage({ channelSlug }: { channelSlug?: string } = {}) {
   }
 
   return (
-    <div style={{ fontFamily }}>
-      <div style={{ display: "flex", gap: "0.6rem", marginBottom: "1rem", flexWrap: "wrap" }}>
+    <div style={fillHeight ? { fontFamily, display: "flex", flexDirection: "column", height: "100%", minHeight: 0 } : { fontFamily }}>
+      <div style={{ display: "flex", gap: "0.6rem", marginBottom: fillHeight ? "0.6rem" : "1rem", flexWrap: "wrap", flexShrink: 0 }}>
         <button className={`btn ${mode === "live" ? "btn-primary" : ""}`} onClick={() => setMode("live")}>
           Live
         </button>
@@ -566,7 +599,7 @@ export function ChannelPage({ channelSlug }: { channelSlug?: string } = {}) {
         )}
       </div>
 
-      <div className="message-list">
+      <div className="message-list" style={fillHeight ? { flex: 1, minHeight: 0, overflowY: "auto", maxWidth: "none" } : undefined}>
         {messages.length === 0 && <p style={{ color: "var(--text-dim)" }}>Nothing here yet.</p>}
         {mode === "search" ? (
           messages.map((m) => (
@@ -584,7 +617,20 @@ export function ChannelPage({ channelSlug }: { channelSlug?: string } = {}) {
       </div>
 
       {user && mode === "live" && (
-        <form onSubmit={handleSend} style={{ marginTop: "1rem", display: "flex", flexDirection: "column", gap: "0.4rem", maxWidth: 720, position: "relative" }}>
+        <form
+          onSubmit={handleSend}
+          style={{
+            marginTop: fillHeight ? 0 : "1rem",
+            paddingTop: fillHeight ? "0.5rem" : 0,
+            borderTop: fillHeight ? "1px solid var(--border)" : "none",
+            flexShrink: 0,
+            display: "flex",
+            flexDirection: "column",
+            gap: "0.4rem",
+            maxWidth: fillHeight ? undefined : 720,
+            position: "relative",
+          }}
+        >
           {replyTarget && (
             <div style={{ fontSize: "0.8rem", color: "var(--text-dim)", display: "flex", gap: "0.4rem", alignItems: "center" }}>
               Replying to <strong>{replyTarget.authorUsername}</strong>: {replyTarget.excerpt}
@@ -617,14 +663,16 @@ export function ChannelPage({ channelSlug }: { channelSlug?: string } = {}) {
               onChange={handleDraftChange}
               onPaste={handlePaste}
               onKeyDown={(e) => {
-                if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
+                if (e.key === "Enter" && !e.shiftKey && !e.ctrlKey && !e.metaKey) {
                   e.preventDefault();
                   void sendMessage();
                 }
+                // Shift+Enter or Ctrl/Cmd+Enter: fall through to the
+                // textarea's own default behavior, which inserts a newline.
               }}
               rows={2}
               style={{ flex: 1 }}
-              placeholder="Write a message… (**bold**, *italic*, `code`, > quote, :emoji:, Ctrl+Enter to send)"
+              placeholder="Write a message… (**bold**, *italic*, `code`, > quote, :emoji:, Enter to send, Shift/Ctrl+Enter for a new line)"
             />
             <button className="btn btn-primary" type="submit">
               Send
