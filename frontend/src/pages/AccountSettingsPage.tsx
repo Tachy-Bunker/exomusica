@@ -1,8 +1,10 @@
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import { api, ApiError } from "../lib/api";
 import { useAuth } from "../lib/auth";
 import { useNotificationWidgetVisibility } from "../lib/notificationWidgetVisibility";
+import { useProfileStore } from "../lib/profileStore";
+import { Avatar } from "../components/Avatar";
 
 interface FollowedChannel {
   slug: string;
@@ -13,6 +15,7 @@ interface FollowedChannel {
 interface Me {
   username: string;
   email: string;
+  avatarUrl: string | null;
   notifyWeeklySummary: boolean;
   notifyDailySummary: boolean;
   notifyFollowedReplies: boolean;
@@ -50,6 +53,29 @@ export function AccountSettingsPage() {
   const [sounds, setSounds] = useState<Sound[]>([]);
   const widgetHidden = useNotificationWidgetVisibility((s) => s.hidden);
   const setWidgetHidden = useNotificationWidgetVisibility((s) => s.setHidden);
+  const setProfileAvatarUrl = useProfileStore((s) => s.setAvatarUrl);
+  const avatarInputRef = useRef<HTMLInputElement>(null);
+  const [avatarError, setAvatarError] = useState<string | null>(null);
+
+  async function uploadAvatar() {
+    const file = avatarInputRef.current?.files?.[0];
+    if (!file) return;
+    if (file.size > 1024 * 1024) {
+      setAvatarError("Image must be 1MB or smaller.");
+      return;
+    }
+    setAvatarError(null);
+    const formData = new FormData();
+    formData.append("file", file);
+    try {
+      const result = await api<{ avatarUrl: string }>("/api/account/avatar", { method: "POST", body: formData });
+      setMe((prev) => (prev ? { ...prev, avatarUrl: result.avatarUrl } : prev));
+      setProfileAvatarUrl(result.avatarUrl);
+      if (avatarInputRef.current) avatarInputRef.current.value = "";
+    } catch (err) {
+      setAvatarError(err instanceof ApiError ? err.message : "Upload failed");
+    }
+  }
 
   useEffect(() => {
     api<Me>("/api/account/me").then(setMe);
@@ -131,6 +157,18 @@ export function AccountSettingsPage() {
       <p style={{ color: "var(--text-dim)", fontSize: "0.9rem" }}>
         {me.username} — {me.email}
       </p>
+
+      <div style={{ display: "flex", alignItems: "center", gap: "0.8rem", marginBottom: "1rem" }}>
+        <Avatar url={me.avatarUrl} size={56} />
+        <div>
+          <input ref={avatarInputRef} type="file" accept="image/jpeg,image/png,image/webp" style={{ fontSize: "0.75rem" }} />
+          <button className="btn" style={{ display: "block", marginTop: "0.3rem" }} onClick={uploadAvatar}>
+            Change picture
+          </button>
+          <p style={{ fontSize: "0.7rem", color: "var(--text-dim)", margin: "0.2rem 0 0" }}>JPG, PNG, or WEBP, 1MB max.</p>
+          {avatarError && <p style={{ fontSize: "0.75rem", color: "var(--accent-danger)" }}>{avatarError}</p>}
+        </div>
+      </div>
 
       <h2 style={{ fontSize: "1rem" }}>Email notifications</h2>
       {checkbox("notifyWeeklySummary", "Weekly activity summary")}
@@ -215,6 +253,17 @@ export function AccountSettingsPage() {
           Update password
         </button>
       </form>
+
+      <h2 style={{ fontSize: "1rem", marginTop: "1.5rem" }}>Session</h2>
+      <button
+        className="btn"
+        onClick={() => {
+          logout();
+          navigate("/");
+        }}
+      >
+        Log out
+      </button>
 
       <h2 style={{ fontSize: "1rem", marginTop: "1.5rem" }}>Danger zone</h2>
       <button className="btn btn-danger" onClick={handleDeleteAccount}>

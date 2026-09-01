@@ -1024,3 +1024,28 @@ th {
   top: 74px;
   left: 37px;
 }
+
+@media (min-width: 900px) {
+  .top-nav .brand {
+    font-size: 2.5rem;
+  }
+  .top-nav nav {
+    font-size: 1.8rem;
+    gap: 1.6rem;
+  }
+  .channel-toolbar .btn {
+    font-size: 1.8rem;
+    padding: 0.5rem 1rem;
+  }
+}
+
+.unread-dot {
+  position: absolute;
+  top: -2px;
+  right: -3px;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--accent-danger);
+  animation: presence-pulse 1.6s ease-out infinite;
+}

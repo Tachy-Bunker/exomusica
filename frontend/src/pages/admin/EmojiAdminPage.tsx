@@ -30,8 +30,18 @@ export function EmojiAdminPage() {
     }
   }
 
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [editName, setEditName] = useState("");
+
   async function handleDelete(id: number) {
     await api(`/api/admin/emojis/${id}`, { method: "DELETE" });
+    await refresh();
+  }
+
+  async function handleRename(id: number) {
+    if (!editName.trim()) return;
+    await api(`/api/admin/emojis/${id}`, { method: "PATCH", body: JSON.stringify({ name: editName.trim() }) });
+    setEditingId(null);
     await refresh();
   }
 
@@ -54,9 +64,37 @@ export function EmojiAdminPage() {
         {emojis.map((e) => (
           <div key={e.id} style={{ textAlign: "center" }}>
             <img src={e.imageUrl} alt={e.name} style={{ width: 32, height: 32, objectFit: "contain" }} />
-            <div className="mono" style={{ fontSize: "0.7rem", color: "var(--text-dim)" }}>
-              :{e.name}:
-            </div>
+            {editingId === e.id ? (
+              <div>
+                <input
+                  autoFocus
+                  value={editName}
+                  onChange={(ev) => setEditName(ev.target.value)}
+                  onKeyDown={(ev) => ev.key === "Enter" && handleRename(e.id)}
+                  style={{ width: "90%", fontSize: "0.75rem" }}
+                />
+                <div>
+                  <button className="btn" style={{ fontSize: "0.65rem", padding: "0.1rem 0.3rem" }} onClick={() => handleRename(e.id)}>
+                    save
+                  </button>{" "}
+                  <button className="btn" style={{ fontSize: "0.65rem", padding: "0.1rem 0.3rem" }} onClick={() => setEditingId(null)}>
+                    cancel
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div
+                className="mono"
+                style={{ fontSize: "0.7rem", color: "var(--text-dim)", cursor: "pointer" }}
+                onClick={() => {
+                  setEditingId(e.id);
+                  setEditName(e.name);
+                }}
+                title="Click to rename"
+              >
+                :{e.name}:
+              </div>
+            )}
             <button className="btn btn-danger" style={{ fontSize: "0.7rem", padding: "0.1rem 0.4rem" }} onClick={() => handleDelete(e.id)}>
               delete
             </button>

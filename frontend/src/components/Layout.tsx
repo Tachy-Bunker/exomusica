@@ -4,6 +4,8 @@ import { api } from "../lib/api";
 import { useAuth } from "../lib/auth";
 import { useCustomFont } from "../lib/useCustomFont";
 import { useAmbienceStore } from "../lib/ambienceStore";
+import { useProfileStore } from "../lib/profileStore";
+import { Avatar } from "./Avatar";
 import { useAudioStore } from "../lib/audioStore";
 import { useEmojiStore } from "../lib/emojiStore";
 import { useGlobalPlayerShortcuts } from "../lib/useGlobalPlayerShortcuts";
@@ -16,7 +18,7 @@ import { OnlineOrbs } from "./OnlineOrbs";
 import { PlayerBar } from "./PlayerBar";
 
 export function Layout() {
-  const { user, logout } = useAuth();
+  const { user } = useAuth();
   const loadEmojis = useEmojiStore((s) => s.load);
   useGlobalPlayerShortcuts();
 
@@ -36,6 +38,16 @@ export function Layout() {
   useEffect(() => {
     if (user) connectPresence();
   }, [user, connectPresence]);
+
+  const avatarUrl = useProfileStore((s) => s.avatarUrl);
+  const hasUnreadPms = useProfileStore((s) => s.hasUnreadPms);
+  const refreshProfile = useProfileStore((s) => s.refresh);
+  useEffect(() => {
+    if (!user) return;
+    refreshProfile();
+    const interval = setInterval(refreshProfile, 20000);
+    return () => clearInterval(interval);
+  }, [user, refreshProfile]);
 
   const [siteFont, setSiteFont] = useState<{ familyName: string; fileUrl: string; format: string } | null>(null);
   useEffect(() => {
@@ -58,8 +70,13 @@ export function Layout() {
     // that in would make --font-body reference itself: an invalid CSS
     // custom property that silently falls back to the browser default
     // instead of the chosen font.
-    if (siteFont) document.documentElement.style.setProperty("--font-body", `"${siteFont.familyName}"`);
-    else document.documentElement.style.removeProperty("--font-body");
+    if (siteFont) {
+      document.documentElement.style.setProperty("--font-body", `"${siteFont.familyName}"`);
+      document.documentElement.style.setProperty("--font-display", `"${siteFont.familyName}"`);
+    } else {
+      document.documentElement.style.removeProperty("--font-body");
+      document.documentElement.style.removeProperty("--font-display");
+    }
   }, [siteFont]);
 
   return (
@@ -81,11 +98,13 @@ export function Layout() {
         {user ? (
           <>
             {user.isAdmin && <Link to="/admin">Admin</Link>}
-            <Link to="/pms">Messages</Link>
-            <Link to="/account">{user.username}</Link>
-            <button className="btn" onClick={logout}>
-              Log out
-            </button>
+            <Link to="/pms" style={{ position: "relative", display: "inline-flex" }} title="Messages">
+              ✉️
+              {hasUnreadPms && <span className="unread-dot" />}
+            </Link>
+            <Link to="/account" title={user.username}>
+              <Avatar url={avatarUrl} />
+            </Link>
           </>
         ) : (
           <Link to="/login">Log in</Link>

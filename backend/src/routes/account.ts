@@ -3,6 +3,7 @@ import { prisma } from "../lib/prisma.js";
 import { requireAuth, requireAdmin, hashPassword, verifyPassword } from "../lib/auth.js";
 import { ghostifyUser } from "../services/accountService.js";
 import { createNotification } from "../lib/notify.js";
+import { saveSiteImage } from "../lib/storage.js";
 
 export async function accountRoutes(app: FastifyInstance): Promise<void> {
   // Self view — includes email and notification prefs, unlike the public
@@ -14,6 +15,26 @@ export async function accountRoutes(app: FastifyInstance): Promise<void> {
     });
     return follows.map((f) => f.channel.slug);
   });
+
+  // Deliberately tighter than the site's general 10MB body limit — an
+  // avatar has no reason to be that large, and a small explicit cap here
+  // keeps profile pictures fast to load everywhere they're shown (header,
+  // messages, profile).
+  app.post(
+    "/api/account/avatar",
+    { preHandler: requireAuth, bodyLimit: 1024 * 1024 },
+    async (req, reply) => {
+      const file = await req.file();
+      if (!file) return reply.code(400).send({ error: "no file uploaded" });
+      if (!["image/jpeg", "image/png", "image/webp"].includes(file.mimetype)) {
+        return reply.code(400).send({ error: "only JPG, PNG, or WEBP images are supported" });
+      }
+      const buffer = await file.toBuffer();
+      const { url } = await saveSiteImage(file.filename, file.mimetype, buffer, "avatars");
+      await prisma.user.update({ where: { id: req.user!.id }, data: { avatarUrl: url } });
+      return { avatarUrl: url };
+    },
+  );
 
   app.get("/api/account/me", { preHandler: requireAuth }, async (req, reply) => {
     const me = await prisma.user.findUnique({

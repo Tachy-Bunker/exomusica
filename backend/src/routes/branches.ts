@@ -75,7 +75,7 @@ export async function branchRoutes(app: FastifyInstance): Promise<void> {
       where: { branchId: branch.id },
       include: {
         tracks: {
-          include: { album: { include: { branch: true } }, bookmarks: true },
+          include: { album: { include: { branch: true } }, bookmarks: true, collaborators: { include: { collaborator: true } } },
           orderBy: { position: "asc" },
           take: 1,
         },

@@ -357,6 +357,8 @@ model WikiPage {
   updatedById     Int
   updatedBy       User       @relation("WikiEditor", fields: [updatedById], references: [id])
   updatedAt       DateTime   @updatedAt
+
+  siteSettings SiteSettings[]
 }
 
 model BlogPost {
@@ -504,6 +506,8 @@ model SiteSettings {
   defaultFont    CustomFont? @relation(fields: [defaultFontId], references: [id])
   ambienceUrl    String? // idle-landing ambient loop, plays when nothing else is
   scanSfxUrl     String? // spacemap text-reveal loop (branch lock-on + F/E/T hint)
+  defaultWikiPageId Int?
+  defaultWikiPage   WikiPage? @relation(fields: [defaultWikiPageId], references: [id])
 }
 
 model CustomFont {

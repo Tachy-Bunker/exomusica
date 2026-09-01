@@ -56,12 +56,20 @@ export function WikiAdminPage() {
     if (fileInputRef.current) fileInputRef.current.value = "";
   }
 
+  const [defaultWikiSlug, setDefaultWikiSlug] = useState<string | null>(null);
+
   function load() {
     api<WikiSummary[]>("/api/wiki").then(setPages);
     api<Font[]>("/api/fonts").then(setFonts);
+    api<{ defaultWikiPage: { slug: string } | null }>("/api/site-settings").then((s) => setDefaultWikiSlug(s.defaultWikiPage?.slug ?? null));
   }
 
   useEffect(load, []);
+
+  async function setDefaultWikiPage(pageId: number | null) {
+    await api("/api/admin/site-settings", { method: "PATCH", body: JSON.stringify({ defaultWikiPageId: pageId }) });
+    load();
+  }
 
   async function startEdit(p: WikiSummary) {
     const full = await api<WikiFull>(`/api/wiki/${p.slug}`);
@@ -114,6 +122,18 @@ export function WikiAdminPage() {
   return (
     <div>
       <h1>Wiki</h1>
+
+      <div className="field" style={{ maxWidth: 360 }}>
+        <label>Default page (opens when visiting "Wiki" with no page selected)</label>
+        <select value={defaultWikiSlug ? pages.find((p) => p.slug === defaultWikiSlug)?.id ?? "" : ""} onChange={(e) => setDefaultWikiPage(e.target.value ? Number(e.target.value) : null)}>
+          <option value="">— none, show the page list —</option>
+          {pages.map((p) => (
+            <option key={p.id} value={p.id}>
+              {p.title}
+            </option>
+          ))}
+        </select>
+      </div>
       <form onSubmit={handleSubmit} style={{ maxWidth: 480, marginBottom: "1.5rem" }}>
         <h3 style={{ fontSize: "0.9rem" }}>{editingId ? "Editing page" : "New page"}</h3>
         <div className="field">
@@ -161,7 +181,7 @@ export function WikiAdminPage() {
           </div>
           <textarea
             ref={textareaRef}
-            placeholder="# Title&#10;Markdown content…"
+            placeholder="# Title&#10;Markdown content… (or just @branch-index on its own for a live branch listing)"
             rows={6}
             required
             value={form.contentMarkdown}

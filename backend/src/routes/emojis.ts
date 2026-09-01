@@ -44,6 +44,16 @@ export async function emojiRoutes(app: FastifyInstance): Promise<void> {
     return reply.code(201).send({ created, errors });
   });
 
+  app.patch<{ Params: { id: string }; Body: { name: string } }>(
+    "/api/admin/emojis/:id",
+    { preHandler: requireAdmin },
+    async (req, reply) => {
+      const name = req.body?.name?.trim();
+      if (!name) return reply.code(400).send({ error: "name is required" });
+      return prisma.customEmoji.update({ where: { id: Number(req.params.id) }, data: { name } });
+    },
+  );
+
   app.delete<{ Params: { id: string } }>(
     "/api/admin/emojis/:id",
     { preHandler: requireAdmin },

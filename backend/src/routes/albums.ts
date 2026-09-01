@@ -10,7 +10,7 @@ export async function albumRoutes(app: FastifyInstance): Promise<void> {
   // just as a sanity limit rather than a real constraint.
   app.get("/api/tracks/shuffle", async () => {
     const tracks = await prisma.track.findMany({
-      include: { album: { include: { branch: true } }, bookmarks: true },
+      include: { album: { include: { branch: true } }, bookmarks: true, collaborators: { include: { collaborator: true } } },
       take: 500,
     });
     const shuffled = [...tracks];
@@ -29,7 +29,7 @@ export async function albumRoutes(app: FastifyInstance): Promise<void> {
     const albums = await prisma.album.findMany({ where: { branchId: branch.id }, select: { id: true } });
     const tracks = await prisma.track.findMany({
       where: { albumId: { in: albums.map((a) => a.id) } },
-      include: { album: { include: { branch: true } }, bookmarks: true },
+      include: { album: { include: { branch: true } }, bookmarks: true, collaborators: { include: { collaborator: true } } },
     });
     const shuffled = [...tracks];
     for (let i = shuffled.length - 1; i > 0; i--) {

@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import { api } from "../lib/api";
+import { useAuth } from "../lib/auth";
 import { useDocumentTitle } from "../lib/useDocumentTitle";
 
 interface Feature {
@@ -13,6 +15,7 @@ interface Feature {
 
 export function AboutPage() {
   useDocumentTitle("About");
+  const { user } = useAuth();
   const [features, setFeatures] = useState<Feature[]>([]);
 
   useEffect(() => {
@@ -26,6 +29,11 @@ export function AboutPage() {
         Exomusica is a platform for accessible experimental music — a laboratory where branches of sound each get
         their own space to talk and to release work.
       </p>
+      {!user && (
+        <Link to="/join" className="btn btn-primary" style={{ display: "inline-block", textDecoration: "none", marginBottom: "1rem" }}>
+          Join the collective
+        </Link>
+      )}
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: "1rem" }}>
         {features.map((f) => {

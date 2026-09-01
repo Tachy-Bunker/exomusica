@@ -5,18 +5,24 @@ import { saveSoundFile } from "../lib/storage.js";
 
 export async function siteSettingsRoutes(app: FastifyInstance): Promise<void> {
   app.get("/api/site-settings", async () => {
-    const settings = await prisma.siteSettings.findUnique({ where: { id: 1 }, include: { defaultFont: true } });
-    return settings ?? { id: 1, defaultFontId: null, defaultFont: null, ambienceUrl: null, scanSfxUrl: null };
+    const settings = await prisma.siteSettings.findUnique({
+      where: { id: 1 },
+      include: { defaultFont: true, defaultWikiPage: { select: { slug: true } } },
+    });
+    return settings ?? { id: 1, defaultFontId: null, defaultFont: null, ambienceUrl: null, scanSfxUrl: null, defaultWikiPage: null };
   });
 
-  app.patch<{ Body: { defaultFontId: number | null } }>(
+  app.patch<{ Body: Partial<{ defaultFontId: number | null; defaultWikiPageId: number | null }> }>(
     "/api/admin/site-settings",
     { preHandler: requireAdmin },
     async (req) => {
+      const data: { defaultFontId?: number | null; defaultWikiPageId?: number | null } = {};
+      if ("defaultFontId" in (req.body ?? {})) data.defaultFontId = req.body!.defaultFontId;
+      if ("defaultWikiPageId" in (req.body ?? {})) data.defaultWikiPageId = req.body!.defaultWikiPageId;
       return prisma.siteSettings.upsert({
         where: { id: 1 },
-        create: { id: 1, defaultFontId: req.body?.defaultFontId ?? null },
-        update: { defaultFontId: req.body?.defaultFontId ?? null },
+        create: { id: 1, ...data },
+        update: data,
       });
     },
   );

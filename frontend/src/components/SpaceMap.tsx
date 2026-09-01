@@ -4,6 +4,7 @@ import type { Branch } from "../lib/types";
 import { useIsDesktop } from "../lib/useIsDesktop";
 import { useChatDockStore } from "../lib/chatDockStore";
 import { useAmbienceStore } from "../lib/ambienceStore";
+import { GaplessLoop } from "../lib/GaplessLoop";
 import { useAudioStore } from "../lib/audioStore";
 import { api } from "../lib/api";
 import type { PlayableTrackDTO } from "../lib/types";
@@ -148,29 +149,20 @@ export function SpaceMap({ branches, centerLabel, centerHref }: { branches: Bran
   const [actionRevealedCount, setActionRevealedCount] = useState(0);
   const openChat = useChatDockStore((s) => s.openChat);
 
-  const scanSfxAudioRef = useRef<HTMLAudioElement | null>(null);
+  const scanSfxRef = useRef<GaplessLoop | null>(null);
   const [scanSfxUrl, setScanSfxUrl] = useState<string | null>(null);
 
   useEffect(() => {
     api<{ scanSfxUrl: string | null }>("/api/site-settings").then((s) => setScanSfxUrl(s.scanSfxUrl));
   }, []);
 
-  function fadeScanSfx(target: number) {
-    const audio = scanSfxAudioRef.current;
-    if (!audio) return;
-    const steps = 15;
-    const start = audio.volume;
-    let i = 0;
-    const interval = setInterval(() => {
-      i++;
-      audio.volume = Math.max(0, Math.min(1, start + ((target - start) * i) / steps));
-      if (i >= steps) {
-        clearInterval(interval);
-        audio.volume = target;
-        if (target === 0) audio.pause();
-      }
-    }, 400 / steps);
-  }
+  // Fully tears down the audio graph on unmount — leaving the browser to
+  // garbage-collect an Audio element on its own schedule (the previous
+  // approach) is exactly what let the loop keep sounding after navigating
+  // away and back.
+  useEffect(() => {
+    return () => scanSfxRef.current?.dispose();
+  }, []);
 
   function viewLockedDetails() {
     const node = lockedNodeRef.current;
@@ -233,26 +225,22 @@ export function SpaceMap({ branches, centerLabel, centerHref }: { branches: Bran
     return () => clearInterval(interval);
   }, [lockedNode, revealedCount]);
 
+  const wasRevealingRef = useRef(false);
   useEffect(() => {
     if (!scanSfxUrl) return;
     const isRevealing = !!lockedNode && (revealedCount < lockedNode.name.length || actionRevealedCount < ACTION_HINT.length);
+    if (isRevealing === wasRevealingRef.current) return; // no state change — don't re-trigger the fade
+    wasRevealingRef.current = isRevealing;
+
+    if (!scanSfxRef.current) scanSfxRef.current = new GaplessLoop();
+    const loop = scanSfxRef.current;
 
     if (isRevealing) {
-      let audio = scanSfxAudioRef.current;
-      if (!audio || audio.src !== scanSfxUrl) {
-        audio?.pause();
-        audio = new Audio(scanSfxUrl);
-        audio.loop = true;
-        audio.volume = 0;
-        scanSfxAudioRef.current = audio;
-      }
-      if (audio.paused) {
-        audio.volume = 0;
-        audio.play().catch(() => {});
-      }
-      fadeScanSfx(0.4);
+      loop.play(scanSfxUrl).then(() => {
+        if (wasRevealingRef.current) loop.fadeTo(0.4); // still wanted by the time loading finished
+      });
     } else {
-      fadeScanSfx(0);
+      loop.fadeTo(0);
     }
   }, [scanSfxUrl, lockedNode, revealedCount, actionRevealedCount]);
 

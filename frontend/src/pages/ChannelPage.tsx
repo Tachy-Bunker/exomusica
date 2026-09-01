@@ -582,7 +582,7 @@ export function ChannelPage({ channelSlug, fillHeight }: { channelSlug?: string;
   return (
     <LinkClickContext.Provider value={setLinkPreviewUrl}>
     <div style={fillHeight ? { fontFamily, display: "flex", flexDirection: "column", height: "100%", minHeight: 0 } : { fontFamily }}>
-      <div style={{ display: "flex", gap: "0.6rem", marginBottom: fillHeight ? "0.6rem" : "1rem", flexWrap: "wrap", flexShrink: 0, alignItems: "center" }}>
+      <div className="channel-toolbar" style={{ display: "flex", gap: "0.6rem", marginBottom: fillHeight ? "0.6rem" : "1rem", flexWrap: "wrap", flexShrink: 0, alignItems: "center" }}>
         <TopicSwitcher label="Branches" />
         <button className={`btn ${mode === "live" ? "btn-primary" : ""}`} onClick={() => setMode("live")}>
           Live

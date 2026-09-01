@@ -6,11 +6,12 @@ type TrackWithRelations = Awaited<ReturnType<typeof fetchTracksByIds>>[number];
 async function fetchTracksByIds(ids: number[]) {
   return prisma.track.findMany({
     where: { id: { in: ids } },
-    include: { album: { include: { branch: true } }, bookmarks: true },
+    include: { album: { include: { branch: true } }, bookmarks: true, collaborators: { include: { collaborator: true } } },
   });
 }
 
 export function trackToDTO(t: TrackWithRelations): PlayableTrackDTO {
+  const perTrackComposers = t.collaborators.map((c) => c.collaborator.name);
   return {
     id: t.id,
     title: t.title,
@@ -20,7 +21,7 @@ export function trackToDTO(t: TrackWithRelations): PlayableTrackDTO {
     position: t.position,
     albumTitle: t.album.title,
     albumSlug: t.album.slug,
-    composer: t.album.composer,
+    composer: perTrackComposers.length > 0 ? perTrackComposers.join(", ") : t.album.composer,
     branchSlug: t.album.branch.slug,
     bookmarks: t.bookmarks.map((b) => ({ label: b.label, timestampSeconds: b.timestampSeconds })),
   };

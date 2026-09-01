@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
-import { useParams, Link } from "react-router-dom";
+import { useParams, useNavigate, Link } from "react-router-dom";
 import { api } from "../lib/api";
 import { renderMarkdown } from "../lib/markdown";
 import { useCustomFont, type FontInfo } from "../lib/useCustomFont";
+import { BranchIndexList } from "../components/BranchIndexList";
 
 interface WikiSummary {
   id: number;
@@ -18,6 +19,7 @@ interface WikiFull extends WikiSummary {
 
 export function WikiPage() {
   const { slug } = useParams<{ slug?: string }>();
+  const navigate = useNavigate();
   const [pages, setPages] = useState<WikiSummary[]>([]);
   const [current, setCurrent] = useState<WikiFull | null>(null);
   const fontFamily = useCustomFont(current?.font);
@@ -25,6 +27,13 @@ export function WikiPage() {
   useEffect(() => {
     api<WikiSummary[]>("/api/wiki").then(setPages);
   }, []);
+
+  useEffect(() => {
+    if (slug) return;
+    api<{ defaultWikiPage: { slug: string } | null }>("/api/site-settings").then((s) => {
+      if (s.defaultWikiPage) navigate(`/wiki/${s.defaultWikiPage.slug}`, { replace: true });
+    });
+  }, [slug, navigate]);
 
   useEffect(() => {
     if (!slug) {
@@ -60,7 +69,8 @@ export function WikiPage() {
       <div style={{ fontFamily }}>
         {!slug && <p style={{ color: "var(--text-dim)" }}>Pick a page from the list.</p>}
         {slug && !current && <p>Loading…</p>}
-        {current && renderMarkdown(current.contentMarkdown)}
+        {current &&
+          (current.contentMarkdown.trim() === "@branch-index" ? <BranchIndexList /> : renderMarkdown(current.contentMarkdown))}
       </div>
     </div>
   );

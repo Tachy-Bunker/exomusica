@@ -73,7 +73,7 @@ export function ChatDock() {
           padding: "0.4rem 0.6rem",
           borderBottom: "1px solid var(--border)",
           fontFamily: "var(--font-display)",
-          fontSize: "0.9rem",
+          fontSize: "1.8rem",
         }}
       >
         <span>

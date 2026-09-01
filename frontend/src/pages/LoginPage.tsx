@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../lib/auth";
 import { ApiError } from "../lib/api";
 
@@ -47,6 +47,9 @@ export function LoginPage() {
           {busy ? "Logging in…" : "Log in"}
         </button>
       </form>
+      <p style={{ marginTop: "1rem", fontSize: "0.9rem", color: "var(--text-dim)" }}>
+        Not a member yet? <Link to="/join">Join the collective</Link>
+      </p>
     </div>
   );
 }
