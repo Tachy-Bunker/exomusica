@@ -1,8 +1,10 @@
 import { useEffect, useState } from "react";
-import { useParams, Link } from "react-router-dom";
+import { useParams, Link, useNavigate } from "react-router-dom";
 import { api } from "../lib/api";
 import { useAudioStore } from "../lib/audioStore";
 import { useDocumentTitle } from "../lib/useDocumentTitle";
+import { useIsDesktop } from "../lib/useIsDesktop";
+import { isTypingTarget } from "../lib/isTypingTarget";
 import type { PlayableTrackDTO } from "../lib/types";
 
 interface TrackWithComposers extends PlayableTrackDTO {
@@ -25,6 +27,8 @@ interface AlbumDetail {
 
 export function AlbumPage() {
   const { slug } = useParams<{ slug: string }>();
+  const navigate = useNavigate();
+  const isDesktop = useIsDesktop();
   const [album, setAlbum] = useState<AlbumDetail | null>(null);
   const play = useAudioStore((s) => s.play);
   const addToQueue = useAudioStore((s) => s.addToQueue);
@@ -36,12 +40,23 @@ export function AlbumPage() {
 
   useDocumentTitle(album?.title ?? "");
 
+  useEffect(() => {
+    if (!isDesktop || !album) return;
+    function handleKeyDown(e: KeyboardEvent) {
+      if (isTypingTarget(e.target)) return;
+      if (e.code === "KeyR") navigate(`/branch/${album!.branch.slug}`);
+    }
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isDesktop, album, navigate]);
+
   if (!album) return <p>Loading…</p>;
 
   return (
     <div style={{ maxWidth: 720 }}>
       <Link to={`/branch/${album.branch.slug}`} style={{ fontSize: "0.85rem" }}>
         ← {album.branch.name}
+        {isDesktop && " (R)"}
       </Link>
       <div style={{ display: "flex", gap: "1.2rem", marginTop: "0.6rem" }}>
         <div

@@ -1,12 +1,11 @@
 import { useEffect, useRef, useState, useContext, createContext, type ChangeEvent, type ClipboardEvent, type FormEvent } from "react";
-import { Link, useParams, useSearchParams } from "react-router-dom";
+import { Link, useParams, useSearchParams, useNavigate } from "react-router-dom";
 import { api } from "../lib/api";
 import { useAuth } from "../lib/auth";
 import { useAudioStore } from "../lib/audioStore";
 import { renderMessageContent } from "../lib/formatMessage";
 import { EmojiPicker } from "../components/EmojiPicker";
 import { AttachmentPreview } from "../components/AttachmentPreview";
-import { LinkEmbedPreview } from "../components/LinkEmbedPreview";
 import { ArchiveCalendar } from "../components/ArchiveCalendar";
 import { SearchBox } from "../components/SearchBox";
 import { TopicSwitcher } from "../components/TopicSwitcher";
@@ -402,7 +401,7 @@ export function ChannelPage({ channelSlug, fillHeight }: { channelSlug?: string;
   }
   useDocumentTitle(channelName ?? "");
   const wsRef = useRef<WebSocket | null>(null);
-  const [linkPreviewUrl, setLinkPreviewUrl] = useState<string | null>(null);
+  const navigate = useNavigate();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
@@ -591,7 +590,7 @@ export function ChannelPage({ channelSlug, fillHeight }: { channelSlug?: string;
   }
 
   return (
-    <LinkClickContext.Provider value={setLinkPreviewUrl}>
+    <LinkClickContext.Provider value={navigate}>
     <div style={fillHeight ? { fontFamily, display: "flex", flexDirection: "column", height: "100%", minHeight: 0 } : { fontFamily }}>
       <div className="channel-toolbar" style={{ display: "flex", gap: "0.6rem", marginBottom: fillHeight ? "0.6rem" : "1rem", flexWrap: "wrap", flexShrink: 0, alignItems: "center" }}>
         <TopicSwitcher />
@@ -639,7 +638,6 @@ export function ChannelPage({ channelSlug, fillHeight }: { channelSlug?: string;
         </button>
       </div>
 
-      {linkPreviewUrl && <LinkEmbedPreview url={linkPreviewUrl} onClose={() => setLinkPreviewUrl(null)} />}
 
       <div
         className="message-list"

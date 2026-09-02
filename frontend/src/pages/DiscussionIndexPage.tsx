@@ -50,7 +50,7 @@ export function DiscussionIndexPage() {
         </div>
       ))}
 
-      <h2 style={{ fontSize: "1rem", color: "var(--accent-audio)", marginTop: "1.5rem" }}>Branches</h2>
+      <h2 style={{ fontSize: "1rem", color: "var(--text)", marginTop: "1.5rem" }}>Branches</h2>
       {branches.length === 0 && <p style={{ color: "var(--text-dim)" }}>No branches yet.</p>}
       <ul style={{ listStyle: "none", padding: 0 }}>
         {branches.map((b) => (

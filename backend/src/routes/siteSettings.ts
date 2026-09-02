@@ -9,23 +9,37 @@ export async function siteSettingsRoutes(app: FastifyInstance): Promise<void> {
       where: { id: 1 },
       include: { defaultFont: true, defaultWikiPage: { select: { slug: true } } },
     });
-    return settings ?? { id: 1, defaultFontId: null, defaultFont: null, ambienceUrl: null, scanSfxUrl: null, defaultWikiPage: null };
+    return (
+      settings ?? {
+        id: 1,
+        defaultFontId: null,
+        defaultFont: null,
+        ambienceUrl: null,
+        scanSfxUrl: null,
+        defaultWikiPage: null,
+        textColorPrimary: null,
+        textColorSecondary: null,
+        chatTitleColor: null,
+      }
+    );
   });
 
-  app.patch<{ Body: Partial<{ defaultFontId: number | null; defaultWikiPageId: number | null }> }>(
-    "/api/admin/site-settings",
-    { preHandler: requireAdmin },
-    async (req) => {
-      const data: { defaultFontId?: number | null; defaultWikiPageId?: number | null } = {};
-      if ("defaultFontId" in (req.body ?? {})) data.defaultFontId = req.body!.defaultFontId;
-      if ("defaultWikiPageId" in (req.body ?? {})) data.defaultWikiPageId = req.body!.defaultWikiPageId;
-      return prisma.siteSettings.upsert({
-        where: { id: 1 },
-        create: { id: 1, ...data },
-        update: data,
-      });
-    },
-  );
+  app.patch<{
+    Body: Partial<{
+      defaultFontId: number | null;
+      defaultWikiPageId: number | null;
+      textColorPrimary: string | null;
+      textColorSecondary: string | null;
+      chatTitleColor: string | null;
+    }>;
+  }>("/api/admin/site-settings", { preHandler: requireAdmin }, async (req) => {
+    const data: Record<string, unknown> = {};
+    const body = req.body ?? {};
+    for (const key of ["defaultFontId", "defaultWikiPageId", "textColorPrimary", "textColorSecondary", "chatTitleColor"] as const) {
+      if (key in body) data[key] = body[key];
+    }
+    return prisma.siteSettings.upsert({ where: { id: 1 }, create: { id: 1, ...data }, update: data });
+  });
 
   app.post("/api/admin/site-settings/ambience", { preHandler: requireAdmin }, async (req, reply) => {
     const file = await req.file();

@@ -33,16 +33,36 @@ export function FontsAdminPage() {
   const ambienceInputRef = useRef<HTMLInputElement>(null);
   const [scanSfxUrl, setScanSfxUrl] = useState<string | null>(null);
   const scanSfxInputRef = useRef<HTMLInputElement>(null);
+  const [textColorPrimary, setTextColorPrimary] = useState("#eef1fb");
+  const [textColorSecondary, setTextColorSecondary] = useState("#a89ec2");
+  const [chatTitleColor, setChatTitleColor] = useState("#eef1fb");
 
   function load() {
     api<Font[]>("/api/fonts").then(setFonts);
-    api<{ defaultFontId: number | null; ambienceUrl: string | null; scanSfxUrl: string | null }>("/api/site-settings").then((s) => {
+    api<{
+      defaultFontId: number | null;
+      ambienceUrl: string | null;
+      scanSfxUrl: string | null;
+      textColorPrimary: string | null;
+      textColorSecondary: string | null;
+      chatTitleColor: string | null;
+    }>("/api/site-settings").then((s) => {
       setSiteDefaultFontId(s.defaultFontId);
       setAmbienceUrl(s.ambienceUrl);
       setScanSfxUrl(s.scanSfxUrl);
+      if (s.textColorPrimary) setTextColorPrimary(s.textColorPrimary);
+      if (s.textColorSecondary) setTextColorSecondary(s.textColorSecondary);
+      if (s.chatTitleColor) setChatTitleColor(s.chatTitleColor);
     });
   }
   useEffect(load, []);
+
+  async function saveColors() {
+    await api("/api/admin/site-settings", {
+      method: "PATCH",
+      body: JSON.stringify({ textColorPrimary, textColorSecondary, chatTitleColor }),
+    });
+  }
 
   async function uploadScanSfx() {
     const file = scanSfxInputRef.current?.files?.[0];
@@ -168,6 +188,28 @@ export function FontsAdminPage() {
             {scanSfxUrl ? "Replace" : "Upload"}
           </button>
         </div>
+      </div>
+
+      <div className="field" style={{ maxWidth: 420 }}>
+        <label>Text colors</label>
+        <p style={{ fontSize: "0.75rem", color: "var(--text-dim)", marginTop: 0 }}>
+          Primary and secondary apply site-wide. The third is specific to the chat dock's branch title.
+        </p>
+        <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.4rem" }}>
+          <input type="color" value={textColorPrimary} onChange={(e) => setTextColorPrimary(e.target.value)} />
+          <span style={{ fontSize: "0.8rem" }}>Primary text</span>
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.4rem" }}>
+          <input type="color" value={textColorSecondary} onChange={(e) => setTextColorSecondary(e.target.value)} />
+          <span style={{ fontSize: "0.8rem" }}>Secondary text</span>
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.4rem" }}>
+          <input type="color" value={chatTitleColor} onChange={(e) => setChatTitleColor(e.target.value)} />
+          <span style={{ fontSize: "0.8rem" }}>Chat branch title</span>
+        </div>
+        <button className="btn btn-primary" onClick={saveColors}>
+          Save colors
+        </button>
       </div>
 
       <div style={{ display: "flex", gap: "0.5rem", marginBottom: "1rem" }}>

@@ -57,9 +57,19 @@ export function Layout() {
 
   const [siteFont, setSiteFont] = useState<{ familyName: string; fileUrl: string; format: string } | null>(null);
   useEffect(() => {
-    api<{ defaultFont: typeof siteFont; ambienceUrl: string | null }>("/api/site-settings").then((s) => {
+    api<{
+      defaultFont: typeof siteFont;
+      ambienceUrl: string | null;
+      textColorPrimary: string | null;
+      textColorSecondary: string | null;
+      chatTitleColor: string | null;
+    }>("/api/site-settings").then((s) => {
       setSiteFont(s.defaultFont);
       useAmbienceStore.getState().setUrl(s.ambienceUrl);
+      const root = document.documentElement.style;
+      if (s.textColorPrimary) root.setProperty("--text", s.textColorPrimary);
+      if (s.textColorSecondary) root.setProperty("--text-dim", s.textColorSecondary);
+      if (s.chatTitleColor) root.setProperty("--chat-title-color", s.chatTitleColor);
     });
   }, []);
   useCustomFont(siteFont); // still needed for its @font-face injection side effect

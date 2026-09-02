@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState, type ChangeEvent, type FormEvent } from "react";
-import { useParams, Link } from "react-router-dom";
+import { useParams, Link, useNavigate } from "react-router-dom";
 import { api } from "../lib/api";
 import { AttachmentPreview } from "../components/AttachmentPreview";
+import { renderMessageContent } from "../lib/formatMessage";
 
 interface Conversation {
   partner: string;
@@ -20,6 +21,7 @@ interface ThreadMessage {
 
 export function PMsPage() {
   const { username } = useParams<{ username?: string }>();
+  const navigate = useNavigate();
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [thread, setThread] = useState<ThreadMessage[]>([]);
   const [draft, setDraft] = useState("");
@@ -102,7 +104,7 @@ export function PMsPage() {
                     maxWidth: "70%",
                   }}
                 >
-                  {m.contentRaw}
+                  {renderMessageContent(m.contentRaw, navigate)}
                   {m.attachments.map((a) => (
                     <AttachmentPreview key={a.id} attachment={a} />
                   ))}

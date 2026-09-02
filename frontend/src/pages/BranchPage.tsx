@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useParams, Link } from "react-router-dom";
+import { useParams, Link, useNavigate } from "react-router-dom";
 import { api } from "../lib/api";
 import { useAudioStore } from "../lib/audioStore";
 import type { Branch, BranchAlbum, PlayableTrackDTO } from "../lib/types";
@@ -10,9 +10,11 @@ import { useCustomFont } from "../lib/useCustomFont";
 import { useChatDockStore } from "../lib/chatDockStore";
 import { useIsDesktop } from "../lib/useIsDesktop";
 import { BranchIntroOverlay } from "../components/BranchIntroOverlay";
+import { isTypingTarget } from "../lib/isTypingTarget";
 
 export function BranchPage() {
   const { slug } = useParams<{ slug: string }>();
+  const navigate = useNavigate();
   const [branch, setBranch] = useState<Branch | null>(null);
   const [albums, setAlbums] = useState<BranchAlbum[]>([]);
   const play = useAudioStore((s) => s.play);
@@ -71,10 +73,23 @@ export function BranchPage() {
 
   useDocumentTitle(branch?.name ?? "");
 
+  useEffect(() => {
+    if (!isDesktop) return;
+    function handleKeyDown(e: KeyboardEvent) {
+      if (isTypingTarget(e.target)) return;
+      if (e.code === "KeyR") navigate("/");
+    }
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isDesktop, navigate]);
+
   if (!branch) return <p>Loading…</p>;
 
   return (
     <div style={{ fontFamily }}>
+      <p style={{ marginBottom: "0.5rem" }}>
+        <Link to="/">{isDesktop ? "← back to Exo-Lands (R)" : "← Back to Exo-Lands"}</Link>
+      </p>
       <h1>{branch.name}</h1>
       {branch.description && <p style={{ color: "var(--text-dim)", maxWidth: 640 }}>{branch.description}</p>}
 

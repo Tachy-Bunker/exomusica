@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
+import { useNavigate } from "react-router-dom";
 import { api } from "../lib/api";
 import { renderMessageContent } from "../lib/formatMessage";
 import type { MessageDTO } from "../lib/types";
@@ -12,6 +13,7 @@ function upsertMessage(list: MessageDTO[], msg: MessageDTO): MessageDTO[] {
 }
 
 export function MiniChat({ slug, channelName }: { slug: string; channelName: string }) {
+  const navigate = useNavigate();
   const [messages, setMessages] = useState<MessageDTO[]>([]);
   const [draft, setDraft] = useState("");
   const listRef = useRef<HTMLDivElement>(null);
@@ -52,7 +54,7 @@ export function MiniChat({ slug, channelName }: { slug: string; channelName: str
             <span className="mono" style={{ fontSize: "0.7rem", color: "var(--text-dim)" }}>
               {new Date(m.unixTimestamp * 1000).toLocaleTimeString()}
             </span>
-            <div>{m.isDeleted ? <em style={{ color: "var(--text-dim)" }}>message deleted</em> : renderMessageContent(m.contentRaw)}</div>
+            <div>{m.isDeleted ? <em style={{ color: "var(--text-dim)" }}>message deleted</em> : renderMessageContent(m.contentRaw, navigate)}</div>
           </div>
         ))}
       </div>

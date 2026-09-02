@@ -27,16 +27,33 @@ const INLINE_PATTERN =
 // them to real names needs a bulk id->name lookup endpoint that doesn't
 // exist yet (the current /api/users/:username route is keyed the other
 // way). Small, cheap follow-up; not done here.
-function renderInline(text: string, keyPrefix: string, onLinkClick?: (url: string) => void): ReactNode[] {
+// Same-origin URLs get a real in-app path back (no leading domain), so the
+// caller can navigate() there without a full page reload. Anything else
+// returns null, meaning "let the native <a target=_blank> handle it" —
+// no onClick at all, so ctrl/cmd/middle-click still work exactly as a
+// normal link would.
+function internalPathOf(url: string): string | null {
+  if (url.startsWith("/") && !url.startsWith("//")) return url;
+  try {
+    const parsed = new URL(url, window.location.origin);
+    if (parsed.origin === window.location.origin) return parsed.pathname + parsed.search + parsed.hash;
+  } catch {
+    // malformed URL — treat as external, let the browser's own error handling apply
+  }
+  return null;
+}
+
+function renderInline(text: string, keyPrefix: string, onLinkClick?: (path: string) => void): ReactNode[] {
   const nodes: ReactNode[] = [];
   let lastIndex = 0;
   let i = 0;
 
   function linkClickHandler(url: string) {
-    if (!onLinkClick) return undefined;
+    const internalPath = internalPathOf(url);
+    if (!internalPath || !onLinkClick) return undefined; // external — no handler, native new-tab behavior applies
     return (e: React.MouseEvent) => {
       e.preventDefault();
-      onLinkClick(url);
+      onLinkClick(internalPath);
     };
   }
 

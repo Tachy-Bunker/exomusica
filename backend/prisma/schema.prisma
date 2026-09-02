@@ -511,6 +511,9 @@ model SiteSettings {
   scanSfxUrl     String? // spacemap text-reveal loop (branch lock-on + F/E/T hint)
   defaultWikiPageId Int?
   defaultWikiPage   WikiPage? @relation(fields: [defaultWikiPageId], references: [id])
+  textColorPrimary   String? // overrides --text site-wide
+  textColorSecondary String? // overrides --text-dim site-wide
+  chatTitleColor     String? // chat dock branch title specifically
 }
 
 model CustomFont {

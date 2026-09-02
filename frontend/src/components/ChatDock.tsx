@@ -74,6 +74,7 @@ export function ChatDock() {
           borderBottom: "1px solid var(--border)",
           fontFamily: "var(--font-display)",
           fontSize: "1.8rem",
+          color: "var(--chat-title-color, var(--text))",
         }}
       >
         <span>
