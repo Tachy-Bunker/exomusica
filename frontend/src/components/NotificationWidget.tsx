@@ -151,21 +151,29 @@ export function NotificationWidget({ offsetRight = 0 }: { offsetRight?: number }
       style={{
         position: "fixed",
         zIndex: 40,
-        right: `calc(1rem + ${offsetRight}px)`,
-        ...(isHomepage
-          ? isDesktop
+        right: isDesktop ? `calc(1rem + ${offsetRight}px)` : "1rem",
+        ...(isDesktop
+          ? isHomepage
             ? { bottom: "calc(1.2rem + var(--player-height, 0px))" }
-            : { top: "4rem" }
-          : { top: "4.4rem" }),
+            : { top: "4.4rem" }
+          : { top: "0.9rem" }),
       }}
     >
       <button
-        className="btn btn-primary"
+        className={`btn btn-primary notif-bell ${unread > 0 ? "notif-bell-active" : ""}`}
         onClick={handleOpen}
         style={{ borderRadius: "50%", width: "2.6rem", height: "2.6rem", position: "relative" }}
         title="Notifications"
       >
-        🔔
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path
+            d="M12 2a6 6 0 0 0-6 6v3.6c0 .7-.28 1.37-.78 1.86L4 14.7c-.9.87-.3 2.4.95 2.4h14.1c1.24 0 1.84-1.53.95-2.4l-1.22-1.24A2.65 2.65 0 0 1 18 11.6V8a6 6 0 0 0-6-6Z"
+            stroke="currentColor"
+            strokeWidth="1.6"
+            strokeLinejoin="round"
+          />
+          <path d="M9.5 20a2.5 2.5 0 0 0 5 0" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+        </svg>
         {unread > 0 && (
           <span
             style={{

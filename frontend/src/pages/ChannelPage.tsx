@@ -286,6 +286,25 @@ export function ChannelPage({ channelSlug, fillHeight }: { channelSlug?: string;
   const slug = channelSlug ?? params.slug;
   const { user } = useAuth();
   const isDesktop = useIsDesktop();
+  // Mobile standalone view behaves like fillHeight mode too — internally
+  // scrolling message list, composer always pinned and visible — the dock
+  // never renders on mobile, so isDesktop alone correctly identifies this.
+  const effectiveFillHeight = fillHeight || !isDesktop;
+  const [isChatFullscreen, setIsChatFullscreen] = useState(false);
+  const mobileWindowRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleFsChange() {
+      setIsChatFullscreen(!!document.fullscreenElement);
+    }
+    document.addEventListener("fullscreenchange", handleFsChange);
+    return () => document.removeEventListener("fullscreenchange", handleFsChange);
+  }, []);
+
+  function toggleChatFullscreen() {
+    if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
+    else mobileWindowRef.current?.requestFullscreen().catch(() => {});
+  }
   const [mode, setMode] = useState<ViewMode>("live");
   const [displayMode, setDisplayMode] = useState<DisplayMode>(
     () => (localStorage.getItem("exomusica_display_mode") as DisplayMode) ?? "standard",
@@ -480,6 +499,11 @@ export function ChannelPage({ channelSlug, fillHeight }: { channelSlug?: string;
       const event = JSON.parse(ev.data);
       if (event.type === "message.create" || event.type === "message.update") {
         setMessages((prev) => upsertMessage(prev, event.message));
+        if (event.type === "message.create" && mode === "live") {
+          requestAnimationFrame(() => {
+            document.getElementById(`m-${event.message.id}`)?.scrollIntoView({ block: "end" });
+          });
+        }
       } else if (event.type === "message.delete") {
         setMessages((prev) =>
           prev.map((m) => (m.id === event.messageId ? { ...m, isDeleted: true, contentRaw: "", embeds: [] } : m)),
@@ -589,14 +613,36 @@ export function ChannelPage({ channelSlug, fillHeight }: { channelSlug?: string;
     });
   }
 
+  const isMobileWindow = !isDesktop && !fillHeight;
+
   return (
     <LinkClickContext.Provider value={navigate}>
-    <div style={fillHeight ? { fontFamily, display: "flex", flexDirection: "column", height: "100%", minHeight: 0 } : { fontFamily }}>
-      <div className="channel-toolbar" style={{ display: "flex", gap: "0.6rem", marginBottom: fillHeight ? "0.6rem" : "1rem", flexWrap: "wrap", flexShrink: 0, alignItems: "center" }}>
+    <div
+      ref={isMobileWindow ? mobileWindowRef : undefined}
+      style={
+        effectiveFillHeight
+          ? {
+              fontFamily,
+              display: "flex",
+              flexDirection: "column",
+              minHeight: 0,
+              ...(isMobileWindow
+                ? { height: isChatFullscreen ? "100vh" : "calc(100dvh - 3.6rem - 3rem)", background: "var(--bg)" }
+                : { height: "100%" }),
+            }
+          : { fontFamily }
+      }
+    >
+      <div className="channel-toolbar" style={{ display: "flex", gap: "0.6rem", marginBottom: effectiveFillHeight ? "0.6rem" : "1rem", flexWrap: "wrap", flexShrink: 0, alignItems: "center" }}>
         <TopicSwitcher />
         <button className={`btn ${mode === "live" ? "btn-primary" : ""}`} onClick={() => setMode("live")}>
           Live
         </button>
+        {isMobileWindow && (
+          <button className="btn" onClick={toggleChatFullscreen} title={isChatFullscreen ? "Exit fullscreen" : "Fullscreen"}>
+            {isChatFullscreen ? "⤡" : "⤢"}
+          </button>
+        )}
         {isDesktop && (
           <button className="btn" onClick={popOutChat} title="Open in a floating window">
             ↗ Pop out
@@ -643,7 +689,7 @@ export function ChannelPage({ channelSlug, fillHeight }: { channelSlug?: string;
         className="message-list"
         style={{
           fontSize: `${messageFontSize}%`,
-          ...(fillHeight ? { flex: 1, minHeight: 0, overflowY: "auto" as const, maxWidth: "none" } : {}),
+          ...(effectiveFillHeight ? { flex: 1, minHeight: 0, overflowY: "auto" as const, maxWidth: "none" } : {}),
         }}
       >
         {messages.length === 0 && <p style={{ color: "var(--text-dim)" }}>Nothing here yet.</p>}
@@ -666,14 +712,14 @@ export function ChannelPage({ channelSlug, fillHeight }: { channelSlug?: string;
         <form
           onSubmit={handleSend}
           style={{
-            marginTop: fillHeight ? 0 : "1rem",
-            paddingTop: fillHeight ? "0.5rem" : 0,
-            borderTop: fillHeight ? "1px solid var(--border)" : "none",
+            marginTop: effectiveFillHeight ? 0 : "1rem",
+            paddingTop: effectiveFillHeight ? "0.5rem" : 0,
+            borderTop: effectiveFillHeight ? "1px solid var(--border)" : "none",
             flexShrink: 0,
             display: "flex",
             flexDirection: "column",
             gap: "0.4rem",
-            maxWidth: fillHeight ? undefined : 720,
+            maxWidth: effectiveFillHeight ? undefined : 720,
             position: "relative",
           }}
         >

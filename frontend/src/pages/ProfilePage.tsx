@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { api } from "../lib/api";
 import { useAuth } from "../lib/auth";
+import { MailIcon } from "../components/Icons";
 
 interface Profile {
   id: number;
@@ -35,7 +36,14 @@ export function ProfilePage() {
           background: profile.avatarUrl ? `url(${profile.avatarUrl}) center/cover` : "var(--bg-elevated)",
         }}
       />
-      <h1>{profile.username}</h1>
+      <h1 style={{ display: "flex", alignItems: "center", gap: "0.6rem" }}>
+        {profile.username}
+        {user && user.username !== profile.username && !profile.isGhost && (
+          <Link to={`/pms/${profile.username}`} title="Send a message" style={{ color: "var(--accent-forum)", display: "inline-flex" }}>
+            <MailIcon size={18} />
+          </Link>
+        )}
+      </h1>
       {profile.isGhost && <p style={{ color: "var(--text-dim)" }}>This account is no longer active.</p>}
       {profile.bio && <p>{profile.bio}</p>}
       {profile.links && profile.links.length > 0 && (

@@ -1,6 +1,7 @@
 import { useEffect, useRef } from "react";
 import { Link } from "react-router-dom";
 import { bindAudioElement, useAudioStore } from "../lib/audioStore";
+import { PreviousIcon, NextIcon, LoopIcon, LoopOneIcon, ExpandIcon, CollapseIcon } from "./Icons";
 
 function formatTime(seconds: number): string {
   if (!Number.isFinite(seconds)) return "0:00";
@@ -70,13 +71,13 @@ export function PlayerBar() {
         <>
           <div className="collapsed">
             <button className="btn" onClick={playPrevious} disabled={history.length === 0} title="Previous (Shift+←)">
-              ⏮
+              <PreviousIcon size={16} />
             </button>
             <button className="play-toggle" onClick={toggle} aria-label={isPlaying ? "Pause" : "Play"} title="Play/Pause (Space)">
               {isPlaying ? "❚❚" : "▶"}
             </button>
             <button className="btn" onClick={playNext} disabled={queue.length === 0} title="Next (Shift+→)">
-              ⏭
+              <NextIcon size={16} />
             </button>
             <div className="track-info">
               <div className="title">{currentTrack.title}</div>
@@ -89,10 +90,10 @@ export function PlayerBar() {
               🔀
             </button>
             <button className={`btn ${repeatMode !== "off" ? "btn-primary" : ""}`} onClick={cycleRepeat} title="Repeat: off/all/one">
-              {repeatMode === "one" ? "🔂" : "🔁"}
+              {repeatMode === "one" ? <LoopOneIcon size={16} /> : <LoopIcon size={16} />}
             </button>
-            <button className="btn" onClick={() => setExpanded(!expanded)}>
-              {expanded ? "Collapse" : "Expand"}
+            <button className="btn" onClick={() => setExpanded(!expanded)} title={expanded ? "Collapse" : "Expand"}>
+              {expanded ? <CollapseIcon size={16} /> : <ExpandIcon size={16} />}
             </button>
           </div>
 

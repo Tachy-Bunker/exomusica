@@ -3,6 +3,7 @@ import { useParams, Link } from "react-router-dom";
 import { api, ApiError } from "../lib/api";
 import { renderMarkdown } from "../lib/markdown";
 import { useCustomFont, type FontInfo } from "../lib/useCustomFont";
+import { useIsDesktop } from "../lib/useIsDesktop";
 
 interface PostSummary {
   id: number;
@@ -46,6 +47,8 @@ function NewsletterForm() {
 
 export function NewsPage() {
   const { slug } = useParams<{ slug?: string }>();
+  const isDesktop = useIsDesktop();
+  const scale = isDesktop ? 2 : 1.6;
   const [posts, setPosts] = useState<PostSummary[]>([]);
   const [current, setCurrent] = useState<PostFull | null>(null);
   const fontFamily = useCustomFont(current?.font);
@@ -64,15 +67,15 @@ export function NewsPage() {
 
   if (slug) {
     return (
-      <div style={{ maxWidth: 640, fontFamily }}>
-        <Link to="/news" style={{ fontSize: "0.85rem" }}>
+      <div style={{ maxWidth: 640, fontFamily, fontSize: `${scale}rem` }}>
+        <Link to="/news" style={{ fontSize: `${0.85 * scale}rem` }}>
           ← News
         </Link>
         {!current && <p>Loading…</p>}
         {current && (
           <>
             <h1>{current.title}</h1>
-            <p className="mono" style={{ fontSize: "0.8rem", color: "var(--text-dim)" }}>
+            <p className="mono" style={{ fontSize: `${0.8 * scale}rem`, color: "var(--text-dim)" }}>
               {new Date(current.publishedAt).toLocaleDateString()}
             </p>
             {renderMarkdown(current.contentMarkdown)}
@@ -83,15 +86,15 @@ export function NewsPage() {
   }
 
   return (
-    <div>
+    <div style={{ fontSize: `${scale}rem` }}>
       <h1>News</h1>
       <NewsletterForm />
       <div style={{ marginTop: "1.5rem", display: "flex", flexDirection: "column", gap: "1rem", maxWidth: 640 }}>
         {posts.length === 0 && <p style={{ color: "var(--text-dim)" }}>Nothing published yet.</p>}
         {posts.map((p) => (
           <Link key={p.id} to={`/news/${p.slug}`} style={{ textDecoration: "none", color: "inherit" }}>
-            <h2 style={{ fontSize: "1.1rem", marginBottom: "0.1rem" }}>{p.title}</h2>
-            <p className="mono" style={{ fontSize: "0.8rem", color: "var(--text-dim)" }}>
+            <h2 style={{ fontSize: `${1.1 * scale}rem`, marginBottom: "0.1rem" }}>{p.title}</h2>
+            <p className="mono" style={{ fontSize: `${0.8 * scale}rem`, color: "var(--text-dim)" }}>
               {new Date(p.publishedAt).toLocaleDateString()}
             </p>
           </Link>

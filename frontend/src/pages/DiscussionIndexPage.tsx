@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../lib/api";
 import { useDocumentTitle } from "../lib/useDocumentTitle";
+import { useIsDesktop } from "../lib/useIsDesktop";
 import type { Branch } from "../lib/types";
 
 interface ChannelSummary {
@@ -13,6 +14,8 @@ interface ChannelSummary {
 
 export function DiscussionIndexPage() {
   useDocumentTitle("Forums");
+  const isDesktop = useIsDesktop();
+  const scale = isDesktop ? 2 : 1.6; // double on desktop, 60% bigger on mobile
   const [topics, setTopics] = useState<ChannelSummary[]>([]);
   const [branches, setBranches] = useState<Branch[]>([]);
 
@@ -31,26 +34,29 @@ export function DiscussionIndexPage() {
   }
 
   return (
-    <div>
+    <div style={{ fontSize: `${scale}rem` }}>
       <h1>Forums</h1>
 
-      <h2 style={{ fontSize: "1rem", color: "var(--accent-forum)" }}>Topics</h2>
       {topics.length === 0 && <p style={{ color: "var(--text-dim)" }}>No topics yet.</p>}
-      {[...groups.entries()].map(([category, items]) => (
-        <div key={category || "uncategorized"} style={{ marginBottom: "1rem" }}>
-          {category && <h3 style={{ fontSize: "0.85rem", color: "var(--text-dim)", textTransform: "uppercase" }}>{category}</h3>}
-          <ul style={{ listStyle: "none", padding: 0 }}>
-            {items.map((t) => (
-              <li key={t.slug} style={{ marginBottom: "0.5rem" }}>
-                <Link to={`/topic/${t.slug}`}>{t.name}</Link>
-                {t.description && <div style={{ fontSize: "0.8rem", color: "var(--text-dim)" }}>{t.description}</div>}
-              </li>
-            ))}
-          </ul>
-        </div>
-      ))}
+      <div className="forums-columns">
+        {[...groups.entries()].map(([category, items]) => (
+          <div key={category || "uncategorized"} style={{ marginBottom: "1rem", breakInside: "avoid" }}>
+            {category && (
+              <h3 style={{ fontSize: `${0.85 * scale}rem`, color: "var(--text-dim)", textTransform: "uppercase" }}>{category}</h3>
+            )}
+            <ul style={{ listStyle: "none", padding: 0 }}>
+              {items.map((t) => (
+                <li key={t.slug} style={{ marginBottom: "0.5rem" }}>
+                  <Link to={`/topic/${t.slug}`}>{t.name}</Link>
+                  {t.description && <div style={{ fontSize: `${0.8 * scale}rem`, color: "var(--text-dim)" }}>{t.description}</div>}
+                </li>
+              ))}
+            </ul>
+          </div>
+        ))}
+      </div>
 
-      <h2 style={{ fontSize: "1rem", color: "var(--text)", marginTop: "1.5rem" }}>Branches</h2>
+      <h2 style={{ fontSize: `${scale}rem`, color: "var(--text)", marginTop: "1.5rem" }}>Branches</h2>
       {branches.length === 0 && <p style={{ color: "var(--text-dim)" }}>No branches yet.</p>}
       <ul style={{ listStyle: "none", padding: 0 }}>
         {branches.map((b) => (

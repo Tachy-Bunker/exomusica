@@ -7,6 +7,8 @@ import { useAmbienceStore } from "../lib/ambienceStore";
 import { useProfileStore } from "../lib/profileStore";
 import { useVolumeMixerStore } from "../lib/volumeMixerStore";
 import { Avatar } from "./Avatar";
+import { MailIcon, MailNotificationIcon } from "./Icons";
+import { MobileAccountHook } from "./MobileAccountHook";
 import { useAudioStore } from "../lib/audioStore";
 import { useEmojiStore } from "../lib/emojiStore";
 import { useGlobalPlayerShortcuts } from "../lib/useGlobalPlayerShortcuts";
@@ -110,17 +112,25 @@ export function Layout() {
           <Link to="/discussion">Forums</Link>
         </nav>
         <div className="spacer" />
-        {user && <OnlineOrbs />}
+        {user && isDesktop && <OnlineOrbs />}
         {user ? (
           <>
             {user.isAdmin && <Link to="/admin">Admin</Link>}
-            <Link to="/pms" style={{ position: "relative", display: "inline-flex" }} title="Messages">
-              ✉️
-              {hasUnreadPms && <span className="unread-dot" />}
-            </Link>
-            <Link to="/account" title={user.username}>
-              <Avatar url={avatarUrl} />
-            </Link>
+            {isDesktop && (
+              <>
+                <Link
+                  to="/pms"
+                  style={{ position: "relative", display: "inline-flex", color: "var(--accent-forum)" }}
+                  title="Messages"
+                >
+                  {hasUnreadPms ? <MailNotificationIcon /> : <MailIcon />}
+                </Link>
+                <Link to="/account" title={user.username}>
+                  <Avatar url={avatarUrl} />
+                </Link>
+              </>
+            )}
+            {!isDesktop && <MobileAccountHook avatarUrl={avatarUrl} hasUnreadPms={hasUnreadPms} username={user.username} />}
           </>
         ) : (
           <Link to="/login">Log in</Link>
