@@ -8,6 +8,8 @@ import { useAmbienceStore } from "../lib/ambienceStore";
 import { GaplessLoop } from "../lib/GaplessLoop";
 import { Joystick } from "./Joystick";
 import { useVolumeMixerStore } from "../lib/volumeMixerStore";
+import { useSpacemapField, pointerRef } from "../lib/entoptic/useSpacemapField";
+import { useFxSettings } from "../lib/entoptic/useFxSettings";
 import { useAudioStore } from "../lib/audioStore";
 import { api } from "../lib/api";
 import type { PlayableTrackDTO } from "../lib/types";
@@ -452,6 +454,22 @@ export function SpaceMap({ branches, centerLabel, centerHref }: { branches: Bran
 
   const scale = isDesktop ? 2 : 1.5;
 
+  const fxSettings = useFxSettings();
+  const { containerRef: fieldContainerRef, fieldCanvasRef, wardenCanvasRef, overlayCanvasRef } = useSpacemapField(fxSettings);
+
+  useEffect(() => {
+    const el = fieldContainerRef.current;
+    if (!el) return;
+    function handleMove(e: MouseEvent) {
+      const rect = el!.getBoundingClientRect();
+      pointerRef.x = e.clientX - rect.left - rect.width / 2;
+      pointerRef.y = rect.height / 2 - (e.clientY - rect.top);
+    }
+    el.addEventListener("mousemove", handleMove);
+    return () => el.removeEventListener("mousemove", handleMove);
+  }, [fieldContainerRef]);
+
+
   function openDonate() {
     window.open("https://paypal.me/tachybunker", "_blank", "popup=1,width=460,height=640");
   }
@@ -512,6 +530,11 @@ export function SpaceMap({ branches, centerLabel, centerHref }: { branches: Bran
         <button className="btn space-map-fullscreen" onClick={toggleFullscreen} title={isFullscreen ? "Exit fullscreen" : "Fullscreen"}>
           {isFullscreen ? "⤡" : "⤢"}
         </button>
+        <div ref={fieldContainerRef} className="space-map-entoptic-field">
+          <canvas ref={fieldCanvasRef} />
+          <canvas ref={wardenCanvasRef} />
+          <canvas ref={overlayCanvasRef} />
+        </div>
         <div
           className="space-map-field"
           style={{ transform: `translate(${cameraRef.current.x}px, ${cameraRef.current.y}px)` }}

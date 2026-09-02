@@ -516,6 +516,33 @@ model SiteSettings {
   chatTitleColor     String? // chat dock branch title specifically
 }
 
+model FxSettings {
+  id                 Int    @id @default(1)
+  debrisCount        Int    @default(320)
+  wardenCount        Int    @default(5)
+  split              Float  @default(0.4)
+  chaos              Float  @default(0.5)
+  drift              Float  @default(0.38)
+  lurk               Float  @default(0.45)
+  bgBright           Float  @default(0.5)
+  bgSat              Float  @default(0.5)
+  bgContrast         Float  @default(0.5)
+  staticAmt          Float  @default(0.18)
+  staticSpeed        Float  @default(0.55)
+  vignette           Float  @default(0.5)
+  caInitial          Float  @default(0.15)
+  caBurst            Float  @default(0.6)
+  wardenHue          Float  @default(0)
+  trailAmt           Float  @default(0.4)
+  wardenReveal       Float  @default(0.65)
+  wardenHuskBright   Float  @default(0.3)
+  wardenOrbBright    Float  @default(0.3)
+  glowHue            Float  @default(280)
+  glowSat            Float  @default(0.6)
+  glowBright         Float  @default(0.45)
+}
+
+
 model CustomFont {
   id         Int      @id @default(autoincrement())
   name       String   @unique // display name shown in admin, e.g. "Anomaly Mono"

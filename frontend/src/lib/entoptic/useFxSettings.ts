@@ -1,0 +1,36 @@
+import { useEffect, useState } from "react";
+import { api } from "../api";
+import { FX_DEFAULTS, type FxSettings } from "./useSpacemapField";
+
+export function useFxSettings(): FxSettings {
+  const [settings, setSettings] = useState<FxSettings>(FX_DEFAULTS);
+
+  useEffect(() => {
+    api<{
+      debrisCount: number;
+      wardenCount: number;
+      split: number;
+      chaos: number;
+      drift: number;
+      lurk: number;
+      bgBright: number;
+      bgSat: number;
+      bgContrast: number;
+      staticAmt: number;
+      staticSpeed: number;
+      vignette: number;
+      caInitial: number;
+      caBurst: number;
+      wardenHue: number;
+      trailAmt: number;
+      wardenReveal: number;
+      wardenHuskBright: number;
+      wardenOrbBright: number;
+      glowHue: number;
+      glowSat: number;
+      glowBright: number;
+    }>("/api/fx-settings").then((s) => setSettings(s));
+  }, []);
+
+  return settings;
+}

@@ -40,6 +40,9 @@ export function AdminLayout() {
         <NavLink to="/admin/fonts" className={({ isActive }) => (isActive ? "active" : "")}>
           Fonts
         </NavLink>
+        <NavLink to="/admin/fx-settings" className={({ isActive }) => (isActive ? "active" : "")}>
+          Spacemap field
+        </NavLink>
         <NavLink to="/admin/notifications" className={({ isActive }) => (isActive ? "active" : "")}>
           Notification sounds
         </NavLink>

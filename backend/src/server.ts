@@ -46,6 +46,7 @@ import { presenceRoutes } from "./routes/presence.js";
 import { linkPreviewRoutes } from "./routes/linkPreview.js";
 import { guideAssetRoutes } from "./routes/guideAssets.js";
 import { siteSettingsRoutes } from "./routes/siteSettings.js";
+import { fxSettingsRoutes } from "./routes/fxSettings.js";
 import { wsRoutes } from "./routes/ws.js";
 
 // Fastify's own default body limit is 1MB, applied before multipart even
@@ -91,6 +92,7 @@ await app.register(presenceRoutes);
 await app.register(linkPreviewRoutes);
 await app.register(guideAssetRoutes);
 await app.register(siteSettingsRoutes);
+await app.register(fxSettingsRoutes);
 await app.register(wsRoutes);
 
 const port = Number(process.env.PORT ?? 3001);
