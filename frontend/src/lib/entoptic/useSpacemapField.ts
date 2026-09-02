@@ -50,9 +50,11 @@ export const cameraOffsetRef = { x: 0, y: 0 };
 export const wardenBridge: {
   bindToBranches: (branches: { id: number; slug: string }[]) => void;
   setScreenPosition: (branchId: number, x: number, y: number) => void;
+  setPlayingBranch: (branchId: number | null) => void;
 } = {
   bindToBranches: () => {},
   setScreenPosition: () => {},
+  setPlayingBranch: () => {},
 };
 
 export function useSpacemapField(settings: FxSettings = FX_DEFAULTS) {
@@ -76,6 +78,7 @@ export function useSpacemapField(settings: FxSettings = FX_DEFAULTS) {
     // Warden count is never independently admin-configurable.
     wardenBridge.bindToBranches = (branches) => wardens.bindToBranches(branches);
     wardenBridge.setScreenPosition = (branchId, x, y) => wardens.setScreenPosition(branchId, x, y);
+    wardenBridge.setPlayingBranch = (branchId) => wardens.setPlayingBranch(branchId);
 
     function resize() {
       const w = container!.clientWidth;
@@ -156,6 +159,7 @@ export function useSpacemapField(settings: FxSettings = FX_DEFAULTS) {
       document.removeEventListener("visibilitychange", handleVisibility);
       wardenBridge.bindToBranches = () => {};
       wardenBridge.setScreenPosition = () => {};
+      wardenBridge.setPlayingBranch = () => {};
       field.dispose();
       wardens.dispose();
     };

@@ -144,7 +144,7 @@ button {
 
 .btn-primary {
   background: var(--accent-forum-dim);
-  border-color: var(--accent-forum);
+  border-color: var(--accent-forum-dim);
 }
 
 .btn-danger {
@@ -938,6 +938,9 @@ th {
   text-shadow: 0 0 8px var(--accent-audio);
   white-space: nowrap;
   pointer-events: none;
+  background: rgba(6, 9, 17, 0.6);
+  padding: 0.2rem 0.7rem;
+  border-radius: var(--radius);
   z-index: 6;
 }
 
@@ -1001,7 +1004,7 @@ th {
 
 .space-hud-action {
   position: absolute;
-  top: calc(50% + 56px);
+  top: calc(50% + 64px);
   left: 50%;
   transform: translateX(-50%);
   font-family: var(--font-mono);
@@ -1009,6 +1012,9 @@ th {
   color: var(--text-dim);
   white-space: nowrap;
   z-index: 6;
+  background: rgba(6, 9, 17, 0.6);
+  padding: 0.15rem 0.6rem;
+  border-radius: var(--radius);
 }
 
 .space-hud-action-link {

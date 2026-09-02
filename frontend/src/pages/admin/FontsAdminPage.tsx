@@ -400,7 +400,7 @@ export function FontsAdminPage() {
           </div>
         )}
         <div style={{ display: "flex", gap: "0.5rem", marginBottom: "0.4rem" }}>
-          <input ref={moireInputRef} type="file" accept="image/png" />
+          <input ref={moireInputRef} type="file" accept="image/png,image/svg+xml" />
           <button className="btn btn-primary" onClick={uploadMoireImage}>
             {moireImageUrl ? "Replace" : "Upload"}
           </button>

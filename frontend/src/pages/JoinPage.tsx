@@ -35,8 +35,9 @@ export function JoinPage() {
     <div style={{ maxWidth: 420, margin: "2rem auto" }}>
       <h1>Join Exomusica</h1>
       <p style={{ color: "var(--text-dim)", fontSize: "0.9rem" }}>
-        Every account is reviewed before it's active. Profile picture upload (max 1MB) and links come in Phase 3's
-        account settings — this covers what's needed to submit the request now.
+        Are you an enthusiast, musician, developer, or researcher?
+        <br />
+        You can apply to come in, chat and connect with the other members.
       </p>
       <form onSubmit={handleSubmit}>
         <div className="field">

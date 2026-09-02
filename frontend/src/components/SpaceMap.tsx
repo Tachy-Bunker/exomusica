@@ -118,6 +118,11 @@ export function SpaceMap({ branches, centerLabel, centerHref }: { branches: Bran
   const addToQueue = useAudioStore((s) => s.addToQueue);
   const clearQueue = useAudioStore((s) => s.clearQueue);
   const currentTrack = useAudioStore((s) => s.currentTrack);
+
+  useEffect(() => {
+    const branch = currentTrack ? branches.find((b) => b.slug === currentTrack.branchSlug) : null;
+    wardenBridge.setPlayingBranch(branch?.id ?? null);
+  }, [currentTrack, branches]);
   const ambienceEnabled = useAmbienceStore((s) => s.enabled);
   const setAmbienceEnabled = useAmbienceStore((s) => s.setEnabled);
 
@@ -214,7 +219,7 @@ export function SpaceMap({ branches, centerLabel, centerHref }: { branches: Bran
     { text: isDesktop ? "Details (T)" : "Details", color: "var(--accent-danger)", action: viewLockedDetails },
   ] as const;
   const ACTION_HINT = ACTION_SEGMENTS.map((s) => s.text).join("");
-  const CENTER_ACTION_TEXT = isDesktop ? "Enter (Enter)" : "Enter";
+  const CENTER_ACTION_TEXT = isDesktop ? "(Enter)" : "Enter";
   const currentActionLength = lockedNode?.id === -1 ? CENTER_ACTION_TEXT.length : ACTION_HINT.length;
 
   useEffect(() => {
@@ -667,7 +672,7 @@ export function SpaceMap({ branches, centerLabel, centerHref }: { branches: Bran
 
       <div className="space-map-controls">
         <button className="btn btn-primary space-map-shuffle" onClick={() => void shufflePlay()}>
-          🔀 Shuffle play
+          🔀 Play all
         </button>
         <button
           className={`space-map-ambience-toggle ${ambienceEnabled ? "space-map-ambience-toggle-on" : ""}`}

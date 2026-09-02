@@ -184,7 +184,7 @@ export async function siteSettingsRoutes(app: FastifyInstance): Promise<void> {
   app.post("/api/admin/site-settings/moire-image", { preHandler: requireAdmin }, async (req, reply) => {
     const file = await req.file();
     if (!file) return reply.code(400).send({ error: "no file uploaded" });
-    if (file.mimetype !== "image/png") return reply.code(400).send({ error: "PNG only" });
+    if (!["image/png", "image/svg+xml"].includes(file.mimetype)) return reply.code(400).send({ error: "PNG or SVG only" });
     const buffer = await file.toBuffer();
     try {
       const { url } = await saveSiteImage(file.filename, file.mimetype, buffer, "moire");

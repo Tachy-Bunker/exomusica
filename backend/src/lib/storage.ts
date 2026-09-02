@@ -92,6 +92,7 @@ const ALLOWED_IMAGE_TYPES: Record<string, string> = {
   "image/gif": ".gif",
   "image/bmp": ".bmp",
   "image/x-ms-bmp": ".bmp", // browsers are inconsistent about which of these two they send for BMP
+  "image/svg+xml": ".svg",
 };
 
 /** Saves a general site image (album cover/gallery, About-page entries).

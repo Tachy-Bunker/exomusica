@@ -191,6 +191,11 @@ export class WardenSystem {
   private branchWardenCache = new Map<number, Warden>(); // incremental — never regenerate wholesale, or an in-progress hover/interaction breaks
   private sizeMin = 24;
   private sizeMax = 44;
+  private playingBranchId: number | null = null;
+
+  setPlayingBranch(branchId: number | null) {
+    this.playingBranchId = branchId;
+  }
   private haloGradient: CanvasGradient | null = null;
   private seed: number;
   private cssWidth = 1;
@@ -432,6 +437,10 @@ export class WardenSystem {
       reveal = Math.pow(Math.max(0, 1 - dCursor / 0.26), 1.5) * state.revealAmt;
     }
 
+    const isPlaying = o.branchId !== null && o.branchId === this.playingBranchId;
+    const playingPulse = isPlaying ? 0.75 + 0.25 * Math.sin(nowSec * 3) : 0;
+    const effectiveGlowB = Math.min(1, state.glowB + playingPulse);
+
     const [trailDx, trailDy] = this.stripeOffsetFor(y0, nowSec);
     this.drawTrail(o, s, trailDx, trailDy);
 
@@ -449,7 +458,7 @@ export class WardenSystem {
       this.ctx.beginPath();
       this.ctx.rect(x0 - reach * 1.3, stripTop - 0.5, reach * 2.6, stripH + 1);
       this.ctx.clip();
-      this.drawBody(o, state.time, hue, eyeHue, s, reveal, state.huskB, state.orbB, state.glowHue, state.glowSat, state.glowB, x0 + dx, y0 + dy);
+      this.drawBody(o, state.time, hue, eyeHue, s, reveal, state.huskB, state.orbB, state.glowHue, state.glowSat, effectiveGlowB, x0 + dx, y0 + dy);
       this.ctx.restore();
     }
   }
