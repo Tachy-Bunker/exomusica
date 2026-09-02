@@ -20,6 +20,9 @@ export async function siteSettingsRoutes(app: FastifyInstance): Promise<void> {
         textColorPrimary: null,
         textColorSecondary: null,
         chatTitleColor: null,
+        accentPrimaryColor: null,
+        contentTextScaleDesktop: 2.0,
+        contentTextScaleMobile: 1.6,
       }
     );
   });
@@ -31,11 +34,23 @@ export async function siteSettingsRoutes(app: FastifyInstance): Promise<void> {
       textColorPrimary: string | null;
       textColorSecondary: string | null;
       chatTitleColor: string | null;
+      accentPrimaryColor: string | null;
+      contentTextScaleDesktop: number;
+      contentTextScaleMobile: number;
     }>;
   }>("/api/admin/site-settings", { preHandler: requireAdmin }, async (req) => {
     const data: Record<string, unknown> = {};
     const body = req.body ?? {};
-    for (const key of ["defaultFontId", "defaultWikiPageId", "textColorPrimary", "textColorSecondary", "chatTitleColor"] as const) {
+    for (const key of [
+      "defaultFontId",
+      "defaultWikiPageId",
+      "textColorPrimary",
+      "textColorSecondary",
+      "chatTitleColor",
+      "accentPrimaryColor",
+      "contentTextScaleDesktop",
+      "contentTextScaleMobile",
+    ] as const) {
       if (key in body) data[key] = body[key];
     }
     return prisma.siteSettings.upsert({ where: { id: 1 }, create: { id: 1, ...data }, update: data });

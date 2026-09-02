@@ -8,7 +8,8 @@ export function useFxSettings(): FxSettings {
   useEffect(() => {
     api<{
       debrisCount: number;
-      wardenCount: number;
+      wardenSizeMin: number;
+      wardenSizeMax: number;
       split: number;
       chaos: number;
       drift: number;

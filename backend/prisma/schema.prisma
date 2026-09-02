@@ -514,12 +514,16 @@ model SiteSettings {
   textColorPrimary   String? // overrides --text site-wide
   textColorSecondary String? // overrides --text-dim site-wide
   chatTitleColor     String? // chat dock branch title specifically
+  accentPrimaryColor String? // overrides --accent-forum (the actual orange used by buttons/links/header/icons) site-wide
+  contentTextScaleDesktop Float @default(2.0) // Wiki/News/Forums/chat-toolbar-buttons text scale, desktop
+  contentTextScaleMobile  Float @default(1.6) // same, mobile
 }
 
 model FxSettings {
   id                 Int    @id @default(1)
   debrisCount        Int    @default(320)
-  wardenCount        Int    @default(5)
+  wardenSizeMin      Float  @default(24)
+  wardenSizeMax      Float  @default(44)
   split              Float  @default(0.4)
   chaos              Float  @default(0.5)
   drift              Float  @default(0.38)

@@ -36,6 +36,9 @@ export function FontsAdminPage() {
   const [textColorPrimary, setTextColorPrimary] = useState("#eef1fb");
   const [textColorSecondary, setTextColorSecondary] = useState("#a89ec2");
   const [chatTitleColor, setChatTitleColor] = useState("#eef1fb");
+  const [accentPrimaryColor, setAccentPrimaryColor] = useState("#e2703f");
+  const [contentTextScaleDesktop, setContentTextScaleDesktop] = useState(2.0);
+  const [contentTextScaleMobile, setContentTextScaleMobile] = useState(1.6);
 
   function load() {
     api<Font[]>("/api/fonts").then(setFonts);
@@ -46,6 +49,9 @@ export function FontsAdminPage() {
       textColorPrimary: string | null;
       textColorSecondary: string | null;
       chatTitleColor: string | null;
+      accentPrimaryColor: string | null;
+      contentTextScaleDesktop: number;
+      contentTextScaleMobile: number;
     }>("/api/site-settings").then((s) => {
       setSiteDefaultFontId(s.defaultFontId);
       setAmbienceUrl(s.ambienceUrl);
@@ -53,6 +59,9 @@ export function FontsAdminPage() {
       if (s.textColorPrimary) setTextColorPrimary(s.textColorPrimary);
       if (s.textColorSecondary) setTextColorSecondary(s.textColorSecondary);
       if (s.chatTitleColor) setChatTitleColor(s.chatTitleColor);
+      if (s.accentPrimaryColor) setAccentPrimaryColor(s.accentPrimaryColor);
+      setContentTextScaleDesktop(s.contentTextScaleDesktop);
+      setContentTextScaleMobile(s.contentTextScaleMobile);
     });
   }
   useEffect(load, []);
@@ -60,7 +69,14 @@ export function FontsAdminPage() {
   async function saveColors() {
     await api("/api/admin/site-settings", {
       method: "PATCH",
-      body: JSON.stringify({ textColorPrimary, textColorSecondary, chatTitleColor }),
+      body: JSON.stringify({ textColorPrimary, textColorSecondary, chatTitleColor, accentPrimaryColor }),
+    });
+  }
+
+  async function saveContentScale() {
+    await api("/api/admin/site-settings", {
+      method: "PATCH",
+      body: JSON.stringify({ contentTextScaleDesktop, contentTextScaleMobile }),
     });
   }
 
@@ -207,8 +223,44 @@ export function FontsAdminPage() {
           <input type="color" value={chatTitleColor} onChange={(e) => setChatTitleColor(e.target.value)} />
           <span style={{ fontSize: "0.8rem" }}>Chat branch title</span>
         </div>
+        <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.4rem" }}>
+          <input type="color" value={accentPrimaryColor} onChange={(e) => setAccentPrimaryColor(e.target.value)} />
+          <span style={{ fontSize: "0.8rem" }}>Primary accent (buttons, links, header, icons)</span>
+        </div>
         <button className="btn btn-primary" onClick={saveColors}>
           Save colors
+        </button>
+      </div>
+
+      <div className="field" style={{ maxWidth: 420 }}>
+        <label>Content text size</label>
+        <p style={{ fontSize: "0.75rem", color: "var(--text-dim)", marginTop: 0 }}>
+          Wiki, News, Forums, and the chat toolbar buttons — multiplier over the base size.
+        </p>
+        <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.4rem" }}>
+          <input
+            type="range"
+            min={1}
+            max={3}
+            step={0.1}
+            value={contentTextScaleDesktop}
+            onChange={(e) => setContentTextScaleDesktop(Number(e.target.value))}
+          />
+          <span style={{ fontSize: "0.8rem" }}>Desktop — {contentTextScaleDesktop.toFixed(1)}x</span>
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.4rem" }}>
+          <input
+            type="range"
+            min={1}
+            max={3}
+            step={0.1}
+            value={contentTextScaleMobile}
+            onChange={(e) => setContentTextScaleMobile(Number(e.target.value))}
+          />
+          <span style={{ fontSize: "0.8rem" }}>Mobile — {contentTextScaleMobile.toFixed(1)}x</span>
+        </div>
+        <button className="btn btn-primary" onClick={saveContentScale}>
+          Save text size
         </button>
       </div>
 

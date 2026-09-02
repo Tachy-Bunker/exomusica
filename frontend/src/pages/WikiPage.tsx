@@ -4,6 +4,7 @@ import { api } from "../lib/api";
 import { renderMarkdown } from "../lib/markdown";
 import { useCustomFont, type FontInfo } from "../lib/useCustomFont";
 import { useIsDesktop } from "../lib/useIsDesktop";
+import { useContentScaleStore } from "../lib/contentScaleStore";
 import { BranchIndexList } from "../components/BranchIndexList";
 
 interface WikiSummary {
@@ -22,7 +23,7 @@ export function WikiPage() {
   const { slug } = useParams<{ slug?: string }>();
   const navigate = useNavigate();
   const isDesktop = useIsDesktop();
-  const scale = isDesktop ? 2 : 1.6;
+  const scale = useContentScaleStore((s) => (isDesktop ? s.desktop : s.mobile));
   const [pages, setPages] = useState<WikiSummary[]>([]);
   const [current, setCurrent] = useState<WikiFull | null>(null);
   const fontFamily = useCustomFont(current?.font);

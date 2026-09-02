@@ -4,6 +4,7 @@ import { api, ApiError } from "../lib/api";
 import { renderMarkdown } from "../lib/markdown";
 import { useCustomFont, type FontInfo } from "../lib/useCustomFont";
 import { useIsDesktop } from "../lib/useIsDesktop";
+import { useContentScaleStore } from "../lib/contentScaleStore";
 
 interface PostSummary {
   id: number;
@@ -48,7 +49,7 @@ function NewsletterForm() {
 export function NewsPage() {
   const { slug } = useParams<{ slug?: string }>();
   const isDesktop = useIsDesktop();
-  const scale = isDesktop ? 2 : 1.6;
+  const scale = useContentScaleStore((s) => (isDesktop ? s.desktop : s.mobile));
   const [posts, setPosts] = useState<PostSummary[]>([]);
   const [current, setCurrent] = useState<PostFull | null>(null);
   const fontFamily = useCustomFont(current?.font);

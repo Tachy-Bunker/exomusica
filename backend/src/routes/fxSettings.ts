@@ -5,7 +5,8 @@ import { requireAdmin } from "../lib/auth.js";
 const DEFAULTS = {
   id: 1,
   debrisCount: 320,
-  wardenCount: 5,
+  wardenSizeMin: 24,
+  wardenSizeMax: 44,
   split: 0.4,
   chaos: 0.5,
   drift: 0.38,
@@ -40,7 +41,6 @@ export async function fxSettingsRoutes(app: FastifyInstance): Promise<void> {
     // Clamp debris count server-side too — an admin typo shouldn't be able
     // to exceed what the prototype's own slider allowed.
     if (data.debrisCount !== undefined) data.debrisCount = Math.max(10, Math.min(1500, data.debrisCount));
-    if (data.wardenCount !== undefined) data.wardenCount = Math.max(2, Math.min(9, data.wardenCount));
     return prisma.fxSettings.upsert({ where: { id: 1 }, create: { id: 1, ...data }, update: data });
   });
 }

@@ -29,6 +29,7 @@ export interface Warden {
   ty: number;
   speed: number;
   size: number;
+  sizeFrac: number; // 0..1, the raw random draw — lets size be rescaled live if min/max change
   hue: number;
   eyeHue: number;
   spikes: Spike[];
@@ -58,7 +59,7 @@ function fnv1a(str: string): number {
 
 const WARDEN_HUE_BASE = 272;
 
-export function makeWardens(count: number, seed: number): Warden[] {
+export function makeWardens(count: number, seed: number, sizeMin = 24, sizeMax = 44): Warden[] {
   const list: Warden[] = [];
   for (let i = 0; i < count; i++) {
     const r = mulberry32((seed ^ 0x51eedbee ^ (i * 0x2545f491)) >>> 0);
@@ -68,13 +69,15 @@ export function makeWardens(count: number, seed: number): Warden[] {
     for (let s = 0; s < spikeCount; s++) {
       spikes.push({ len: 0.55 + r() * 0.95, curve: (r() - 0.5) * 0.5, rate: 0.0009 + r() * 0.0012, phase: r() * Math.PI * 2 });
     }
+    const sizeFrac = r();
     const w: Warden = {
       x: r() * 1.5 - 0.75,
       y: r() * 1.5 - 0.75,
       tx: 0,
       ty: 0,
       speed: 0.00018 + r() * 0.00026,
-      size: 24 + r() * 20,
+      size: sizeMin + sizeFrac * (sizeMax - sizeMin),
+      sizeFrac,
       hue,
       eyeHue: hue,
       spikes,
@@ -101,7 +104,7 @@ function pickWaypoint(o: Warden) {
   o.ty = Math.random() * 1.7 - 0.85;
 }
 
-function makeWardenForBranch(branchId: number, slug: string): Warden {
+function makeWardenForBranch(branchId: number, slug: string, sizeMin = 24, sizeMax = 44): Warden {
   const seed = fnv1a(`branch:${branchId}:${slug}`);
   const r = mulberry32(seed);
   const hue = WARDEN_HUE_BASE + (r() * 14 - 7);
@@ -110,13 +113,15 @@ function makeWardenForBranch(branchId: number, slug: string): Warden {
   for (let s = 0; s < spikeCount; s++) {
     spikes.push({ len: 0.55 + r() * 0.95, curve: (r() - 0.5) * 0.5, rate: 0.0009 + r() * 0.0012, phase: r() * Math.PI * 2 });
   }
+  const sizeFrac = r();
   const w: Warden = {
     x: 0,
     y: 0,
     tx: 0,
     ty: 0,
     speed: 0,
-    size: 24 + r() * 20,
+    size: sizeMin + sizeFrac * (sizeMax - sizeMin),
+    sizeFrac,
     hue,
     eyeHue: hue,
     spikes,
@@ -184,6 +189,8 @@ export class WardenSystem {
   private ctx: CanvasRenderingContext2D;
   private wardens: Warden[] = [];
   private branchWardenCache = new Map<number, Warden>(); // incremental — never regenerate wholesale, or an in-progress hover/interaction breaks
+  private sizeMin = 24;
+  private sizeMax = 44;
   private haloGradient: CanvasGradient | null = null;
   private seed: number;
   private cssWidth = 1;
@@ -196,7 +203,17 @@ export class WardenSystem {
   }
 
   setWardens(count: number) {
-    this.wardens = makeWardens(count, this.seed);
+    this.wardens = makeWardens(count, this.seed, this.sizeMin, this.sizeMax);
+  }
+
+  /** Rescales every existing warden's size from its stored raw fraction —
+   *  no regeneration needed, so an in-progress hover/lock-on isn't disrupted
+   *  when the admin adjusts the min/max sliders. */
+  setSizeRange(min: number, max: number) {
+    this.sizeMin = min;
+    this.sizeMax = max;
+    for (const w of this.wardens) w.size = min + w.sizeFrac * (max - min);
+    for (const w of this.branchWardenCache.values()) w.size = min + w.sizeFrac * (max - min);
   }
 
   /** Wardens become the branch objects themselves — one per branch,
@@ -210,7 +227,7 @@ export class WardenSystem {
     }
     for (const b of branches) {
       if (!this.branchWardenCache.has(b.id)) {
-        this.branchWardenCache.set(b.id, makeWardenForBranch(b.id, b.slug));
+        this.branchWardenCache.set(b.id, makeWardenForBranch(b.id, b.slug, this.sizeMin, this.sizeMax));
       }
     }
     // Preserve the branches' own order for stable draw order.

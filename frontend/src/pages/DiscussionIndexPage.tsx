@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { api } from "../lib/api";
 import { useDocumentTitle } from "../lib/useDocumentTitle";
 import { useIsDesktop } from "../lib/useIsDesktop";
+import { useContentScaleStore } from "../lib/contentScaleStore";
 import type { Branch } from "../lib/types";
 
 interface ChannelSummary {
@@ -15,7 +16,7 @@ interface ChannelSummary {
 export function DiscussionIndexPage() {
   useDocumentTitle("Forums");
   const isDesktop = useIsDesktop();
-  const scale = isDesktop ? 2 : 1.6; // double on desktop, 60% bigger on mobile
+  const scale = useContentScaleStore((s) => (isDesktop ? s.desktop : s.mobile));
   const [topics, setTopics] = useState<ChannelSummary[]>([]);
   const [branches, setBranches] = useState<Branch[]>([]);
 

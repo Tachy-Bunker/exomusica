@@ -4,7 +4,8 @@ import { FX_DEFAULTS, type FxSettings } from "../../lib/entoptic/useSpacemapFiel
 
 const SLIDERS: { key: keyof FxSettings; label: string; min: number; max: number; step: number }[] = [
   { key: "debrisCount", label: "Debris", min: 10, max: 1500, step: 1 },
-  { key: "wardenCount", label: "Wardens", min: 2, max: 9, step: 1 },
+  { key: "wardenSizeMin", label: "Warden size (min)", min: 8, max: 100, step: 1 },
+  { key: "wardenSizeMax", label: "Warden size (max)", min: 8, max: 100, step: 1 },
   { key: "split", label: "Chromatic split", min: 0, max: 1, step: 0.01 },
   { key: "chaos", label: "Fold chaos", min: 0, max: 1, step: 0.01 },
   { key: "drift", label: "Drift speed", min: 0, max: 1, step: 0.01 },

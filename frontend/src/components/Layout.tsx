@@ -6,6 +6,7 @@ import { useCustomFont } from "../lib/useCustomFont";
 import { useAmbienceStore } from "../lib/ambienceStore";
 import { useProfileStore } from "../lib/profileStore";
 import { useVolumeMixerStore } from "../lib/volumeMixerStore";
+import { useContentScaleStore } from "../lib/contentScaleStore";
 import { Avatar } from "./Avatar";
 import { MailIcon, MailNotificationIcon } from "./Icons";
 import { MobileAccountHook } from "./MobileAccountHook";
@@ -65,6 +66,9 @@ export function Layout() {
       textColorPrimary: string | null;
       textColorSecondary: string | null;
       chatTitleColor: string | null;
+      accentPrimaryColor: string | null;
+      contentTextScaleDesktop: number;
+      contentTextScaleMobile: number;
     }>("/api/site-settings").then((s) => {
       setSiteFont(s.defaultFont);
       useAmbienceStore.getState().setUrl(s.ambienceUrl);
@@ -72,6 +76,10 @@ export function Layout() {
       if (s.textColorPrimary) root.setProperty("--text", s.textColorPrimary);
       if (s.textColorSecondary) root.setProperty("--text-dim", s.textColorSecondary);
       if (s.chatTitleColor) root.setProperty("--chat-title-color", s.chatTitleColor);
+      if (s.accentPrimaryColor) root.setProperty("--accent-forum", s.accentPrimaryColor);
+      root.setProperty("--content-scale-desktop", String(s.contentTextScaleDesktop));
+      root.setProperty("--content-scale-mobile", String(s.contentTextScaleMobile));
+      useContentScaleStore.getState().setScale(s.contentTextScaleDesktop, s.contentTextScaleMobile);
     });
   }, []);
   useCustomFont(siteFont); // still needed for its @font-face injection side effect

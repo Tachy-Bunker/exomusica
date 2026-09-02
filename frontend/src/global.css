@@ -1065,6 +1065,10 @@ th {
   left: 37px;
 }
 
+.channel-toolbar .btn {
+  font-size: calc(0.9rem * var(--content-scale-mobile, 1.6));
+}
+
 @media (min-width: 900px) {
   .top-nav .brand {
     font-size: 2.5rem;
@@ -1074,7 +1078,7 @@ th {
     gap: 1.6rem;
   }
   .channel-toolbar .btn {
-    font-size: 1.8rem;
+    font-size: calc(0.9rem * var(--content-scale-desktop, 2));
     padding: 0.5rem 1rem;
   }
 }

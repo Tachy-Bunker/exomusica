@@ -6,7 +6,8 @@ import { WardenSystem } from "./wardenSystem";
 // Matches the prototype's <div class="hud"> default slider values exactly.
 export const FX_DEFAULTS = {
   debrisCount: 320,
-  wardenCount: 5,
+  wardenSizeMin: 24,
+  wardenSizeMax: 44,
   split: 0.4,
   chaos: 0.5,
   drift: 0.38,
@@ -74,7 +75,9 @@ export function useSpacemapField(settings: FxSettings = FX_DEFAULTS) {
     const field = new FieldRenderer(fieldCanvas);
     const overlay = new OverlaySnowRenderer(overlayCanvas);
     const wardens = new WardenSystem(wardenCanvas, seed);
-    wardens.setWardens(settingsRef.current.wardenCount);
+    // No initial random set — bindToBranches (called by the spacemap as
+    // soon as its branch list loads) populates wardens 1:1 with branches.
+    // Warden count is never independently admin-configurable.
     wardenBridge.bindToBranches = (branches) => wardens.bindToBranches(branches);
     wardenBridge.setScreenPosition = (branchId, x, y) => wardens.setScreenPosition(branchId, x, y);
 
@@ -110,6 +113,7 @@ export function useSpacemapField(settings: FxSettings = FX_DEFAULTS) {
 
       wardens.tick(dt, 1, s.drift);
       wardens.updateTrails(now, s.trailAmt);
+      wardens.setSizeRange(s.wardenSizeMin, s.wardenSizeMax);
 
       const fieldSources = wardens.getFieldSources(now);
       const fieldFlyers = wardens.getFieldFlyers();

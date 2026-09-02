@@ -1,4 +1,5 @@
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { ChromaticAberrationLayer } from "./components/ChromaticAberrationLayer";
 import { AuthProvider } from "./lib/auth";
 import { Layout } from "./components/Layout";
 import { RequireAdmin } from "./components/RequireAdmin";
@@ -34,12 +35,15 @@ import { GuideAssetsAdminPage } from "./pages/admin/GuideAssetsAdminPage";
 
 export default function App() {
   return (
-    <BrowserRouter>
-      <AuthProvider>
-        <Routes>
-          <Route element={<Layout />}>
-            <Route index element={<HomePage />} />
-            <Route path="login" element={<LoginPage />} />
+    <>
+      <ChromaticAberrationLayer />
+      <div style={{ filter: "url(#caFilter)" }}>
+        <BrowserRouter>
+          <AuthProvider>
+            <Routes>
+              <Route element={<Layout />}>
+                <Route index element={<HomePage />} />
+                <Route path="login" element={<LoginPage />} />
             <Route path="join" element={<JoinPage />} />
             <Route path="about" element={<AboutPage />} />
             <Route path="wiki" element={<WikiPage />} />
@@ -79,5 +83,7 @@ export default function App() {
         </Routes>
       </AuthProvider>
     </BrowserRouter>
+      </div>
+    </>
   );
 }
