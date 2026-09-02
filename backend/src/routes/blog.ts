@@ -5,6 +5,13 @@ import { requireAdmin } from "../lib/auth.js";
 import { sendTemplatedMail } from "../lib/emailTemplates.js";
 
 export async function blogRoutes(app: FastifyInstance): Promise<void> {
+  app.get("/api/admin/newsletter-subscriptions", { preHandler: requireAdmin }, async () => {
+    return prisma.newsletterSubscription.findMany({
+      select: { id: true, email: true, confirmed: true, createdAt: true },
+      orderBy: { createdAt: "desc" },
+    });
+  });
+
   app.get("/api/blog", async () => {
     return prisma.blogPost.findMany({
       where: { publishedAt: { not: null } },

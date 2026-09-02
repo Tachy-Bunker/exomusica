@@ -25,7 +25,7 @@ export const useSiteEffectsStore = create<SiteEffectsState>((set) => ({
   caBurst: 0.6,
   chatOpenSfxUrl: null,
   userCaEnabled: true,
-  userMoireEnabled: true,
+  userMoireEnabled: false,
   chatHudRevealRate: 30,
   chatHudSfxUrl: null,
   chatSplashMessages: [],

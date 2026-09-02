@@ -79,7 +79,7 @@ export function PlayerBar() {
             <button className="btn" onClick={playNext} disabled={queue.length === 0} title="Next (Shift+→)">
               <NextIcon size={16} />
             </button>
-            <div className="track-info">
+            <div className="track-info" title={`${currentTrack.title} by ${currentTrack.composer}`}>
               <div className="title">{currentTrack.title}</div>
               <div className="origin">
                 {currentTrack.composer} —{" "}

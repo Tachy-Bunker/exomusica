@@ -641,61 +641,65 @@ export function ChannelPage({ channelSlug, fillHeight }: { channelSlug?: string;
               flexDirection: "column",
               minHeight: 0,
               ...(isMobileWindow
-                ? { height: isChatFullscreen ? "100vh" : "calc(100dvh - 3.6rem - 3rem)", background: "var(--bg)" }
+                ? { height: isChatFullscreen ? "100vh" : "calc(100dvh - var(--nav-height, 3.6rem) - 3rem)", background: "var(--bg)" }
                 : { height: "100%" }),
             }
           : { fontFamily }
       }
     >
       <div className="channel-toolbar" style={{ display: "flex", gap: "0.6rem", marginBottom: effectiveFillHeight ? "0.6rem" : "1rem", flexWrap: "wrap", flexShrink: 0, alignItems: "center" }}>
-        <TopicSwitcher />
-        <button className={`btn ${mode === "live" ? "btn-primary" : ""}`} onClick={() => setMode("live")}>
-          Live
-        </button>
         {isMobileWindow && (
           <button className="btn" onClick={toggleChatFullscreen} title={isChatFullscreen ? "Exit fullscreen" : "Fullscreen"}>
             {isChatFullscreen ? "⤡" : "⤢"}
           </button>
         )}
-        {isDesktop && (
-          <button className="btn" onClick={popOutChat} title="Open in a floating window">
-            ↗ Pop out
-          </button>
+        {(!isMobileWindow || isChatFullscreen) && (
+          <>
+            <TopicSwitcher />
+            <button className={`btn ${mode === "live" ? "btn-primary" : ""}`} onClick={() => setMode("live")}>
+              Live
+            </button>
+            {isDesktop && (
+              <button className="btn" onClick={popOutChat} title="Open in a floating window">
+                ↗ Pop out
+              </button>
+            )}
+            <ArchiveCalendar
+              label="Past chats"
+              archiveDays={archiveDays}
+              selectedDay={mode === "day" ? selectedDay : null}
+              onSelect={(day) => {
+                setSelectedDay(day);
+                setMode("day");
+              }}
+            />
+            {slug && (
+              <SearchBox
+                channelSlug={slug}
+                onSearch={(query) => {
+                  setActiveSearch(query);
+                  setMode("search");
+                }}
+              />
+            )}
+            <div style={{ display: "flex", alignItems: "center", gap: "0.2rem" }} title="Message text size">
+              <button className="btn" style={{ padding: "0.1rem 0.5rem" }} onClick={() => adjustFontSize(-10)}>
+                −
+              </button>
+              <button className="btn" style={{ padding: "0.1rem 0.5rem" }} onClick={() => adjustFontSize(10)}>
+                +
+              </button>
+            </div>
+            {user && (
+              <button className="btn" onClick={toggleFollow}>
+                {following ? "Following ✓" : "Follow"}
+              </button>
+            )}
+            <button className="btn" onClick={toggleDisplayMode} title={displayMode === "grouped" ? "Switch to standard view" : "Switch to grouped view"}>
+              👁
+            </button>
+          </>
         )}
-        <ArchiveCalendar
-          label="Past chats"
-          archiveDays={archiveDays}
-          selectedDay={mode === "day" ? selectedDay : null}
-          onSelect={(day) => {
-            setSelectedDay(day);
-            setMode("day");
-          }}
-        />
-        {slug && (
-          <SearchBox
-            channelSlug={slug}
-            onSearch={(query) => {
-              setActiveSearch(query);
-              setMode("search");
-            }}
-          />
-        )}
-        <div style={{ display: "flex", alignItems: "center", gap: "0.2rem" }} title="Message text size">
-          <button className="btn" style={{ padding: "0.1rem 0.5rem" }} onClick={() => adjustFontSize(-10)}>
-            −
-          </button>
-          <button className="btn" style={{ padding: "0.1rem 0.5rem" }} onClick={() => adjustFontSize(10)}>
-            +
-          </button>
-        </div>
-        {user && (
-          <button className="btn" onClick={toggleFollow}>
-            {following ? "Following ✓" : "Follow"}
-          </button>
-        )}
-        <button className="btn" onClick={toggleDisplayMode} title={displayMode === "grouped" ? "Switch to standard view" : "Switch to grouped view"}>
-          👁
-        </button>
       </div>
 
 
@@ -779,6 +783,7 @@ export function ChannelPage({ channelSlug, fillHeight }: { channelSlug?: string;
                 }}
                 rows={2}
                 style={{ width: "100%", fontSize: `${messageFontSize}%` }}
+                className="hud-reveal-textarea"
                 placeholder={hudReveal.placeholderText}
               />
               {draft.length === 0 && (

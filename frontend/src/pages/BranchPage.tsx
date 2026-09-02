@@ -85,77 +85,83 @@ export function BranchPage() {
 
   if (!branch) return <p>Loading…</p>;
 
+  const coverMinWidth = isDesktop ? "160px" : "28vw";
+  const coverTextScale = isDesktop ? 1 : 0.6;
+
   return (
-    <div style={{ fontFamily }}>
-      <p style={{ marginBottom: "0.5rem" }}>
-        <Link to="/">{isDesktop ? "← back to Exo-Lands (R)" : "← Back to Exo-Lands"}</Link>
-      </p>
-      <h1>{branch.name}</h1>
-      {branch.description && <p style={{ color: "var(--text-dim)", maxWidth: 640 }}>{branch.description}</p>}
-
-
-      <h2 style={{ fontSize: "1.1rem", color: "var(--accent-audio)" }}>Music</h2>
-      {albums.length === 0 ? (
-        <p style={{ color: "var(--text-dim)" }}>
-          No releases yet. Full album pages (streaming/download links, collaborator cards) are a Phase 3 build —
-          this shows whatever's already in the database.
+    <div style={{ fontFamily, ...(isDesktop ? {} : { display: "flex", flexDirection: "column", height: "calc(100dvh - var(--nav-height, 3.6rem) - 3rem)" }) }}>
+      <div style={isDesktop ? {} : { flexShrink: 0, overflowY: "auto" }}>
+        <p style={{ marginBottom: "0.5rem" }}>
+          <Link to="/">{isDesktop ? "← back to Exo-Lands (R)" : "← Back to Exo-Lands"}</Link>
         </p>
-      ) : (
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))", gap: "1rem" }}>
-          {albums.map((a) => (
-            <div key={a.id}>
-              <Link to={`/album/${a.slug}`} style={{ display: "block", textDecoration: "none", color: "inherit" }}>
-                <div
-                  style={{
-                    aspectRatio: "1",
-                    background: a.coverArtUrl ? `url(${a.coverArtUrl}) center/cover` : "var(--bg-elevated)",
-                    borderRadius: "var(--radius)",
-                    border: "1px solid var(--border)",
-                    position: "relative",
-                  }}
-                >
-                  {a.previewTrack && (
-                    <button
-                      className="btn"
-                      style={{ position: "absolute", bottom: 8, right: 40 }}
-                      title="Play album"
-                      onClick={(e) => {
-                        e.preventDefault();
-                        void playAlbum(a.slug);
-                      }}
-                    >
-                      ▶
-                    </button>
-                  )}
-                  <button
-                    className="btn"
-                    style={{ position: "absolute", bottom: 8, right: 8 }}
-                    title="Add whole album to queue"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      void queueAlbum(a.slug);
+        <h1>{branch.name}</h1>
+        {branch.description && <p style={{ color: "var(--text-dim)", maxWidth: 640 }}>{branch.description}</p>}
+
+        <h2 style={{ fontSize: "1.1rem", color: "var(--accent-audio)" }}>Music</h2>
+        {albums.length === 0 ? (
+          <p style={{ color: "var(--text-dim)" }}>
+            No releases yet. Full album pages (streaming/download links, collaborator cards) are a Phase 3 build —
+            this shows whatever's already in the database.
+          </p>
+        ) : (
+          <div style={{ display: "grid", gridTemplateColumns: `repeat(auto-fill, minmax(${coverMinWidth}, 1fr))`, gap: isDesktop ? "1rem" : "0.5rem" }}>
+            {albums.map((a) => (
+              <div key={a.id}>
+                <Link to={`/album/${a.slug}`} style={{ display: "block", textDecoration: "none", color: "inherit" }}>
+                  <div
+                    style={{
+                      aspectRatio: "1",
+                      background: a.coverArtUrl ? `url(${a.coverArtUrl}) center/cover` : "var(--bg-elevated)",
+                      borderRadius: "var(--radius)",
+                      border: "1px solid var(--border)",
+                      position: "relative",
                     }}
                   >
-                    +
-                  </button>
-                </div>
-                <div style={{ fontSize: "0.9rem", marginTop: "0.3rem" }}>{a.title}</div>
-              </Link>
-              <div style={{ fontSize: "0.8rem", color: "var(--text-dim)" }}>{a.composer}</div>
-            </div>
-          ))}
-        </div>
-      )}
+                    {a.previewTrack && (
+                      <button
+                        className="btn"
+                        style={{ position: "absolute", bottom: 8, right: 40, fontSize: `${coverTextScale}rem`, padding: "0.2rem 0.4rem" }}
+                        title="Play album"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          void playAlbum(a.slug);
+                        }}
+                      >
+                        ▶
+                      </button>
+                    )}
+                    <button
+                      className="btn"
+                      style={{ position: "absolute", bottom: 8, right: 8, fontSize: `${coverTextScale}rem`, padding: "0.2rem 0.4rem" }}
+                      title="Add whole album to queue"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        void queueAlbum(a.slug);
+                      }}
+                    >
+                      +
+                    </button>
+                  </div>
+                  <div style={{ fontSize: `${0.9 * coverTextScale}rem`, marginTop: "0.3rem" }}>{a.title}</div>
+                </Link>
+                <div style={{ fontSize: `${0.8 * coverTextScale}rem`, color: "var(--text-dim)" }}>{a.composer}</div>
+              </div>
+            ))}
+          </div>
+        )}
 
-      <RootDivider />
+        {isDesktop && <RootDivider />}
+        {isDesktop && <h2 style={{ fontSize: "1.1rem", color: "var(--accent-forum)" }}>Forum</h2>}
+      </div>
 
-      <h2 style={{ fontSize: "1.1rem", color: "var(--accent-forum)" }}>Forum</h2>
       {!branch.channel ? (
-        <p>No topic yet.</p>
+        isDesktop && <p>No topic yet.</p>
       ) : isDesktop ? (
         <p style={{ color: "var(--text-dim)", fontSize: "0.9rem" }}>This topic's chat is open in the dock →</p>
       ) : (
-        <ChannelPage channelSlug={branch.channel.slug} />
+        <div style={{ flex: 1, minHeight: "30vh", marginTop: "0.6rem" }}>
+          <ChannelPage channelSlug={branch.channel.slug} />
+        </div>
       )}
 
       {showIntro && branch.guideAsset && (

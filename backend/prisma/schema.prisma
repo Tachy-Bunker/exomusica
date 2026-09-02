@@ -59,7 +59,7 @@ model User {
   volumeSfxPlaying      Float        @default(0.6) // SFX volume while music is playing — ducked so it doesn't compete
   volumeMusic           Float        @default(1.0)
   caEnabled             Boolean      @default(true)
-  moireEnabled          Boolean      @default(true)
+  moireEnabled          Boolean      @default(false)
   notifyWeeklySummary   Boolean      @default(true)
   notifyDailySummary    Boolean      @default(false)
   notifyFollowedReplies Boolean      @default(true)

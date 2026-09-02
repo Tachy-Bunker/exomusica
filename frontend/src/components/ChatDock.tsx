@@ -53,7 +53,7 @@ export function ChatDock() {
     <div
       style={{
         position: "fixed",
-        top: "3.6rem",
+        top: "var(--nav-height, 3.6rem)",
         right: 0,
         bottom: "var(--player-height, 0px)",
         width,

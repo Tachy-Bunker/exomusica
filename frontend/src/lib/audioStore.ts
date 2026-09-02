@@ -56,7 +56,7 @@ export const useAudioStore = create<AudioState>((set, get) => ({
   queue: [],
   history: [],
   shuffle: false,
-  repeatMode: "off",
+  repeatMode: "all",
   isPlaying: false,
   currentTime: 0,
   duration: 0,

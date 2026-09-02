@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, Outlet } from "react-router-dom";
 import { api } from "../lib/api";
 import { useAuth } from "../lib/auth";
@@ -67,6 +67,16 @@ export function Layout() {
   }, [user]);
 
   const [siteFont, setSiteFont] = useState<{ familyName: string; fileUrl: string; format: string } | null>(null);
+  const navRef = useRef<HTMLElement>(null);
+  useEffect(() => {
+    const el = navRef.current;
+    if (!el) return;
+    const observer = new ResizeObserver(() => {
+      document.documentElement.style.setProperty("--nav-height", `${el.getBoundingClientRect().height}px`);
+    });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
   useEffect(() => {
     api<{
       defaultFont: typeof siteFont;
@@ -148,7 +158,7 @@ export function Layout() {
       className="app-shell"
       style={{ "--dock-offset": `${dockOffset}px` } as React.CSSProperties}
     >
-      <header className="top-nav">
+      <header className="top-nav" ref={navRef}>
         <Link to="/" className="brand">
           ⩽ Exomusica ⪖
         </Link>

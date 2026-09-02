@@ -43,6 +43,9 @@ export function AdminLayout() {
         <NavLink to="/admin/fx-settings" className={({ isActive }) => (isActive ? "active" : "")}>
           Spacemap field
         </NavLink>
+        <NavLink to="/admin/newsletter" className={({ isActive }) => (isActive ? "active" : "")}>
+          Newsletter
+        </NavLink>
         <NavLink to="/admin/notifications" className={({ isActive }) => (isActive ? "active" : "")}>
           Notification sounds
         </NavLink>

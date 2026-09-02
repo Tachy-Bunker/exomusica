@@ -31,6 +31,7 @@ import { AuditLogAdminPage } from "./pages/admin/AuditLogAdminPage";
 import { AboutAdminPage } from "./pages/admin/AboutAdminPage";
 import { FontsAdminPage } from "./pages/admin/FontsAdminPage";
 import { FxSettingsAdminPage } from "./pages/admin/FxSettingsAdminPage";
+import { NewsletterAdminPage } from "./pages/admin/NewsletterAdminPage";
 import { NotificationsAdminPage } from "./pages/admin/NotificationsAdminPage";
 import { GuideAssetsAdminPage } from "./pages/admin/GuideAssetsAdminPage";
 
@@ -77,6 +78,7 @@ export default function App() {
                 <Route path="about" element={<AboutAdminPage />} />
                 <Route path="fonts" element={<FontsAdminPage />} />
                 <Route path="fx-settings" element={<FxSettingsAdminPage />} />
+                <Route path="newsletter" element={<NewsletterAdminPage />} />
                 <Route path="notifications" element={<NotificationsAdminPage />} />
                 <Route path="guide-assets" element={<GuideAssetsAdminPage />} />
               </Route>
