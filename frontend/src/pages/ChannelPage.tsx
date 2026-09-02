@@ -21,6 +21,7 @@ import { MiniChat } from "../components/MiniChat";
 import { useSiteEffectsStore } from "../lib/siteEffectsStore";
 import { getCurrentSfxVolume } from "../lib/volumeMixerStore";
 import { useChatHudReveal } from "../lib/useChatHudReveal";
+import { useFixedPortalRoot } from "../lib/useFixedPortalRoot";
 
 type ViewMode = "live" | "day" | "search";
 type DisplayMode = "standard" | "grouped";
@@ -307,17 +308,8 @@ export function ChannelPage({ channelSlug, fillHeight }: { channelSlug?: string;
   const hudReveal = useChatHudReveal(slug ? `${slug}-${isChatFullscreen}` : undefined);
   const mobileWindowRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    function handleFsChange() {
-      setIsChatFullscreen(!!document.fullscreenElement);
-    }
-    document.addEventListener("fullscreenchange", handleFsChange);
-    return () => document.removeEventListener("fullscreenchange", handleFsChange);
-  }, []);
-
   function toggleChatFullscreen() {
-    if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
-    else mobileWindowRef.current?.requestFullscreen().catch(() => {});
+    setIsChatFullscreen((v) => !v);
   }
   const [mode, setMode] = useState<ViewMode>("live");
   const [displayMode, setDisplayMode] = useState<DisplayMode>(
@@ -628,8 +620,9 @@ export function ChannelPage({ channelSlug, fillHeight }: { channelSlug?: string;
   }
 
   const isMobileWindow = !isDesktop && !fillHeight;
+  const portalRoot = useFixedPortalRoot();
 
-  return (
+  const content = (
     <LinkClickContext.Provider value={navigate}>
     <div
       ref={isMobileWindow ? mobileWindowRef : undefined}
@@ -641,7 +634,9 @@ export function ChannelPage({ channelSlug, fillHeight }: { channelSlug?: string;
               flexDirection: "column",
               minHeight: 0,
               ...(isMobileWindow
-                ? { height: isChatFullscreen ? "100vh" : "calc(100dvh - var(--nav-height, 3.6rem) - 3rem)", background: "var(--bg)" }
+                ? isChatFullscreen
+                  ? { position: "fixed" as const, inset: 0, zIndex: 55, background: "var(--bg)" }
+                  : { height: "calc(100dvh - var(--nav-height, 3.6rem) - 3rem)", background: "var(--bg)" }
                 : { height: "100%" }),
             }
           : { fontFamily }
@@ -821,4 +816,11 @@ export function ChannelPage({ channelSlug, fillHeight }: { channelSlug?: string;
     </div>
     </LinkClickContext.Provider>
   );
+
+  // Same fix as the player bar: only actually portal while genuinely in
+  // fullscreen mode (position:fixed, needs the true viewport) — normal
+  // in-place rendering the rest of the time, so this doesn't change
+  // anything about how the dock or standalone page rendering works.
+  if (isChatFullscreen && isMobileWindow && portalRoot) return createPortal(content, portalRoot);
+  return content;
 }

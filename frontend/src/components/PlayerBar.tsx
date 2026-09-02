@@ -1,7 +1,9 @@
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { Link } from "react-router-dom";
 import { bindAudioElement, useAudioStore } from "../lib/audioStore";
 import { useIsDesktop } from "../lib/useIsDesktop";
+import { useFixedPortalRoot } from "../lib/useFixedPortalRoot";
 import { PreviousIcon, NextIcon, LoopIcon, LoopOneIcon, ExpandIcon, CollapseIcon } from "./Icons";
 
 function formatTime(seconds: number): string {
@@ -91,8 +93,9 @@ export function PlayerBar() {
   }
 
   const progressPct = duration ? (currentTime / duration) * 100 : 0;
+  const portalRoot = useFixedPortalRoot();
 
-  return (
+  const content = (
     <div className="player-bar-wrapper" ref={wrapperRef} style={{ display: currentTrack ? "block" : "none" }}>
       {/* This element is created once and never unmounts across route
           changes — that's the entire mechanism behind "playback survives
@@ -244,4 +247,12 @@ export function PlayerBar() {
       )}
     </div>
   );
+
+  // Portal escapes the app-root's chromatic-aberration filter wrapper —
+  // CSS filter on an ancestor changes the containing block for
+  // position:fixed descendants, which was making this bar/overlay
+  // position and size relative to that wrapper instead of the true
+  // viewport (most visible as the expanded view not properly filling the
+  // screen on pages with unusual content height, like branch pages).
+  return portalRoot ? createPortal(content, portalRoot) : content;
 }

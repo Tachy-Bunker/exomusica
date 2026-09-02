@@ -36,6 +36,10 @@ export function Layout() {
   const dockOffset = isDesktop && dockOpen && !dockCollapsed ? dockWidth : 0;
 
   useEffect(() => {
+    document.documentElement.style.setProperty("--dock-offset", `${dockOffset}px`);
+  }, [dockOffset]);
+
+  useEffect(() => {
     loadEmojis();
   }, [loadEmojis]);
 

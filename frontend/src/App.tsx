@@ -39,6 +39,7 @@ export default function App() {
   return (
     <>
       <ChromaticAberrationLayer />
+      <div id="fixed-portal-root" />
       <div style={{ filter: "url(#caFilter)" }}>
         <MoireLayer />
         <BrowserRouter>
