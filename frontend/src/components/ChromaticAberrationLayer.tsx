@@ -1,4 +1,5 @@
 import { useEffect, useRef } from "react";
+import { useSiteEffectsStore } from "../lib/siteEffectsStore";
 
 // Deliberately not a mirror of R_DIR — keeps the split asymmetric, matching the prototype.
 const CA_R_DIR: [number, number] = [1.0, 0.32];
@@ -21,8 +22,6 @@ interface CaBurst {
 export function ChromaticAberrationLayer() {
   const offRRef = useRef<SVGFEOffsetElement>(null);
   const offBRef = useRef<SVGFEOffsetElement>(null);
-  const initialAmtRef = useRef(0.15 * 2.6); // FX_DEFAULTS.caInitial * 2.6px
-  const burstAmtRef = useRef(0.6 * 22); // FX_DEFAULTS.caBurst * 22px
 
   useEffect(() => {
     let rafId: number;
@@ -40,6 +39,9 @@ export function ChromaticAberrationLayer() {
 
     function tick(now: number) {
       if (paused) return;
+      const { caInitial, caBurst } = useSiteEffectsStore.getState();
+      const initialAmt = caInitial * 2.6;
+      const burstAmt = caBurst * 22;
       if (!reduceMotion) {
         if (!burst && now >= nextBurst) {
           burst = {
@@ -53,7 +55,7 @@ export function ChromaticAberrationLayer() {
         }
       }
 
-      let amt = initialAmtRef.current;
+      let amt = initialAmt;
       let angR = 0;
       let angB = 0;
       if (burst) {
@@ -64,7 +66,7 @@ export function ChromaticAberrationLayer() {
           const t = el / burst.dur;
           const env = Math.sin(Math.PI * t);
           const jitter = 0.85 + Math.random() * 0.3;
-          amt = initialAmtRef.current + (burstAmtRef.current - initialAmtRef.current) * env * burst.peak * jitter;
+          amt = initialAmt + (burstAmt - initialAmt) * env * burst.peak * jitter;
           angR = burst.angR * env;
           angB = burst.angB * env;
         }

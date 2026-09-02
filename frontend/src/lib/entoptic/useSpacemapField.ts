@@ -1,6 +1,5 @@
 import { useEffect, useRef } from "react";
 import { FieldRenderer } from "./fieldRenderer";
-import { OverlaySnowRenderer } from "./overlaySnow";
 import { WardenSystem } from "./wardenSystem";
 
 // Matches the prototype's <div class="hud"> default slider values exactly.
@@ -59,7 +58,6 @@ export const wardenBridge: {
 export function useSpacemapField(settings: FxSettings = FX_DEFAULTS) {
   const fieldCanvasRef = useRef<HTMLCanvasElement>(null);
   const wardenCanvasRef = useRef<HTMLCanvasElement>(null);
-  const overlayCanvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const settingsRef = useRef(settings);
   settingsRef.current = settings;
@@ -67,13 +65,11 @@ export function useSpacemapField(settings: FxSettings = FX_DEFAULTS) {
   useEffect(() => {
     const fieldCanvas = fieldCanvasRef.current;
     const wardenCanvas = wardenCanvasRef.current;
-    const overlayCanvas = overlayCanvasRef.current;
     const container = containerRef.current;
-    if (!fieldCanvas || !wardenCanvas || !overlayCanvas || !container) return;
+    if (!fieldCanvas || !wardenCanvas || !container) return;
 
     const seed = (Math.random() * 0xffffffff) >>> 0;
     const field = new FieldRenderer(fieldCanvas);
-    const overlay = new OverlaySnowRenderer(overlayCanvas);
     const wardens = new WardenSystem(wardenCanvas, seed);
     // No initial random set — bindToBranches (called by the spacemap as
     // soon as its branch list loads) populates wardens 1:1 with branches.
@@ -85,7 +81,6 @@ export function useSpacemapField(settings: FxSettings = FX_DEFAULTS) {
       const w = container!.clientWidth;
       const h = container!.clientHeight;
       field.resize(w, h);
-      overlay.resize(w, h);
       wardens.resize(w, h);
     }
     resize();
@@ -136,8 +131,6 @@ export function useSpacemapField(settings: FxSettings = FX_DEFAULTS) {
         flyers: fieldFlyers,
       });
 
-      overlay.render({ time: now, staticAmt: s.staticAmt, staticSpeed: s.staticSpeed });
-
       const containerW = container!.clientWidth || 1;
       const containerH = container!.clientHeight || 1;
       wardens.render({
@@ -164,10 +157,9 @@ export function useSpacemapField(settings: FxSettings = FX_DEFAULTS) {
       wardenBridge.bindToBranches = () => {};
       wardenBridge.setScreenPosition = () => {};
       field.dispose();
-      overlay.dispose();
       wardens.dispose();
     };
   }, []);
 
-  return { containerRef, fieldCanvasRef, wardenCanvasRef, overlayCanvasRef };
+  return { containerRef, fieldCanvasRef, wardenCanvasRef };
 }

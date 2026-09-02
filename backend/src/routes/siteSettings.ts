@@ -2,6 +2,7 @@ import type { FastifyInstance } from "fastify";
 import { prisma } from "../lib/prisma.js";
 import { requireAdmin } from "../lib/auth.js";
 import { saveSoundFile } from "../lib/storage.js";
+import { verifySmtpConnection } from "../lib/mailer.js";
 
 export async function siteSettingsRoutes(app: FastifyInstance): Promise<void> {
   app.get("/api/site-settings", async () => {
@@ -23,8 +24,56 @@ export async function siteSettingsRoutes(app: FastifyInstance): Promise<void> {
         accentPrimaryColor: null,
         contentTextScaleDesktop: 2.0,
         contentTextScaleMobile: 1.6,
+        caInitial: 0.15,
+        caBurst: 0.6,
+        staticAmt: 0.18,
+        staticSpeed: 0.55,
+        smtpHost: null,
+        smtpPort: null,
+        smtpUser: null,
+        smtpFrom: null,
+        // smtpPassword deliberately never returned to the client
       }
     );
+  });
+
+  // Admin-only view — includes whether a password is set (as a boolean,
+  // never the value itself) so the form can show "configured" without
+  // ever round-tripping the actual secret back to the browser.
+  app.get("/api/admin/site-settings/smtp", { preHandler: requireAdmin }, async () => {
+    const settings = await prisma.siteSettings.findUnique({ where: { id: 1 } });
+    return {
+      smtpHost: settings?.smtpHost ?? null,
+      smtpPort: settings?.smtpPort ?? null,
+      smtpUser: settings?.smtpUser ?? null,
+      smtpFrom: settings?.smtpFrom ?? null,
+      smtpPasswordSet: !!settings?.smtpPassword,
+    };
+  });
+
+  app.put<{
+    Body: { smtpHost: string | null; smtpPort: number | null; smtpUser: string | null; smtpPassword?: string; smtpFrom: string | null };
+  }>("/api/admin/site-settings/smtp", { preHandler: requireAdmin }, async (req) => {
+    const data: Record<string, unknown> = {
+      smtpHost: req.body.smtpHost,
+      smtpPort: req.body.smtpPort,
+      smtpUser: req.body.smtpUser,
+      smtpFrom: req.body.smtpFrom,
+    };
+    // Only overwrite the password if a new one was actually typed — an
+    // empty field means "leave the existing one alone", not "clear it".
+    if (req.body.smtpPassword) data.smtpPassword = req.body.smtpPassword;
+    await prisma.siteSettings.upsert({ where: { id: 1 }, create: { id: 1, ...data }, update: data });
+    return { status: "ok" };
+  });
+
+  app.post("/api/admin/site-settings/smtp/test", { preHandler: requireAdmin }, async (_req, reply) => {
+    try {
+      await verifySmtpConnection();
+      return { ok: true };
+    } catch (err) {
+      return reply.code(400).send({ ok: false, error: err instanceof Error ? err.message : "connection failed" });
+    }
   });
 
   app.patch<{
@@ -37,6 +86,10 @@ export async function siteSettingsRoutes(app: FastifyInstance): Promise<void> {
       accentPrimaryColor: string | null;
       contentTextScaleDesktop: number;
       contentTextScaleMobile: number;
+      caInitial: number;
+      caBurst: number;
+      staticAmt: number;
+      staticSpeed: number;
     }>;
   }>("/api/admin/site-settings", { preHandler: requireAdmin }, async (req) => {
     const data: Record<string, unknown> = {};
@@ -50,6 +103,10 @@ export async function siteSettingsRoutes(app: FastifyInstance): Promise<void> {
       "accentPrimaryColor",
       "contentTextScaleDesktop",
       "contentTextScaleMobile",
+      "caInitial",
+      "caBurst",
+      "staticAmt",
+      "staticSpeed",
     ] as const) {
       if (key in body) data[key] = body[key];
     }

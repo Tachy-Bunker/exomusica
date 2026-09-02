@@ -7,6 +7,7 @@ import { useAmbienceStore } from "../lib/ambienceStore";
 import { useProfileStore } from "../lib/profileStore";
 import { useVolumeMixerStore } from "../lib/volumeMixerStore";
 import { useContentScaleStore } from "../lib/contentScaleStore";
+import { useSiteEffectsStore } from "../lib/siteEffectsStore";
 import { Avatar } from "./Avatar";
 import { MailIcon, MailNotificationIcon } from "./Icons";
 import { MobileAccountHook } from "./MobileAccountHook";
@@ -69,6 +70,10 @@ export function Layout() {
       accentPrimaryColor: string | null;
       contentTextScaleDesktop: number;
       contentTextScaleMobile: number;
+      caInitial: number;
+      caBurst: number;
+      staticAmt: number;
+      staticSpeed: number;
     }>("/api/site-settings").then((s) => {
       setSiteFont(s.defaultFont);
       useAmbienceStore.getState().setUrl(s.ambienceUrl);
@@ -80,6 +85,7 @@ export function Layout() {
       root.setProperty("--content-scale-desktop", String(s.contentTextScaleDesktop));
       root.setProperty("--content-scale-mobile", String(s.contentTextScaleMobile));
       useContentScaleStore.getState().setScale(s.contentTextScaleDesktop, s.contentTextScaleMobile);
+      useSiteEffectsStore.getState().setEffects({ caInitial: s.caInitial, caBurst: s.caBurst, staticAmt: s.staticAmt, staticSpeed: s.staticSpeed });
     });
   }, []);
   useCustomFont(siteFont); // still needed for its @font-face injection side effect

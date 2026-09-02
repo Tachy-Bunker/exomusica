@@ -39,6 +39,76 @@ export function FontsAdminPage() {
   const [accentPrimaryColor, setAccentPrimaryColor] = useState("#e2703f");
   const [contentTextScaleDesktop, setContentTextScaleDesktop] = useState(2.0);
   const [contentTextScaleMobile, setContentTextScaleMobile] = useState(1.6);
+  const [caInitial, setCaInitial] = useState(0.15);
+  const [caBurst, setCaBurst] = useState(0.6);
+  const [staticAmt, setStaticAmt] = useState(0.18);
+  const [staticSpeed, setStaticSpeed] = useState(0.55);
+  const [effectsSaved, setEffectsSaved] = useState(false);
+
+  const [smtpHost, setSmtpHost] = useState("");
+  const [smtpPort, setSmtpPort] = useState(587);
+  const [smtpUser, setSmtpUser] = useState("");
+  const [smtpPassword, setSmtpPassword] = useState("");
+  const [smtpFrom, setSmtpFrom] = useState("");
+  const [smtpPasswordSet, setSmtpPasswordSet] = useState(false);
+  const [smtpSaved, setSmtpSaved] = useState(false);
+  const [smtpTestResult, setSmtpTestResult] = useState<{ ok: boolean; error?: string } | null>(null);
+  const [smtpTesting, setSmtpTesting] = useState(false);
+
+  useEffect(() => {
+    api<{
+      smtpHost: string | null;
+      smtpPort: number | null;
+      smtpUser: string | null;
+      smtpFrom: string | null;
+      smtpPasswordSet: boolean;
+    }>("/api/admin/site-settings/smtp").then((s) => {
+      setSmtpHost(s.smtpHost ?? "");
+      setSmtpPort(s.smtpPort ?? 587);
+      setSmtpUser(s.smtpUser ?? "");
+      setSmtpFrom(s.smtpFrom ?? "");
+      setSmtpPasswordSet(s.smtpPasswordSet);
+    });
+  }, []);
+
+  async function saveEffects() {
+    await api("/api/admin/site-settings", {
+      method: "PATCH",
+      body: JSON.stringify({ caInitial, caBurst, staticAmt, staticSpeed }),
+    });
+    setEffectsSaved(true);
+    setTimeout(() => setEffectsSaved(false), 2000);
+  }
+
+  async function saveSmtp() {
+    await api("/api/admin/site-settings/smtp", {
+      method: "PUT",
+      body: JSON.stringify({
+        smtpHost: smtpHost || null,
+        smtpPort: smtpPort || null,
+        smtpUser: smtpUser || null,
+        smtpPassword: smtpPassword || undefined,
+        smtpFrom: smtpFrom || null,
+      }),
+    });
+    if (smtpPassword) setSmtpPasswordSet(true);
+    setSmtpPassword("");
+    setSmtpSaved(true);
+    setTimeout(() => setSmtpSaved(false), 2000);
+  }
+
+  async function testSmtp() {
+    setSmtpTesting(true);
+    setSmtpTestResult(null);
+    try {
+      const result = await api<{ ok: boolean; error?: string }>("/api/admin/site-settings/smtp/test", { method: "POST" });
+      setSmtpTestResult(result);
+    } catch (err) {
+      setSmtpTestResult({ ok: false, error: err instanceof ApiError ? err.message : "Test failed" });
+    } finally {
+      setSmtpTesting(false);
+    }
+  }
 
   function load() {
     api<Font[]>("/api/fonts").then(setFonts);
@@ -52,6 +122,10 @@ export function FontsAdminPage() {
       accentPrimaryColor: string | null;
       contentTextScaleDesktop: number;
       contentTextScaleMobile: number;
+      caInitial: number;
+      caBurst: number;
+      staticAmt: number;
+      staticSpeed: number;
     }>("/api/site-settings").then((s) => {
       setSiteDefaultFontId(s.defaultFontId);
       setAmbienceUrl(s.ambienceUrl);
@@ -62,6 +136,10 @@ export function FontsAdminPage() {
       if (s.accentPrimaryColor) setAccentPrimaryColor(s.accentPrimaryColor);
       setContentTextScaleDesktop(s.contentTextScaleDesktop);
       setContentTextScaleMobile(s.contentTextScaleMobile);
+      setCaInitial(s.caInitial);
+      setCaBurst(s.caBurst);
+      setStaticAmt(s.staticAmt);
+      setStaticSpeed(s.staticSpeed);
     });
   }
   useEffect(load, []);
@@ -141,7 +219,7 @@ export function FontsAdminPage() {
 
   return (
     <div>
-      <h1>Fonts</h1>
+      <h1>Fonts &amp; Misc</h1>
       <p style={{ color: "var(--text-dim)", fontSize: "0.9rem" }}>
         Upload OTF, TTF, WOFF, or WOFF2 files. Once uploaded, assign one to any branch, discussion topic, wiki page,
         or blog post from that item's edit screen — each picks independently from this library.
@@ -262,6 +340,70 @@ export function FontsAdminPage() {
         <button className="btn btn-primary" onClick={saveContentScale}>
           Save text size
         </button>
+      </div>
+
+      <div className="field" style={{ maxWidth: 420 }}>
+        <label>Site-wide effects</label>
+        <p style={{ fontSize: "0.75rem", color: "var(--text-dim)", marginTop: 0 }}>
+          Chromatic aberration and static snow — both run across the whole site now, not just the spacemap.
+        </p>
+        <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.3rem" }}>
+          <input type="range" min={0} max={1} step={0.01} value={caInitial} onChange={(e) => setCaInitial(Number(e.target.value))} />
+          <span style={{ fontSize: "0.8rem" }}>Aberration initial — {caInitial.toFixed(2)}</span>
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.3rem" }}>
+          <input type="range" min={0} max={1} step={0.01} value={caBurst} onChange={(e) => setCaBurst(Number(e.target.value))} />
+          <span style={{ fontSize: "0.8rem" }}>Aberration burst — {caBurst.toFixed(2)}</span>
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.3rem" }}>
+          <input type="range" min={0} max={1} step={0.01} value={staticAmt} onChange={(e) => setStaticAmt(Number(e.target.value))} />
+          <span style={{ fontSize: "0.8rem" }}>Static snow — {staticAmt.toFixed(2)}</span>
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.4rem" }}>
+          <input type="range" min={0} max={1} step={0.01} value={staticSpeed} onChange={(e) => setStaticSpeed(Number(e.target.value))} />
+          <span style={{ fontSize: "0.8rem" }}>Static speed — {staticSpeed.toFixed(2)}</span>
+        </div>
+        <button className="btn btn-primary" onClick={saveEffects}>
+          Save effects
+        </button>
+        {effectsSaved && <span style={{ marginLeft: "0.6rem", fontSize: "0.85rem", color: "var(--accent-audio)" }}>Saved ✓</span>}
+      </div>
+
+      <div className="field" style={{ maxWidth: 420 }}>
+        <label>SMTP (outgoing email)</label>
+        <p style={{ fontSize: "0.75rem", color: "var(--text-dim)", marginTop: 0 }}>
+          Overrides the server's environment-variable SMTP config when set. Leave the password blank to keep the
+          current one.
+        </p>
+        <input placeholder="smtp.example.com" value={smtpHost} onChange={(e) => setSmtpHost(e.target.value)} style={{ marginBottom: "0.3rem" }} />
+        <input
+          type="number"
+          placeholder="Port (587)"
+          value={smtpPort}
+          onChange={(e) => setSmtpPort(Number(e.target.value))}
+          style={{ marginBottom: "0.3rem" }}
+        />
+        <input placeholder="Username" value={smtpUser} onChange={(e) => setSmtpUser(e.target.value)} style={{ marginBottom: "0.3rem" }} />
+        <input
+          type="password"
+          placeholder={smtpPasswordSet ? "•••••••• (set — leave blank to keep)" : "Password"}
+          value={smtpPassword}
+          onChange={(e) => setSmtpPassword(e.target.value)}
+          style={{ marginBottom: "0.3rem" }}
+        />
+        <input placeholder="From address" value={smtpFrom} onChange={(e) => setSmtpFrom(e.target.value)} style={{ marginBottom: "0.5rem" }} />
+        <button className="btn btn-primary" onClick={saveSmtp}>
+          Save SMTP
+        </button>{" "}
+        <button className="btn" onClick={testSmtp} disabled={smtpTesting}>
+          {smtpTesting ? "Testing…" : "Check connection"}
+        </button>
+        {smtpSaved && <span style={{ marginLeft: "0.6rem", fontSize: "0.85rem", color: "var(--accent-audio)" }}>Saved ✓</span>}
+        {smtpTestResult && (
+          <p style={{ fontSize: "0.85rem", color: smtpTestResult.ok ? "var(--accent-audio)" : "var(--accent-danger)", marginTop: "0.4rem" }}>
+            {smtpTestResult.ok ? "Connected ✓" : `Failed: ${smtpTestResult.error}`}
+          </p>
+        )}
       </div>
 
       <div style={{ display: "flex", gap: "0.5rem", marginBottom: "1rem" }}>

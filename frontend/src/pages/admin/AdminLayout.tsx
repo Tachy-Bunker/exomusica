@@ -38,7 +38,7 @@ export function AdminLayout() {
           About page
         </NavLink>
         <NavLink to="/admin/fonts" className={({ isActive }) => (isActive ? "active" : "")}>
-          Fonts
+          Fonts &amp; Misc
         </NavLink>
         <NavLink to="/admin/fx-settings" className={({ isActive }) => (isActive ? "active" : "")}>
           Spacemap field

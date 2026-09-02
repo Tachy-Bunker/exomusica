@@ -462,7 +462,7 @@ export function SpaceMap({ branches, centerLabel, centerHref }: { branches: Bran
   useEffect(() => {
     wardenBridge.bindToBranches(branches.map((b) => ({ id: b.id, slug: b.slug })));
   }, [branches]);
-  const { containerRef: fieldContainerRef, fieldCanvasRef, wardenCanvasRef, overlayCanvasRef } = useSpacemapField(fxSettings);
+  const { containerRef: fieldContainerRef, fieldCanvasRef, wardenCanvasRef } = useSpacemapField(fxSettings);
 
   useEffect(() => {
     const el = fieldContainerRef.current;
@@ -540,7 +540,6 @@ export function SpaceMap({ branches, centerLabel, centerHref }: { branches: Bran
         <div ref={fieldContainerRef} className="space-map-entoptic-field">
           <canvas ref={fieldCanvasRef} />
           <canvas ref={wardenCanvasRef} />
-          <canvas ref={overlayCanvasRef} />
         </div>
         <div
           className="space-map-field"
