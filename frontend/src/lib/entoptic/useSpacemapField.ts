@@ -89,6 +89,7 @@ export function useSpacemapField(settings: FxSettings = FX_DEFAULTS) {
     resize();
     const resizeObserver = new ResizeObserver(resize);
     resizeObserver.observe(container);
+    document.addEventListener("fullscreenchange", resize);
 
     let rafId: number;
     let last = performance.now();
@@ -156,6 +157,7 @@ export function useSpacemapField(settings: FxSettings = FX_DEFAULTS) {
     return () => {
       cancelAnimationFrame(rafId);
       resizeObserver.disconnect();
+      document.removeEventListener("fullscreenchange", resize);
       document.removeEventListener("visibilitychange", handleVisibility);
       wardenBridge.bindToBranches = () => {};
       wardenBridge.setScreenPosition = () => {};

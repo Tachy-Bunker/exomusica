@@ -671,7 +671,7 @@ export function SpaceMap({ branches, centerLabel, centerHref }: { branches: Bran
       </div>
 
       <div className="space-map-controls">
-        <button className="btn btn-primary space-map-shuffle" onClick={() => void shufflePlay()}>
+        <button className="space-map-shuffle" onClick={() => void shufflePlay()}>
           🔀 Play all
         </button>
         <button

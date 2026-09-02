@@ -32,6 +32,8 @@ export function FontsAdminPage() {
   const [ambienceUrl, setAmbienceUrl] = useState<string | null>(null);
   const ambienceInputRef = useRef<HTMLInputElement>(null);
   const [scanSfxUrl, setScanSfxUrl] = useState<string | null>(null);
+  const [chatOpenSfxUrl, setChatOpenSfxUrl] = useState<string | null>(null);
+  const chatOpenSfxInputRef = useRef<HTMLInputElement>(null);
   const scanSfxInputRef = useRef<HTMLInputElement>(null);
   const [textColorPrimary, setTextColorPrimary] = useState("#eef1fb");
   const [textColorSecondary, setTextColorSecondary] = useState("#a89ec2");
@@ -138,6 +140,7 @@ export function FontsAdminPage() {
       defaultFontId: number | null;
       ambienceUrl: string | null;
       scanSfxUrl: string | null;
+      chatOpenSfxUrl: string | null;
       textColorPrimary: string | null;
       textColorSecondary: string | null;
       chatTitleColor: string | null;
@@ -158,6 +161,7 @@ export function FontsAdminPage() {
       setSiteDefaultFontId(s.defaultFontId);
       setAmbienceUrl(s.ambienceUrl);
       setScanSfxUrl(s.scanSfxUrl);
+      setChatOpenSfxUrl(s.chatOpenSfxUrl);
       if (s.textColorPrimary) setTextColorPrimary(s.textColorPrimary);
       if (s.textColorSecondary) setTextColorSecondary(s.textColorSecondary);
       if (s.chatTitleColor) setChatTitleColor(s.chatTitleColor);
@@ -200,6 +204,21 @@ export function FontsAdminPage() {
     const result = await api<{ scanSfxUrl: string }>("/api/admin/site-settings/scan-sfx", { method: "POST", body: formData });
     setScanSfxUrl(result.scanSfxUrl);
     if (scanSfxInputRef.current) scanSfxInputRef.current.value = "";
+  }
+
+  async function uploadChatOpenSfx() {
+    const file = chatOpenSfxInputRef.current?.files?.[0];
+    if (!file) return;
+    const formData = new FormData();
+    formData.append("file", file);
+    const result = await api<{ chatOpenSfxUrl: string }>("/api/admin/site-settings/chat-open-sfx", { method: "POST", body: formData });
+    setChatOpenSfxUrl(result.chatOpenSfxUrl);
+    if (chatOpenSfxInputRef.current) chatOpenSfxInputRef.current.value = "";
+  }
+
+  async function removeChatOpenSfx() {
+    await api("/api/admin/site-settings/chat-open-sfx", { method: "DELETE" });
+    setChatOpenSfxUrl(null);
   }
 
   async function removeScanSfx() {
@@ -314,6 +333,28 @@ export function FontsAdminPage() {
           <input ref={scanSfxInputRef} type="file" accept="audio/mpeg,audio/wav,audio/ogg" />
           <button className="btn btn-primary" onClick={uploadScanSfx}>
             {scanSfxUrl ? "Replace" : "Upload"}
+          </button>
+        </div>
+      </div>
+
+      <div className="field" style={{ maxWidth: 420 }}>
+        <label>Chat-open sound</label>
+        <p style={{ fontSize: "0.75rem", color: "var(--text-dim)", marginTop: 0 }}>
+          Plays once whenever a new chat location (branch or forum topic) is opened — desktop dock or mobile, either
+          way.
+        </p>
+        {chatOpenSfxUrl && (
+          <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.4rem" }}>
+            <audio src={chatOpenSfxUrl} controls style={{ height: 32 }} />
+            <button className="btn btn-danger" onClick={removeChatOpenSfx}>
+              Remove
+            </button>
+          </div>
+        )}
+        <div style={{ display: "flex", gap: "0.5rem" }}>
+          <input ref={chatOpenSfxInputRef} type="file" accept="audio/mpeg,audio/wav,audio/ogg" />
+          <button className="btn btn-primary" onClick={uploadChatOpenSfx}>
+            {chatOpenSfxUrl ? "Replace" : "Upload"}
           </button>
         </div>
       </div>

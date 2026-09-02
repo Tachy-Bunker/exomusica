@@ -39,6 +39,7 @@ export async function siteSettingsRoutes(app: FastifyInstance): Promise<void> {
         smtpUser: null,
         smtpFrom: null,
         // smtpPassword deliberately never returned to the client
+        chatOpenSfxUrl: null,
       }
     );
   });
@@ -204,6 +205,32 @@ export async function siteSettingsRoutes(app: FastifyInstance): Promise<void> {
       where: { id: 1 },
       create: { id: 1, moireImageUrl: null },
       update: { moireImageUrl: null },
+    });
+    return { status: "ok" };
+  });
+
+  app.post("/api/admin/site-settings/chat-open-sfx", { preHandler: requireAdmin }, async (req, reply) => {
+    const file = await req.file();
+    if (!file) return reply.code(400).send({ error: "no file uploaded" });
+    const buffer = await file.toBuffer();
+    try {
+      const { url } = await saveSoundFile(file.filename, file.mimetype, buffer);
+      const settings = await prisma.siteSettings.upsert({
+        where: { id: 1 },
+        create: { id: 1, chatOpenSfxUrl: url },
+        update: { chatOpenSfxUrl: url },
+      });
+      return { chatOpenSfxUrl: settings.chatOpenSfxUrl };
+    } catch (err) {
+      return reply.code(400).send({ error: err instanceof Error ? err.message : "upload failed" });
+    }
+  });
+
+  app.delete("/api/admin/site-settings/chat-open-sfx", { preHandler: requireAdmin }, async () => {
+    await prisma.siteSettings.upsert({
+      where: { id: 1 },
+      create: { id: 1, chatOpenSfxUrl: null },
+      update: { chatOpenSfxUrl: null },
     });
     return { status: "ok" };
   });

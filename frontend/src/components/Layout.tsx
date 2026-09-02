@@ -71,6 +71,7 @@ export function Layout() {
       contentTextScaleDesktop: number;
       contentTextScaleMobile: number;
       caInitial: number;
+      chatOpenSfxUrl: string | null;
       caBurst: number;
       moireImageUrl: string | null;
       moireOpacity: number;
@@ -93,6 +94,7 @@ export function Layout() {
       useContentScaleStore.getState().setScale(s.contentTextScaleDesktop, s.contentTextScaleMobile);
       useSiteEffectsStore.getState().setEffects({
         caInitial: s.caInitial,
+        chatOpenSfxUrl: s.chatOpenSfxUrl,
         caBurst: s.caBurst,
         moireImageUrl: s.moireImageUrl,
         moireOpacity: s.moireOpacity,

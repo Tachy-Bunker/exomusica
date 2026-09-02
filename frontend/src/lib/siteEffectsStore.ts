@@ -3,6 +3,7 @@ import { create } from "zustand";
 interface SiteEffectsState {
   caInitial: number;
   caBurst: number;
+  chatOpenSfxUrl: string | null;
   moireImageUrl: string | null;
   moireOpacity: number;
   moireSize: number;
@@ -17,6 +18,7 @@ interface SiteEffectsState {
 export const useSiteEffectsStore = create<SiteEffectsState>((set) => ({
   caInitial: 0.15,
   caBurst: 0.6,
+  chatOpenSfxUrl: null,
   moireImageUrl: null,
   moireOpacity: 0.15,
   moireSize: 1,

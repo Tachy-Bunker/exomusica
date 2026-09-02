@@ -830,8 +830,11 @@ th {
   min-height: 0;
 }
 
-.space-map:fullscreen {
+.space-map-wrapper:fullscreen {
   height: 100vh;
+}
+
+.space-map-wrapper:fullscreen .space-map {
   border-radius: 0;
 }
 
@@ -983,6 +986,19 @@ th {
   mix-blend-mode: multiply;
 }
 
+.space-map-shuffle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.85rem;
+  padding: 0.5rem 0.9rem;
+  border-radius: var(--radius);
+  border: 1px solid var(--accent-audio);
+  background: var(--accent-audio-dim);
+  color: var(--text);
+  cursor: pointer;
+}
+
 .space-map-ambience-toggle {
   display: inline-flex;
   align-items: center;
@@ -1130,7 +1146,7 @@ th {
   margin-top: -20px;
   margin-left: -20px;
   border-radius: 50%;
-  background: var(--accent-forum-dim);
+  background: var(--accent-forum);
   border: 1px solid var(--accent-forum);
   box-shadow: 0 0 10px var(--accent-forum);
   transition: none;

@@ -18,6 +18,8 @@ import { isTypingTarget } from "../lib/isTypingTarget";
 import { usePresenceStore } from "../lib/presenceStore";
 import { useCustomFont, type FontInfo } from "../lib/useCustomFont";
 import { MiniChat } from "../components/MiniChat";
+import { useSiteEffectsStore } from "../lib/siteEffectsStore";
+import { useVolumeMixerStore } from "../lib/volumeMixerStore";
 
 type ViewMode = "live" | "day" | "search";
 type DisplayMode = "standard" | "grouped";
@@ -284,6 +286,16 @@ function MessageGroup({
 export function ChannelPage({ channelSlug, fillHeight }: { channelSlug?: string; fillHeight?: boolean } = {}) {
   const params = useParams<{ slug: string }>();
   const slug = channelSlug ?? params.slug;
+
+  useEffect(() => {
+    if (!slug) return;
+    const url = useSiteEffectsStore.getState().chatOpenSfxUrl;
+    if (!url) return;
+    const audio = new Audio(url);
+    audio.volume = useVolumeMixerStore.getState().sfx;
+    audio.play().catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [slug]);
   const { user } = useAuth();
   const isDesktop = useIsDesktop();
   // Mobile standalone view behaves like fillHeight mode too — internally
@@ -713,7 +725,7 @@ export function ChannelPage({ channelSlug, fillHeight }: { channelSlug?: string;
           onSubmit={handleSend}
           style={{
             marginTop: effectiveFillHeight ? 0 : "1rem",
-            paddingTop: effectiveFillHeight ? "0.5rem" : 0,
+            paddingTop: effectiveFillHeight ? "1rem" : 0,
             borderTop: effectiveFillHeight ? "1px solid var(--border)" : "none",
             flexShrink: 0,
             display: "flex",
