@@ -55,7 +55,8 @@ model User {
   storageUsedBytes      BigInt       @default(0)
   storageLimitBytes     BigInt       @default(68157440) // 65MB
   volumeNotifications   Float        @default(0.8)
-  volumeSfx             Float        @default(1.0)
+  volumeSfxIdle         Float        @default(0.8) // SFX volume when no music is playing
+  volumeSfxPlaying      Float        @default(0.6) // SFX volume while music is playing — ducked so it doesn't compete
   volumeMusic           Float        @default(1.0)
   caEnabled             Boolean      @default(true)
   moireEnabled          Boolean      @default(true)

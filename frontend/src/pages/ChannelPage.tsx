@@ -19,7 +19,7 @@ import { usePresenceStore } from "../lib/presenceStore";
 import { useCustomFont, type FontInfo } from "../lib/useCustomFont";
 import { MiniChat } from "../components/MiniChat";
 import { useSiteEffectsStore } from "../lib/siteEffectsStore";
-import { useVolumeMixerStore } from "../lib/volumeMixerStore";
+import { getCurrentSfxVolume } from "../lib/volumeMixerStore";
 
 type ViewMode = "live" | "day" | "search";
 type DisplayMode = "standard" | "grouped";
@@ -292,7 +292,7 @@ export function ChannelPage({ channelSlug, fillHeight }: { channelSlug?: string;
     const url = useSiteEffectsStore.getState().chatOpenSfxUrl;
     if (!url) return;
     const audio = new Audio(url);
-    audio.volume = useVolumeMixerStore.getState().sfx;
+    audio.volume = getCurrentSfxVolume();
     audio.play().catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [slug]);

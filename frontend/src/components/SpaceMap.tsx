@@ -7,7 +7,7 @@ import { useChatDockStore } from "../lib/chatDockStore";
 import { useAmbienceStore } from "../lib/ambienceStore";
 import { GaplessLoop } from "../lib/GaplessLoop";
 import { Joystick } from "./Joystick";
-import { useVolumeMixerStore } from "../lib/volumeMixerStore";
+import { getCurrentSfxVolume } from "../lib/volumeMixerStore";
 import { useSpacemapField, pointerRef, cameraOffsetRef, wardenBridge } from "../lib/entoptic/useSpacemapField";
 import { useFxSettings } from "../lib/entoptic/useFxSettings";
 import { useAudioStore } from "../lib/audioStore";
@@ -265,7 +265,7 @@ export function SpaceMap({ branches, centerLabel, centerHref }: { branches: Bran
 
     if (isRevealing) {
       loop.play(scanSfxUrl).then(() => {
-        if (wasRevealingRef.current) loop.fadeTo(0.4 * useVolumeMixerStore.getState().sfx); // still wanted by the time loading finished
+        if (wasRevealingRef.current) loop.fadeTo(0.4 * getCurrentSfxVolume()); // still wanted by the time loading finished
       });
     } else {
       loop.fadeTo(0);

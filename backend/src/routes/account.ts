@@ -49,7 +49,8 @@ export async function accountRoutes(app: FastifyInstance): Promise<void> {
       bio: me.bio,
       links: me.links,
       volumeNotifications: me.volumeNotifications,
-      volumeSfx: me.volumeSfx,
+      volumeSfxIdle: me.volumeSfxIdle,
+      volumeSfxPlaying: me.volumeSfxPlaying,
       volumeMusic: me.volumeMusic,
       caEnabled: me.caEnabled,
       moireEnabled: me.moireEnabled,
@@ -82,14 +83,15 @@ export async function accountRoutes(app: FastifyInstance): Promise<void> {
     return prisma.user.update({ where: { id: req.user!.id }, data: req.body ?? {} });
   });
 
-  app.patch<{ Body: Partial<{ volumeNotifications: number; volumeSfx: number; volumeMusic: number }> }>(
+  app.patch<{ Body: Partial<{ volumeNotifications: number; volumeSfxIdle: number; volumeSfxPlaying: number; volumeMusic: number }> }>(
     "/api/account/volume-mixer",
     { preHandler: requireAuth },
     async (req) => {
       const clamp = (v: number) => Math.max(0, Math.min(1, v));
       const data: Record<string, number> = {};
       if (req.body?.volumeNotifications !== undefined) data.volumeNotifications = clamp(req.body.volumeNotifications);
-      if (req.body?.volumeSfx !== undefined) data.volumeSfx = clamp(req.body.volumeSfx);
+      if (req.body?.volumeSfxIdle !== undefined) data.volumeSfxIdle = clamp(req.body.volumeSfxIdle);
+      if (req.body?.volumeSfxPlaying !== undefined) data.volumeSfxPlaying = clamp(req.body.volumeSfxPlaying);
       if (req.body?.volumeMusic !== undefined) data.volumeMusic = clamp(req.body.volumeMusic);
       return prisma.user.update({ where: { id: req.user!.id }, data });
     },

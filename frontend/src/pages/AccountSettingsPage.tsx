@@ -273,8 +273,19 @@ export function AccountSettingsPage() {
         />
       </div>
       <div className="field">
-        <label>Sound effects — {Math.round(mixer.sfx * 100)}%</label>
-        <input type="range" min={0} max={1} step={0.05} value={mixer.sfx} onChange={(e) => mixer.setVolume("sfx", Number(e.target.value))} />
+        <label>Sound effects (when nothing's playing) — {Math.round(mixer.sfxIdle * 100)}%</label>
+        <input type="range" min={0} max={1} step={0.05} value={mixer.sfxIdle} onChange={(e) => mixer.setVolume("sfxIdle", Number(e.target.value))} />
+      </div>
+      <div className="field">
+        <label>Sound effects (while music plays) — {Math.round(mixer.sfxPlaying * 100)}%</label>
+        <input
+          type="range"
+          min={0}
+          max={1}
+          step={0.05}
+          value={mixer.sfxPlaying}
+          onChange={(e) => mixer.setVolume("sfxPlaying", Number(e.target.value))}
+        />
       </div>
       <div className="field">
         <label>Music — {Math.round(mixer.music * 100)}%</label>
