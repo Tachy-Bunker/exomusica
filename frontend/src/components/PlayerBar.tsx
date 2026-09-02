@@ -4,7 +4,7 @@ import { Link } from "react-router-dom";
 import { bindAudioElement, useAudioStore } from "../lib/audioStore";
 import { useIsDesktop } from "../lib/useIsDesktop";
 import { useFixedPortalRoot } from "../lib/useFixedPortalRoot";
-import { PreviousIcon, NextIcon, LoopIcon, LoopOneIcon, ExpandIcon, CollapseIcon } from "./Icons";
+import { PreviousIcon, NextIcon, LoopIcon, LoopOneIcon, ExpandIcon, CollapseIcon, ShuffleIcon } from "./Icons";
 
 function formatTime(seconds: number): string {
   if (!Number.isFinite(seconds)) return "0:00";
@@ -92,7 +92,33 @@ export function PlayerBar() {
     seek(frac * duration);
   }
 
-  const progressPct = duration ? (currentTime / duration) * 100 : 0;
+  function handleSeekStripDragStart(e: React.MouseEvent<HTMLDivElement>) {
+    if (!duration) return;
+    const stripEl = e.currentTarget;
+    function computeAndPreview(clientX: number) {
+      const rect = stripEl.getBoundingClientRect();
+      const frac = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
+      setSeekPreview(frac * duration);
+    }
+    computeAndPreview(e.clientX);
+    function onMove(ev: MouseEvent) {
+      computeAndPreview(ev.clientX);
+    }
+    function onUp(ev: MouseEvent) {
+      const rect = stripEl.getBoundingClientRect();
+      const frac = Math.max(0, Math.min(1, (ev.clientX - rect.left) / rect.width));
+      seek(frac * duration);
+      setSeekPreview(null);
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", onUp);
+    }
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+  }
+
+  const [seekPreview, setSeekPreview] = useState<number | null>(null);
+  const endedHandledRef = useRef(false);
+  const progressPct = duration ? ((seekPreview ?? currentTime) / duration) * 100 : 0;
   const portalRoot = useFixedPortalRoot();
 
   const content = (
@@ -103,15 +129,31 @@ export function PlayerBar() {
           here, in Layout, outside the router's <Outlet />. */}
       <audio
         ref={audioRef}
-        onTimeUpdate={(e) => setProgress(e.currentTarget.currentTime, e.currentTarget.duration || 0)}
-        onLoadedMetadata={(e) => setProgress(e.currentTarget.currentTime, e.currentTarget.duration || 0)}
-        onEnded={ended}
+        onTimeUpdate={(e) => {
+          const el = e.currentTarget;
+          setProgress(el.currentTime, el.duration || 0);
+          if (el.duration && !el.paused && el.currentTime >= el.duration - 0.2 && !endedHandledRef.current) {
+            endedHandledRef.current = true;
+            ended();
+          }
+        }}
+        onLoadedMetadata={(e) => {
+          endedHandledRef.current = false;
+          setProgress(e.currentTarget.currentTime, e.currentTarget.duration || 0);
+        }}
+        onEnded={() => {
+          if (endedHandledRef.current) return;
+          endedHandledRef.current = true;
+          ended();
+        }}
       />
 
       {currentTrack && !expanded && (
         <div className="player-bar-docked">
-          <div className="player-seek-strip" onClick={handleSeekStripClick}>
-            <div className={`player-seek-fill ${isPlaying ? "player-seek-fill-animated" : ""}`} style={{ width: `${progressPct}%` }} />
+          <div className="player-seek-strip" onClick={handleSeekStripClick} onMouseDown={handleSeekStripDragStart}>
+            <div className="player-seek-track">
+              <div className={`player-seek-fill ${isPlaying ? "player-seek-fill-animated" : ""}`} style={{ width: `${progressPct}%` }} />
+            </div>
           </div>
           <div
             className="player-bar-row"
@@ -141,7 +183,7 @@ export function PlayerBar() {
             <div className="player-transport">
               {isDesktop && (
                 <button className={`btn ${shuffle ? "btn-primary" : ""}`} onClick={toggleShuffle} title="Shuffle">
-                  🔀
+                  <ShuffleIcon size={16} />
                 </button>
               )}
               <button className="btn" onClick={playPrevious} disabled={history.length === 0} title="Previous (Shift+←)">
@@ -188,21 +230,29 @@ export function PlayerBar() {
             </p>
 
             <div className="seek-row">
-              <span className="mono">{formatTime(currentTime)}</span>
+              <span className="mono">{formatTime(seekPreview ?? currentTime)}</span>
               <input
                 type="range"
                 min={0}
                 max={duration || 0}
                 step={0.1}
-                value={currentTime}
-                onChange={(e) => seek(Number(e.target.value))}
+                value={seekPreview ?? currentTime}
+                onChange={(e) => setSeekPreview(Number(e.target.value))}
+                onMouseUp={(e) => {
+                  seek(Number((e.target as HTMLInputElement).value));
+                  setSeekPreview(null);
+                }}
+                onTouchEnd={(e) => {
+                  seek(Number((e.target as HTMLInputElement).value));
+                  setSeekPreview(null);
+                }}
               />
               <span className="mono">{formatTime(duration)}</span>
             </div>
 
             <div className="player-transport" style={{ justifyContent: "center", marginTop: "0.8rem" }}>
               <button className={`btn ${shuffle ? "btn-primary" : ""}`} onClick={toggleShuffle} title="Shuffle">
-                🔀
+                <ShuffleIcon size={18} />
               </button>
               <button className="btn" onClick={playPrevious} disabled={history.length === 0} title="Previous (Shift+←)">
                 <PreviousIcon size={18} />

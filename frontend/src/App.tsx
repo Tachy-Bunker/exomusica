@@ -7,7 +7,6 @@ import { RequireAdmin } from "./components/RequireAdmin";
 import { HomePage } from "./pages/HomePage";
 import { LoginPage } from "./pages/LoginPage";
 import { JoinPage } from "./pages/JoinPage";
-import { AboutPage } from "./pages/AboutPage";
 import { WikiPage } from "./pages/WikiPage";
 import { NewsPage } from "./pages/NewsPage";
 import { DiscussionIndexPage } from "./pages/DiscussionIndexPage";
@@ -49,7 +48,7 @@ export default function App() {
                 <Route index element={<HomePage />} />
                 <Route path="login" element={<LoginPage />} />
             <Route path="join" element={<JoinPage />} />
-            <Route path="about" element={<AboutPage />} />
+            <Route path="about" element={<Navigate to="/wiki" replace />} />
             <Route path="wiki" element={<WikiPage />} />
             <Route path="wiki/:slug" element={<WikiPage />} />
             <Route path="news" element={<NewsPage />} />

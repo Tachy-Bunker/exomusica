@@ -44,6 +44,7 @@ export async function siteSettingsRoutes(app: FastifyInstance): Promise<void> {
         chatHudRevealRate: 30,
         chatHudSfxUrl: null,
         chatSplashMessages: [],
+        linkClickSfxUrl: null,
       }
     );
   });
@@ -267,6 +268,32 @@ export async function siteSettingsRoutes(app: FastifyInstance): Promise<void> {
       where: { id: 1 },
       create: { id: 1, chatHudSfxUrl: null },
       update: { chatHudSfxUrl: null },
+    });
+    return { status: "ok" };
+  });
+
+  app.post("/api/admin/site-settings/link-click-sfx", { preHandler: requireAdmin }, async (req, reply) => {
+    const file = await req.file();
+    if (!file) return reply.code(400).send({ error: "no file uploaded" });
+    const buffer = await file.toBuffer();
+    try {
+      const { url } = await saveSoundFile(file.filename, file.mimetype, buffer);
+      const settings = await prisma.siteSettings.upsert({
+        where: { id: 1 },
+        create: { id: 1, linkClickSfxUrl: url },
+        update: { linkClickSfxUrl: url },
+      });
+      return { linkClickSfxUrl: settings.linkClickSfxUrl };
+    } catch (err) {
+      return reply.code(400).send({ error: err instanceof Error ? err.message : "upload failed" });
+    }
+  });
+
+  app.delete("/api/admin/site-settings/link-click-sfx", { preHandler: requireAdmin }, async () => {
+    await prisma.siteSettings.upsert({
+      where: { id: 1 },
+      create: { id: 1, linkClickSfxUrl: null },
+      update: { linkClickSfxUrl: null },
     });
     return { status: "ok" };
   });

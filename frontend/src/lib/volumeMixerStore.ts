@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { api } from "./api";
 import { setMusicVolume, useAudioStore } from "./audioStore";
+import { useSiteEffectsStore } from "./siteEffectsStore";
 
 interface VolumeMixerState {
   notifications: number; // 0..1
@@ -48,4 +49,17 @@ export const useVolumeMixerStore = create<VolumeMixerState>((set, get) => ({
 export function getCurrentSfxVolume(): number {
   const { sfxIdle, sfxPlaying } = useVolumeMixerStore.getState();
   return useAudioStore.getState().currentTrack ? sfxPlaying : sfxIdle;
+}
+
+/** Plays the admin-configured link-click sound, if one is set. Used by the
+ *  global <a> click listener in Layout, and directly by anything that
+ *  navigates without a real <a> tag (e.g. spacemap branch nodes, which are
+ *  clickable divs) so link-click sound coverage isn't limited to actual
+ *  anchor elements. */
+export function playLinkClickSound(): void {
+  const url = useSiteEffectsStore.getState().linkClickSfxUrl;
+  if (!url) return;
+  const audio = new Audio(url);
+  audio.volume = getCurrentSfxVolume();
+  audio.play().catch(() => {});
 }

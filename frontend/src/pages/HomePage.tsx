@@ -16,7 +16,7 @@ export function HomePage() {
 
   return (
     <div className="homepage-fill">
-      <SpaceMap branches={branches} centerLabel={user ? "About" : "Join"} centerHref={user ? "/about" : "/join"} />
+      <SpaceMap branches={branches} centerLabel={user ? "About" : "Join"} centerHref={user ? "/wiki" : "/join"} />
     </div>
   );
 }

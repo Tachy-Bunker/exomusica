@@ -7,7 +7,7 @@ import { useChatDockStore } from "../lib/chatDockStore";
 import { useAmbienceStore } from "../lib/ambienceStore";
 import { GaplessLoop } from "../lib/GaplessLoop";
 import { Joystick } from "./Joystick";
-import { getCurrentSfxVolume } from "../lib/volumeMixerStore";
+import { getCurrentSfxVolume, playLinkClickSound } from "../lib/volumeMixerStore";
 import { useSpacemapField, pointerRef, cameraOffsetRef, wardenBridge } from "../lib/entoptic/useSpacemapField";
 import { useFxSettings } from "../lib/entoptic/useFxSettings";
 import { useAudioStore } from "../lib/audioStore";
@@ -188,6 +188,7 @@ export function SpaceMap({ branches, centerLabel, centerHref }: { branches: Bran
   function openLockedChat() {
     const node = lockedNodeRef.current;
     if (!node || node.id === -1) return;
+    playLinkClickSound();
     if (!isDesktop) {
       navigate(`/branch/${node.slug}`);
       return;
@@ -550,7 +551,7 @@ export function SpaceMap({ branches, centerLabel, centerHref }: { branches: Bran
           className="space-map-field"
           style={{ transform: `translate(${cameraRef.current.x}px, ${cameraRef.current.y}px)` }}
         >
-          <div className="space-node space-node-center" onClick={() => navigate(centerHref)} style={{ left: 0, top: 0 }}>
+          <div className="space-node space-node-center" onClick={() => { playLinkClickSound(); navigate(centerHref); }} style={{ left: 0, top: 0 }}>
             {centerLabel}
         </div>
 
@@ -569,7 +570,7 @@ export function SpaceMap({ branches, centerLabel, centerHref }: { branches: Bran
                 hoveredIdRef.current = null;
                 setHoveredId(null);
               }}
-              onClick={() => navigate(`/branch/${n.slug}`)}
+              onClick={() => { playLinkClickSound(); navigate(`/branch/${n.slug}`); }}
             >
               {n.name}
               {hoveredId === n.id && <span className="space-node-frozen-dot" />}

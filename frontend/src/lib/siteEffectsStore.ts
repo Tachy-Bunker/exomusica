@@ -9,6 +9,7 @@ interface SiteEffectsState {
   chatHudRevealRate: number;
   chatHudSfxUrl: string | null;
   chatSplashMessages: string[];
+  linkClickSfxUrl: string | null;
   moireImageUrl: string | null;
   moireOpacity: number;
   moireSize: number;
@@ -29,6 +30,7 @@ export const useSiteEffectsStore = create<SiteEffectsState>((set) => ({
   chatHudRevealRate: 30,
   chatHudSfxUrl: null,
   chatSplashMessages: [],
+  linkClickSfxUrl: null,
   moireImageUrl: null,
   moireOpacity: 0.15,
   moireSize: 1,

@@ -5,9 +5,24 @@ import { useAuth } from "../lib/auth";
 import { useCustomFont } from "../lib/useCustomFont";
 import { useAmbienceStore } from "../lib/ambienceStore";
 import { useProfileStore } from "../lib/profileStore";
-import { useVolumeMixerStore } from "../lib/volumeMixerStore";
+import { useVolumeMixerStore, playLinkClickSound } from "../lib/volumeMixerStore";
 import { useContentScaleStore } from "../lib/contentScaleStore";
 import { useSiteEffectsStore } from "../lib/siteEffectsStore";
+
+/** Darkens a #rrggbb hex color by mixing it toward black by `amount`
+ *  (0..1). Used to derive the "-dim" variant of the admin-configurable
+ *  primary color at runtime, since .btn-primary/Live/Send/etc. all use
+ *  the dim variant for background/border, not the bright color directly. */
+function darkenHex(hex: string, amount: number): string {
+  const m = hex.replace("#", "");
+  if (m.length !== 6) return hex;
+  const r = parseInt(m.slice(0, 2), 16);
+  const g = parseInt(m.slice(2, 4), 16);
+  const b = parseInt(m.slice(4, 6), 16);
+  const mix = (c: number) => Math.round(c * (1 - amount));
+  const toHex = (c: number) => c.toString(16).padStart(2, "0");
+  return `#${toHex(mix(r))}${toHex(mix(g))}${toHex(mix(b))}`;
+}
 import { Avatar } from "./Avatar";
 import { MailIcon, MailNotificationIcon } from "./Icons";
 import { MobileAccountHook } from "./MobileAccountHook";
@@ -59,6 +74,16 @@ export function Layout() {
   }, [user, refreshProfile]);
 
   const loadVolumeMixer = useVolumeMixerStore((s) => s.load);
+
+  useEffect(() => {
+    function handleLinkClick(e: MouseEvent) {
+      const target = e.target as HTMLElement;
+      if (!target.closest("a")) return;
+      playLinkClickSound();
+    }
+    document.addEventListener("click", handleLinkClick, true);
+    return () => document.removeEventListener("click", handleLinkClick, true);
+  }, []);
   useEffect(() => {
     if (user) loadVolumeMixer();
   }, [user, loadVolumeMixer]);
@@ -96,6 +121,7 @@ export function Layout() {
       chatHudRevealRate: number;
       chatHudSfxUrl: string | null;
       chatSplashMessages: string[] | null;
+      linkClickSfxUrl: string | null;
       caBurst: number;
       moireImageUrl: string | null;
       moireOpacity: number;
@@ -112,7 +138,10 @@ export function Layout() {
       if (s.textColorPrimary) root.setProperty("--text", s.textColorPrimary);
       if (s.textColorSecondary) root.setProperty("--text-dim", s.textColorSecondary);
       if (s.chatTitleColor) root.setProperty("--chat-title-color", s.chatTitleColor);
-      if (s.accentPrimaryColor) root.setProperty("--accent-forum", s.accentPrimaryColor);
+      if (s.accentPrimaryColor) {
+        root.setProperty("--accent-forum", s.accentPrimaryColor);
+        root.setProperty("--accent-forum-dim", darkenHex(s.accentPrimaryColor, 0.45));
+      }
       root.setProperty("--content-scale-desktop", String(s.contentTextScaleDesktop));
       root.setProperty("--content-scale-mobile", String(s.contentTextScaleMobile));
       useContentScaleStore.getState().setScale(s.contentTextScaleDesktop, s.contentTextScaleMobile);
@@ -122,6 +151,7 @@ export function Layout() {
         chatHudRevealRate: s.chatHudRevealRate,
         chatHudSfxUrl: s.chatHudSfxUrl,
         chatSplashMessages: s.chatSplashMessages ?? [],
+        linkClickSfxUrl: s.linkClickSfxUrl,
         caBurst: s.caBurst,
         moireImageUrl: s.moireImageUrl,
         moireOpacity: s.moireOpacity,

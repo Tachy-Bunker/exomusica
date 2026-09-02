@@ -35,6 +35,8 @@ export function FontsAdminPage() {
   const [chatOpenSfxUrl, setChatOpenSfxUrl] = useState<string | null>(null);
   const [chatHudRevealRate, setChatHudRevealRate] = useState(30);
   const [chatHudSfxUrl, setChatHudSfxUrl] = useState<string | null>(null);
+  const [linkClickSfxUrl, setLinkClickSfxUrl] = useState<string | null>(null);
+  const linkClickSfxInputRef = useRef<HTMLInputElement>(null);
   const chatHudSfxInputRef = useRef<HTMLInputElement>(null);
   const [chatSplashMessages, setChatSplashMessages] = useState<string[]>([]);
   const [newSplashMessage, setNewSplashMessage] = useState("");
@@ -149,6 +151,7 @@ export function FontsAdminPage() {
       chatOpenSfxUrl: string | null;
       chatHudRevealRate: number;
       chatHudSfxUrl: string | null;
+      linkClickSfxUrl: string | null;
       chatSplashMessages: string[] | null;
       textColorPrimary: string | null;
       textColorSecondary: string | null;
@@ -173,6 +176,7 @@ export function FontsAdminPage() {
       setChatOpenSfxUrl(s.chatOpenSfxUrl);
       setChatHudRevealRate(s.chatHudRevealRate);
       setChatHudSfxUrl(s.chatHudSfxUrl);
+      setLinkClickSfxUrl(s.linkClickSfxUrl);
       setChatSplashMessages(s.chatSplashMessages ?? []);
       if (s.textColorPrimary) setTextColorPrimary(s.textColorPrimary);
       if (s.textColorSecondary) setTextColorSecondary(s.textColorSecondary);
@@ -216,6 +220,21 @@ export function FontsAdminPage() {
     const result = await api<{ scanSfxUrl: string }>("/api/admin/site-settings/scan-sfx", { method: "POST", body: formData });
     setScanSfxUrl(result.scanSfxUrl);
     if (scanSfxInputRef.current) scanSfxInputRef.current.value = "";
+  }
+
+  async function uploadLinkClickSfx() {
+    const file = linkClickSfxInputRef.current?.files?.[0];
+    if (!file) return;
+    const formData = new FormData();
+    formData.append("file", file);
+    const result = await api<{ linkClickSfxUrl: string }>("/api/admin/site-settings/link-click-sfx", { method: "POST", body: formData });
+    setLinkClickSfxUrl(result.linkClickSfxUrl);
+    if (linkClickSfxInputRef.current) linkClickSfxInputRef.current.value = "";
+  }
+
+  async function removeLinkClickSfx() {
+    await api("/api/admin/site-settings/link-click-sfx", { method: "DELETE" });
+    setLinkClickSfxUrl(null);
   }
 
   async function uploadChatHudSfx() {
@@ -379,6 +398,28 @@ export function FontsAdminPage() {
           <input ref={scanSfxInputRef} type="file" accept="audio/mpeg,audio/wav,audio/ogg" />
           <button className="btn btn-primary" onClick={uploadScanSfx}>
             {scanSfxUrl ? "Replace" : "Upload"}
+          </button>
+        </div>
+      </div>
+
+      <div className="field" style={{ maxWidth: 420 }}>
+        <label>Link-click sound</label>
+        <p style={{ fontSize: "0.75rem", color: "var(--text-dim)", marginTop: 0 }}>
+          Plays whenever the user clicks any hyperlink, site-wide — header nav, external links, spacemap branches,
+          album links from the player.
+        </p>
+        {linkClickSfxUrl && (
+          <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.4rem" }}>
+            <audio src={linkClickSfxUrl} controls style={{ height: 32 }} />
+            <button className="btn btn-danger" onClick={removeLinkClickSfx}>
+              Remove
+            </button>
+          </div>
+        )}
+        <div style={{ display: "flex", gap: "0.5rem" }}>
+          <input ref={linkClickSfxInputRef} type="file" accept="audio/mpeg,audio/wav,audio/ogg" />
+          <button className="btn btn-primary" onClick={uploadLinkClickSfx}>
+            {linkClickSfxUrl ? "Replace" : "Upload"}
           </button>
         </div>
       </div>

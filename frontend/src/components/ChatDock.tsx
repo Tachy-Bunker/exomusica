@@ -1,16 +1,19 @@
 import { useRef } from "react";
+import { createPortal } from "react-dom";
 import type { MouseEvent as ReactMouseEvent } from "react";
 import { Link } from "react-router-dom";
 import { useChatDockStore } from "../lib/chatDockStore";
 import { useIsDesktop } from "../lib/useIsDesktop";
 import { ChannelPage } from "../pages/ChannelPage";
+import { useFixedPortalRoot } from "../lib/useFixedPortalRoot";
 
 export function ChatDock() {
   const isDesktop = useIsDesktop();
   const { openChannelSlug, openChannelName, openBranchSlug, collapsed, width, close, toggleCollapse, setWidth } = useChatDockStore();
   const dragging = useRef(false);
+  const portalRoot = useFixedPortalRoot();
 
-  if (!isDesktop || !openChannelSlug) return null;
+  if (!isDesktop || !openChannelSlug || !portalRoot) return null;
 
   function startResize(e: ReactMouseEvent) {
     e.preventDefault();
@@ -29,7 +32,7 @@ export function ChatDock() {
   }
 
   if (collapsed) {
-    return (
+    return createPortal(
       <button
         className="btn btn-primary"
         onClick={toggleCollapse}
@@ -45,11 +48,12 @@ export function ChatDock() {
         title={`Reopen chat: ${openChannelName}`}
       >
         💬 {openChannelName}
-      </button>
+      </button>,
+      portalRoot,
     );
   }
 
-  return (
+  return createPortal(
     <div
       style={{
         position: "fixed",
@@ -98,6 +102,7 @@ export function ChatDock() {
       <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column", padding: "0 0.6rem 0.6rem" }}>
         <ChannelPage channelSlug={openChannelSlug} fillHeight />
       </div>
-    </div>
+    </div>,
+    portalRoot,
   );
 }
