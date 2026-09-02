@@ -40,6 +40,20 @@ export interface Warden {
   coreJag: number;
   trail: { x: number; y: number }[];
   lastTrailAt: number;
+  branchId: number | null;
+  screenX: number | null; // when bound to a branch, position comes from here (CSS px, camera-relative) instead of the x/y wander system
+  screenY: number | null;
+}
+
+// FNV-1a — deterministic per-branch seed so a warden's appearance never
+// reshuffles when branches reorder, unlike seeding from array index.
+function fnv1a(str: string): number {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < str.length; i++) {
+    h ^= str.charCodeAt(i);
+    h = Math.imul(h, 0x01000193);
+  }
+  return h >>> 0;
 }
 
 const WARDEN_HUE_BASE = 272;
@@ -72,6 +86,9 @@ export function makeWardens(count: number, seed: number): Warden[] {
       coreJag: 0.1 + r() * 0.1,
       trail: [],
       lastTrailAt: 0,
+      branchId: null,
+      screenX: null,
+      screenY: null,
     };
     pickWaypoint(w);
     list.push(w);
@@ -82,6 +99,40 @@ export function makeWardens(count: number, seed: number): Warden[] {
 function pickWaypoint(o: Warden) {
   o.tx = Math.random() * 1.7 - 0.85;
   o.ty = Math.random() * 1.7 - 0.85;
+}
+
+function makeWardenForBranch(branchId: number, slug: string): Warden {
+  const seed = fnv1a(`branch:${branchId}:${slug}`);
+  const r = mulberry32(seed);
+  const hue = WARDEN_HUE_BASE + (r() * 14 - 7);
+  const spikeCount = 7 + Math.floor(r() * 7);
+  const spikes: Spike[] = [];
+  for (let s = 0; s < spikeCount; s++) {
+    spikes.push({ len: 0.55 + r() * 0.95, curve: (r() - 0.5) * 0.5, rate: 0.0009 + r() * 0.0012, phase: r() * Math.PI * 2 });
+  }
+  const w: Warden = {
+    x: 0,
+    y: 0,
+    tx: 0,
+    ty: 0,
+    speed: 0,
+    size: 24 + r() * 20,
+    hue,
+    eyeHue: hue,
+    spikes,
+    spin: (r() - 0.5) * 0.00045,
+    facing: r() * Math.PI * 2,
+    phase: r() * Math.PI * 2,
+    pulseRate: 0.0011 + r() * 0.0009,
+    pupilRate: 0.0006 + r() * 0.0007,
+    coreJag: 0.1 + r() * 0.1,
+    trail: [],
+    lastTrailAt: 0,
+    branchId,
+    screenX: null,
+    screenY: null,
+  };
+  return w;
 }
 
 function wardenSilhouette(ctx: CanvasRenderingContext2D, o: Warden, time: number, coreR: number) {
@@ -132,6 +183,7 @@ export class WardenSystem {
   private canvas: HTMLCanvasElement;
   private ctx: CanvasRenderingContext2D;
   private wardens: Warden[] = [];
+  private branchWardenCache = new Map<number, Warden>(); // incremental — never regenerate wholesale, or an in-progress hover/interaction breaks
   private haloGradient: CanvasGradient | null = null;
   private seed: number;
   private cssWidth = 1;
@@ -145,6 +197,35 @@ export class WardenSystem {
 
   setWardens(count: number) {
     this.wardens = makeWardens(count, this.seed);
+  }
+
+  /** Wardens become the branch objects themselves — one per branch,
+   *  deterministically seeded from the branch's own ID, diffed against the
+   *  previous set so reordering or one branch changing doesn't regenerate
+   *  (and thereby interrupt) every other warden. */
+  bindToBranches(branches: { id: number; slug: string }[]) {
+    const nextIds = new Set(branches.map((b) => b.id));
+    for (const id of this.branchWardenCache.keys()) {
+      if (!nextIds.has(id)) this.branchWardenCache.delete(id);
+    }
+    for (const b of branches) {
+      if (!this.branchWardenCache.has(b.id)) {
+        this.branchWardenCache.set(b.id, makeWardenForBranch(b.id, b.slug));
+      }
+    }
+    // Preserve the branches' own order for stable draw order.
+    this.wardens = branches.map((b) => this.branchWardenCache.get(b.id)!);
+  }
+
+  /** Called once per frame per branch by the spacemap, reusing the exact
+   *  screen-position math it already computes for hit-testing/lock-on —
+   *  this is what makes wardens track the camera pan and physics wander. */
+  setScreenPosition(branchId: number, screenX: number, screenY: number) {
+    const w = this.branchWardenCache.get(branchId);
+    if (w) {
+      w.screenX = screenX;
+      w.screenY = screenY;
+    }
   }
 
   resize(cssWidth: number, cssHeight: number) {
@@ -316,15 +397,23 @@ export class WardenSystem {
   }
 
   private drawOne(o: Warden, state: WardenRenderState) {
-    const x0 = (o.x * 0.5 + 0.5) * this.cssWidth;
-    const y0 = (1 - (o.y * 0.5 + 0.5)) * this.cssHeight;
+    const x0 = o.screenX ?? (o.x * 0.5 + 0.5) * this.cssWidth;
+    const y0 = o.screenY ?? (1 - (o.y * 0.5 + 0.5)) * this.cssHeight;
     const s = o.size;
     const hue = (o.hue + state.hueShift + 360) % 360;
     const eyeHue = (o.eyeHue + state.hueShift + 360) % 360;
     const nowSec = state.time * 0.001;
 
-    const dCursor = Math.hypot(o.x - state.pointerNormX, o.y - state.pointerNormY);
-    const reveal = Math.pow(Math.max(0, 1 - dCursor / 0.26), 1.5) * state.revealAmt;
+    let reveal: number;
+    if (o.screenX !== null && o.screenY !== null) {
+      const pointerScreenX = (state.pointerNormX * this.cssWidth) / 2 + this.cssWidth / 2;
+      const pointerScreenY = this.cssHeight / 2 - (state.pointerNormY * this.cssHeight) / 2;
+      const dCursorPx = Math.hypot(x0 - pointerScreenX, y0 - pointerScreenY);
+      reveal = Math.pow(Math.max(0, 1 - dCursorPx / 140), 1.5) * state.revealAmt;
+    } else {
+      const dCursor = Math.hypot(o.x - state.pointerNormX, o.y - state.pointerNormY);
+      reveal = Math.pow(Math.max(0, 1 - dCursor / 0.26), 1.5) * state.revealAmt;
+    }
 
     const [trailDx, trailDy] = this.stripeOffsetFor(y0, nowSec);
     this.drawTrail(o, s, trailDx, trailDy);
@@ -351,6 +440,10 @@ export class WardenSystem {
   /** Advances waypoint wandering — call once per logic tick. */
   tick(dt: number, zoneSpeedFactor: number, driftMul: number) {
     for (const o of this.wardens) {
+      if (o.branchId !== null) {
+        o.facing += o.spin * dt * zoneSpeedFactor;
+        continue; // position is externally driven — see setScreenPosition
+      }
       const dx = o.tx - o.x;
       const dy = o.ty - o.y;
       const dist = Math.hypot(dx, dy);
@@ -367,6 +460,7 @@ export class WardenSystem {
   updateTrails(now: number, trailAmt: number) {
     const trailCap = Math.round(trailAmt * 22);
     for (const o of this.wardens) {
+      if (o.branchId !== null) continue;
       if (now - o.lastTrailAt > 90 && trailCap > 0) {
         o.lastTrailAt = now;
         o.trail.push({ x: o.x, y: o.y });
@@ -390,12 +484,28 @@ export class WardenSystem {
   /** Sources fed into the field shader's `sources[]`/`uFlyerLens[]` uniforms
    *  — wardens act as light sources and lens-distortion points in the field
    *  itself, matching the prototype's per-frame uniform wiring. */
+  private fieldSpacePosition(o: Warden): { x: number; y: number } {
+    if (o.screenX !== null && o.screenY !== null) {
+      return {
+        x: (o.screenX - this.cssWidth / 2) / this.cssHeight,
+        y: (this.cssHeight / 2 - o.screenY) / this.cssHeight,
+      };
+    }
+    return { x: o.x * 0.5, y: o.y * 0.5 };
+  }
+
   getFieldSources(now: number): { x: number; y: number; amp: number; phase: number }[] {
-    return this.wardens.slice(0, 20).map((o) => ({ x: o.x * 0.5, y: o.y * 0.5, amp: 0.16, phase: now * 0.0022 + o.phase }));
+    return this.wardens.slice(0, 20).map((o) => {
+      const p = this.fieldSpacePosition(o);
+      return { x: p.x, y: p.y, amp: 0.16, phase: now * 0.0022 + o.phase };
+    });
   }
 
   getFieldFlyers(): { x: number; y: number; amp: number }[] {
-    return this.wardens.slice(0, 6).map((o) => ({ x: o.x * 0.5, y: o.y * 0.5, amp: 0.5 }));
+    return this.wardens.slice(0, 6).map((o) => {
+      const p = this.fieldSpacePosition(o);
+      return { x: p.x, y: p.y, amp: 0.5 };
+    });
   }
 
   dispose() {

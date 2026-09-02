@@ -37,6 +37,24 @@ export type FxSettings = typeof FX_DEFAULTS;
  *  can reach in without needing this hook to know about it. */
 export const pointerRef = { x: 0, y: 0 };
 
+/** Camera pan offset (CSS px), same convention as the spacemap's own
+ *  cameraRef — feeding this into the field makes it navigable via the
+ *  existing WASD/joystick controls instead of a static background. */
+export const cameraOffsetRef = { x: 0, y: 0 };
+
+/** Bridge to the WardenSystem instance living inside this hook's effect —
+ *  the spacemap's own physics tick loop already computes per-node screen
+ *  positions for hit-testing/lock-on, this lets it push those straight
+ *  into the wardens without either side needing to know the other's
+ *  internals. No-ops until the field has actually mounted. */
+export const wardenBridge: {
+  bindToBranches: (branches: { id: number; slug: string }[]) => void;
+  setScreenPosition: (branchId: number, x: number, y: number) => void;
+} = {
+  bindToBranches: () => {},
+  setScreenPosition: () => {},
+};
+
 export function useSpacemapField(settings: FxSettings = FX_DEFAULTS) {
   const fieldCanvasRef = useRef<HTMLCanvasElement>(null);
   const wardenCanvasRef = useRef<HTMLCanvasElement>(null);
@@ -57,6 +75,8 @@ export function useSpacemapField(settings: FxSettings = FX_DEFAULTS) {
     const overlay = new OverlaySnowRenderer(overlayCanvas);
     const wardens = new WardenSystem(wardenCanvas, seed);
     wardens.setWardens(settingsRef.current.wardenCount);
+    wardenBridge.bindToBranches = (branches) => wardens.bindToBranches(branches);
+    wardenBridge.setScreenPosition = (branchId, x, y) => wardens.setScreenPosition(branchId, x, y);
 
     function resize() {
       const w = container!.clientWidth;
@@ -97,6 +117,8 @@ export function useSpacemapField(settings: FxSettings = FX_DEFAULTS) {
       field.render({
         pointerX: pointerRef.x,
         pointerY: pointerRef.y,
+        cameraX: cameraOffsetRef.x,
+        cameraY: cameraOffsetRef.y,
         time: now,
         seed,
         split: s.split,
@@ -135,6 +157,8 @@ export function useSpacemapField(settings: FxSettings = FX_DEFAULTS) {
       cancelAnimationFrame(rafId);
       resizeObserver.disconnect();
       document.removeEventListener("visibilitychange", handleVisibility);
+      wardenBridge.bindToBranches = () => {};
+      wardenBridge.setScreenPosition = () => {};
       field.dispose();
       overlay.dispose();
       wardens.dispose();

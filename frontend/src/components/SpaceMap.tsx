@@ -8,7 +8,7 @@ import { useAmbienceStore } from "../lib/ambienceStore";
 import { GaplessLoop } from "../lib/GaplessLoop";
 import { Joystick } from "./Joystick";
 import { useVolumeMixerStore } from "../lib/volumeMixerStore";
-import { useSpacemapField, pointerRef } from "../lib/entoptic/useSpacemapField";
+import { useSpacemapField, pointerRef, cameraOffsetRef, wardenBridge } from "../lib/entoptic/useSpacemapField";
 import { useFxSettings } from "../lib/entoptic/useFxSettings";
 import { useAudioStore } from "../lib/audioStore";
 import { api } from "../lib/api";
@@ -331,6 +331,8 @@ export function SpaceMap({ branches, centerLabel, centerHref }: { branches: Bran
         cam.x += cam.vx * dt;
         cam.y += cam.vy * dt;
       }
+      cameraOffsetRef.x = cam.x;
+      cameraOffsetRef.y = cam.y;
 
       // --- nodes: orbit/wander home position, spring + repulsion ---
       const nodes = nodesRef.current;
@@ -411,6 +413,7 @@ export function SpaceMap({ branches, centerLabel, centerHref }: { branches: Bran
         for (const n of nodes) {
           const screenX = w / 2 + cam.x + n.x;
           const screenY = h / 2 + cam.y + n.y;
+          wardenBridge.setScreenPosition(n.id, screenX, screenY);
           const dist = Math.hypot(screenX - w / 2, screenY - h / 2);
           if (dist < nearestDist) {
             nearest = n;
@@ -455,6 +458,10 @@ export function SpaceMap({ branches, centerLabel, centerHref }: { branches: Bran
   const scale = isDesktop ? 2 : 1.5;
 
   const fxSettings = useFxSettings();
+
+  useEffect(() => {
+    wardenBridge.bindToBranches(branches.map((b) => ({ id: b.id, slug: b.slug })));
+  }, [branches]);
   const { containerRef: fieldContainerRef, fieldCanvasRef, wardenCanvasRef, overlayCanvasRef } = useSpacemapField(fxSettings);
 
   useEffect(() => {
@@ -549,7 +556,7 @@ export function SpaceMap({ branches, centerLabel, centerHref }: { branches: Bran
             <div
               key={n.id}
               className={`space-node ${n.isAnchor ? "space-node-anchor" : ""} ${isPlaying ? "space-node-playing" : ""}`}
-              style={{ left: n.x, top: n.y }}
+              style={{ left: n.x, top: n.y, opacity: 0 }}
               onMouseEnter={() => {
                 hoveredIdRef.current = n.id;
                 setHoveredId(n.id);

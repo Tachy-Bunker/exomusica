@@ -12,6 +12,7 @@ export const fieldFragmentSrc = `
 precision mediump float;
 uniform vec2 resolution;
 uniform vec2 pointer;
+uniform vec2 uCameraOffset;
 uniform float time;
 uniform float uSeed;
 uniform float uSplit;
@@ -56,6 +57,7 @@ float sdSegment(vec2 p, vec2 a, vec2 b){
 
 void main(){
   vec2 uv = (gl_FragCoord.xy - 0.5*resolution) / resolution.y;
+  uv += uCameraOffset;
   float t = time * 0.20;
   float seedA = fract(uSeed * 0.0001) * 6.2831;
   float seedB = fract(uSeed * 0.00037) * 6.2831;

@@ -23,6 +23,8 @@ export interface FieldFlyer {
 export interface FieldRenderState {
   pointerX: number; // CSS px, spacemap-relative, origin at center (matches prototype's toClipXY output)
   pointerY: number;
+  cameraX: number; // CSS px — the spacemap's camera pan offset, makes the field navigable via WASD/joystick
+  cameraY: number;
   time: number; // ms
   seed: number;
   split: number; // 0..1
@@ -51,9 +53,11 @@ export class FieldRenderer {
   private gl: WebGLRenderingContext | null;
   private program: WebGLProgram | null = null;
   private cssWidth = 1; // last width passed to resize() — the prototype scales the pointer uniform by this directly, not by anything derived from dpr
+  private cssHeight = 1;
 
   private uResolution: WebGLUniformLocation | null = null;
   private uPointer: WebGLUniformLocation | null = null;
+  private uCameraOffset: WebGLUniformLocation | null = null;
   private uTime: WebGLUniformLocation | null = null;
   private uSeed: WebGLUniformLocation | null = null;
   private uSplit: WebGLUniformLocation | null = null;
@@ -96,6 +100,7 @@ export class FieldRenderer {
 
     this.uResolution = gl.getUniformLocation(this.program, "resolution");
     this.uPointer = gl.getUniformLocation(this.program, "pointer");
+    this.uCameraOffset = gl.getUniformLocation(this.program, "uCameraOffset");
     this.uTime = gl.getUniformLocation(this.program, "time");
     this.uSeed = gl.getUniformLocation(this.program, "uSeed");
     this.uSplit = gl.getUniformLocation(this.program, "uSplit");
@@ -122,6 +127,7 @@ export class FieldRenderer {
    *  is where this becomes device-tier-aware, not here. */
   resize(cssWidth: number, cssHeight: number): void {
     this.cssWidth = cssWidth;
+    this.cssHeight = cssHeight;
     const dpr = Math.min(window.devicePixelRatio || 1, 1.4);
     const maxPixels = 480000;
     const fit = Math.sqrt(maxPixels / (cssWidth * cssHeight));
@@ -140,6 +146,10 @@ export class FieldRenderer {
     // — scaled by the canvas's *own* render-target width over the real CSS
     // window width, not by anything derived from devicePixelRatio.
     gl.uniform2f(this.uPointer, (state.pointerX * this.canvas.width) / this.cssWidth, (state.pointerY * this.canvas.width) / this.cssWidth);
+    // Negated: panning the camera right (positive cameraX, per the spacemap's
+    // convention) should make the field appear to slide left under it, same
+    // as the branch nodes do.
+    gl.uniform2f(this.uCameraOffset, -state.cameraX / this.cssHeight, state.cameraY / this.cssHeight);
     gl.uniform1f(this.uTime, state.time * 0.001);
     gl.uniform1f(this.uSeed, state.seed);
     gl.uniform1f(this.uSplit, state.split);
