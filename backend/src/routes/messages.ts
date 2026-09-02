@@ -7,6 +7,7 @@ import { broadcast } from "../lib/chatHub.js";
 import { sendTemplatedMail } from "../lib/emailTemplates.js";
 import { createNotification } from "../lib/notify.js";
 import { parseSearchQuery } from "../lib/searchQuery.js";
+import { walkChannelHistoryInChunks } from "../lib/messageChunking.js";
 
 const messageInclude = {
   author: { select: { username: true, avatarUrl: true } },
@@ -29,7 +30,7 @@ export async function messageRoutes(app: FastifyInstance): Promise<void> {
       const channel = await prisma.forumChannel.findUnique({ where: { slug: req.params.slug } });
       if (!channel) return reply.code(404).send({ error: "no such channel" });
 
-      const limit = Math.min(Number(req.query.limit ?? 50), 200);
+      const limit = Math.min(Number(req.query.limit ?? 100), 300);
       const { day, before, q } = req.query;
 
       // --- search: scoped to this channel, most recent match first --------
@@ -278,4 +279,54 @@ export async function messageRoutes(app: FastifyInstance): Promise<void> {
       return reply.code(204).send();
     },
   );
+
+  // Full chat export — walks the whole channel history in chunks of 300
+  // (never loads it all into memory at once) and returns a plain-text
+  // file: one line per message, "YYYY-MM-DD-HH-MM-SS:username:message".
+  app.get<{ Params: { slug: string } }>("/api/channels/:slug/export", { preHandler: requireAuth }, async (req, reply) => {
+    const channel = await prisma.forumChannel.findUnique({ where: { slug: req.params.slug } });
+    if (!channel) return reply.code(404).send({ error: "not found" });
+
+    const lines: string[] = [];
+    await walkChannelHistoryInChunks(prisma, channel.id, async (batch) => {
+      const full = await prisma.message.findMany({
+        where: { id: { in: batch.map((m) => m.id) } },
+        orderBy: { createdAt: "asc" },
+        include: { author: { select: { username: true } } },
+      });
+      for (const m of full) {
+        if (m.isDeleted) continue;
+        const ts = m.createdAt.toISOString().slice(0, 19).replace("T", "-").replace(/:/g, "-");
+        const text = m.contentRaw.replace(/\n/g, " ");
+        lines.push(`${ts}:${m.author.username}:${text}`);
+      }
+    });
+
+    reply.header("Content-Type", "text/plain; charset=utf-8");
+    reply.header("Content-Disposition", `attachment; filename="${req.params.slug}-export.txt"`);
+    return lines.join("\n");
+  });
+
+  // Attachment list for the export — the export itself is plain text, so
+  // attachments are handed back as a flat list of URLs/filenames for the
+  // user to download individually rather than bundling a zip server-side.
+  app.get<{ Params: { slug: string } }>("/api/channels/:slug/export/attachments", { preHandler: requireAuth }, async (req, reply) => {
+    const channel = await prisma.forumChannel.findUnique({ where: { slug: req.params.slug } });
+    if (!channel) return reply.code(404).send({ error: "not found" });
+
+    const attachments: { filename: string; url: string; createdAt: string }[] = [];
+    await walkChannelHistoryInChunks(prisma, channel.id, async (batch) => {
+      const full = await prisma.message.findMany({
+        where: { id: { in: batch.map((m) => m.id) }, isDeleted: false },
+        orderBy: { createdAt: "asc" },
+        include: { attachments: true },
+      });
+      for (const m of full) {
+        for (const a of m.attachments) {
+          attachments.push({ filename: a.filename, url: a.storagePath, createdAt: m.createdAt.toISOString() });
+        }
+      }
+    });
+    return attachments;
+  });
 }

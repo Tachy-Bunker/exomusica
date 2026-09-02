@@ -1,12 +1,11 @@
-import { useEffect, useRef, useState, useContext, createContext, type ChangeEvent, type ClipboardEvent, type FormEvent } from "react";
+import { useEffect, useRef, useState, useCallback, useContext, createContext, type ChangeEvent, type ClipboardEvent, type FormEvent } from "react";
 import { Link, useParams, useSearchParams, useNavigate } from "react-router-dom";
-import { api } from "../lib/api";
+import { api, getToken } from "../lib/api";
 import { useAuth } from "../lib/auth";
 import { useAudioStore } from "../lib/audioStore";
 import { renderMessageContent } from "../lib/formatMessage";
 import { EmojiPicker } from "../components/EmojiPicker";
 import { AttachmentPreview } from "../components/AttachmentPreview";
-import { ArchiveCalendar } from "../components/ArchiveCalendar";
 import { SearchBox } from "../components/SearchBox";
 import { TopicSwitcher } from "../components/TopicSwitcher";
 import { useIsDesktop } from "../lib/useIsDesktop";
@@ -328,6 +327,9 @@ export function ChannelPage({ channelSlug, fillHeight }: { channelSlug?: string;
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
   const [activeSearch, setActiveSearch] = useState<string | null>(null);
   const [messages, setMessages] = useState<MessageDTO[]>([]);
+  const messageListRef = useRef<HTMLDivElement>(null);
+  const [loadingOlder, setLoadingOlder] = useState(false);
+  const [hasMoreOlder, setHasMoreOlder] = useState(true);
   const [archiveDays, setArchiveDays] = useState<{ day: string; messageCount: number }[]>([]);
   const [draft, setDraft] = useState("");
   const [emojiQuery, setEmojiQuery] = useState<string | null>(null);
@@ -340,6 +342,26 @@ export function ChannelPage({ channelSlug, fillHeight }: { channelSlug?: string;
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [pipWindow, setPipWindow] = useState<Window | null>(null);
   const [pendingScrollTo, setPendingScrollTo] = useState<number | null>(null);
+
+  const [exportAttachments, setExportAttachments] = useState<{ filename: string; url: string }[] | null>(null);
+
+  async function exportChat() {
+    if (!slug) return;
+    const res = await fetch(`/api/channels/${slug}/export`, {
+      headers: { Authorization: `Bearer ${getToken()}` },
+    });
+    const text = await res.text();
+    const blob = new Blob([text], { type: "text/plain" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${slug}-export.txt`;
+    a.click();
+    URL.revokeObjectURL(url);
+
+    const attachments = await api<{ filename: string; url: string }[]>(`/api/channels/${slug}/export/attachments`);
+    setExportAttachments(attachments);
+  }
 
   async function popOutChat() {
     if (!slug) return;
@@ -475,8 +497,11 @@ export function ChannelPage({ channelSlug, fillHeight }: { channelSlug?: string;
     const params = new URLSearchParams();
     if (mode === "day" && selectedDay) params.set("day", selectedDay);
     if (mode === "search" && activeSearch) params.set("q", activeSearch);
+    if (mode === "live") params.set("limit", "100");
+    setHasMoreOlder(true);
     api<MessageDTO[]>(`/api/channels/${slug}/messages?${params}`).then((data) => {
       setMessages(data);
+      if (mode === "live" && data.length < 100) setHasMoreOlder(false);
       if (mode === "live" && data.length > 0) {
         const last = data[data.length - 1];
         // Wait a tick for the DOM to actually contain the new messages before scrolling to one.
@@ -486,6 +511,42 @@ export function ChannelPage({ channelSlug, fillHeight }: { channelSlug?: string;
       }
     });
   }, [slug, mode, selectedDay, activeSearch]);
+
+  // Discord-style infinite scroll: scrolling near the top of the live feed
+  // loads the next 100 older messages via cursor pagination, prepending
+  // them without visually jerking the viewport — we measure the height
+  // added and adjust scrollTop by that same amount in the same paint.
+  const loadOlderMessages = useCallback(() => {
+    if (!slug || mode !== "live" || loadingOlder || !hasMoreOlder || messages.length === 0) return;
+    const oldest = messages[0];
+    const container = messageListRef.current;
+    const prevScrollHeight = container?.scrollHeight ?? 0;
+    setLoadingOlder(true);
+    api<MessageDTO[]>(`/api/channels/${slug}/messages?limit=100&before=${oldest.id}`)
+      .then((older) => {
+        if (older.length < 100) setHasMoreOlder(false);
+        if (older.length === 0) return;
+        setMessages((prev) => [...older, ...prev]);
+        requestAnimationFrame(() => {
+          if (container) {
+            const heightAdded = container.scrollHeight - prevScrollHeight;
+            container.scrollTop += heightAdded;
+          }
+        });
+      })
+      .finally(() => setLoadingOlder(false));
+  }, [slug, mode, loadingOlder, hasMoreOlder, messages]);
+
+  useEffect(() => {
+    const container = messageListRef.current;
+    if (!container) return;
+    function handleScroll() {
+      if (container!.scrollTop < 200) loadOlderMessages();
+    }
+    container.addEventListener("scroll", handleScroll);
+    return () => container.removeEventListener("scroll", handleScroll);
+  }, [loadOlderMessages]);
+
 
   const reportViewing = usePresenceStore((s) => s.reportViewing);
   useEffect(() => {
@@ -651,23 +712,14 @@ export function ChannelPage({ channelSlug, fillHeight }: { channelSlug?: string;
         {(!isMobileWindow || isChatFullscreen) && (
           <>
             <TopicSwitcher />
-            <button className={`btn ${mode === "live" ? "btn-primary" : ""}`} onClick={() => setMode("live")}>
-              Live
-            </button>
             {isDesktop && (
               <button className="btn" onClick={popOutChat} title="Open in a floating window">
                 ↗ Pop out
               </button>
             )}
-            <ArchiveCalendar
-              label="Past chats"
-              archiveDays={archiveDays}
-              selectedDay={mode === "day" ? selectedDay : null}
-              onSelect={(day) => {
-                setSelectedDay(day);
-                setMode("day");
-              }}
-            />
+            <button className="btn" onClick={exportChat} title="Download the full chat history as a text file">
+              ⬇ Export
+            </button>
             {slug && (
               <SearchBox
                 channelSlug={slug}
@@ -697,8 +749,28 @@ export function ChannelPage({ channelSlug, fillHeight }: { channelSlug?: string;
         )}
       </div>
 
+      {exportAttachments && (
+        <div style={{ border: "1px solid var(--border)", borderRadius: "var(--radius)", padding: "0.6rem", marginBottom: "0.6rem", maxHeight: 200, overflowY: "auto" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "0.3rem" }}>
+            <strong style={{ fontSize: "0.85rem" }}>Attachments ({exportAttachments.length}) — download individually</strong>
+            <button className="btn" style={{ padding: "0 0.4rem" }} onClick={() => setExportAttachments(null)}>
+              ×
+            </button>
+          </div>
+          {exportAttachments.length === 0 && <p style={{ fontSize: "0.8rem", color: "var(--text-dim)" }}>No attachments in this chat.</p>}
+          {exportAttachments.map((a, i) => (
+            <div key={i} style={{ fontSize: "0.8rem" }}>
+              <a href={a.url} download={a.filename} target="_blank" rel="noreferrer">
+                {a.filename}
+              </a>
+            </div>
+          ))}
+        </div>
+      )}
+
 
       <div
+        ref={messageListRef}
         className="message-list"
         style={{
           fontSize: `${messageFontSize}%`,

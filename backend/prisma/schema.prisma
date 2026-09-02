@@ -181,6 +181,7 @@ model Message {
 
   @@index([channelId, dayKey])
   @@index([channelId, createdAt])
+  @@unique([channelId, importedFrom])
 }
 
 model Reaction {

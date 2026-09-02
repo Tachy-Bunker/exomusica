@@ -46,6 +46,9 @@ export function AdminLayout() {
         <NavLink to="/admin/newsletter" className={({ isActive }) => (isActive ? "active" : "")}>
           Newsletter
         </NavLink>
+        <NavLink to="/admin/discord-import" className={({ isActive }) => (isActive ? "active" : "")}>
+          Discord import
+        </NavLink>
         <NavLink to="/admin/notifications" className={({ isActive }) => (isActive ? "active" : "")}>
           Notification sounds
         </NavLink>
