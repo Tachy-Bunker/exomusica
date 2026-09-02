@@ -3,6 +3,7 @@ import { useParams, Link, useNavigate } from "react-router-dom";
 import { api } from "../lib/api";
 import { useAudioStore } from "../lib/audioStore";
 import { useDocumentTitle } from "../lib/useDocumentTitle";
+import { renderMarkdown } from "../lib/markdown";
 import { useIsDesktop } from "../lib/useIsDesktop";
 import { isTypingTarget } from "../lib/isTypingTarget";
 import type { PlayableTrackDTO } from "../lib/types";
@@ -18,6 +19,7 @@ interface AlbumDetail {
   composer: string;
   coverArtUrl: string | null;
   description: string | null;
+  contentMarkdown: string | null;
   links: { id: number; label: string; url: string }[];
   gallery: { id: number; url: string }[];
   branch: { slug: string; name: string };
@@ -83,6 +85,7 @@ export function AlbumPage() {
       </div>
 
       {album.description && <p style={{ marginTop: "1.2rem" }}>{album.description}</p>}
+      {album.contentMarkdown && <div style={{ marginTop: "1rem" }}>{renderMarkdown(album.contentMarkdown)}</div>}
 
       {album.gallery.length > 0 && (
         <div style={{ display: "flex", gap: "0.5rem", marginTop: "1rem", overflowX: "auto" }}>

@@ -7,6 +7,7 @@ interface ChannelSummary {
   slug: string;
   name: string;
   description: string | null;
+  contentMarkdown: string | null;
   category: string | null;
   position: number;
   fontId: number | null;
@@ -23,7 +24,7 @@ export function ChannelsPage() {
   const [form, setForm] = useState({ slug: "", name: "", description: "", category: "" });
   const [error, setError] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<number | null>(null);
-  const [editForm, setEditForm] = useState({ name: "", description: "", category: "", position: "" });
+  const [editForm, setEditForm] = useState({ name: "", description: "", contentMarkdown: "", category: "", position: "" });
 
   function load() {
     api<ChannelSummary[]>("/api/channels?kind=DISCUSSION").then(setTopics);
@@ -65,6 +66,7 @@ export function ChannelsPage() {
     setEditForm({
       name: t.name,
       description: t.description ?? "",
+      contentMarkdown: t.contentMarkdown ?? "",
       category: t.category ?? "",
       position: String(t.position),
     });
@@ -76,6 +78,7 @@ export function ChannelsPage() {
       body: JSON.stringify({
         name: editForm.name,
         description: editForm.description,
+        contentMarkdown: editForm.contentMarkdown,
         category: editForm.category,
         position: Number(editForm.position) || 0,
       }),
@@ -155,6 +158,13 @@ export function ChannelsPage() {
                     value={editForm.description}
                     onChange={(e) => setEditForm((f) => ({ ...f, description: e.target.value }))}
                     style={{ marginBottom: "0.2rem" }}
+                  />
+                  <textarea
+                    rows={6}
+                    placeholder="Page content (markdown — text, images, embeds)"
+                    value={editForm.contentMarkdown}
+                    onChange={(e) => setEditForm((f) => ({ ...f, contentMarkdown: e.target.value }))}
+                    style={{ marginBottom: "0.2rem", width: "100%" }}
                   />
                   <input
                     placeholder="Category"

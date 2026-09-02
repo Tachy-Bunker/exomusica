@@ -128,6 +128,7 @@ model ForumChannel {
   slug        String      @unique
   name        String
   description String?
+  contentMarkdown String? @db.Text // optional illustrative content shown on the topic's page — images, text, embeds
   category    String?
   position    Int         @default(0)
   kind        ChannelKind
@@ -240,6 +241,7 @@ model Album {
   composer    String // default/primary composer shown on the album as a whole
   coverArtUrl String?
   description String?  @db.Text
+  contentMarkdown String? @db.Text // optional illustrative content shown on the album's page — images, text, embeds
   createdAt   DateTime @default(now())
 
   tracks        Track[]

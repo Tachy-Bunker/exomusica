@@ -21,6 +21,7 @@ interface AlbumDetail {
   title: string;
   composer: string;
   description: string | null;
+  contentMarkdown: string | null;
   coverArtUrl: string | null;
   links: { id: number; label: string; url: string }[];
   gallery: { id: number; url: string }[];
@@ -50,7 +51,7 @@ export function AlbumsAdminPage() {
   const [editingTrackId, setEditingTrackId] = useState<number | null>(null);
   const [trackEditForm, setTrackEditForm] = useState({ title: "", fileUrl: "", format: "MP3" });
   const [editingAlbumInfo, setEditingAlbumInfo] = useState(false);
-  const [albumEditForm, setAlbumEditForm] = useState({ title: "", composer: "", description: "" });
+  const [albumEditForm, setAlbumEditForm] = useState({ title: "", composer: "", description: "", contentMarkdown: "" });
   const coverInput = useRef<HTMLInputElement>(null);
   const galleryInput = useRef<HTMLInputElement>(null);
 
@@ -85,7 +86,7 @@ export function AlbumsAdminPage() {
 
   function startEditAlbumInfo() {
     if (!detail) return;
-    setAlbumEditForm({ title: detail.title, composer: detail.composer, description: detail.description ?? "" });
+    setAlbumEditForm({ title: detail.title, composer: detail.composer, description: detail.description ?? "", contentMarkdown: detail.contentMarkdown ?? "" });
     setEditingAlbumInfo(true);
   }
 
@@ -230,6 +231,13 @@ export function AlbumsAdminPage() {
     loadDetail(detail.slug);
   }
 
+  async function removeAlbumCollaborator(collaboratorId: number) {
+    if (!detail) return;
+    if (!confirm("Remove this collaborator from the album entirely? This also clears any per-track composer credits for them.")) return;
+    await api(`/api/admin/albums/${detail.id}/collaborators/${collaboratorId}`, { method: "DELETE" });
+    loadDetail(detail.slug);
+  }
+
   return (
     <div>
       <h1>Albums</h1>
@@ -308,6 +316,16 @@ export function AlbumsAdminPage() {
                   value={albumEditForm.description}
                   onChange={(e) => setAlbumEditForm((f) => ({ ...f, description: e.target.value }))}
                   placeholder="description"
+                />
+              </div>
+              <div className="field">
+                <label>Page content (markdown — text, images, embeds)</label>
+                <textarea
+                  rows={6}
+                  style={{ width: "100%" }}
+                  value={albumEditForm.contentMarkdown}
+                  onChange={(e) => setAlbumEditForm((f) => ({ ...f, contentMarkdown: e.target.value }))}
+                  placeholder="Optional — shown on the album's public page"
                 />
               </div>
               <button className="btn btn-primary" onClick={saveAlbumInfo}>
@@ -450,6 +468,21 @@ export function AlbumsAdminPage() {
 
           {detail.collaborators.length > 0 && (
             <>
+              <h3 style={{ fontSize: "0.9rem", marginTop: "1rem" }}>Album collaborators</h3>
+              <div style={{ display: "flex", gap: "0.6rem", flexWrap: "wrap", marginBottom: "0.6rem" }}>
+                {detail.collaborators.map((c) => (
+                  <div
+                    key={c.id}
+                    style={{ display: "flex", alignItems: "center", gap: "0.4rem", border: "1px solid var(--border)", borderRadius: "var(--radius)", padding: "0.2rem 0.5rem" }}
+                  >
+                    <span style={{ fontSize: "0.85rem" }}>{c.name}</span>
+                    <button className="btn btn-danger" style={{ fontSize: "0.7rem", padding: "0 0.4rem" }} onClick={() => removeAlbumCollaborator(c.id)}>
+                      Remove
+                    </button>
+                  </div>
+                ))}
+              </div>
+
               <h3 style={{ fontSize: "0.9rem", marginTop: "1rem" }}>Per-track composer</h3>
               {detail.tracks.map((t) => (
                 <div key={t.id} style={{ marginBottom: "0.4rem" }}>

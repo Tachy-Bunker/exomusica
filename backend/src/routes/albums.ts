@@ -87,7 +87,7 @@ export async function albumRoutes(app: FastifyInstance): Promise<void> {
     return reply.code(201).send(album);
   });
 
-  app.patch<{ Params: { id: string }; Body: Partial<{ title: string; composer: string; description: string }> }>(
+  app.patch<{ Params: { id: string }; Body: Partial<{ title: string; composer: string; description: string; contentMarkdown: string }> }>(
     "/api/admin/albums/:id",
     { preHandler: requireAdmin },
     async (req) => {
@@ -274,6 +274,25 @@ export async function albumRoutes(app: FastifyInstance): Promise<void> {
         where: { albumId_collaboratorId: { albumId, collaboratorId } },
         create: { albumId, collaboratorId },
         update: {},
+      });
+      return reply.code(204).send();
+    },
+  );
+
+  app.delete<{ Params: { id: string; collaboratorId: string } }>(
+    "/api/admin/albums/:id/collaborators/:collaboratorId",
+    { preHandler: requireAdmin },
+    async (req, reply) => {
+      const albumId = Number(req.params.id);
+      const collaboratorId = Number(req.params.collaboratorId);
+      // Clean up per-track composer credits for this collaborator on this
+      // album's tracks too — otherwise a track could still credit someone
+      // no longer listed as an album collaborator at all.
+      await prisma.trackCollaborator.deleteMany({
+        where: { collaboratorId, track: { albumId } },
+      });
+      await prisma.albumCollaborator.delete({
+        where: { albumId_collaboratorId: { albumId, collaboratorId } },
       });
       return reply.code(204).send();
     },
