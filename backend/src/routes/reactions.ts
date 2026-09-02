@@ -5,7 +5,7 @@ import { toMessageDTO } from "../lib/messageDto.js";
 import { broadcast } from "../lib/chatHub.js";
 
 const messageInclude = {
-  author: { select: { username: true, avatarUrl: true } },
+  author: { select: { username: true, avatarUrl: true, isGhost: true, linkedUserId: true, linkedUser: { select: { username: true, avatarUrl: true } } } },
   reactions: { include: { emoji: true, user: { select: { username: true } } } },
   attachments: true,
   replyTo: { select: { id: true, contentRaw: true, author: { select: { username: true } } } },

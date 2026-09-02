@@ -5,6 +5,8 @@ import { useDocumentTitle } from "../lib/useDocumentTitle";
 import { useIsDesktop } from "../lib/useIsDesktop";
 import { useContentScaleStore } from "../lib/contentScaleStore";
 import type { Branch } from "../lib/types";
+import { ExportIcon } from "../components/Icons";
+import { exportChatHistory } from "../lib/exportChat";
 
 interface ChannelSummary {
   slug: string;
@@ -48,7 +50,10 @@ export function DiscussionIndexPage() {
             <ul style={{ listStyle: "none", padding: 0 }}>
               {items.map((t) => (
                 <li key={t.slug} style={{ marginBottom: "0.5rem" }}>
-                  <Link to={`/topic/${t.slug}`}>{t.name}</Link>
+                  <Link to={`/topic/${t.slug}`}>{t.name}</Link>{" "}
+                  <button className="export-icon-btn" onClick={() => exportChatHistory(t.slug)} title="Download this topic's chat history">
+                    <ExportIcon size={16} />
+                  </button>
                   {t.description && <div style={{ fontSize: `${0.8 * scale}rem`, color: "var(--text-dim)" }}>{t.description}</div>}
                 </li>
               ))}

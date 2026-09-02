@@ -97,6 +97,7 @@ button {
 
 .top-nav {
   position: relative;
+  z-index: 46;
   display: flex;
   align-items: center;
   gap: 1.5rem;
@@ -321,6 +322,10 @@ th {
   border-radius: var(--radius);
   padding: 0.5rem 0.8rem;
   flex: 1;
+  min-width: 0;
+  overflow-wrap: break-word;
+  word-break: break-word;
+  hyphens: auto;
 }
 
 .message .meta {
@@ -1394,4 +1399,21 @@ th {
    overlap into a doubled/garbled look during the reveal. */
 .hud-reveal-textarea::placeholder {
   color: transparent;
+}
+
+.export-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #555;
+  background: transparent;
+  border: none;
+  padding: 0.2rem;
+  cursor: pointer;
+  transition: color 0.2s ease, transform 0.2s ease;
+}
+
+.export-icon-btn:hover {
+  color: #fff;
+  transform: rotate(-20deg);
 }

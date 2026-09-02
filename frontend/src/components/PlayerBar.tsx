@@ -182,7 +182,7 @@ export function PlayerBar() {
 
             <div className="player-transport">
               {isDesktop && (
-                <button className={`btn ${shuffle ? "btn-primary" : ""}`} onClick={toggleShuffle} title="Shuffle">
+                <button className={`btn ${shuffle ? "btn-primary" : ""}`} onClick={toggleShuffle} title="Shuffle (P)">
                   <ShuffleIcon size={16} />
                 </button>
               )}
@@ -251,7 +251,7 @@ export function PlayerBar() {
             </div>
 
             <div className="player-transport" style={{ justifyContent: "center", marginTop: "0.8rem" }}>
-              <button className={`btn ${shuffle ? "btn-primary" : ""}`} onClick={toggleShuffle} title="Shuffle">
+              <button className={`btn ${shuffle ? "btn-primary" : ""}`} onClick={toggleShuffle} title="Shuffle (P)">
                 <ShuffleIcon size={18} />
               </button>
               <button className="btn" onClick={playPrevious} disabled={history.length === 0} title="Previous (Shift+←)">

@@ -13,7 +13,7 @@ export function useGlobalPlayerShortcuts(): void {
         store.cycleRepeat();
         return;
       }
-      if (e.code === "KeyK") {
+      if (e.code === "KeyP") {
         store.toggleShuffle();
         return;
       }

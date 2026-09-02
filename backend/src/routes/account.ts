@@ -207,47 +207,52 @@ export async function accountRoutes(app: FastifyInstance): Promise<void> {
           isAdmin: true,
           isGhost: true,
           discordId: true,
-          mergedIntoUserId: true,
-          mergedIntoUser: { select: { id: true, username: true } },
+          linkedUserId: true,
+          linkedUser: { select: { id: true, username: true } },
           createdAt: true,
           _count: { select: { messages: true } },
         },
-        orderBy: { username: "asc" },
-        take: 50,
+        orderBy: [{ isGhost: "asc" }, { username: "asc" }],
+        take: ghostsOnly === "true" ? undefined : 50,
       });
       return users;
     },
   );
 
   app.post<{ Params: { id: string }; Body: { targetUserId: number } }>(
-    "/api/admin/users/:id/merge-ghost",
+    "/api/admin/users/:id/link-ghost",
     { preHandler: requireAdmin },
     async (req, reply) => {
       const ghostId = Number(req.params.id);
       const { targetUserId } = req.body ?? {};
       if (!targetUserId) return reply.code(400).send({ error: "targetUserId is required" });
-      if (ghostId === targetUserId) return reply.code(400).send({ error: "can't merge a ghost into itself" });
+      if (ghostId === targetUserId) return reply.code(400).send({ error: "can't link a ghost to itself" });
 
       const ghost = await prisma.user.findUnique({ where: { id: ghostId } });
       if (!ghost || !ghost.isGhost) return reply.code(400).send({ error: "not a ghost account" });
       const target = await prisma.user.findUnique({ where: { id: targetUserId } });
       if (!target) return reply.code(404).send({ error: "target account not found" });
 
-      // Reassign every message the ghost authored directly to the real
-      // account — this is what makes clicking through from an old message
-      // land on the real account automatically, no special-casing needed
-      // anywhere messages are displayed. The ghost row itself is kept
-      // (not deleted) so mention resolution can still find it and redirect
-      // to mergedIntoUser for any message text that still says
-      // "@<old ghost username>".
-      await prisma.$transaction([
-        prisma.message.updateMany({ where: { authorId: ghostId }, data: { authorId: targetUserId } }),
-        prisma.user.update({ where: { id: ghostId }, data: { mergedIntoUserId: targetUserId } }),
-      ]);
-
-      return { status: "merged" };
+      // Deliberately NOT reassigning message.authorId — this is a
+      // persistent link, resolved at read time (message display, export,
+      // mentions) rather than a one-time backfill. That's what makes it
+      // safe to relink/unlink later, and what makes a future Discord bot
+      // bridge work: new messages can keep arriving tagged with this
+      // discordId's ghost, and every reader resolves through the link to
+      // the real account automatically — no per-message reassignment
+      // needed going forward.
+      await prisma.user.update({ where: { id: ghostId }, data: { linkedUserId: targetUserId } });
+      return { status: "linked" };
     },
   );
+
+  app.post<{ Params: { id: string } }>("/api/admin/users/:id/unlink-ghost", { preHandler: requireAdmin }, async (req, reply) => {
+    const ghostId = Number(req.params.id);
+    const ghost = await prisma.user.findUnique({ where: { id: ghostId } });
+    if (!ghost || !ghost.isGhost) return reply.code(400).send({ error: "not a ghost account" });
+    await prisma.user.update({ where: { id: ghostId }, data: { linkedUserId: null } });
+    return { status: "unlinked" };
+  });
 
   app.get<{ Params: { username: string } }>("/api/users/:username", async (req, reply) => {
     const user = await prisma.user.findUnique({

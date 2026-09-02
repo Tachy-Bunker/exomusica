@@ -2,7 +2,6 @@ import { useEffect, useRef, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { api } from "../lib/api";
 import { useAuth } from "../lib/auth";
-import { useNotificationWidgetVisibility } from "../lib/notificationWidgetVisibility";
 import { useIsDesktop } from "../lib/useIsDesktop";
 import { useVolumeMixerStore } from "../lib/volumeMixerStore";
 
@@ -55,8 +54,6 @@ export function NotificationWidget({ offsetRight = 0, inline = false }: { offset
   const isDesktop = useIsDesktop();
   const isHomepage = location.pathname === "/";
   const [open, setOpen] = useState(false);
-  const hidden = useNotificationWidgetVisibility((s) => s.hidden);
-  const setHidden = useNotificationWidgetVisibility((s) => s.setHidden);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [recent, setRecent] = useState<RecentMessage[]>([]);
   const seenNotificationIds = useRef<Set<number>>(new Set());
@@ -122,7 +119,7 @@ export function NotificationWidget({ offsetRight = 0, inline = false }: { offset
     };
   }, [user]);
 
-  if (!user || hidden) return null;
+  if (!user) return null;
 
   const unread = notifications.filter((n) => !n.read).length;
 
@@ -166,10 +163,19 @@ export function NotificationWidget({ offsetRight = 0, inline = false }: { offset
       <button
         className={`btn btn-primary notif-bell ${unread > 0 ? "notif-bell-active" : ""}`}
         onClick={handleOpen}
-        style={{ borderRadius: "50%", width: "2.6rem", height: "2.6rem", position: "relative" }}
+        style={{
+          borderRadius: "50%",
+          width: "2.6rem",
+          height: "2.6rem",
+          padding: 0,
+          position: "relative",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+        }}
         title="Notifications"
       >
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
+        <svg width="33" height="33" viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
           <path d="M10,20h4a2,2,0,0,1-4,0Zm8-4V10a6,6,0,0,0-5-5.91V3a1,1,0,0,0-2,0V4.09A6,6,0,0,0,6,10v6L4,18H20Z" />
         </svg>
         {unread > 0 && (
@@ -207,11 +213,8 @@ export function NotificationWidget({ offsetRight = 0, inline = false }: { offset
             boxShadow: "0 12px 30px rgba(0,0,0,0.4)",
           }}
         >
-          <div style={{ display: "flex", justifyContent: "space-between", padding: "0.5rem 0.7rem", borderBottom: "1px solid var(--border)" }}>
+          <div style={{ padding: "0.5rem 0.7rem", borderBottom: "1px solid var(--border)" }}>
             <strong style={{ fontSize: "0.85rem" }}>Notifications</strong>
-            <button className="btn" style={{ padding: "0 0.4rem", fontSize: "0.7rem" }} onClick={() => setHidden(true)} title="Hide this widget">
-              Hide
-            </button>
           </div>
           {notifications.length === 0 && <p style={{ padding: "0.7rem 0.7rem 0.3rem", fontSize: "0.8rem", color: "var(--text-dim)" }}>Nothing yet.</p>}
           {notifications.map((n) => (

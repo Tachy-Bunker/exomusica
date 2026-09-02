@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState, useCallback, useContext, createContext, type ChangeEvent, type ClipboardEvent, type FormEvent } from "react";
 import { Link, useParams, useSearchParams, useNavigate } from "react-router-dom";
-import { api, getToken } from "../lib/api";
+import { api } from "../lib/api";
+import { exportChatHistory } from "../lib/exportChat";
+import { ExportIcon } from "../components/Icons";
 import { useAuth } from "../lib/auth";
 import { useAudioStore } from "../lib/audioStore";
 import { renderMessageContent } from "../lib/formatMessage";
@@ -347,18 +349,7 @@ export function ChannelPage({ channelSlug, fillHeight }: { channelSlug?: string;
 
   async function exportChat() {
     if (!slug) return;
-    const res = await fetch(`/api/channels/${slug}/export`, {
-      headers: { Authorization: `Bearer ${getToken()}` },
-    });
-    const text = await res.text();
-    const blob = new Blob([text], { type: "text/plain" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `${slug}-export.txt`;
-    a.click();
-    URL.revokeObjectURL(url);
-
+    await exportChatHistory(slug);
     const attachments = await api<{ filename: string; url: string }[]>(`/api/channels/${slug}/export/attachments`);
     setExportAttachments(attachments);
   }
@@ -717,8 +708,8 @@ export function ChannelPage({ channelSlug, fillHeight }: { channelSlug?: string;
                 ↗ Pop out
               </button>
             )}
-            <button className="btn" onClick={exportChat} title="Download the full chat history as a text file">
-              ⬇ Export
+            <button className="export-icon-btn" onClick={exportChat} title="Download the full chat history as a text file">
+              <ExportIcon size={20} />
             </button>
             {slug && (
               <SearchBox

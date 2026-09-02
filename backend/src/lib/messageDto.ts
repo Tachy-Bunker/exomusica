@@ -2,8 +2,24 @@ import type { Message, Reaction, CustomEmoji, User, Attachment } from "@prisma/c
 import { resolveTrackEmbeds } from "./embeds.js";
 import type { MessageDTO } from "./types.js";
 
+type LinkableAuthor = Pick<User, "username" | "avatarUrl" | "isGhost" | "linkedUserId"> & {
+  linkedUser: Pick<User, "username" | "avatarUrl"> | null;
+};
+
+/** Resolves a message's displayed author through a ghost's link, if one is
+ *  set — a persistent mapping (not a one-time backfill), so this same
+ *  resolution keeps working for messages a future Discord bot bridge
+ *  creates under the ghost's discordId, without needing per-message
+ *  reassignment. */
+function resolveAuthor(author: LinkableAuthor): { username: string; avatarUrl: string | null } {
+  if (author.isGhost && author.linkedUserId && author.linkedUser) {
+    return { username: author.linkedUser.username, avatarUrl: author.linkedUser.avatarUrl };
+  }
+  return { username: author.username, avatarUrl: author.avatarUrl };
+}
+
 type MessageWithRelations = Message & {
-  author: Pick<User, "username" | "avatarUrl">;
+  author: LinkableAuthor;
   reactions: (Reaction & { emoji: CustomEmoji; user: Pick<User, "username"> })[];
   attachments: Attachment[];
   replyTo: (Pick<Message, "id" | "contentRaw"> & { author: Pick<User, "username"> }) | null;
@@ -17,12 +33,14 @@ export async function toMessageDTO(message: MessageWithRelations): Promise<Messa
     reactionsByEmoji.set(r.emojiId, entry);
   }
 
+  const resolvedAuthor = resolveAuthor(message.author);
+
   return {
     id: message.id,
     channelId: message.channelId,
     authorId: message.authorId,
-    authorUsername: message.author.username,
-    authorAvatarUrl: message.author.avatarUrl,
+    authorUsername: resolvedAuthor.username,
+    authorAvatarUrl: resolvedAuthor.avatarUrl,
     unixTimestamp: Math.floor(message.createdAt.getTime() / 1000),
     replyToId: message.replyToId,
     replyPreview: message.replyTo

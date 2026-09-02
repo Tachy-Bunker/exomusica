@@ -8,8 +8,8 @@ interface UserSummary {
   isAdmin: boolean;
   isGhost: boolean;
   discordId?: string | null;
-  mergedIntoUserId?: number | null;
-  mergedIntoUser?: { id: number; username: string } | null;
+  linkedUserId?: number | null;
+  linkedUser?: { id: number; username: string } | null;
   _count?: { messages: number };
   createdAt: string;
 }
@@ -42,7 +42,7 @@ export function UsersPage() {
   useEffect(load, [query]);
   useEffect(loadGhosts, []);
 
-  async function mergeGhost(ghostId: number) {
+  async function linkGhost(ghostId: number) {
     const targetUsername = mergeTargets[ghostId]?.trim();
     if (!targetUsername) return;
     const matches = await api<UserSummary[]>(`/api/admin/users?q=${encodeURIComponent(targetUsername)}`);
@@ -51,8 +51,13 @@ export function UsersPage() {
       alert(`No account found with username "${targetUsername}" — check the spelling.`);
       return;
     }
-    if (!confirm(`Merge this ghost's messages into ${target.username}? This can't be undone.`)) return;
-    await api(`/api/admin/users/${ghostId}/merge-ghost`, { method: "POST", body: JSON.stringify({ targetUserId: target.id }) });
+    await api(`/api/admin/users/${ghostId}/link-ghost`, { method: "POST", body: JSON.stringify({ targetUserId: target.id }) });
+    loadGhosts();
+  }
+
+  async function unlinkGhost(ghostId: number) {
+    if (!confirm("Unlink this ghost? Its messages will show under its own name again.")) return;
+    await api(`/api/admin/users/${ghostId}/unlink-ghost`, { method: "POST" });
     loadGhosts();
   }
 
@@ -134,15 +139,24 @@ export function UsersPage() {
         <div style={{ marginBottom: "1.5rem", border: "1px solid var(--border)", borderRadius: "var(--radius)", padding: "0.8rem" }}>
           <h2 style={{ fontSize: "1rem", marginTop: 0 }}>Ghost accounts ({ghosts.length})</h2>
           <p style={{ fontSize: "0.8rem", color: "var(--text-dim)" }}>
-            Created by Discord import — can't log in. Merge one into a real account to reassign all its messages;
-            after merging, mentions and message-author links resolve to the real account even in old messages.
+            Created by Discord import — can't log in. Linking one to a real account resolves its messages,
+            mentions, and exports as that account from now on — this is a persistent link, not a one-time merge, so
+            it keeps working for anything a future Discord bot bridge sends under the same author id too.
           </p>
           {ghosts.map((g) => (
             <div key={g.id} style={{ display: "flex", alignItems: "center", gap: "0.5rem", padding: "0.4rem 0", borderBottom: "1px solid var(--border)" }}>
               <span style={{ minWidth: 140 }}>{g.username}</span>
+              <span className="mono" style={{ fontSize: "0.7rem", color: "var(--text-dim)", minWidth: 130 }} title="Discord author ID">
+                {g.discordId ?? "—"}
+              </span>
               <span style={{ fontSize: "0.75rem", color: "var(--text-dim)", minWidth: 90 }}>{g._count?.messages ?? 0} messages</span>
-              {g.mergedIntoUser ? (
-                <span style={{ fontSize: "0.85rem", color: "var(--accent-audio)" }}>Merged into {g.mergedIntoUser.username}</span>
+              {g.linkedUser ? (
+                <>
+                  <span style={{ fontSize: "0.85rem", color: "var(--accent-audio)" }}>Linked to {g.linkedUser.username}</span>
+                  <button className="btn btn-danger" onClick={() => unlinkGhost(g.id)}>
+                    Unlink
+                  </button>
+                </>
               ) : (
                 <>
                   <input
@@ -151,8 +165,8 @@ export function UsersPage() {
                     onChange={(e) => setMergeTargets((prev) => ({ ...prev, [g.id]: e.target.value }))}
                     style={{ fontSize: "0.85rem" }}
                   />
-                  <button className="btn btn-primary" onClick={() => mergeGhost(g.id)}>
-                    Merge
+                  <button className="btn btn-primary" onClick={() => linkGhost(g.id)}>
+                    Link
                   </button>
                 </>
               )}

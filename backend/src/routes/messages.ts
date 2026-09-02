@@ -10,7 +10,7 @@ import { parseSearchQuery } from "../lib/searchQuery.js";
 import { walkChannelHistoryInChunks } from "../lib/messageChunking.js";
 
 const messageInclude = {
-  author: { select: { username: true, avatarUrl: true } },
+  author: { select: { username: true, avatarUrl: true, isGhost: true, linkedUserId: true, linkedUser: { select: { username: true, avatarUrl: true } } } },
   reactions: { include: { emoji: true, user: { select: { username: true } } } },
   attachments: true,
   replyTo: { select: { id: true, contentRaw: true, author: { select: { username: true } } } },
@@ -292,13 +292,14 @@ export async function messageRoutes(app: FastifyInstance): Promise<void> {
       const full = await prisma.message.findMany({
         where: { id: { in: batch.map((m) => m.id) } },
         orderBy: { createdAt: "asc" },
-        include: { author: { select: { username: true } } },
+        include: { author: { select: { username: true, isGhost: true, linkedUser: { select: { username: true } } } } },
       });
       for (const m of full) {
         if (m.isDeleted) continue;
         const ts = m.createdAt.toISOString().slice(0, 19).replace("T", "-").replace(/:/g, "-");
         const text = m.contentRaw.replace(/\n/g, " ");
-        lines.push(`${ts}:${m.author.username}:${text}`);
+        const username = m.author.isGhost && m.author.linkedUser ? m.author.linkedUser.username : m.author.username;
+        lines.push(`${ts}:${username}:${text}`);
       }
     });
 

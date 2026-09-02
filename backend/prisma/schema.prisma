@@ -51,9 +51,9 @@ model User {
   ghostReason           GhostReason?
   claimToken            String?      @unique // only ever set for DISCORD_IMPORT ghosts
   discordId             String?      @unique // Discord snowflake, for idempotent re-import and any future bot bridge
-  mergedIntoUserId      Int?         // set on a ghost once claimed/merged into a real account
-  mergedIntoUser        User?        @relation("GhostMerge", fields: [mergedIntoUserId], references: [id])
-  mergedGhosts          User[]       @relation("GhostMerge")
+  linkedUserId          Int?         // ghost's discordId is linked to this real account — resolved at read time everywhere (messages, mentions, export), not a one-time reassignment, since a future bot bridge needs this mapping to keep working for new messages too
+  linkedUser            User?        @relation("GhostLink", fields: [linkedUserId], references: [id])
+  linkedGhosts          User[]       @relation("GhostLink")
   deletedAt             DateTime? // set when a real account is ghosted (self- or admin-deleted)
   storageUsedBytes      BigInt       @default(0)
   storageLimitBytes     BigInt       @default(68157440) // 65MB
