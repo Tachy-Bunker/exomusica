@@ -483,10 +483,6 @@ export function SpaceMap({ branches, centerLabel, centerHref }: { branches: Bran
   }, [fieldContainerRef]);
 
 
-  function openDonate() {
-    window.open("https://paypal.me/tachybunker", "_blank", "popup=1,width=460,height=640");
-  }
-
   // Compass: top-level nodes (central-cluster + anchors) currently outside
   // the visible container get a small arrow at the edge pointing toward
   // them, so an anchor scattered far away is never truly "lost". Orbiting
@@ -528,11 +524,6 @@ export function SpaceMap({ branches, centerLabel, centerHref }: { branches: Bran
 
   return (
     <>
-      {!isDesktop && (
-        <button className="btn space-donate-top" onClick={openDonate}>
-          💛 Donate
-        </button>
-      )}
       <div className="space-map-wrapper" ref={wrapperRef}>
       <div
         className="space-map"
@@ -681,11 +672,6 @@ export function SpaceMap({ branches, centerLabel, centerHref }: { branches: Bran
         >
           🌫 Exo-Ambience {ambienceEnabled ? "On" : "Off"}
         </button>
-        {isDesktop && (
-          <button className="btn space-donate-bottom" onClick={openDonate}>
-            💛 Donate
-          </button>
-        )}
       </div>
       </div>
     </>

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
-import { Link, Outlet } from "react-router-dom";
+import { Link, Outlet, useNavigate } from "react-router-dom";
+import { isTypingTarget } from "../lib/isTypingTarget";
 import { api } from "../lib/api";
 import { useAuth } from "../lib/auth";
 import { useCustomFont } from "../lib/useCustomFont";
@@ -23,6 +24,18 @@ function darkenHex(hex: string, amount: number): string {
   const toHex = (c: number) => c.toString(16).padStart(2, "0");
   return `#${toHex(mix(r))}${toHex(mix(g))}${toHex(mix(b))}`;
 }
+
+function underlineLetter(word: string, letter: string) {
+  const idx = word.toLowerCase().indexOf(letter.toLowerCase());
+  if (idx === -1) return word;
+  return (
+    <>
+      <span style={{ textDecoration: "none" }}>{word.slice(0, idx)}</span>
+      <span style={{ textDecoration: "underline" }}>{word[idx]}</span>
+      <span style={{ textDecoration: "none" }}>{word.slice(idx + 1)}</span>
+    </>
+  );
+}
 import { Avatar } from "./Avatar";
 import { MailIcon, MailNotificationIcon } from "./Icons";
 import { MobileAccountHook } from "./MobileAccountHook";
@@ -43,6 +56,35 @@ export function Layout() {
   useGlobalPlayerShortcuts();
 
   const isDesktop = useIsDesktop();
+  const navigate = useNavigate();
+
+  function openDonate() {
+    window.open("https://paypal.me/tachybunker", "_blank", "popup=1,width=460,height=640");
+  }
+
+  useEffect(() => {
+    if (!isDesktop) return;
+    function handleShortcut(e: KeyboardEvent) {
+      if (isTypingTarget(e.target)) return;
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
+      switch (e.code) {
+        case "KeyC":
+          navigate("/");
+          break;
+        case "KeyK":
+          navigate("/wiki");
+          break;
+        case "KeyN":
+          navigate("/news");
+          break;
+        case "KeyM":
+          navigate("/discussion");
+          break;
+      }
+    }
+    window.addEventListener("keydown", handleShortcut);
+    return () => window.removeEventListener("keydown", handleShortcut);
+  }, [isDesktop, navigate]);
   const dockOpen = useChatDockStore((s) => !!s.openChannelSlug);
   const dockCollapsed = useChatDockStore((s) => s.collapsed);
   const dockWidth = useChatDockStore((s) => s.width);
@@ -194,12 +236,12 @@ export function Layout() {
     >
       <header className="top-nav" ref={navRef}>
         <Link to="/" className="brand">
-          {isDesktop ? "⩽ Exomusica ⪖" : "⩽Exomusica⪖"}
+          {isDesktop ? <>⩽ {underlineLetter("Exomusica", "c")} ⪖</> : "⩽Exomusica⪖"}
         </Link>
         <nav>
-          <Link to="/wiki">Wiki</Link>
-          <Link to="/news">News</Link>
-          <Link to="/discussion">Forums</Link>
+          <Link to="/wiki">{isDesktop ? underlineLetter("Wiki", "k") : "Wiki"}</Link>
+          <Link to="/news">{isDesktop ? underlineLetter("News", "n") : "News"}</Link>
+          <Link to="/discussion">{isDesktop ? underlineLetter("Forums", "m") : "Forums"}</Link>
         </nav>
         <div className="spacer" />
         {user && isDesktop && <OnlineOrbs />}
@@ -207,6 +249,7 @@ export function Layout() {
           user ? (
             <>
               {user.isAdmin && <Link to="/admin">Admin</Link>}
+              <NotificationWidget inline offsetRight={dockOffset} />
               <Link
                 to="/pms"
                 style={{ position: "relative", display: "inline-flex", color: "var(--accent-forum)" }}
@@ -217,9 +260,17 @@ export function Layout() {
               <Link to="/account" title={user.username}>
                 <Avatar url={avatarUrl} />
               </Link>
+              <button className="btn" onClick={openDonate}>
+                💛 Donate
+              </button>
             </>
           ) : (
-            <Link to="/login">Log in</Link>
+            <>
+              <Link to="/login">Log in</Link>
+              <button className="btn" onClick={openDonate}>
+                💛 Donate
+              </button>
+            </>
           )
         ) : user ? (
           <MobileAccountHook loggedIn avatarUrl={avatarUrl} hasUnreadPms={hasUnreadPms} username={user.username} isAdmin={user.isAdmin} />
@@ -233,7 +284,7 @@ export function Layout() {
       </main>
 
       <PlayerBar />
-      <NotificationWidget offsetRight={dockOffset} />
+      {!isDesktop && <NotificationWidget offsetRight={dockOffset} />}
       <ChatDock />
       <div className="crt-overlay" />
     </div>

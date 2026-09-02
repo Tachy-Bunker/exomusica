@@ -19,6 +19,10 @@ export function MobileAccountHook(props: LoggedInProps | LoggedOutProps) {
   const [open, setOpen] = useState(false);
   const onlineCount = usePresenceStore((s) => s.onlineCount);
 
+  function openDonate() {
+    window.open("https://paypal.me/tachybunker", "_blank", "popup=1,width=460,height=640");
+  }
+
   return (
     <div className="mobile-hook-wrap">
       <button className="mobile-hook-tab" onClick={() => setOpen((v) => !v)} aria-label="Account">
@@ -40,11 +44,19 @@ export function MobileAccountHook(props: LoggedInProps | LoggedOutProps) {
               <Link to="/account" onClick={() => setOpen(false)} title={props.username}>
                 <Avatar url={props.avatarUrl} />
               </Link>
+              <button className="btn" onClick={openDonate}>
+                💛 Donate
+              </button>
             </>
           ) : (
-            <Link to="/login" onClick={() => setOpen(false)}>
-              Log in
-            </Link>
+            <>
+              <Link to="/login" onClick={() => setOpen(false)}>
+                Log in
+              </Link>
+              <button className="btn" onClick={openDonate}>
+                💛 Donate
+              </button>
+            </>
           )}
         </div>
       )}

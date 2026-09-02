@@ -71,9 +71,32 @@ export function AlbumPage() {
             background: album.coverArtUrl ? `url(${album.coverArtUrl}) center/cover` : "var(--bg-elevated)",
           }}
         />
-        <div>
-          <h1 style={{ marginBottom: "0.1rem" }}>{album.title}</h1>
-          <p style={{ color: "var(--text-dim)", marginTop: 0 }}>{album.composer}</p>
+        <div style={{ minWidth: 0, flex: 1, paddingRight: isDesktop ? 0 : "1.2rem" }}>
+          <h1
+            style={{
+              marginBottom: "0.1rem",
+              overflowWrap: "break-word",
+              hyphens: "auto",
+              ...(isDesktop
+                ? {}
+                : { display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" as const, overflow: "hidden" }),
+            }}
+          >
+            {album.title}
+          </h1>
+          <p
+            style={{
+              color: "var(--text-dim)",
+              marginTop: 0,
+              overflowWrap: "break-word",
+              hyphens: "auto",
+              ...(isDesktop
+                ? {}
+                : { display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" as const, overflow: "hidden" }),
+            }}
+          >
+            {album.composer}
+          </p>
           <div style={{ display: "flex", gap: "0.6rem", flexWrap: "wrap" }}>
             {album.links.map((l) => (
               <a key={l.id} className="btn" href={l.url} target="_blank" rel="noreferrer">

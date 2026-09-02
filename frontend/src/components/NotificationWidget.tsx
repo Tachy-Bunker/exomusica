@@ -48,7 +48,7 @@ function jumpUrl(channelSlug: string, unixTimestamp: number, messageId: number):
   return day === today ? `/topic/${channelSlug}#m-${messageId}` : `/topic/${channelSlug}?day=${day}#m-${messageId}`;
 }
 
-export function NotificationWidget({ offsetRight = 0 }: { offsetRight?: number }) {
+export function NotificationWidget({ offsetRight = 0, inline = false }: { offsetRight?: number; inline?: boolean }) {
   const { user } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
@@ -148,16 +148,20 @@ export function NotificationWidget({ offsetRight = 0 }: { offsetRight?: number }
 
   return (
     <div
-      style={{
-        position: "fixed",
-        zIndex: 40,
-        right: isDesktop ? `calc(1rem + ${offsetRight}px)` : "1rem",
-        ...(isDesktop
-          ? isHomepage
-            ? { bottom: "calc(1.2rem + var(--player-height, 0px))" }
-            : { top: "4.4rem" }
-          : { top: "0.9rem" }),
-      }}
+      style={
+        inline
+          ? { position: "relative", display: "inline-flex" }
+          : {
+              position: "fixed",
+              zIndex: 40,
+              right: isDesktop ? `calc(1rem + ${offsetRight}px)` : "1rem",
+              ...(isDesktop
+                ? isHomepage
+                  ? { bottom: "calc(1.2rem + var(--player-height, 0px))" }
+                  : { top: "4.4rem" }
+                : { top: "0.9rem" }),
+            }
+      }
     >
       <button
         className={`btn btn-primary notif-bell ${unread > 0 ? "notif-bell-active" : ""}`}
@@ -165,14 +169,8 @@ export function NotificationWidget({ offsetRight = 0 }: { offsetRight?: number }
         style={{ borderRadius: "50%", width: "2.6rem", height: "2.6rem", position: "relative" }}
         title="Notifications"
       >
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <path
-            d="M12 2a6 6 0 0 0-6 6v3.6c0 .7-.28 1.37-.78 1.86L4 14.7c-.9.87-.3 2.4.95 2.4h14.1c1.24 0 1.84-1.53.95-2.4l-1.22-1.24A2.65 2.65 0 0 1 18 11.6V8a6 6 0 0 0-6-6Z"
-            stroke="currentColor"
-            strokeWidth="1.6"
-            strokeLinejoin="round"
-          />
-          <path d="M9.5 20a2.5 2.5 0 0 0 5 0" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
+          <path d="M10,20h4a2,2,0,0,1-4,0Zm8-4V10a6,6,0,0,0-5-5.91V3a1,1,0,0,0-2,0V4.09A6,6,0,0,0,6,10v6L4,18H20Z" />
         </svg>
         {unread > 0 && (
           <span
@@ -199,7 +197,7 @@ export function NotificationWidget({ offsetRight = 0 }: { offsetRight?: number }
           style={{
             position: "absolute",
             right: 0,
-            ...(isHomepage && isDesktop ? { bottom: "calc(100% + 0.5rem)" } : { top: "calc(100% + 0.5rem)" }),
+            ...(inline ? { top: "calc(100% + 0.5rem)" } : isHomepage && isDesktop ? { bottom: "calc(100% + 0.5rem)" } : { top: "calc(100% + 0.5rem)" }),
             width: 300,
             maxHeight: 420,
             overflowY: "auto",
