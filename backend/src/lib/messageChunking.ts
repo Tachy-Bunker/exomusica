@@ -1,3 +1,5 @@
+import type { PrismaClient } from "@prisma/client";
+
 export const MESSAGE_CHUNK_SIZE = 300;
 
 /** Splits an array into chunks of MESSAGE_CHUNK_SIZE (or a custom size).
@@ -16,10 +18,9 @@ export function chunk<T>(items: T[], size: number = MESSAGE_CHUNK_SIZE): T[][] {
  *  calling `onChunk` for each batch. Uses the same cursor-based pagination
  *  as the live feed endpoint (paginate by position in creation order, not
  *  raw id — imported history can have ids that don't match creation order
- *  chronologically). `prisma` is passed in rather than imported to avoid a
- *  circular import between this lib and the routes that use it. */
+ *  chronologically). */
 export async function walkChannelHistoryInChunks(
-  prisma: { message: { findMany: (args: unknown) => Promise<{ id: number }[]> } },
+  prisma: PrismaClient,
   channelId: number,
   onChunk: (chunk: { id: number }[]) => Promise<void>,
   chunkSize: number = MESSAGE_CHUNK_SIZE,
@@ -30,6 +31,7 @@ export async function walkChannelHistoryInChunks(
       where: { channelId },
       orderBy: { createdAt: "asc" },
       take: chunkSize,
+      select: { id: true },
       ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
     });
     if (batch.length === 0) break;
