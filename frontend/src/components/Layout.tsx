@@ -79,6 +79,9 @@ export function Layout() {
       contentTextScaleMobile: number;
       caInitial: number;
       chatOpenSfxUrl: string | null;
+      chatHudRevealRate: number;
+      chatHudSfxUrl: string | null;
+      chatSplashMessages: string[] | null;
       caBurst: number;
       moireImageUrl: string | null;
       moireOpacity: number;
@@ -102,6 +105,9 @@ export function Layout() {
       useSiteEffectsStore.getState().setEffects({
         caInitial: s.caInitial,
         chatOpenSfxUrl: s.chatOpenSfxUrl,
+        chatHudRevealRate: s.chatHudRevealRate,
+        chatHudSfxUrl: s.chatHudSfxUrl,
+        chatSplashMessages: s.chatSplashMessages ?? [],
         caBurst: s.caBurst,
         moireImageUrl: s.moireImageUrl,
         moireOpacity: s.moireOpacity,

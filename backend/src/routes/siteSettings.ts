@@ -41,6 +41,9 @@ export async function siteSettingsRoutes(app: FastifyInstance): Promise<void> {
         // smtpPassword deliberately never returned to the client
         chatOpenSfxUrl: null,
         joinNotifyEmail: null,
+        chatHudRevealRate: 30,
+        chatHudSfxUrl: null,
+        chatSplashMessages: [],
       }
     );
   });
@@ -104,6 +107,8 @@ export async function siteSettingsRoutes(app: FastifyInstance): Promise<void> {
       moireWaveform: string;
       moireRotationSpeed: number;
       joinNotifyEmail: string | null;
+      chatHudRevealRate: number;
+      chatSplashMessages: string[];
     }>;
   }>("/api/admin/site-settings", { preHandler: requireAdmin }, async (req) => {
     const data: Record<string, unknown> = {};
@@ -127,6 +132,8 @@ export async function siteSettingsRoutes(app: FastifyInstance): Promise<void> {
       "moireWaveform",
       "moireRotationSpeed",
       "joinNotifyEmail",
+      "chatHudRevealRate",
+      "chatSplashMessages",
     ] as const) {
       if (key in body) data[key] = body[key];
     }
@@ -234,6 +241,32 @@ export async function siteSettingsRoutes(app: FastifyInstance): Promise<void> {
       where: { id: 1 },
       create: { id: 1, chatOpenSfxUrl: null },
       update: { chatOpenSfxUrl: null },
+    });
+    return { status: "ok" };
+  });
+
+  app.post("/api/admin/site-settings/chat-hud-sfx", { preHandler: requireAdmin }, async (req, reply) => {
+    const file = await req.file();
+    if (!file) return reply.code(400).send({ error: "no file uploaded" });
+    const buffer = await file.toBuffer();
+    try {
+      const { url } = await saveSoundFile(file.filename, file.mimetype, buffer);
+      const settings = await prisma.siteSettings.upsert({
+        where: { id: 1 },
+        create: { id: 1, chatHudSfxUrl: url },
+        update: { chatHudSfxUrl: url },
+      });
+      return { chatHudSfxUrl: settings.chatHudSfxUrl };
+    } catch (err) {
+      return reply.code(400).send({ error: err instanceof Error ? err.message : "upload failed" });
+    }
+  });
+
+  app.delete("/api/admin/site-settings/chat-hud-sfx", { preHandler: requireAdmin }, async () => {
+    await prisma.siteSettings.upsert({
+      where: { id: 1 },
+      create: { id: 1, chatHudSfxUrl: null },
+      update: { chatHudSfxUrl: null },
     });
     return { status: "ok" };
   });

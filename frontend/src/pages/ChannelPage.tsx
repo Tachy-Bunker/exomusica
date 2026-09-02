@@ -20,6 +20,7 @@ import { useCustomFont, type FontInfo } from "../lib/useCustomFont";
 import { MiniChat } from "../components/MiniChat";
 import { useSiteEffectsStore } from "../lib/siteEffectsStore";
 import { getCurrentSfxVolume } from "../lib/volumeMixerStore";
+import { useChatHudReveal } from "../lib/useChatHudReveal";
 
 type ViewMode = "live" | "day" | "search";
 type DisplayMode = "standard" | "grouped";
@@ -303,6 +304,7 @@ export function ChannelPage({ channelSlug, fillHeight }: { channelSlug?: string;
   // never renders on mobile, so isDesktop alone correctly identifies this.
   const effectiveFillHeight = fillHeight || !isDesktop;
   const [isChatFullscreen, setIsChatFullscreen] = useState(false);
+  const hudReveal = useChatHudReveal(slug ? `${slug}-${isChatFullscreen}` : undefined);
   const mobileWindowRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -761,25 +763,50 @@ export function ChannelPage({ channelSlug, fillHeight }: { channelSlug?: string;
             <button type="button" className="btn" onClick={() => fileInputRef.current?.click()} title="Attach a file">
               📎
             </button>
-            <textarea
-              ref={textareaRef}
-              value={draft}
-              onChange={handleDraftChange}
-              onPaste={handlePaste}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && !e.shiftKey && !e.ctrlKey && !e.metaKey) {
-                  e.preventDefault();
-                  void sendMessage();
-                }
-                // Shift+Enter or Ctrl/Cmd+Enter: fall through to the
-                // textarea's own default behavior, which inserts a newline.
-              }}
-              rows={2}
-              style={{ flex: 1, fontSize: `${messageFontSize}%` }}
-              placeholder="Write a message… (**bold**, *italic*, `code`, > quote, :emoji:, Enter to send, Shift/Ctrl+Enter for a new line)"
-            />
+            <div style={{ position: "relative", flex: 1 }}>
+              <textarea
+                ref={textareaRef}
+                value={draft}
+                onChange={handleDraftChange}
+                onPaste={handlePaste}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !e.shiftKey && !e.ctrlKey && !e.metaKey) {
+                    e.preventDefault();
+                    void sendMessage();
+                  }
+                  // Shift+Enter or Ctrl/Cmd+Enter: fall through to the
+                  // textarea's own default behavior, which inserts a newline.
+                }}
+                rows={2}
+                style={{ width: "100%", fontSize: `${messageFontSize}%` }}
+                placeholder={hudReveal.placeholderText}
+              />
+              {draft.length === 0 && (
+                <div
+                  className="mono"
+                  style={{
+                    position: "absolute",
+                    left: "0.7rem",
+                    top: "0.5rem",
+                    color: "var(--text-dim)",
+                    fontSize: `${messageFontSize}%`,
+                    pointerEvents: "none",
+                  }}
+                >
+                  {hudReveal.revealedPlaceholder}
+                  {hudReveal.isRevealing && hudReveal.revealedSend.length === 0 && <span className="space-hud-cursor">▌</span>}
+                </div>
+              )}
+            </div>
             <button className="btn btn-primary" type="submit" style={{ fontSize: `${messageFontSize}%` }}>
-              Send
+              {hudReveal.isRevealing ? (
+                <>
+                  {hudReveal.revealedSend}
+                  <span className="space-hud-cursor">▌</span>
+                </>
+              ) : (
+                "Send"
+              )}
             </button>
           </div>
         </form>

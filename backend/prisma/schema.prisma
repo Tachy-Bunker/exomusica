@@ -539,6 +539,9 @@ model SiteSettings {
   smtpFrom           String?
   chatOpenSfxUrl     String? // plays once whenever a new chat location (branch/topic) is opened
   joinNotifyEmail    String? // admin gets emailed here whenever a new join request comes in
+  chatHudRevealRate  Float   @default(30) // ms per character for the letter-by-letter chat reveal
+  chatHudSfxUrl      String? // loops during the reveal
+  chatSplashMessages Json?   // string[] — admin-managed rotating hints, "Write a message..." is the fallback if empty
 }
 
 model FxSettings {

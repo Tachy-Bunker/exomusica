@@ -33,6 +33,12 @@ export function FontsAdminPage() {
   const ambienceInputRef = useRef<HTMLInputElement>(null);
   const [scanSfxUrl, setScanSfxUrl] = useState<string | null>(null);
   const [chatOpenSfxUrl, setChatOpenSfxUrl] = useState<string | null>(null);
+  const [chatHudRevealRate, setChatHudRevealRate] = useState(30);
+  const [chatHudSfxUrl, setChatHudSfxUrl] = useState<string | null>(null);
+  const chatHudSfxInputRef = useRef<HTMLInputElement>(null);
+  const [chatSplashMessages, setChatSplashMessages] = useState<string[]>([]);
+  const [newSplashMessage, setNewSplashMessage] = useState("");
+  const [hudSettingsSaved, setHudSettingsSaved] = useState(false);
   const chatOpenSfxInputRef = useRef<HTMLInputElement>(null);
   const scanSfxInputRef = useRef<HTMLInputElement>(null);
   const [textColorPrimary, setTextColorPrimary] = useState("#eef1fb");
@@ -141,6 +147,9 @@ export function FontsAdminPage() {
       ambienceUrl: string | null;
       scanSfxUrl: string | null;
       chatOpenSfxUrl: string | null;
+      chatHudRevealRate: number;
+      chatHudSfxUrl: string | null;
+      chatSplashMessages: string[] | null;
       textColorPrimary: string | null;
       textColorSecondary: string | null;
       chatTitleColor: string | null;
@@ -162,6 +171,9 @@ export function FontsAdminPage() {
       setAmbienceUrl(s.ambienceUrl);
       setScanSfxUrl(s.scanSfxUrl);
       setChatOpenSfxUrl(s.chatOpenSfxUrl);
+      setChatHudRevealRate(s.chatHudRevealRate);
+      setChatHudSfxUrl(s.chatHudSfxUrl);
+      setChatSplashMessages(s.chatSplashMessages ?? []);
       if (s.textColorPrimary) setTextColorPrimary(s.textColorPrimary);
       if (s.textColorSecondary) setTextColorSecondary(s.textColorSecondary);
       if (s.chatTitleColor) setChatTitleColor(s.chatTitleColor);
@@ -204,6 +216,40 @@ export function FontsAdminPage() {
     const result = await api<{ scanSfxUrl: string }>("/api/admin/site-settings/scan-sfx", { method: "POST", body: formData });
     setScanSfxUrl(result.scanSfxUrl);
     if (scanSfxInputRef.current) scanSfxInputRef.current.value = "";
+  }
+
+  async function uploadChatHudSfx() {
+    const file = chatHudSfxInputRef.current?.files?.[0];
+    if (!file) return;
+    const formData = new FormData();
+    formData.append("file", file);
+    const result = await api<{ chatHudSfxUrl: string }>("/api/admin/site-settings/chat-hud-sfx", { method: "POST", body: formData });
+    setChatHudSfxUrl(result.chatHudSfxUrl);
+    if (chatHudSfxInputRef.current) chatHudSfxInputRef.current.value = "";
+  }
+
+  async function removeChatHudSfx() {
+    await api("/api/admin/site-settings/chat-hud-sfx", { method: "DELETE" });
+    setChatHudSfxUrl(null);
+  }
+
+  function addSplashMessage() {
+    if (!newSplashMessage.trim()) return;
+    setChatSplashMessages((prev) => [...prev, newSplashMessage.trim()]);
+    setNewSplashMessage("");
+  }
+
+  function removeSplashMessage(index: number) {
+    setChatSplashMessages((prev) => prev.filter((_, i) => i !== index));
+  }
+
+  async function saveChatHudSettings() {
+    await api("/api/admin/site-settings", {
+      method: "PATCH",
+      body: JSON.stringify({ chatHudRevealRate, chatSplashMessages }),
+    });
+    setHudSettingsSaved(true);
+    setTimeout(() => setHudSettingsSaved(false), 2000);
   }
 
   async function uploadChatOpenSfx() {
@@ -357,6 +403,58 @@ export function FontsAdminPage() {
             {chatOpenSfxUrl ? "Replace" : "Upload"}
           </button>
         </div>
+      </div>
+
+      <div className="field" style={{ maxWidth: 420 }}>
+        <label>Chat letter-by-letter reveal</label>
+        <p style={{ fontSize: "0.75rem", color: "var(--text-dim)", marginTop: 0 }}>
+          Every time a chat location opens, the composer hint and Send button reveal letter-by-letter with a
+          console-style cursor. This loop plays for the duration of that reveal.
+        </p>
+        {chatHudSfxUrl && (
+          <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.4rem" }}>
+            <audio src={chatHudSfxUrl} controls style={{ height: 32 }} />
+            <button className="btn btn-danger" onClick={removeChatHudSfx}>
+              Remove
+            </button>
+          </div>
+        )}
+        <div style={{ display: "flex", gap: "0.5rem", marginBottom: "0.5rem" }}>
+          <input ref={chatHudSfxInputRef} type="file" accept="audio/mpeg,audio/wav,audio/ogg" />
+          <button className="btn btn-primary" onClick={uploadChatHudSfx}>
+            {chatHudSfxUrl ? "Replace" : "Upload"}
+          </button>
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.6rem" }}>
+          <input type="range" min={10} max={100} step={1} value={chatHudRevealRate} onChange={(e) => setChatHudRevealRate(Number(e.target.value))} />
+          <span style={{ fontSize: "0.8rem" }}>Reveal rate — {chatHudRevealRate}ms/letter</span>
+        </div>
+
+        <label>Splash hints (rotates through these — falls back to "Write a message..." if empty)</label>
+        {chatSplashMessages.map((msg, i) => (
+          <div key={i} style={{ display: "flex", gap: "0.4rem", marginBottom: "0.2rem" }}>
+            <input value={msg} readOnly style={{ flex: 1, fontSize: "0.85rem" }} />
+            <button className="btn btn-danger" onClick={() => removeSplashMessage(i)}>
+              ×
+            </button>
+          </div>
+        ))}
+        <div style={{ display: "flex", gap: "0.4rem", marginBottom: "0.5rem" }}>
+          <input
+            placeholder="e.g. The orbissators are waiting"
+            value={newSplashMessage}
+            onChange={(e) => setNewSplashMessage(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && addSplashMessage()}
+            style={{ flex: 1 }}
+          />
+          <button className="btn" onClick={addSplashMessage}>
+            Add
+          </button>
+        </div>
+        <button className="btn btn-primary" onClick={saveChatHudSettings}>
+          Save reveal settings
+        </button>
+        {hudSettingsSaved && <span style={{ marginLeft: "0.6rem", fontSize: "0.85rem", color: "var(--accent-audio)" }}>Saved ✓</span>}
       </div>
 
       <div className="field" style={{ maxWidth: 420 }}>
