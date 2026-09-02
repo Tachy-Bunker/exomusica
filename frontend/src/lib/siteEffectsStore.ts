@@ -4,6 +4,8 @@ interface SiteEffectsState {
   caInitial: number;
   caBurst: number;
   chatOpenSfxUrl: string | null;
+  userCaEnabled: boolean;
+  userMoireEnabled: boolean;
   moireImageUrl: string | null;
   moireOpacity: number;
   moireSize: number;
@@ -19,6 +21,8 @@ export const useSiteEffectsStore = create<SiteEffectsState>((set) => ({
   caInitial: 0.15,
   caBurst: 0.6,
   chatOpenSfxUrl: null,
+  userCaEnabled: true,
+  userMoireEnabled: true,
   moireImageUrl: null,
   moireOpacity: 0.15,
   moireSize: 1,

@@ -59,6 +59,13 @@ export function Layout() {
     if (user) loadVolumeMixer();
   }, [user, loadVolumeMixer]);
 
+  useEffect(() => {
+    if (!user) return;
+    api<{ caEnabled: boolean; moireEnabled: boolean }>("/api/account/me").then((me) => {
+      useSiteEffectsStore.getState().setEffects({ userCaEnabled: me.caEnabled, userMoireEnabled: me.moireEnabled });
+    });
+  }, [user]);
+
   const [siteFont, setSiteFont] = useState<{ familyName: string; fileUrl: string; format: string } | null>(null);
   useEffect(() => {
     api<{

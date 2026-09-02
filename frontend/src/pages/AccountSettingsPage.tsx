@@ -6,6 +6,7 @@ import { useNotificationWidgetVisibility } from "../lib/notificationWidgetVisibi
 import { useProfileStore } from "../lib/profileStore";
 import { Avatar } from "../components/Avatar";
 import { useVolumeMixerStore } from "../lib/volumeMixerStore";
+import { useSiteEffectsStore } from "../lib/siteEffectsStore";
 
 interface FollowedChannel {
   slug: string;
@@ -19,6 +20,8 @@ interface Me {
   avatarUrl: string | null;
   bio: string | null;
   links: { label: string; url: string }[] | null;
+  caEnabled: boolean;
+  moireEnabled: boolean;
   notifyWeeklySummary: boolean;
   notifyDailySummary: boolean;
   notifyFollowedReplies: boolean;
@@ -86,6 +89,13 @@ export function AccountSettingsPage() {
 
   function removeLink(index: number) {
     updateMeField({ links: (me?.links ?? []).filter((_, i) => i !== index) });
+  }
+
+  async function toggleVisualEffect(key: "caEnabled" | "moireEnabled", value: boolean) {
+    if (!me) return;
+    setMe({ ...me, [key]: value });
+    await api("/api/account/visual-effects", { method: "PATCH", body: JSON.stringify({ [key]: value }) });
+    useSiteEffectsStore.getState().setEffects(key === "caEnabled" ? { userCaEnabled: value } : { userMoireEnabled: value });
   }
 
   async function saveProfile() {
@@ -210,6 +220,16 @@ export function AccountSettingsPage() {
           {avatarError && <p style={{ fontSize: "0.75rem", color: "var(--accent-danger)" }}>{avatarError}</p>}
         </div>
       </div>
+
+      <h2 style={{ fontSize: "1rem" }}>Visual effects</h2>
+      <label style={{ display: "block", fontSize: "0.9rem", marginBottom: "0.3rem" }}>
+        <input type="checkbox" checked={me.caEnabled} onChange={(e) => toggleVisualEffect("caEnabled", e.target.checked)} /> Chromatic
+        aberration bursts
+      </label>
+      <label style={{ display: "block", fontSize: "0.9rem", marginBottom: "0.8rem" }}>
+        <input type="checkbox" checked={me.moireEnabled} onChange={(e) => toggleVisualEffect("moireEnabled", e.target.checked)} /> Moiré
+        effect
+      </label>
 
       <h2 style={{ fontSize: "1rem" }}>Bio & links</h2>
       <div className="field">

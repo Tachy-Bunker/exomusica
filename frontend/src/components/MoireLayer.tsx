@@ -32,6 +32,13 @@ export function MoireLayer() {
         const s = useSiteEffectsStore.getState();
         const t = now / 1000;
 
+        if (!s.userMoireEnabled) {
+          base.style.opacity = "0";
+          dupe.style.opacity = "0";
+          rafId = requestAnimationFrame(tick);
+          return;
+        }
+
         const bgImage = s.moireImageUrl ? `url(${s.moireImageUrl})` : "none";
         const bgSize = `${BASE_TILE_PX * s.moireSize}px`;
         base.style.backgroundImage = bgImage;

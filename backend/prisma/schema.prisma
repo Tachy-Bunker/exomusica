@@ -57,6 +57,8 @@ model User {
   volumeNotifications   Float        @default(0.8)
   volumeSfx             Float        @default(1.0)
   volumeMusic           Float        @default(1.0)
+  caEnabled             Boolean      @default(true)
+  moireEnabled          Boolean      @default(true)
   notifyWeeklySummary   Boolean      @default(true)
   notifyDailySummary    Boolean      @default(false)
   notifyFollowedReplies Boolean      @default(true)
@@ -535,6 +537,7 @@ model SiteSettings {
   smtpPassword       String?
   smtpFrom           String?
   chatOpenSfxUrl     String? // plays once whenever a new chat location (branch/topic) is opened
+  joinNotifyEmail    String? // admin gets emailed here whenever a new join request comes in
 }
 
 model FxSettings {

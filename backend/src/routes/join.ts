@@ -2,6 +2,7 @@ import type { FastifyInstance } from "fastify";
 import { prisma } from "../lib/prisma.js";
 import { hashPassword, requireAdmin } from "../lib/auth.js";
 import { sendTemplatedMail } from "../lib/emailTemplates.js";
+import { sendMail } from "../lib/mailer.js";
 import { createNotification } from "../lib/notify.js";
 
 interface JoinBody {
@@ -36,6 +37,16 @@ export async function joinRoutes(app: FastifyInstance): Promise<void> {
     const joinRequest = await prisma.joinRequest.create({
       data: { username, email, passwordHash, bio, links, reason },
     });
+
+    const settings = await prisma.siteSettings.findUnique({ where: { id: 1 } });
+    if (settings?.joinNotifyEmail) {
+      void sendMail(
+        settings.joinNotifyEmail,
+        `New join request: ${username}`,
+        `${username} (${email}) wants to join Exomusica.\n\nReason: ${reason}\n\nReview it at /admin/join-requests.`,
+      ).catch((err) => app.log.error(err, "join-request admin notification failed"));
+    }
+
     return reply.code(201).send({ id: joinRequest.id, status: joinRequest.status });
   });
 

@@ -51,6 +51,8 @@ export async function accountRoutes(app: FastifyInstance): Promise<void> {
       volumeNotifications: me.volumeNotifications,
       volumeSfx: me.volumeSfx,
       volumeMusic: me.volumeMusic,
+      caEnabled: me.caEnabled,
+      moireEnabled: me.moireEnabled,
       notifyWeeklySummary: me.notifyWeeklySummary,
       notifyDailySummary: me.notifyDailySummary,
       notifyFollowedReplies: me.notifyFollowedReplies,
@@ -90,6 +92,14 @@ export async function accountRoutes(app: FastifyInstance): Promise<void> {
       if (req.body?.volumeSfx !== undefined) data.volumeSfx = clamp(req.body.volumeSfx);
       if (req.body?.volumeMusic !== undefined) data.volumeMusic = clamp(req.body.volumeMusic);
       return prisma.user.update({ where: { id: req.user!.id }, data });
+    },
+  );
+
+  app.patch<{ Body: Partial<{ caEnabled: boolean; moireEnabled: boolean }> }>(
+    "/api/account/visual-effects",
+    { preHandler: requireAuth },
+    async (req) => {
+      return prisma.user.update({ where: { id: req.user!.id }, data: req.body ?? {} });
     },
   );
 

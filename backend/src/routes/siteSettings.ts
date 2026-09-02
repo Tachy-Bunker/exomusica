@@ -40,6 +40,7 @@ export async function siteSettingsRoutes(app: FastifyInstance): Promise<void> {
         smtpFrom: null,
         // smtpPassword deliberately never returned to the client
         chatOpenSfxUrl: null,
+        joinNotifyEmail: null,
       }
     );
   });
@@ -102,6 +103,7 @@ export async function siteSettingsRoutes(app: FastifyInstance): Promise<void> {
       moireOffsetSpeed: number;
       moireWaveform: string;
       moireRotationSpeed: number;
+      joinNotifyEmail: string | null;
     }>;
   }>("/api/admin/site-settings", { preHandler: requireAdmin }, async (req) => {
     const data: Record<string, unknown> = {};
@@ -124,6 +126,7 @@ export async function siteSettingsRoutes(app: FastifyInstance): Promise<void> {
       "moireOffsetSpeed",
       "moireWaveform",
       "moireRotationSpeed",
+      "joinNotifyEmail",
     ] as const) {
       if (key in body) data[key] = body[key];
     }

@@ -39,7 +39,15 @@ export function ChromaticAberrationLayer() {
 
     function tick(now: number) {
       if (paused) return;
-      const { caInitial, caBurst } = useSiteEffectsStore.getState();
+      const { caInitial, caBurst, userCaEnabled } = useSiteEffectsStore.getState();
+      if (!userCaEnabled) {
+        offRRef.current?.setAttribute("dx", "0");
+        offRRef.current?.setAttribute("dy", "0");
+        offBRef.current?.setAttribute("dx", "0");
+        offBRef.current?.setAttribute("dy", "0");
+        rafId = requestAnimationFrame(tick);
+        return;
+      }
       const initialAmt = caInitial * 12; // was *2.6 — capped at a sub-pixel 2.6px even at max, genuinely invisible
       const burstAmt = caBurst * 22;
       if (!reduceMotion) {
