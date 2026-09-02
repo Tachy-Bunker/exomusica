@@ -4,15 +4,18 @@ import { usePresenceStore } from "../lib/presenceStore";
 import { MailIcon, MailNotificationIcon } from "./Icons";
 import { Avatar } from "./Avatar";
 
-export function MobileAccountHook({
-  avatarUrl,
-  hasUnreadPms,
-  username,
-}: {
+interface LoggedInProps {
+  loggedIn: true;
   avatarUrl: string | null;
   hasUnreadPms: boolean;
   username: string;
-}) {
+  isAdmin: boolean;
+}
+interface LoggedOutProps {
+  loggedIn: false;
+}
+
+export function MobileAccountHook(props: LoggedInProps | LoggedOutProps) {
   const [open, setOpen] = useState(false);
   const onlineCount = usePresenceStore((s) => s.onlineCount);
 
@@ -23,13 +26,26 @@ export function MobileAccountHook({
       </button>
       {open && (
         <div className="mobile-hook-panel">
-          <span className="mobile-hook-online">{onlineCount} online</span>
-          <Link to="/pms" onClick={() => setOpen(false)} style={{ color: "var(--accent-forum)", display: "inline-flex" }}>
-            {hasUnreadPms ? <MailNotificationIcon /> : <MailIcon />}
-          </Link>
-          <Link to="/account" onClick={() => setOpen(false)} title={username}>
-            <Avatar url={avatarUrl} />
-          </Link>
+          {props.loggedIn ? (
+            <>
+              <span className="mobile-hook-online">{onlineCount} online</span>
+              {props.isAdmin && (
+                <Link to="/admin" onClick={() => setOpen(false)}>
+                  Admin
+                </Link>
+              )}
+              <Link to="/pms" onClick={() => setOpen(false)} style={{ color: "var(--accent-forum)", display: "inline-flex" }}>
+                {props.hasUnreadPms ? <MailNotificationIcon /> : <MailIcon />}
+              </Link>
+              <Link to="/account" onClick={() => setOpen(false)} title={props.username}>
+                <Avatar url={props.avatarUrl} />
+              </Link>
+            </>
+          ) : (
+            <Link to="/login" onClick={() => setOpen(false)}>
+              Log in
+            </Link>
+          )}
         </div>
       )}
     </div>

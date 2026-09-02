@@ -160,7 +160,7 @@ export function Layout() {
     >
       <header className="top-nav" ref={navRef}>
         <Link to="/" className="brand">
-          ⩽ Exomusica ⪖
+          {isDesktop ? "⩽ Exomusica ⪖" : "⩽Exomusica⪖"}
         </Link>
         <nav>
           <Link to="/wiki">Wiki</Link>
@@ -169,27 +169,28 @@ export function Layout() {
         </nav>
         <div className="spacer" />
         {user && isDesktop && <OnlineOrbs />}
-        {user ? (
-          <>
-            {user.isAdmin && <Link to="/admin">Admin</Link>}
-            {isDesktop && (
-              <>
-                <Link
-                  to="/pms"
-                  style={{ position: "relative", display: "inline-flex", color: "var(--accent-forum)" }}
-                  title="Messages"
-                >
-                  {hasUnreadPms ? <MailNotificationIcon /> : <MailIcon />}
-                </Link>
-                <Link to="/account" title={user.username}>
-                  <Avatar url={avatarUrl} />
-                </Link>
-              </>
-            )}
-            {!isDesktop && <MobileAccountHook avatarUrl={avatarUrl} hasUnreadPms={hasUnreadPms} username={user.username} />}
-          </>
+        {isDesktop ? (
+          user ? (
+            <>
+              {user.isAdmin && <Link to="/admin">Admin</Link>}
+              <Link
+                to="/pms"
+                style={{ position: "relative", display: "inline-flex", color: "var(--accent-forum)" }}
+                title="Messages"
+              >
+                {hasUnreadPms ? <MailNotificationIcon /> : <MailIcon />}
+              </Link>
+              <Link to="/account" title={user.username}>
+                <Avatar url={avatarUrl} />
+              </Link>
+            </>
+          ) : (
+            <Link to="/login">Log in</Link>
+          )
+        ) : user ? (
+          <MobileAccountHook loggedIn avatarUrl={avatarUrl} hasUnreadPms={hasUnreadPms} username={user.username} isAdmin={user.isAdmin} />
         ) : (
-          <Link to="/login">Log in</Link>
+          <MobileAccountHook loggedIn={false} />
         )}
       </header>
 

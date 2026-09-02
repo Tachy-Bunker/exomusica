@@ -113,8 +113,14 @@ button {
 
 .top-nav nav {
   display: flex;
-  gap: 1.1rem;
+  gap: clamp(0.5rem, 3vw, 1.1rem);
   font-size: 0.9rem;
+}
+
+@media (max-width: 420px) {
+  .top-nav nav {
+    font-size: 0.78rem;
+  }
 }
 
 .top-nav .spacer {
