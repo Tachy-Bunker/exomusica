@@ -22,6 +22,8 @@ export function BranchPage() {
   const fontFamily = useCustomFont(branch?.font);
   const isDesktop = useIsDesktop();
   const openChat = useChatDockStore((s) => s.openChat);
+  const closeChat = useChatDockStore((s) => s.close);
+  const dockOpenChannelSlug = useChatDockStore((s) => s.openChannelSlug);
   const [showIntro, setShowIntro] = useState(false);
   const [pendingPlayAlbumSlug, setPendingPlayAlbumSlug] = useState<string | null>(null);
 
@@ -78,10 +80,14 @@ export function BranchPage() {
     function handleKeyDown(e: KeyboardEvent) {
       if (isTypingTarget(e.target)) return;
       if (e.code === "KeyR") navigate("/");
+      if (e.code === "KeyE") {
+        if (dockOpenChannelSlug) closeChat();
+        else if (branch?.channel) openChat(branch.channel.slug, branch.name, branch.slug);
+      }
     }
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [isDesktop, navigate]);
+  }, [isDesktop, navigate, dockOpenChannelSlug, closeChat, openChat, branch]);
 
   if (!branch) return <p>Loading…</p>;
 
@@ -157,7 +163,7 @@ export function BranchPage() {
       {!branch.channel ? (
         isDesktop && <p>No topic yet.</p>
       ) : isDesktop ? (
-        <p style={{ color: "var(--text-dim)", fontSize: "0.9rem" }}>This topic's chat is open in the dock →</p>
+        <p style={{ color: "var(--text-dim)", fontSize: "0.9rem" }}>This topic's chat is open in the dock → (E)</p>
       ) : (
         <div style={{ flex: 1, minHeight: "30vh", marginTop: "0.6rem" }}>
           <ChannelPage channelSlug={branch.channel.slug} />

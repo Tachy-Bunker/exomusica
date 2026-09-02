@@ -11,6 +11,7 @@ export interface PlayableTrackDTO {
   position: number;
   albumTitle: string;
   albumSlug: string;
+  coverArtUrl: string | null;
   composer: string;
   branchSlug: string;
   bookmarks: { label: string; timestampSeconds: number }[];

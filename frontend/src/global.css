@@ -498,24 +498,96 @@ th {
 
 /* --- Persistent player bar -------------------------------------------------- */
 
-.player-bar {
+.player-bar-wrapper {
   position: fixed;
   bottom: 0;
   left: 0;
   right: var(--dock-offset, 0px);
-  background: var(--bg-elevated);
-  border-top: 1px solid var(--accent-audio-dim);
   z-index: 50;
 }
 
-.player-bar .collapsed {
+.player-bar-docked {
+  background: var(--bg-elevated);
+}
+
+.player-seek-strip {
+  height: 4px;
+  background: var(--bg-inset);
+  cursor: pointer;
+  position: relative;
+}
+
+.player-seek-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--accent-forum), var(--accent-audio));
+}
+
+.player-seek-fill-animated {
+  background-size: 200% 100%;
+  animation: player-seek-shimmer 2.5s linear infinite;
+}
+
+@keyframes player-seek-shimmer {
+  0% {
+    background-position: 0% 0%;
+  }
+  100% {
+    background-position: 200% 0%;
+  }
+}
+
+.player-bar-row {
   display: flex;
   align-items: center;
   gap: 0.8rem;
   padding: 0.5rem 1rem;
+  cursor: pointer;
+  /* Never lets the docked bar grow wider than its container — the
+     transport cluster and cover have fixed/shrink-safe sizing so this
+     never has to scroll horizontally regardless of title length. */
+  max-width: 100%;
+  overflow: hidden;
 }
 
-.player-bar .collapsed button.play-toggle {
+.player-cover {
+  width: 2.6rem;
+  height: 2.6rem;
+  flex-shrink: 0;
+  border-radius: 4px;
+  background-color: var(--bg-inset);
+  background-size: cover;
+  background-position: center;
+}
+
+.player-bar-row .track-info {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.player-bar-row .track-info .title {
+  font-size: 0.9rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.player-bar-row .track-info .origin {
+  font-size: 0.75rem;
+  color: var(--text-dim);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.player-transport {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-shrink: 0;
+}
+
+.player-transport button.play-toggle {
   background: var(--accent-audio-dim);
   border: 1px solid var(--accent-audio);
   border-radius: 50%;
@@ -525,55 +597,79 @@ th {
   color: var(--text);
 }
 
-.player-bar .track-info {
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
+.player-expand-btn {
+  flex-shrink: 0;
+  padding: 0.3rem 0.5rem;
 }
 
-.player-bar .track-info .title {
-  font-size: 0.9rem;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+.player-expanded-overlay {
+  position: fixed;
+  left: 0;
+  right: var(--dock-offset, 0px);
+  top: var(--nav-height, 3.6rem);
+  bottom: 0;
+  background: var(--bg);
+  z-index: 60;
+  overflow-y: auto;
 }
 
-.player-bar .track-info .origin {
-  font-size: 0.75rem;
-  color: var(--text-dim);
+.player-expanded-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 2rem 1.5rem 3rem;
+  max-width: 640px;
+  margin: 0 auto;
 }
 
-.player-bar .expanded {
-  padding: 0.5rem 1rem 1rem;
-  border-top: 1px solid var(--border);
+.player-expanded-cover {
+  width: min(50vw, 280px);
+  height: min(50vw, 280px);
+  border-radius: var(--radius);
+  background-color: var(--bg-inset);
+  background-size: cover;
+  background-position: center;
+  margin-bottom: 1.2rem;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
 }
 
-.player-bar .seek-row {
+.player-expanded-content .seek-row {
   display: flex;
   align-items: center;
   gap: 0.6rem;
   font-size: 0.75rem;
+  width: 100%;
+  max-width: 480px;
+  margin-top: 1rem;
 }
 
-.player-bar .seek-row input[type="range"] {
+.player-expanded-content .seek-row input[type="range"] {
   flex: 1;
   accent-color: var(--accent-audio);
 }
 
-.player-bar .bookmarks {
+.player-expanded-content .bookmarks {
   display: flex;
   flex-wrap: wrap;
   gap: 0.4rem;
-  margin-top: 0.5rem;
+  justify-content: center;
 }
 
-.player-bar .bookmarks button {
+.player-expanded-content .bookmarks button {
   font-size: 0.75rem;
   background: var(--bg-inset);
   border: 1px solid var(--accent-audio-dim);
   border-radius: 999px;
   padding: 0.2rem 0.6rem;
   color: var(--text-dim);
+}
+
+@media (max-width: 640px) {
+  .player-expanded-overlay {
+    top: 0;
+    right: 0;
+  }
 }
 
 .online-orb {
@@ -782,21 +878,6 @@ th {
   animation: liquid-flow 6s ease-in-out infinite;
 }
 
-.player-bar {
-  border-top: none !important;
-}
-
-.player-bar::before {
-  content: "";
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 3px;
-  background: linear-gradient(120deg, var(--accent-forum), var(--accent-audio), var(--accent-forum-dim), var(--accent-audio-dim), var(--accent-forum));
-  background-size: 400% 400%;
-  animation: liquid-flow 6s ease-in-out infinite;
-}
 
 .dock-resize-handle {
   position: absolute;

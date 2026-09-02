@@ -6,6 +6,7 @@ import { useIsDesktop } from "../lib/useIsDesktop";
 import { useDocumentTitle } from "../lib/useDocumentTitle";
 import { ChannelPage } from "./ChannelPage";
 import { renderMarkdown } from "../lib/markdown";
+import { isTypingTarget } from "../lib/isTypingTarget";
 
 interface ChannelInfo {
   slug: string;
@@ -19,6 +20,22 @@ export function TopicPage() {
   const [channel, setChannel] = useState<ChannelInfo | null>(null);
   const isDesktop = useIsDesktop();
   const openChat = useChatDockStore((s) => s.openChat);
+  const closeChat = useChatDockStore((s) => s.close);
+  const dockOpenChannelSlug = useChatDockStore((s) => s.openChannelSlug);
+
+  useEffect(() => {
+    if (!isDesktop) return;
+    function handleKeyDown(e: KeyboardEvent) {
+      if (isTypingTarget(e.target)) return;
+      if (e.code === "KeyE") {
+        if (dockOpenChannelSlug) closeChat();
+        else if (channel) openChat(channel.slug, channel.name);
+      }
+    }
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isDesktop, dockOpenChannelSlug, closeChat, openChat, channel]);
+
 
   useEffect(() => {
     if (!slug) return;
@@ -39,7 +56,9 @@ export function TopicPage() {
   if (isDesktop) {
     return (
       <div>
-        <h1>{channel.name}</h1>
+        <h1>
+          {channel.name} <span style={{ fontSize: "0.85rem", color: "var(--text-dim)" }}>(E)</span>
+        </h1>
         {channel.description && <p style={{ color: "var(--text-dim)", maxWidth: 640 }}>{channel.description}</p>}
         {channel.contentMarkdown && <div style={{ maxWidth: 640 }}>{renderMarkdown(channel.contentMarkdown)}</div>}
       </div>
