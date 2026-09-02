@@ -7,6 +7,10 @@ interface UserSummary {
   username: string;
   isAdmin: boolean;
   isGhost: boolean;
+  discordId?: string | null;
+  mergedIntoUserId?: number | null;
+  mergedIntoUser?: { id: number; username: string } | null;
+  _count?: { messages: number };
   createdAt: string;
 }
 
@@ -20,6 +24,8 @@ interface UserDetail extends UserSummary {
 export function UsersPage() {
   const [query, setQuery] = useState("");
   const [users, setUsers] = useState<UserSummary[]>([]);
+  const [ghosts, setGhosts] = useState<UserSummary[]>([]);
+  const [mergeTargets, setMergeTargets] = useState<Record<number, string>>({});
   const [editingId, setEditingId] = useState<number | null>(null);
   const [detail, setDetail] = useState<UserDetail | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -29,7 +35,26 @@ export function UsersPage() {
     api<UserSummary[]>(`/api/admin/users?q=${encodeURIComponent(query)}`).then(setUsers);
   }
 
+  function loadGhosts() {
+    api<UserSummary[]>("/api/admin/users?ghostsOnly=true").then(setGhosts);
+  }
+
   useEffect(load, [query]);
+  useEffect(loadGhosts, []);
+
+  async function mergeGhost(ghostId: number) {
+    const targetUsername = mergeTargets[ghostId]?.trim();
+    if (!targetUsername) return;
+    const matches = await api<UserSummary[]>(`/api/admin/users?q=${encodeURIComponent(targetUsername)}`);
+    const target = matches.find((u) => u.username.toLowerCase() === targetUsername.toLowerCase());
+    if (!target) {
+      alert(`No account found with username "${targetUsername}" — check the spelling.`);
+      return;
+    }
+    if (!confirm(`Merge this ghost's messages into ${target.username}? This can't be undone.`)) return;
+    await api(`/api/admin/users/${ghostId}/merge-ghost`, { method: "POST", body: JSON.stringify({ targetUserId: target.id }) });
+    loadGhosts();
+  }
 
   async function handleGhost(user: UserSummary) {
     if (!confirm(`Ghost ${user.username}? Their messages stay, but the account can no longer log in.`)) return;
@@ -104,6 +129,38 @@ export function UsersPage() {
   return (
     <div>
       <h1>Users</h1>
+
+      {ghosts.length > 0 && (
+        <div style={{ marginBottom: "1.5rem", border: "1px solid var(--border)", borderRadius: "var(--radius)", padding: "0.8rem" }}>
+          <h2 style={{ fontSize: "1rem", marginTop: 0 }}>Ghost accounts ({ghosts.length})</h2>
+          <p style={{ fontSize: "0.8rem", color: "var(--text-dim)" }}>
+            Created by Discord import — can't log in. Merge one into a real account to reassign all its messages;
+            after merging, mentions and message-author links resolve to the real account even in old messages.
+          </p>
+          {ghosts.map((g) => (
+            <div key={g.id} style={{ display: "flex", alignItems: "center", gap: "0.5rem", padding: "0.4rem 0", borderBottom: "1px solid var(--border)" }}>
+              <span style={{ minWidth: 140 }}>{g.username}</span>
+              <span style={{ fontSize: "0.75rem", color: "var(--text-dim)", minWidth: 90 }}>{g._count?.messages ?? 0} messages</span>
+              {g.mergedIntoUser ? (
+                <span style={{ fontSize: "0.85rem", color: "var(--accent-audio)" }}>Merged into {g.mergedIntoUser.username}</span>
+              ) : (
+                <>
+                  <input
+                    placeholder="target username"
+                    value={mergeTargets[g.id] ?? ""}
+                    onChange={(e) => setMergeTargets((prev) => ({ ...prev, [g.id]: e.target.value }))}
+                    style={{ fontSize: "0.85rem" }}
+                  />
+                  <button className="btn btn-primary" onClick={() => mergeGhost(g.id)}>
+                    Merge
+                  </button>
+                </>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
       <input
         placeholder="Search by username…"
         value={query}

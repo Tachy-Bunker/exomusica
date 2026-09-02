@@ -15,6 +15,12 @@ export function NewsletterAdminPage() {
     api<Subscription[]>("/api/admin/newsletter-subscriptions").then(setSubs);
   }, []);
 
+  async function removeSubscriber(id: number) {
+    if (!confirm("Unsubscribe this email?")) return;
+    await api(`/api/admin/newsletter-subscriptions/${id}`, { method: "DELETE" });
+    setSubs((prev) => prev.filter((s) => s.id !== id));
+  }
+
   function exportTxt() {
     const text = subs.map((s) => s.email).join("\n");
     const blob = new Blob([text], { type: "text/plain" });
@@ -38,6 +44,7 @@ export function NewsletterAdminPage() {
           <tr>
             <th>Email</th>
             <th>Subscribed</th>
+            <th></th>
           </tr>
         </thead>
         <tbody>
@@ -45,6 +52,11 @@ export function NewsletterAdminPage() {
             <tr key={s.id}>
               <td>{s.email}</td>
               <td className="mono">{new Date(s.createdAt).toLocaleDateString()}</td>
+              <td>
+                <button className="btn btn-danger" onClick={() => removeSubscriber(s.id)}>
+                  Unsubscribe
+                </button>
+              </td>
             </tr>
           ))}
         </tbody>

@@ -12,6 +12,11 @@ export async function blogRoutes(app: FastifyInstance): Promise<void> {
     });
   });
 
+  app.delete<{ Params: { id: string } }>("/api/admin/newsletter-subscriptions/:id", { preHandler: requireAdmin }, async (req) => {
+    await prisma.newsletterSubscription.delete({ where: { id: Number(req.params.id) } });
+    return { status: "ok" };
+  });
+
   app.get("/api/blog", async () => {
     return prisma.blogPost.findMany({
       where: { publishedAt: { not: null } },

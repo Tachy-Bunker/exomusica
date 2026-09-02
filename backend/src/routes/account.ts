@@ -191,17 +191,61 @@ export async function accountRoutes(app: FastifyInstance): Promise<void> {
     return { avatarUrl: url };
   });
 
-  app.get<{ Querystring: { q?: string } }>(
+  app.get<{ Querystring: { q?: string; ghostsOnly?: string } }>(
     "/api/admin/users",
     { preHandler: requireAdmin },
     async (req) => {
-      const { q } = req.query;
-      return prisma.user.findMany({
-        where: q ? { username: { contains: q, mode: "insensitive" } } : undefined,
-        select: { id: true, username: true, isAdmin: true, isGhost: true, createdAt: true },
+      const { q, ghostsOnly } = req.query;
+      const users = await prisma.user.findMany({
+        where: {
+          ...(q ? { username: { contains: q, mode: "insensitive" } } : {}),
+          ...(ghostsOnly === "true" ? { isGhost: true } : {}),
+        },
+        select: {
+          id: true,
+          username: true,
+          isAdmin: true,
+          isGhost: true,
+          discordId: true,
+          mergedIntoUserId: true,
+          mergedIntoUser: { select: { id: true, username: true } },
+          createdAt: true,
+          _count: { select: { messages: true } },
+        },
         orderBy: { username: "asc" },
         take: 50,
       });
+      return users;
+    },
+  );
+
+  app.post<{ Params: { id: string }; Body: { targetUserId: number } }>(
+    "/api/admin/users/:id/merge-ghost",
+    { preHandler: requireAdmin },
+    async (req, reply) => {
+      const ghostId = Number(req.params.id);
+      const { targetUserId } = req.body ?? {};
+      if (!targetUserId) return reply.code(400).send({ error: "targetUserId is required" });
+      if (ghostId === targetUserId) return reply.code(400).send({ error: "can't merge a ghost into itself" });
+
+      const ghost = await prisma.user.findUnique({ where: { id: ghostId } });
+      if (!ghost || !ghost.isGhost) return reply.code(400).send({ error: "not a ghost account" });
+      const target = await prisma.user.findUnique({ where: { id: targetUserId } });
+      if (!target) return reply.code(404).send({ error: "target account not found" });
+
+      // Reassign every message the ghost authored directly to the real
+      // account — this is what makes clicking through from an old message
+      // land on the real account automatically, no special-casing needed
+      // anywhere messages are displayed. The ghost row itself is kept
+      // (not deleted) so mention resolution can still find it and redirect
+      // to mergedIntoUser for any message text that still says
+      // "@<old ghost username>".
+      await prisma.$transaction([
+        prisma.message.updateMany({ where: { authorId: ghostId }, data: { authorId: targetUserId } }),
+        prisma.user.update({ where: { id: ghostId }, data: { mergedIntoUserId: targetUserId } }),
+      ]);
+
+      return { status: "merged" };
     },
   );
 

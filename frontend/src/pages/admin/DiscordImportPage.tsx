@@ -24,7 +24,7 @@ export function DiscordImportPage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    api<ChannelOption[]>("/api/admin/channels").then(setChannels);
+    api<ChannelOption[]>("/api/channels").then(setChannels);
   }, []);
 
   async function runImport() {
