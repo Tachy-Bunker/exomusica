@@ -1,7 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import { prisma } from "../lib/prisma.js";
 import { requireAdmin } from "../lib/auth.js";
-import { saveSoundFile } from "../lib/storage.js";
+import { saveSoundFile, saveSiteImage } from "../lib/storage.js";
 import { verifySmtpConnection } from "../lib/mailer.js";
 
 export async function siteSettingsRoutes(app: FastifyInstance): Promise<void> {
@@ -26,8 +26,14 @@ export async function siteSettingsRoutes(app: FastifyInstance): Promise<void> {
         contentTextScaleMobile: 1.6,
         caInitial: 0.15,
         caBurst: 0.6,
-        staticAmt: 0.18,
-        staticSpeed: 0.55,
+        moireImageUrl: null,
+        moireOpacity: 0.15,
+        moireSize: 1,
+        moireOffsetMin: 0,
+        moireOffsetMax: 20,
+        moireOffsetSpeed: 0.3,
+        moireWaveform: "sine",
+        moireRotationSpeed: 0.1,
         smtpHost: null,
         smtpPort: null,
         smtpUser: null,
@@ -88,8 +94,13 @@ export async function siteSettingsRoutes(app: FastifyInstance): Promise<void> {
       contentTextScaleMobile: number;
       caInitial: number;
       caBurst: number;
-      staticAmt: number;
-      staticSpeed: number;
+      moireOpacity: number;
+      moireSize: number;
+      moireOffsetMin: number;
+      moireOffsetMax: number;
+      moireOffsetSpeed: number;
+      moireWaveform: string;
+      moireRotationSpeed: number;
     }>;
   }>("/api/admin/site-settings", { preHandler: requireAdmin }, async (req) => {
     const data: Record<string, unknown> = {};
@@ -105,8 +116,13 @@ export async function siteSettingsRoutes(app: FastifyInstance): Promise<void> {
       "contentTextScaleMobile",
       "caInitial",
       "caBurst",
-      "staticAmt",
-      "staticSpeed",
+      "moireOpacity",
+      "moireSize",
+      "moireOffsetMin",
+      "moireOffsetMax",
+      "moireOffsetSpeed",
+      "moireWaveform",
+      "moireRotationSpeed",
     ] as const) {
       if (key in body) data[key] = body[key];
     }
@@ -161,6 +177,33 @@ export async function siteSettingsRoutes(app: FastifyInstance): Promise<void> {
       where: { id: 1 },
       create: { id: 1, scanSfxUrl: null },
       update: { scanSfxUrl: null },
+    });
+    return { status: "ok" };
+  });
+
+  app.post("/api/admin/site-settings/moire-image", { preHandler: requireAdmin }, async (req, reply) => {
+    const file = await req.file();
+    if (!file) return reply.code(400).send({ error: "no file uploaded" });
+    if (file.mimetype !== "image/png") return reply.code(400).send({ error: "PNG only" });
+    const buffer = await file.toBuffer();
+    try {
+      const { url } = await saveSiteImage(file.filename, file.mimetype, buffer, "moire");
+      const settings = await prisma.siteSettings.upsert({
+        where: { id: 1 },
+        create: { id: 1, moireImageUrl: url },
+        update: { moireImageUrl: url },
+      });
+      return { moireImageUrl: settings.moireImageUrl };
+    } catch (err) {
+      return reply.code(400).send({ error: err instanceof Error ? err.message : "upload failed" });
+    }
+  });
+
+  app.delete("/api/admin/site-settings/moire-image", { preHandler: requireAdmin }, async () => {
+    await prisma.siteSettings.upsert({
+      where: { id: 1 },
+      create: { id: 1, moireImageUrl: null },
+      update: { moireImageUrl: null },
     });
     return { status: "ok" };
   });

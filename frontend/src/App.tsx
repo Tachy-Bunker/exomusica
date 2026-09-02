@@ -1,6 +1,6 @@
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { ChromaticAberrationLayer } from "./components/ChromaticAberrationLayer";
-import { StaticSnowLayer } from "./components/StaticSnowLayer";
+import { MoireLayer } from "./components/MoireLayer";
 import { AuthProvider } from "./lib/auth";
 import { Layout } from "./components/Layout";
 import { RequireAdmin } from "./components/RequireAdmin";
@@ -39,7 +39,7 @@ export default function App() {
     <>
       <ChromaticAberrationLayer />
       <div style={{ filter: "url(#caFilter)" }}>
-        <StaticSnowLayer />
+        <MoireLayer />
         <BrowserRouter>
           <AuthProvider>
             <Routes>

@@ -1,6 +1,7 @@
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent, type ChangeEvent } from "react";
 import { Link } from "react-router-dom";
 import { api, ApiError } from "../../lib/api";
+import { snippetFor } from "../../lib/markdownSnippet";
 
 interface ChannelSummary {
   id: number;
@@ -25,6 +26,23 @@ export function ChannelsPage() {
   const [error, setError] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editForm, setEditForm] = useState({ name: "", description: "", contentMarkdown: "", category: "", position: "" });
+  const contentTextareaRef = useRef<HTMLTextAreaElement>(null);
+
+  async function handleMediaUpload(e: ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const formData = new FormData();
+    formData.append("file", file);
+    const result = await api<{ url: string; mimeType: string; filename: string }>("/api/admin/media", { method: "POST", body: formData });
+    const snippet = snippetFor(result.mimeType, result.url, result.filename);
+    const el = contentTextareaRef.current;
+    const pos = el?.selectionStart ?? editForm.contentMarkdown.length;
+    setEditForm((f) => ({
+      ...f,
+      contentMarkdown: `${f.contentMarkdown.slice(0, pos)}\n${snippet}\n${f.contentMarkdown.slice(pos)}`,
+    }));
+    e.target.value = "";
+  }
 
   function load() {
     api<ChannelSummary[]>("/api/channels?kind=DISCUSSION").then(setTopics);
@@ -160,12 +178,14 @@ export function ChannelsPage() {
                     style={{ marginBottom: "0.2rem" }}
                   />
                   <textarea
+                    ref={contentTextareaRef}
                     rows={6}
                     placeholder="Page content (markdown — text, images, embeds)"
                     value={editForm.contentMarkdown}
                     onChange={(e) => setEditForm((f) => ({ ...f, contentMarkdown: e.target.value }))}
                     style={{ marginBottom: "0.2rem", width: "100%" }}
                   />
+                  <input type="file" accept="image/*,audio/*,video/*" onChange={handleMediaUpload} style={{ marginBottom: "0.2rem", fontSize: "0.75rem" }} />
                   <input
                     placeholder="Category"
                     value={editForm.category}

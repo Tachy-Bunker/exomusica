@@ -72,8 +72,14 @@ export function Layout() {
       contentTextScaleMobile: number;
       caInitial: number;
       caBurst: number;
-      staticAmt: number;
-      staticSpeed: number;
+      moireImageUrl: string | null;
+      moireOpacity: number;
+      moireSize: number;
+      moireOffsetMin: number;
+      moireOffsetMax: number;
+      moireOffsetSpeed: number;
+      moireWaveform: "sine" | "triangle";
+      moireRotationSpeed: number;
     }>("/api/site-settings").then((s) => {
       setSiteFont(s.defaultFont);
       useAmbienceStore.getState().setUrl(s.ambienceUrl);
@@ -85,7 +91,18 @@ export function Layout() {
       root.setProperty("--content-scale-desktop", String(s.contentTextScaleDesktop));
       root.setProperty("--content-scale-mobile", String(s.contentTextScaleMobile));
       useContentScaleStore.getState().setScale(s.contentTextScaleDesktop, s.contentTextScaleMobile);
-      useSiteEffectsStore.getState().setEffects({ caInitial: s.caInitial, caBurst: s.caBurst, staticAmt: s.staticAmt, staticSpeed: s.staticSpeed });
+      useSiteEffectsStore.getState().setEffects({
+        caInitial: s.caInitial,
+        caBurst: s.caBurst,
+        moireImageUrl: s.moireImageUrl,
+        moireOpacity: s.moireOpacity,
+        moireSize: s.moireSize,
+        moireOffsetMin: s.moireOffsetMin,
+        moireOffsetMax: s.moireOffsetMax,
+        moireOffsetSpeed: s.moireOffsetSpeed,
+        moireWaveform: s.moireWaveform,
+        moireRotationSpeed: s.moireRotationSpeed,
+      });
     });
   }, []);
   useCustomFont(siteFont); // still needed for its @font-face injection side effect

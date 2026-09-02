@@ -41,8 +41,15 @@ export function FontsAdminPage() {
   const [contentTextScaleMobile, setContentTextScaleMobile] = useState(1.6);
   const [caInitial, setCaInitial] = useState(0.15);
   const [caBurst, setCaBurst] = useState(0.6);
-  const [staticAmt, setStaticAmt] = useState(0.18);
-  const [staticSpeed, setStaticSpeed] = useState(0.55);
+  const [moireImageUrl, setMoireImageUrl] = useState<string | null>(null);
+  const [moireOpacity, setMoireOpacity] = useState(0.15);
+  const [moireSize, setMoireSize] = useState(1);
+  const [moireOffsetMin, setMoireOffsetMin] = useState(0);
+  const [moireOffsetMax, setMoireOffsetMax] = useState(20);
+  const [moireOffsetSpeed, setMoireOffsetSpeed] = useState(0.3);
+  const [moireWaveform, setMoireWaveform] = useState<"sine" | "triangle">("sine");
+  const [moireRotationSpeed, setMoireRotationSpeed] = useState(0.1);
+  const moireInputRef = useRef<HTMLInputElement>(null);
   const [effectsSaved, setEffectsSaved] = useState(false);
 
   const [smtpHost, setSmtpHost] = useState("");
@@ -71,10 +78,25 @@ export function FontsAdminPage() {
     });
   }, []);
 
+  async function uploadMoireImage() {
+    const file = moireInputRef.current?.files?.[0];
+    if (!file) return;
+    const formData = new FormData();
+    formData.append("file", file);
+    const result = await api<{ moireImageUrl: string }>("/api/admin/site-settings/moire-image", { method: "POST", body: formData });
+    setMoireImageUrl(result.moireImageUrl);
+    if (moireInputRef.current) moireInputRef.current.value = "";
+  }
+
+  async function removeMoireImage() {
+    await api("/api/admin/site-settings/moire-image", { method: "DELETE" });
+    setMoireImageUrl(null);
+  }
+
   async function saveEffects() {
     await api("/api/admin/site-settings", {
       method: "PATCH",
-      body: JSON.stringify({ caInitial, caBurst, staticAmt, staticSpeed }),
+      body: JSON.stringify({ caInitial, caBurst, moireOpacity, moireSize, moireOffsetMin, moireOffsetMax, moireOffsetSpeed, moireWaveform, moireRotationSpeed }),
     });
     setEffectsSaved(true);
     setTimeout(() => setEffectsSaved(false), 2000);
@@ -124,8 +146,14 @@ export function FontsAdminPage() {
       contentTextScaleMobile: number;
       caInitial: number;
       caBurst: number;
-      staticAmt: number;
-      staticSpeed: number;
+      moireImageUrl: string | null;
+      moireOpacity: number;
+      moireSize: number;
+      moireOffsetMin: number;
+      moireOffsetMax: number;
+      moireOffsetSpeed: number;
+      moireWaveform: "sine" | "triangle";
+      moireRotationSpeed: number;
     }>("/api/site-settings").then((s) => {
       setSiteDefaultFontId(s.defaultFontId);
       setAmbienceUrl(s.ambienceUrl);
@@ -138,8 +166,14 @@ export function FontsAdminPage() {
       setContentTextScaleMobile(s.contentTextScaleMobile);
       setCaInitial(s.caInitial);
       setCaBurst(s.caBurst);
-      setStaticAmt(s.staticAmt);
-      setStaticSpeed(s.staticSpeed);
+      setMoireImageUrl(s.moireImageUrl);
+      setMoireOpacity(s.moireOpacity);
+      setMoireSize(s.moireSize);
+      setMoireOffsetMin(s.moireOffsetMin);
+      setMoireOffsetMax(s.moireOffsetMax);
+      setMoireOffsetSpeed(s.moireOffsetSpeed);
+      setMoireWaveform(s.moireWaveform);
+      setMoireRotationSpeed(s.moireRotationSpeed);
     });
   }
   useEffect(load, []);
@@ -345,23 +379,62 @@ export function FontsAdminPage() {
       <div className="field" style={{ maxWidth: 420 }}>
         <label>Site-wide effects</label>
         <p style={{ fontSize: "0.75rem", color: "var(--text-dim)", marginTop: 0 }}>
-          Chromatic aberration and static snow — both run across the whole site now, not just the spacemap.
+          Chromatic aberration and the moiré generator — both run across the whole site now, not just the spacemap.
         </p>
         <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.3rem" }}>
           <input type="range" min={0} max={1} step={0.01} value={caInitial} onChange={(e) => setCaInitial(Number(e.target.value))} />
           <span style={{ fontSize: "0.8rem" }}>Aberration initial — {caInitial.toFixed(2)}</span>
         </div>
-        <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.3rem" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.6rem" }}>
           <input type="range" min={0} max={1} step={0.01} value={caBurst} onChange={(e) => setCaBurst(Number(e.target.value))} />
           <span style={{ fontSize: "0.8rem" }}>Aberration burst — {caBurst.toFixed(2)}</span>
         </div>
+
+        <p style={{ fontSize: "0.8rem", fontWeight: 600, marginBottom: "0.3rem" }}>Moiré generator</p>
+        {moireImageUrl && (
+          <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.4rem" }}>
+            <img src={moireImageUrl} alt="Moiré pattern" style={{ height: 40, border: "1px solid var(--border)" }} />
+            <button className="btn btn-danger" onClick={removeMoireImage}>
+              Remove
+            </button>
+          </div>
+        )}
+        <div style={{ display: "flex", gap: "0.5rem", marginBottom: "0.4rem" }}>
+          <input ref={moireInputRef} type="file" accept="image/png" />
+          <button className="btn btn-primary" onClick={uploadMoireImage}>
+            {moireImageUrl ? "Replace" : "Upload"}
+          </button>
+        </div>
         <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.3rem" }}>
-          <input type="range" min={0} max={1} step={0.01} value={staticAmt} onChange={(e) => setStaticAmt(Number(e.target.value))} />
-          <span style={{ fontSize: "0.8rem" }}>Static snow — {staticAmt.toFixed(2)}</span>
+          <input type="range" min={0} max={1} step={0.01} value={moireOpacity} onChange={(e) => setMoireOpacity(Number(e.target.value))} />
+          <span style={{ fontSize: "0.8rem" }}>Opacity — {moireOpacity.toFixed(2)}</span>
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.3rem" }}>
+          <input type="range" min={0.2} max={5} step={0.1} value={moireSize} onChange={(e) => setMoireSize(Number(e.target.value))} />
+          <span style={{ fontSize: "0.8rem" }}>Size — {moireSize.toFixed(1)}x</span>
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.3rem" }}>
+          <input type="range" min={0} max={100} step={1} value={moireOffsetMin} onChange={(e) => setMoireOffsetMin(Number(e.target.value))} />
+          <span style={{ fontSize: "0.8rem" }}>Offset min — {moireOffsetMin}px</span>
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.3rem" }}>
+          <input type="range" min={0} max={200} step={1} value={moireOffsetMax} onChange={(e) => setMoireOffsetMax(Number(e.target.value))} />
+          <span style={{ fontSize: "0.8rem" }}>Offset max — {moireOffsetMax}px</span>
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.3rem" }}>
+          <input type="range" min={0} max={2} step={0.01} value={moireOffsetSpeed} onChange={(e) => setMoireOffsetSpeed(Number(e.target.value))} />
+          <span style={{ fontSize: "0.8rem" }}>Offset speed — {moireOffsetSpeed.toFixed(2)} Hz</span>
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.3rem" }}>
+          <select value={moireWaveform} onChange={(e) => setMoireWaveform(e.target.value as "sine" | "triangle")}>
+            <option value="sine">Sine LFO</option>
+            <option value="triangle">Triangle LFO</option>
+          </select>
+          <span style={{ fontSize: "0.8rem" }}>Offset waveform</span>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.4rem" }}>
-          <input type="range" min={0} max={1} step={0.01} value={staticSpeed} onChange={(e) => setStaticSpeed(Number(e.target.value))} />
-          <span style={{ fontSize: "0.8rem" }}>Static speed — {staticSpeed.toFixed(2)}</span>
+          <input type="range" min={0} max={2} step={0.01} value={moireRotationSpeed} onChange={(e) => setMoireRotationSpeed(Number(e.target.value))} />
+          <span style={{ fontSize: "0.8rem" }}>Rotation speed — {moireRotationSpeed.toFixed(2)}/s</span>
         </div>
         <button className="btn btn-primary" onClick={saveEffects}>
           Save effects

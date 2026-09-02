@@ -521,8 +521,14 @@ model SiteSettings {
   contentTextScaleMobile  Float @default(1.6) // same, mobile
   caInitial          Float  @default(0.15) // site-wide chromatic aberration, always-present subtle shift
   caBurst            Float  @default(0.6)  // site-wide chromatic aberration, peak shift during a burst
-  staticAmt          Float  @default(0.18) // site-wide static snow (CSS tiled texture)
-  staticSpeed        Float  @default(0.55)
+  moireImageUrl      String? // uploaded PNG pattern for the site-wide moiré effect
+  moireOpacity       Float  @default(0.15)
+  moireSize          Float  @default(1) // scale multiplier on the uploaded image's natural tile size
+  moireOffsetMin     Float  @default(0) // px
+  moireOffsetMax     Float  @default(20) // px
+  moireOffsetSpeed   Float  @default(0.3) // cycles per second of the offset LFO
+  moireWaveform      String @default("sine") // "sine" | "triangle"
+  moireRotationSpeed Float  @default(0.1) // degrees per second, wraps at 360
   smtpHost           String?
   smtpPort           Int?
   smtpUser           String?

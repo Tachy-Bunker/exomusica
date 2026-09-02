@@ -1,6 +1,7 @@
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent, type ChangeEvent } from "react";
 import { api, ApiError } from "../../lib/api";
 import type { Branch } from "../../lib/types";
+import { snippetFor } from "../../lib/markdownSnippet";
 
 interface AlbumSummary {
   id: number;
@@ -52,6 +53,23 @@ export function AlbumsAdminPage() {
   const [trackEditForm, setTrackEditForm] = useState({ title: "", fileUrl: "", format: "MP3" });
   const [editingAlbumInfo, setEditingAlbumInfo] = useState(false);
   const [albumEditForm, setAlbumEditForm] = useState({ title: "", composer: "", description: "", contentMarkdown: "" });
+  const contentTextareaRef = useRef<HTMLTextAreaElement>(null);
+
+  async function handleContentMediaUpload(e: ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const formData = new FormData();
+    formData.append("file", file);
+    const result = await api<{ url: string; mimeType: string; filename: string }>("/api/admin/media", { method: "POST", body: formData });
+    const snippet = snippetFor(result.mimeType, result.url, result.filename);
+    const el = contentTextareaRef.current;
+    const pos = el?.selectionStart ?? albumEditForm.contentMarkdown.length;
+    setAlbumEditForm((f) => ({
+      ...f,
+      contentMarkdown: `${f.contentMarkdown.slice(0, pos)}\n${snippet}\n${f.contentMarkdown.slice(pos)}`,
+    }));
+    e.target.value = "";
+  }
   const coverInput = useRef<HTMLInputElement>(null);
   const galleryInput = useRef<HTMLInputElement>(null);
 
@@ -321,12 +339,14 @@ export function AlbumsAdminPage() {
               <div className="field">
                 <label>Page content (markdown — text, images, embeds)</label>
                 <textarea
+                  ref={contentTextareaRef}
                   rows={6}
                   style={{ width: "100%" }}
                   value={albumEditForm.contentMarkdown}
                   onChange={(e) => setAlbumEditForm((f) => ({ ...f, contentMarkdown: e.target.value }))}
                   placeholder="Optional — shown on the album's public page"
                 />
+                <input type="file" accept="image/*,audio/*,video/*" onChange={handleContentMediaUpload} style={{ fontSize: "0.75rem" }} />
               </div>
               <button className="btn btn-primary" onClick={saveAlbumInfo}>
                 Save

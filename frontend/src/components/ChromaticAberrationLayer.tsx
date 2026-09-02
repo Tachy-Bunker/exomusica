@@ -40,7 +40,7 @@ export function ChromaticAberrationLayer() {
     function tick(now: number) {
       if (paused) return;
       const { caInitial, caBurst } = useSiteEffectsStore.getState();
-      const initialAmt = caInitial * 2.6;
+      const initialAmt = caInitial * 12; // was *2.6 — capped at a sub-pixel 2.6px even at max, genuinely invisible
       const burstAmt = caBurst * 22;
       if (!reduceMotion) {
         if (!burst && now >= nextBurst) {
