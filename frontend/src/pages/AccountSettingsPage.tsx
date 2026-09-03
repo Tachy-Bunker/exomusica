@@ -22,12 +22,14 @@ interface Me {
   links: { label: string; url: string }[] | null;
   collaboratorSlug: string | null;
   caEnabled: boolean;
+  exclusiveMediaPlayback: boolean;
   moireEnabled: boolean;
   notifyWeeklySummary: boolean;
   notifyDailySummary: boolean;
   notifyFollowedReplies: boolean;
   notifyPrivateMessage: boolean;
   discordUsername: string | null;
+  discordUserId: string | null;
   notifyDiscordWeeklySummary: boolean;
   notifyDiscordDailySummary: boolean;
   notifyDiscordFollowedReplies: boolean;
@@ -38,7 +40,7 @@ interface Me {
   followedChannels: FollowedChannel[];
 }
 
-type NotifyKey = Exclude<keyof Me, "username" | "email" | "followedChannels" | "discordUsername">;
+type NotifyKey = Exclude<keyof Me, "username" | "email" | "followedChannels" | "discordUsername" | "discordUserId">;
 
 interface SoundPref {
   eventId: number;
@@ -97,11 +99,12 @@ export function AccountSettingsPage() {
     updateMeField({ links: (me?.links ?? []).filter((_, i) => i !== index) });
   }
 
-  async function toggleVisualEffect(key: "caEnabled" | "moireEnabled", value: boolean) {
+  async function toggleVisualEffect(key: "caEnabled" | "moireEnabled" | "exclusiveMediaPlayback", value: boolean) {
     if (!me) return;
     setMe({ ...me, [key]: value });
     await api("/api/account/visual-effects", { method: "PATCH", body: JSON.stringify({ [key]: value }) });
-    useSiteEffectsStore.getState().setEffects(key === "caEnabled" ? { userCaEnabled: value } : { userMoireEnabled: value });
+    const storeKey = key === "caEnabled" ? "userCaEnabled" : key === "moireEnabled" ? "userMoireEnabled" : "exclusiveMediaPlayback";
+    useSiteEffectsStore.getState().setEffects({ [storeKey]: value });
   }
 
   async function saveProfile() {
@@ -241,6 +244,14 @@ export function AccountSettingsPage() {
         <input type="checkbox" checked={me.moireEnabled} onChange={(e) => toggleVisualEffect("moireEnabled", e.target.checked)} /> Moiré
         effect
       </label>
+      <label style={{ display: "block", fontSize: "0.9rem", marginBottom: "0.8rem" }}>
+        <input
+          type="checkbox"
+          checked={me.exclusiveMediaPlayback}
+          onChange={(e) => toggleVisualEffect("exclusiveMediaPlayback", e.target.checked)}
+        />{" "}
+        Only one audio/video plays at a time (starting one pauses any other, including the main player)
+      </label>
 
       <h2 style={{ fontSize: "1rem" }}>Bio & links</h2>
       <div className="field">
@@ -341,7 +352,20 @@ export function AccountSettingsPage() {
 
       <h2 style={{ fontSize: "1rem" }}>Discord notifications</h2>
       <div className="field">
-        <label>Your Discord username</label>
+        <label>Your Discord user ID (preferred — more reliable)</label>
+        <input
+          placeholder="e.g. 259653581316161536"
+          value={me.discordUserId ?? ""}
+          onChange={(e) => setMe({ ...me, discordUserId: e.target.value })}
+          onBlur={() => api("/api/account/notifications", { method: "PATCH", body: JSON.stringify({ discordUserId: me.discordUserId || null }) })}
+        />
+        <p style={{ fontSize: "0.75rem", color: "var(--text-dim)", marginTop: "0.2rem" }}>
+          In Discord: User Settings → Advanced → enable Developer Mode, then right-click your own name → Copy User
+          ID.
+        </p>
+      </div>
+      <div className="field">
+        <label>Your Discord username (fallback if no ID set)</label>
         <input
           placeholder="e.g. tachy_bunker"
           value={me.discordUsername ?? ""}
@@ -349,8 +373,7 @@ export function AccountSettingsPage() {
           onBlur={() => api("/api/account/notifications", { method: "PATCH", body: JSON.stringify({ discordUsername: me.discordUsername || null }) })}
         />
         <p style={{ fontSize: "0.75rem", color: "var(--text-dim)", marginTop: "0.2rem" }}>
-          Only works if you're in a Discord server the Exomusica bot is also in — it looks you up by this username to
-          send DMs.
+          Only used if no ID is set above — requires being in a Discord server the bot is also in.
         </p>
       </div>
       {checkbox("notifyDiscordWeeklySummary", "Weekly activity summary")}

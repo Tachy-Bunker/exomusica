@@ -123,10 +123,26 @@ export function Layout() {
 
   useEffect(() => {
     if (!user) return;
-    api<{ caEnabled: boolean; moireEnabled: boolean }>("/api/account/me").then((me) => {
-      useSiteEffectsStore.getState().setEffects({ userCaEnabled: me.caEnabled, userMoireEnabled: me.moireEnabled });
+    api<{ caEnabled: boolean; moireEnabled: boolean; exclusiveMediaPlayback: boolean }>("/api/account/me").then((me) => {
+      useSiteEffectsStore
+        .getState()
+        .setEffects({ userCaEnabled: me.caEnabled, userMoireEnabled: me.moireEnabled, exclusiveMediaPlayback: me.exclusiveMediaPlayback });
     });
   }, [user]);
+
+  useEffect(() => {
+    function handleMediaPlay(e: Event) {
+      if (!useSiteEffectsStore.getState().exclusiveMediaPlayback) return;
+      const target = e.target as HTMLMediaElement;
+      document.querySelectorAll("audio, video").forEach((el) => {
+        if (el !== target && !(el as HTMLMediaElement).paused) (el as HTMLMediaElement).pause();
+      });
+    }
+    // 'play' doesn't bubble on media elements, but capture phase at the
+    // document level still sees it fire on the way down.
+    document.addEventListener("play", handleMediaPlay, true);
+    return () => document.removeEventListener("play", handleMediaPlay, true);
+  }, []);
 
   const [siteFont, setSiteFont] = useState<{ familyName: string; fileUrl: string; format: string } | null>(null);
   const navRef = useRef<HTMLElement>(null);

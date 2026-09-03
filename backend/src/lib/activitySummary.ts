@@ -35,8 +35,8 @@ export async function sendActivitySummary(
       await sendTemplatedMail(emailType, user.email, user.username, { summary: lines.join("<br>") });
       sent++;
     }
-    if (user[discordField] && user.discordUsername) {
-      await sendDiscordDM(user.discordUsername, `Your Exomusica activity summary:\n${lines.join("\n")}`);
+    if (user[discordField] && (user.discordUserId || user.discordUsername)) {
+      await sendDiscordDM({ discordUserId: user.discordUserId, discordUsername: user.discordUsername }, `Your Exomusica activity summary:\n${lines.join("\n")}`);
     }
   }
   console.log(`${emailType} sent to ${sent} of ${users.length} eligible users.`);

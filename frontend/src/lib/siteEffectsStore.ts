@@ -6,6 +6,7 @@ interface SiteEffectsState {
   chatOpenSfxUrl: string | null;
   userCaEnabled: boolean;
   userMoireEnabled: boolean;
+  exclusiveMediaPlayback: boolean;
   chatHudRevealRate: number;
   chatHudSfxUrl: string | null;
   chatSplashMessages: string[];
@@ -27,6 +28,7 @@ export const useSiteEffectsStore = create<SiteEffectsState>((set) => ({
   chatOpenSfxUrl: null,
   userCaEnabled: true,
   userMoireEnabled: false,
+  exclusiveMediaPlayback: true,
   chatHudRevealRate: 30,
   chatHudSfxUrl: null,
   chatSplashMessages: [],

@@ -64,11 +64,13 @@ model User {
   volumeMusic           Float        @default(1.0)
   caEnabled             Boolean      @default(true)
   moireEnabled          Boolean      @default(false)
+  exclusiveMediaPlayback Boolean     @default(true) // when on, starting any audio/video (main player or chat-embedded) pauses every other one playing
   notifyWeeklySummary   Boolean      @default(true)
   notifyDailySummary    Boolean      @default(false)
   notifyFollowedReplies Boolean      @default(true)
   notifyPrivateMessage  Boolean      @default(true)
   discordUsername             String?  // for the bot to DM — matched against the bot's shared-server member list, not a stored user ID
+  discordUserId               String?  @unique // preferred over discordUsername — a direct fetch by snowflake ID, more reliable than searching guild members by name
   notifyDiscordWeeklySummary  Boolean  @default(false)
   notifyDiscordDailySummary   Boolean  @default(false)
   notifyDiscordFollowedReplies Boolean @default(false)
@@ -564,6 +566,7 @@ model SiteSettings {
   chatOpenSfxUrl     String? // plays once whenever a new chat location (branch/topic) is opened
   joinNotifyEmail    String? // admin gets emailed here whenever a new join request comes in
   joinNotifyDiscordUsername String? // admin also gets DMed here, if the bridge bot shares a server with this Discord account
+  joinNotifyDiscordUserId   String? // preferred over the username above — a direct, reliable lookup by snowflake ID
   linkClickSfxUrl    String? // plays whenever the user clicks any hyperlink, site-wide
   chatHudRevealRate  Float   @default(30) // ms per character for the letter-by-letter chat reveal
   chatHudSfxUrl      String? // loops during the reveal

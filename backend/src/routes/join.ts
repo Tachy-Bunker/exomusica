@@ -47,9 +47,9 @@ export async function joinRoutes(app: FastifyInstance): Promise<void> {
         `${username} (${email}) wants to join Exomusica.\n\nReason: ${reason}\n\nReview it at /admin/join-requests.`,
       ).catch((err) => app.log.error(err, "join-request admin notification failed"));
     }
-    if (settings?.joinNotifyDiscordUsername) {
+    if (settings?.joinNotifyDiscordUsername || settings?.joinNotifyDiscordUserId) {
       void sendDiscordDM(
-        settings.joinNotifyDiscordUsername,
+        { discordUserId: settings.joinNotifyDiscordUserId, discordUsername: settings.joinNotifyDiscordUsername },
         `New join request: ${username} (${email}) wants to join Exomusica.\nReason: ${reason}\nReview it at /admin/join-requests.`,
       );
     }

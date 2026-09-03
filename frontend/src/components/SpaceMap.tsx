@@ -38,9 +38,9 @@ const DAMPING = 4.5;
 const CAMERA_ACCEL = 1800;
 const CAMERA_FRICTION = 5;
 const CAMERA_MAX_SPEED = 900;
-const CROSSHAIR_LOOKAHEAD = 0.045; // fraction of camera velocity the crosshair leads by
-const CROSSHAIR_MAX_OFFSET = 26; // px — caps how far the crosshair can drift from center
-const CROSSHAIR_CATCHUP_RATE = 4.5; // higher = the visor catches up to the crosshair faster
+const CROSSHAIR_LOOKAHEAD = 0.09; // fraction of camera velocity the crosshair leads by
+const CROSSHAIR_MAX_OFFSET = 46; // px — caps how far the crosshair can drift from center
+const CROSSHAIR_CATCHUP_RATE = 3; // higher = the visor catches up to the crosshair faster
 const LOCK_RADIUS = 58; // px from screen center to start locking on
 const LOCK_TIME = 0.9; // seconds of holding a target to complete the lock
 
@@ -167,6 +167,8 @@ export function SpaceMap({
   const targetNodeIdRef = useRef<number | null>(null);
   const lockProgressRef = useRef(0);
   const [lockedNode, setLockedNode] = useState<MapNode | null>(null);
+  const [lockedTopic, setLockedTopic] = useState<{ slug: string; name: string } | null>(null);
+  const lockedTopicRef = useRef<{ slug: string; name: string } | null>(null);
   const lockedNodeRef = useRef<MapNode | null>(null);
   useEffect(() => {
     lockedNodeRef.current = lockedNode;
@@ -196,6 +198,10 @@ export function SpaceMap({
 
   function enterCenter() {
     if (lockedNodeRef.current?.id === -1) navigate(centerHref);
+    else if (!lockedNodeRef.current && lockedTopicRef.current) {
+      playLinkClickSound();
+      navigate(`/topic/${lockedTopicRef.current.slug}`);
+    }
   }
 
   function viewLockedDetails() {
@@ -474,14 +480,30 @@ export function SpaceMap({
           }
         }
 
+        let nearestTopic: { slug: string; name: string } | null = null;
+        let nearestTopicDist = LOCK_RADIUS;
         for (const t of topicNodesRef.current) {
           const el = topicElRefs.current.get(t.slug);
+          const screenX = w / 2 + cam.x + t.worldX;
+          const screenY = h / 2 + cam.y + t.worldY;
           if (el) {
-            el.style.left = `${w / 2 + cam.x + t.worldX}px`;
-            el.style.top = `${h / 2 + cam.y + t.worldY}px`;
+            el.style.left = `${screenX}px`;
+            el.style.top = `${screenY}px`;
+          }
+          const dist = Math.hypot(screenX - w / 2, screenY - h / 2);
+          if (dist < nearestTopicDist) {
+            nearestTopicDist = dist;
+            nearestTopic = t;
           }
         }
-
+        // Branches take priority when both are in range — topics only
+        // lock when nothing closer is competing for the reticle.
+        const topicWins = nearestTopic && (!nearest || nearestTopicDist < nearestDist);
+        const nextLockedTopic = topicWins ? nearestTopic : null;
+        if (nextLockedTopic?.slug !== lockedTopicRef.current?.slug) {
+          lockedTopicRef.current = nextLockedTopic;
+          setLockedTopic(nextLockedTopic);
+        }
 
         if (nearest?.id !== targetNodeIdRef.current) {
           targetNodeIdRef.current = nearest?.id ?? null;
@@ -676,6 +698,24 @@ export function SpaceMap({
           {lockedNode.name.slice(0, revealedCount)}
           {revealedCount < lockedNode.name.length && <span className="space-hud-cursor">▌</span>}
         </div>
+      )}
+      {!lockedNode && lockedTopic && (
+        <>
+          <div className="space-hud-name">{lockedTopic.name}</div>
+          <div className="space-hud-action">
+            <span
+              className="space-hud-action-link"
+              style={{ color: "var(--accent-forum)" }}
+              onClick={(e) => {
+                e.stopPropagation();
+                playLinkClickSound();
+                navigate(`/topic/${lockedTopic.slug}`);
+              }}
+            >
+              Enter{isDesktop ? " (Enter)" : ""}
+            </span>
+          </div>
+        </>
       )}
       {lockedNode && revealedCount >= lockedNode.name.length && actionRevealedCount > 0 && (
         <div className="space-hud-action">

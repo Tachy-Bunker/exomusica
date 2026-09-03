@@ -92,9 +92,9 @@ export async function pmRoutes(app: FastifyInstance): Promise<void> {
           messageExcerpt: (contentRaw || "(attachment)").slice(0, 200),
         }).catch((err) => app.log.error(err, "sendTemplatedMail failed"));
       }
-      if (other.notifyDiscordPrivateMessage && other.discordUsername) {
+      if (other.notifyDiscordPrivateMessage && (other.discordUserId || other.discordUsername)) {
         void sendDiscordDM(
-          other.discordUsername,
+          { discordUserId: other.discordUserId, discordUsername: other.discordUsername },
           `${sender?.username ?? "Someone"} sent you a private message on Exomusica: "${(contentRaw || "(attachment)").slice(0, 200)}"`,
         );
       }

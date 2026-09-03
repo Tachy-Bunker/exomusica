@@ -83,38 +83,59 @@ async function handleIncomingDiscordMessage(message: {
  *  username, this is the mechanism. Silently no-ops if the bot isn't
  *  connected, no username is given, or no match is found — notification
  *  delivery failures shouldn't ever break the action that triggered them. */
-export async function sendDiscordDM(username: string | null | undefined, message: string): Promise<void> {
-  if (!client || !username) return;
-  try {
-    for (const guild of client.guilds.cache.values()) {
-      const members = await guild.members.fetch();
-      const match = members.find((m) => m.user.username.toLowerCase() === username.toLowerCase());
-      if (match) {
-        await match.send(message);
-        return;
-      }
+interface DiscordIdentity {
+  discordUserId?: string | null;
+  discordUsername?: string | null;
+}
+
+/** Resolves a Discord identity to an actual discord.js User object.
+ *  Prefers a direct fetch by id (reliable, works without a shared guild
+ *  or the Server Members intent) over searching guild members by
+ *  username (the fallback, since usernames are what we ask most users
+ *  for — but that path needs Server Members intent and a shared server). */
+async function resolveDiscordUser(identity: DiscordIdentity) {
+  if (!client) return null;
+  if (identity.discordUserId) {
+    try {
+      return await client.users.fetch(identity.discordUserId);
+    } catch (err) {
+      console.warn(`Discord bridge: could not fetch user by id "${identity.discordUserId}":`, err);
     }
-    console.warn(`Discord bridge: no member found matching username "${username}" in any shared server — DM not sent.`);
+  }
+  if (identity.discordUsername) {
+    try {
+      for (const guild of client.guilds.cache.values()) {
+        const members = await guild.members.fetch();
+        const match = members.find((m) => m.user.username.toLowerCase() === identity.discordUsername!.toLowerCase());
+        if (match) return match.user;
+      }
+    } catch (err) {
+      console.error("Discord bridge: failed to search guild members:", err);
+    }
+  }
+  return null;
+}
+
+export async function sendDiscordDM(identity: DiscordIdentity, message: string): Promise<void> {
+  if (!client || (!identity.discordUserId && !identity.discordUsername)) return;
+  try {
+    const user = await resolveDiscordUser(identity);
+    if (!user) {
+      console.warn(`Discord bridge: no user found for`, identity, `— DM not sent.`);
+      return;
+    }
+    await user.send(message);
   } catch (err) {
     console.error("Discord bridge: failed to send DM:", err);
   }
 }
 
-/** Finds a guild member's current avatar URL by username, same lookup as
- *  sendDiscordDM. Used to make a forwarded website message's webhook post
- *  show the linked Discord user's real, current avatar. */
-export async function findDiscordAvatarUrl(username: string | null | undefined): Promise<string | null> {
-  if (!client || !username) return null;
-  try {
-    for (const guild of client.guilds.cache.values()) {
-      const members = await guild.members.fetch();
-      const match = members.find((m) => m.user.username.toLowerCase() === username.toLowerCase());
-      if (match) return match.user.displayAvatarURL({ size: 256 });
-    }
-  } catch (err) {
-    console.error("Discord bridge: failed to look up avatar:", err);
-  }
-  return null;
+/** Same identity resolution as sendDiscordDM, for borrowing a real
+ *  Discord avatar on a forwarded message. */
+export async function findDiscordAvatarUrl(identity: DiscordIdentity): Promise<string | null> {
+  if (!client || (!identity.discordUserId && !identity.discordUsername)) return null;
+  const user = await resolveDiscordUser(identity);
+  return user?.displayAvatarURL({ size: 256 }) ?? null;
 }
 
 export type AnnouncementEvent = "join_applied" | "join_approved" | "news_published" | "calls_for_artists" | "calls_for_ideas";
@@ -138,14 +159,19 @@ export async function sendDiscordAnnouncement(event: AnnouncementEvent, message:
   }
 }
 
-export async function forwardMessageToDiscord(channelSlug: string, authorUsername: string, content: string, authorDiscordUsername?: string | null): Promise<void> {
+export async function forwardMessageToDiscord(
+  channelSlug: string,
+  authorUsername: string,
+  content: string,
+  authorDiscordIdentity?: DiscordIdentity,
+): Promise<void> {
   if (!client) return;
   try {
     const channel = await prisma.forumChannel.findUnique({ where: { slug: channelSlug } });
     if (!channel?.discordChannelId) return;
 
     if (channel.discordWebhookUrl) {
-      const avatarUrl = await findDiscordAvatarUrl(authorDiscordUsername);
+      const avatarUrl = authorDiscordIdentity ? await findDiscordAvatarUrl(authorDiscordIdentity) : null;
       await fetch(channel.discordWebhookUrl, {
         method: "POST",
         headers: { "Content-Type": "application/json" },

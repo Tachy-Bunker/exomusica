@@ -57,12 +57,14 @@ export async function accountRoutes(app: FastifyInstance): Promise<void> {
       volumeSfxPlaying: me.volumeSfxPlaying,
       volumeMusic: me.volumeMusic,
       caEnabled: me.caEnabled,
+      exclusiveMediaPlayback: me.exclusiveMediaPlayback,
       moireEnabled: me.moireEnabled,
       notifyWeeklySummary: me.notifyWeeklySummary,
       notifyDailySummary: me.notifyDailySummary,
       notifyFollowedReplies: me.notifyFollowedReplies,
       notifyPrivateMessage: me.notifyPrivateMessage,
       discordUsername: me.discordUsername,
+      discordUserId: me.discordUserId,
       notifyDiscordWeeklySummary: me.notifyDiscordWeeklySummary,
       notifyDiscordDailySummary: me.notifyDiscordDailySummary,
       notifyDiscordFollowedReplies: me.notifyDiscordFollowedReplies,
@@ -88,6 +90,7 @@ export async function accountRoutes(app: FastifyInstance): Promise<void> {
       notifyCallsForIdeas: boolean;
       notifyCallsForArtists: boolean;
       discordUsername: string | null;
+      discordUserId: string | null;
       notifyDiscordWeeklySummary: boolean;
       notifyDiscordDailySummary: boolean;
       notifyDiscordFollowedReplies: boolean;
@@ -111,7 +114,7 @@ export async function accountRoutes(app: FastifyInstance): Promise<void> {
     },
   );
 
-  app.patch<{ Body: Partial<{ caEnabled: boolean; moireEnabled: boolean }> }>(
+  app.patch<{ Body: Partial<{ caEnabled: boolean; moireEnabled: boolean; exclusiveMediaPlayback: boolean }> }>(
     "/api/account/visual-effects",
     { preHandler: requireAuth },
     async (req) => {
@@ -261,6 +264,9 @@ export async function accountRoutes(app: FastifyInstance): Promise<void> {
       // the real account automatically — no per-message reassignment
       // needed going forward.
       await prisma.user.update({ where: { id: ghostId }, data: { linkedUserId: targetUserId } });
+      if (ghost.discordId && !target.discordUserId) {
+        await prisma.user.update({ where: { id: targetUserId }, data: { discordUserId: ghost.discordId } });
+      }
       return { status: "linked" };
     },
   );

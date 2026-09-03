@@ -106,6 +106,13 @@ button {
   background: var(--bg-elevated);
 }
 
+@media (max-width: 480px) {
+  .top-nav {
+    gap: 0.5rem;
+    padding: 0.7rem 0.8rem;
+  }
+}
+
 .top-nav .brand {
   font-family: var(--font-display);
   font-size: 1.25rem;
@@ -537,20 +544,6 @@ th {
   left: 0;
   top: 0;
   background: linear-gradient(90deg, var(--accent-forum), var(--accent-audio));
-}
-
-.player-seek-fill-animated {
-  background-size: 200% 100%;
-  animation: player-seek-shimmer 2.5s linear infinite;
-}
-
-@keyframes player-seek-shimmer {
-  0% {
-    background-position: 0% 0%;
-  }
-  100% {
-    background-position: 200% 0%;
-  }
 }
 
 .player-bar-row {

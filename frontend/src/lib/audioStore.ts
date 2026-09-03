@@ -63,42 +63,16 @@ export const useAudioStore = create<AudioState>((set, get) => ({
   expanded: false,
 
   play: (track) => {
-    const isSameTrack = get().currentTrack?.id === track.id;
     const el = audioEl;
-    const isStuckAtEnd = !!el && (el.ended || (el.duration > 0 && el.currentTime >= el.duration - 0.1));
-
-    if (!isSameTrack) {
-      set({ currentTrack: track, currentTime: 0, duration: 0 });
-      if (el) el.src = track.fileUrl;
-    } else if (isStuckAtEnd) {
-      // Same track, but the element has already finished — this happens
-      // when repeat-all replays a single track with an empty queue and
-      // history (playNext hands the same object back). Without an
-      // explicit reset here, .play() is a no-op: the element is sitting
-      // at its end position with nothing left to play.
-      set({ currentTime: 0 });
-      if (el) el.currentTime = 0;
+    set({ currentTrack: track, currentTime: 0, duration: get().currentTrack?.id === track.id ? get().duration : 0 });
+    if (el) {
+      if (el.currentSrc !== track.fileUrl) el.src = track.fileUrl;
+      el.currentTime = 0;
     }
-
     set({ isPlaying: true });
     el?.play().catch((err) => {
-      console.error("Playback failed to start:", err, "readyState:", el?.readyState);
-      // A rejection right after setting .src is a well-documented browser
-      // race (the new source hasn't buffered enough yet) — retry once it
-      // actually can play, rather than just giving up and silently
-      // leaving the queue stuck on this track forever.
-      if (el && el.readyState < 3) {
-        const retry = () => {
-          el.removeEventListener("canplay", retry);
-          el.play().catch((err2) => {
-            console.error("Playback retry also failed:", err2);
-            set({ isPlaying: false });
-          });
-        };
-        el.addEventListener("canplay", retry);
-      } else {
-        set({ isPlaying: false });
-      }
+      console.error("Playback failed to start:", err);
+      set({ isPlaying: false });
     });
     useAmbienceStore.getState().setEnabled(false);
   },
