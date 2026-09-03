@@ -47,7 +47,7 @@ export interface Branch {
   voiceoverText?: string | null;
   posX: number | null;
   posY: number | null;
-  channel: { slug: string } | null;
+  channel: { id: number; slug: string; discordChannelId: string | null; discordWebhookUrl: string | null } | null;
 }
 
 export interface BranchAlbum {

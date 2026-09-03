@@ -50,7 +50,7 @@ export async function branchRoutes(app: FastifyInstance): Promise<void> {
   // Admin sees everything, hidden included — needed to ever unhide something.
   app.get("/api/admin/branches", { preHandler: requireAdmin }, async () => {
     return prisma.branch.findMany({
-      include: { channel: { select: { slug: true } } },
+      include: { channel: { select: { id: true, slug: true, discordChannelId: true, discordWebhookUrl: true } } },
       orderBy: { id: "asc" },
     });
   });

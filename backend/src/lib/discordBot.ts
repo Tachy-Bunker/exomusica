@@ -7,6 +7,12 @@ import { toMessageDTO } from "./messageDto.js";
 
 let client: Client | null = null;
 let startedWithToken: string | null = null;
+let connectionStatus: "disconnected" | "connecting" | "connected" | "error" = "disconnected";
+let lastError: string | null = null;
+
+export function getDiscordBridgeStatus(): { status: string; lastError: string | null } {
+  return { status: connectionStatus, lastError };
+}
 
 /** Extracts the numeric webhook id from a Discord webhook URL
  *  (https://discord.com/api/webhooks/{id}/{token}) so incoming messages
@@ -107,6 +113,9 @@ export async function initDiscordBot(): Promise<void> {
       client = null;
       startedWithToken = null;
     }
+    connectionStatus = "disconnected";
+    lastError = null;
+    console.log("Discord bridge: no token configured, bridge inactive.");
     return;
   }
 
@@ -116,6 +125,8 @@ export async function initDiscordBot(): Promise<void> {
     await client.destroy();
     client = null;
   }
+
+  connectionStatus = "connecting";
 
   const newClient = new Client({
     intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages, GatewayIntentBits.MessageContent],
@@ -133,14 +144,27 @@ export async function initDiscordBot(): Promise<void> {
     }).catch((err) => console.error("Discord bridge: failed to process incoming message:", err));
   });
 
-  newClient.on("error", (err) => console.error("Discord client error:", err));
+  newClient.on("error", (err) => {
+    connectionStatus = "error";
+    lastError = err instanceof Error ? err.message : String(err);
+    console.error("Discord client error:", err);
+  });
+
+  newClient.on("shardDisconnect", () => {
+    connectionStatus = "disconnected";
+    console.warn("Discord bridge: shard disconnected.");
+  });
 
   try {
     await newClient.login(token);
     client = newClient;
     startedWithToken = token;
+    connectionStatus = "connected";
+    lastError = null;
     console.log("Discord bridge connected.");
   } catch (err) {
+    connectionStatus = "error";
+    lastError = err instanceof Error ? err.message : String(err);
     console.error("Discord bridge failed to connect — check the bot token:", err);
   }
 }

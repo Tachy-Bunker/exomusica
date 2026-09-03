@@ -21,6 +21,8 @@ export function BranchesPage() {
     isAnchor: false,
     guideAssetId: "",
     voiceoverText: "",
+    discordChannelId: "",
+    discordWebhookUrl: "",
   });
   const [guideAssets, setGuideAssets] = useState<{ id: number; name: string }[]>([]);
   const voiceoverInputRef = useRef<HTMLInputElement>(null);
@@ -63,10 +65,12 @@ export function BranchesPage() {
       isAnchor: !!b.isAnchor,
       guideAssetId: b.guideAssetId ? String(b.guideAssetId) : "",
       voiceoverText: b.voiceoverText ?? "",
+      discordChannelId: b.channel?.discordChannelId ?? "",
+      discordWebhookUrl: b.channel?.discordWebhookUrl ?? "",
     });
   }
 
-  async function saveEdit(id: number) {
+  async function saveEdit(id: number, channelId: number | undefined) {
     await api(`/api/admin/branches/${id}`, {
       method: "PATCH",
       body: JSON.stringify({
@@ -79,6 +83,15 @@ export function BranchesPage() {
         voiceoverText: editForm.voiceoverText,
       }),
     });
+    if (channelId) {
+      await api(`/api/admin/channels/${channelId}`, {
+        method: "PATCH",
+        body: JSON.stringify({
+          discordChannelId: editForm.discordChannelId || null,
+          discordWebhookUrl: editForm.discordWebhookUrl || null,
+        }),
+      });
+    }
     setEditingId(null);
     load();
   }
@@ -228,6 +241,18 @@ export function BranchesPage() {
                     onChange={(e) => setEditForm((f) => ({ ...f, voiceoverText: e.target.value }))}
                     style={{ marginTop: "0.3rem" }}
                   />
+                  <input
+                    placeholder="Discord channel ID (bridge)"
+                    value={editForm.discordChannelId}
+                    onChange={(e) => setEditForm((f) => ({ ...f, discordChannelId: e.target.value }))}
+                    style={{ marginTop: "0.3rem", width: "100%" }}
+                  />
+                  <input
+                    placeholder="Discord webhook URL (optional — for the {username} | Exo-API format)"
+                    value={editForm.discordWebhookUrl}
+                    onChange={(e) => setEditForm((f) => ({ ...f, discordWebhookUrl: e.target.value }))}
+                    style={{ marginTop: "0.3rem", width: "100%" }}
+                  />
                   <div style={{ display: "flex", gap: "0.4rem", alignItems: "center", marginTop: "0.3rem" }}>
                     <input ref={voiceoverInputRef} type="file" accept="audio/mpeg,audio/wav,audio/ogg" style={{ fontSize: "0.75rem" }} />
                     <button className="btn" onClick={() => uploadVoiceover(b.id)}>
@@ -247,7 +272,7 @@ export function BranchesPage() {
               <td style={{ whiteSpace: "nowrap" }}>
                 {editingId === b.id ? (
                   <>
-                    <button className="btn btn-primary" onClick={() => saveEdit(b.id)}>
+                    <button className="btn btn-primary" onClick={() => saveEdit(b.id, b.channel?.id)}>
                       Save
                     </button>{" "}
                     <button className="btn" onClick={() => setEditingId(null)}>

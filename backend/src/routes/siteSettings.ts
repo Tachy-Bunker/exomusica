@@ -3,7 +3,7 @@ import { prisma } from "../lib/prisma.js";
 import { requireAdmin } from "../lib/auth.js";
 import { saveSoundFile, saveSiteImage } from "../lib/storage.js";
 import { verifySmtpConnection } from "../lib/mailer.js";
-import { restartDiscordBotIfNeeded } from "../lib/discordBot.js";
+import { restartDiscordBotIfNeeded, getDiscordBridgeStatus } from "../lib/discordBot.js";
 
 export async function siteSettingsRoutes(app: FastifyInstance): Promise<void> {
   app.get("/api/site-settings", async () => {
@@ -91,7 +91,7 @@ export async function siteSettingsRoutes(app: FastifyInstance): Promise<void> {
   // ever round-tripping the actual secret back to the browser.
   app.get("/api/admin/discord-bridge/status", { preHandler: requireAdmin }, async () => {
     const settings = await prisma.siteSettings.findUnique({ where: { id: 1 } });
-    return { discordBotTokenSet: !!settings?.discordBotToken };
+    return { discordBotTokenSet: !!settings?.discordBotToken, ...getDiscordBridgeStatus() };
   });
 
   app.get("/api/admin/site-settings/smtp", { preHandler: requireAdmin }, async () => {
