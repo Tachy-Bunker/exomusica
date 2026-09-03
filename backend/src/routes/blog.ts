@@ -3,6 +3,7 @@ import type { FastifyInstance } from "fastify";
 import { prisma } from "../lib/prisma.js";
 import { requireAdmin } from "../lib/auth.js";
 import { sendTemplatedMail } from "../lib/emailTemplates.js";
+import { sendDiscordAnnouncement } from "../lib/discordBot.js";
 
 export async function blogRoutes(app: FastifyInstance): Promise<void> {
   app.get("/api/admin/newsletter-subscriptions", { preHandler: requireAdmin }, async () => {
@@ -109,6 +110,7 @@ export async function blogRoutes(app: FastifyInstance): Promise<void> {
         );
         notified++;
       }
+      void sendDiscordAnnouncement("news_published", `New Exomusica News: "${post.title}" — ${excerpt.slice(0, 200)}`);
       return { notified };
     },
   );

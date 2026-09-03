@@ -11,7 +11,7 @@ import { walkChannelHistoryInChunks } from "../lib/messageChunking.js";
 import { forwardMessageToDiscord, sendDiscordDM } from "../lib/discordBot.js";
 
 const messageInclude = {
-  author: { select: { username: true, avatarUrl: true, isGhost: true, linkedUserId: true, linkedUser: { select: { username: true, avatarUrl: true } } } },
+  author: { select: { username: true, avatarUrl: true, isGhost: true, discordUsername: true, linkedUserId: true, linkedUser: { select: { username: true, avatarUrl: true } } } },
   reactions: { include: { emoji: true, user: { select: { username: true } } } },
   attachments: true,
   replyTo: { select: { id: true, contentRaw: true, author: { select: { username: true } } } },
@@ -204,7 +204,7 @@ export async function messageRoutes(app: FastifyInstance): Promise<void> {
       const full = await prisma.message.findUniqueOrThrow({ where: { id: message.id }, include: messageInclude });
       const dto = await toMessageDTO(full);
       broadcast(channel.slug, { type: "message.create", message: dto });
-      void forwardMessageToDiscord(channel.slug, dto.authorUsername, contentRaw);
+      void forwardMessageToDiscord(channel.slug, dto.authorUsername, contentRaw, full.author.discordUsername);
 
       // Fire-and-forget: followers who want replies on this specific topic
       // (global notifyFollowedReplies AND this follow's own notifyOnReply,

@@ -3,7 +3,7 @@ import { prisma } from "../lib/prisma.js";
 import { hashPassword, requireAdmin } from "../lib/auth.js";
 import { sendTemplatedMail } from "../lib/emailTemplates.js";
 import { sendMail } from "../lib/mailer.js";
-import { sendDiscordDM } from "../lib/discordBot.js";
+import { sendDiscordDM, sendDiscordAnnouncement } from "../lib/discordBot.js";
 import { createNotification } from "../lib/notify.js";
 
 interface JoinBody {
@@ -53,6 +53,7 @@ export async function joinRoutes(app: FastifyInstance): Promise<void> {
         `New join request: ${username} (${email}) wants to join Exomusica.\nReason: ${reason}\nReview it at /admin/join-requests.`,
       );
     }
+    void sendDiscordAnnouncement("join_applied", `${username} applied to join Exomusica!`);
 
     return reply.code(201).send({ id: joinRequest.id, status: joinRequest.status });
   });
@@ -106,6 +107,7 @@ export async function joinRoutes(app: FastifyInstance): Promise<void> {
       void createNotification(user.id, "join_approved", "You're in", "Your Exomusica account was approved.").catch((err) =>
         app.log.error(err, "createNotification failed"),
       );
+      void sendDiscordAnnouncement("join_approved", `${user.username} was approved for Exomusical experiments!`);
       return { id: user.id, username: user.username };
     },
   );

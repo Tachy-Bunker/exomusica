@@ -93,7 +93,12 @@ export async function siteSettingsRoutes(app: FastifyInstance): Promise<void> {
   // ever round-tripping the actual secret back to the browser.
   app.get("/api/admin/discord-bridge/status", { preHandler: requireAdmin }, async () => {
     const settings = await prisma.siteSettings.findUnique({ where: { id: 1 } });
-    return { discordBotTokenSet: !!settings?.discordBotToken, ...getDiscordBridgeStatus() };
+    return {
+      discordBotTokenSet: !!settings?.discordBotToken,
+      discordAnnounceChannelId: settings?.discordAnnounceChannelId ?? null,
+      discordAnnounceEvents: settings?.discordAnnounceEvents ?? [],
+      ...getDiscordBridgeStatus(),
+    };
   });
 
   app.get("/api/admin/site-settings/smtp", { preHandler: requireAdmin }, async () => {
@@ -158,6 +163,8 @@ export async function siteSettingsRoutes(app: FastifyInstance): Promise<void> {
       chatSplashMessages: string[];
       categoryOrder: string[];
       discordBotToken: string | null;
+      discordAnnounceChannelId: string | null;
+      discordAnnounceEvents: string[];
     }>;
   }>("/api/admin/site-settings", { preHandler: requireAdmin }, async (req) => {
     const data: Record<string, unknown> = {};
@@ -186,6 +193,8 @@ export async function siteSettingsRoutes(app: FastifyInstance): Promise<void> {
       "chatSplashMessages",
       "categoryOrder",
       "discordBotToken",
+      "discordAnnounceChannelId",
+      "discordAnnounceEvents",
     ] as const) {
       if (key in body) data[key] = body[key];
     }

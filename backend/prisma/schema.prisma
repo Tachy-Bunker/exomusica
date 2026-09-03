@@ -570,6 +570,8 @@ model SiteSettings {
   chatSplashMessages Json?   // string[] — admin-managed rotating hints, "Write a message..." is the fallback if empty
   categoryOrder      Json?   // string[] — admin-controlled forum topic category display order
   discordBotToken    String? // Discord bot token — the bridge is inactive if this is unset
+  discordAnnounceChannelId String? // channel the bot posts admin-selected announcements to, as itself (Exo-API)
+  discordAnnounceEvents    Json?   // string[] — which event types are enabled, e.g. ["join_applied","join_approved","news_published","calls_for_artists","calls_for_ideas"]
 }
 
 model FxSettings {

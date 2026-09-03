@@ -100,17 +100,56 @@ export async function sendDiscordDM(username: string | null | undefined, message
   }
 }
 
-export async function forwardMessageToDiscord(channelSlug: string, authorUsername: string, content: string): Promise<void> {
+/** Finds a guild member's current avatar URL by username, same lookup as
+ *  sendDiscordDM. Used to make a forwarded website message's webhook post
+ *  show the linked Discord user's real, current avatar. */
+export async function findDiscordAvatarUrl(username: string | null | undefined): Promise<string | null> {
+  if (!client || !username) return null;
+  try {
+    for (const guild of client.guilds.cache.values()) {
+      const members = await guild.members.fetch();
+      const match = members.find((m) => m.user.username.toLowerCase() === username.toLowerCase());
+      if (match) return match.user.displayAvatarURL({ size: 256 });
+    }
+  } catch (err) {
+    console.error("Discord bridge: failed to look up avatar:", err);
+  }
+  return null;
+}
+
+export type AnnouncementEvent = "join_applied" | "join_approved" | "news_published" | "calls_for_artists" | "calls_for_ideas";
+
+/** Posts an admin-selected event announcement to the configured channel,
+ *  as the bot itself — a no-op if no channel is set or this event type
+ *  isn't one the admin enabled. */
+export async function sendDiscordAnnouncement(event: AnnouncementEvent, message: string): Promise<void> {
+  if (!client) return;
+  try {
+    const settings = await prisma.siteSettings.findUnique({ where: { id: 1 } });
+    if (!settings?.discordAnnounceChannelId) return;
+    const enabled = (settings.discordAnnounceEvents as string[] | null) ?? [];
+    if (!enabled.includes(event)) return;
+    const channel = await client.channels.fetch(settings.discordAnnounceChannelId);
+    if (channel?.isTextBased() && "send" in channel) {
+      await channel.send(message);
+    }
+  } catch (err) {
+    console.error("Discord bridge: failed to send announcement:", err);
+  }
+}
+
+export async function forwardMessageToDiscord(channelSlug: string, authorUsername: string, content: string, authorDiscordUsername?: string | null): Promise<void> {
   if (!client) return;
   try {
     const channel = await prisma.forumChannel.findUnique({ where: { slug: channelSlug } });
     if (!channel?.discordChannelId) return;
 
     if (channel.discordWebhookUrl) {
+      const avatarUrl = await findDiscordAvatarUrl(authorDiscordUsername);
       await fetch(channel.discordWebhookUrl, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username: `${authorUsername} | Exo-API`, content }),
+        body: JSON.stringify({ username: `${authorUsername} | Exo-API`, content, ...(avatarUrl ? { avatar_url: avatarUrl } : {}) }),
       });
       return;
     }

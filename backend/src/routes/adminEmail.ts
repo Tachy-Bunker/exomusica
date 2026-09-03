@@ -1,6 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import { prisma } from "../lib/prisma.js";
 import { requireAdmin } from "../lib/auth.js";
+import { sendDiscordAnnouncement } from "../lib/discordBot.js";
 import {
   DEFAULT_TEMPLATES,
   TEMPLATE_TOKENS,
@@ -84,6 +85,7 @@ export async function adminEmailRoutes(app: FastifyInstance): Promise<void> {
       await prisma.auditLog.create({
         data: { actorId: req.user!.id, action: "broadcast.send", targetType: "EmailType", meta: { type, notified } },
       });
+      void sendDiscordAnnouncement(type === "CALL_FOR_IDEAS" ? "calls_for_ideas" : "calls_for_artists", `${subject}\n${body}`);
       return { notified };
     },
   );
