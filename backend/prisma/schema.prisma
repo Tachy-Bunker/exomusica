@@ -116,6 +116,9 @@ model Branch {
   id          Int      @id @default(autoincrement())
   slug        String   @unique
   name        String
+  ogTitle       String?
+  ogDescription String?
+  ogImageUrl    String?
   description String?
   coverArtUrl String?
   hidden      Boolean  @default(false) // soft take-down: excluded from public listings, data untouched
@@ -142,6 +145,9 @@ model ForumChannel {
   slug        String      @unique
   name        String
   description String?
+  ogTitle       String?
+  ogDescription String?
+  ogImageUrl    String?
   contentMarkdown String? @db.Text // optional illustrative content shown on the topic's page — images, text, embeds
   discordChannelId  String? @unique // the Discord channel this topic is bridged to
   discordWebhookUrl String? // optional — lets outgoing messages show as "{username} | Exo-API" instead of a plain bot message prefixed with the username
@@ -253,6 +259,9 @@ model Album {
   id          Int      @id @default(autoincrement())
   branchId    Int
   branch      Branch   @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  ogTitle       String?
+  ogDescription String?
+  ogImageUrl    String?
   slug        String   @unique
   title       String
   composer    String // default/primary composer shown on the album as a whole
@@ -382,6 +391,9 @@ model WikiPage {
   id              Int        @id @default(autoincrement())
   slug            String     @unique
   parentId        Int?
+  ogTitle       String?
+  ogDescription String?
+  ogImageUrl    String?
   parent          WikiPage?  @relation("WikiTree", fields: [parentId], references: [id])
   children        WikiPage[] @relation("WikiTree")
   title           String
@@ -399,6 +411,9 @@ model BlogPost {
   id              Int       @id @default(autoincrement())
   slug            String    @unique
   title           String
+  ogTitle       String?
+  ogDescription String?
+  ogImageUrl    String?
   contentMarkdown String    @db.Text
   coverImageUrl   String?
   fontId          Int?
@@ -575,6 +590,25 @@ model SiteSettings {
   discordBotToken    String? // Discord bot token — the bridge is inactive if this is unset
   discordAnnounceChannelId String? // channel the bot posts admin-selected announcements to, as itself (Exo-API)
   discordAnnounceEvents    Json?   // string[] — which event types are enabled, e.g. ["join_applied","join_approved","news_published","calls_for_artists","calls_for_ideas"]
+  faviconUrl         String? // site-wide favicon
+  ogHomepageTitle       String?
+  ogHomepageDescription String?
+  ogHomepageImageUrl    String?
+  ogBranchDefaultTitle       String?
+  ogBranchDefaultDescription String?
+  ogBranchDefaultImageUrl    String?
+  ogAlbumDefaultTitle       String?
+  ogAlbumDefaultDescription String?
+  ogAlbumDefaultImageUrl    String?
+  ogWikiDefaultTitle       String?
+  ogWikiDefaultDescription String?
+  ogWikiDefaultImageUrl    String?
+  ogNewsDefaultTitle       String?
+  ogNewsDefaultDescription String?
+  ogNewsDefaultImageUrl    String?
+  ogForumDefaultTitle       String?
+  ogForumDefaultDescription String?
+  ogForumDefaultImageUrl    String?
 }
 
 model FxSettings {

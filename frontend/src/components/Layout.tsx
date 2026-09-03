@@ -180,9 +180,19 @@ export function Layout() {
       moireOffsetSpeed: number;
       moireWaveform: "sine" | "triangle";
       moireRotationSpeed: number;
+      faviconUrl: string | null;
     }>("/api/site-settings").then((s) => {
       setSiteFont(s.defaultFont);
       useAmbienceStore.getState().setUrl(s.ambienceUrl);
+      if (s.faviconUrl) {
+        let link = document.querySelector<HTMLLinkElement>("link[rel~='icon']");
+        if (!link) {
+          link = document.createElement("link");
+          link.rel = "icon";
+          document.head.appendChild(link);
+        }
+        link.href = s.faviconUrl;
+      }
       const root = document.documentElement.style;
       if (s.textColorPrimary) root.setProperty("--text", s.textColorPrimary);
       if (s.textColorSecondary) root.setProperty("--text-dim", s.textColorSecondary);

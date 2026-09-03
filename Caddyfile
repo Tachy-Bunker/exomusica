@@ -9,8 +9,17 @@ exomusica.com {
 		reverse_proxy backend:3001
 	}
 	route {
-		root * /srv/frontend
-		try_files {path} /index.html
-		file_server
+		@bots {
+			header_regexp bot User-Agent "bot|facebookexternalhit|Twitterbot|Discordbot|LinkedInBot|WhatsApp|Slackbot|TelegramBot|Googlebot"
+		}
+		handle @bots {
+			rewrite * /embed{path}
+			reverse_proxy backend:3001
+		}
+		handle {
+			root * /srv/frontend
+			try_files {path} /index.html
+			file_server
+		}
 	}
 }

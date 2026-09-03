@@ -58,6 +58,9 @@ export function AdminLayout() {
         <NavLink to="/admin/collaborators" className={({ isActive }) => (isActive ? "active" : "")}>
           Collaborators
         </NavLink>
+        <NavLink to="/admin/embeds" className={({ isActive }) => (isActive ? "active" : "")}>
+          Favicon & Embeds
+        </NavLink>
         <NavLink to="/admin/notifications" className={({ isActive }) => (isActive ? "active" : "")}>
           Notification sounds
         </NavLink>

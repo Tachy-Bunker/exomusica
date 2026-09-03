@@ -47,6 +47,7 @@ export async function siteSettingsRoutes(app: FastifyInstance): Promise<void> {
         chatSplashMessages: true,
         categoryOrder: true,
         linkClickSfxUrl: true,
+        faviconUrl: true,
       },
     });
     return (
@@ -86,6 +87,7 @@ export async function siteSettingsRoutes(app: FastifyInstance): Promise<void> {
         chatSplashMessages: [],
         categoryOrder: [],
         linkClickSfxUrl: null,
+        faviconUrl: null,
       }
     );
   });
@@ -168,6 +170,18 @@ export async function siteSettingsRoutes(app: FastifyInstance): Promise<void> {
       discordBotToken: string | null;
       discordAnnounceChannelId: string | null;
       discordAnnounceEvents: string[];
+      ogHomepageTitle: string | null;
+      ogHomepageDescription: string | null;
+      ogBranchDefaultTitle: string | null;
+      ogBranchDefaultDescription: string | null;
+      ogAlbumDefaultTitle: string | null;
+      ogAlbumDefaultDescription: string | null;
+      ogWikiDefaultTitle: string | null;
+      ogWikiDefaultDescription: string | null;
+      ogNewsDefaultTitle: string | null;
+      ogNewsDefaultDescription: string | null;
+      ogForumDefaultTitle: string | null;
+      ogForumDefaultDescription: string | null;
     }>;
   }>("/api/admin/site-settings", { preHandler: requireAdmin }, async (req) => {
     const data: Record<string, unknown> = {};
@@ -199,6 +213,18 @@ export async function siteSettingsRoutes(app: FastifyInstance): Promise<void> {
       "discordBotToken",
       "discordAnnounceChannelId",
       "discordAnnounceEvents",
+      "ogHomepageTitle",
+      "ogHomepageDescription",
+      "ogBranchDefaultTitle",
+      "ogBranchDefaultDescription",
+      "ogAlbumDefaultTitle",
+      "ogAlbumDefaultDescription",
+      "ogWikiDefaultTitle",
+      "ogWikiDefaultDescription",
+      "ogNewsDefaultTitle",
+      "ogNewsDefaultDescription",
+      "ogForumDefaultTitle",
+      "ogForumDefaultDescription",
     ] as const) {
       if (key in body) data[key] = body[key];
     }
@@ -255,6 +281,31 @@ export async function siteSettingsRoutes(app: FastifyInstance): Promise<void> {
       update: { scanSfxUrl: null },
     });
     return { status: "ok" };
+  });
+
+  const OG_IMAGE_FIELDS = [
+    "faviconUrl",
+    "ogHomepageImageUrl",
+    "ogBranchDefaultImageUrl",
+    "ogAlbumDefaultImageUrl",
+    "ogWikiDefaultImageUrl",
+    "ogNewsDefaultImageUrl",
+    "ogForumDefaultImageUrl",
+  ] as const;
+
+  app.post<{ Params: { field: string } }>("/api/admin/site-settings/og-image/:field", { preHandler: requireAdmin }, async (req, reply) => {
+    const field = req.params.field as (typeof OG_IMAGE_FIELDS)[number];
+    if (!OG_IMAGE_FIELDS.includes(field)) return reply.code(400).send({ error: "unknown field" });
+    const file = await req.file();
+    if (!file) return reply.code(400).send({ error: "no file uploaded" });
+    const buffer = await file.toBuffer();
+    try {
+      const { url } = await saveSiteImage(file.filename, file.mimetype, buffer, "og-images");
+      const settings = await prisma.siteSettings.upsert({ where: { id: 1 }, create: { id: 1, [field]: url }, update: { [field]: url } });
+      return { [field]: settings[field] };
+    } catch (err) {
+      return reply.code(400).send({ error: err instanceof Error ? err.message : "upload failed" });
+    }
   });
 
   app.post("/api/admin/site-settings/moire-image", { preHandler: requireAdmin }, async (req, reply) => {

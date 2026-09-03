@@ -51,13 +51,14 @@ import { wsRoutes } from "./routes/ws.js";
 import { discordImportRoutes } from "./routes/discordImport.js";
 import { storageAdminRoutes } from "./routes/storageAdmin.js";
 import { initDiscordBot } from "./lib/discordBot.js";
+import { embedRoutes } from "./routes/embeds.js";
 
 // Fastify's own default body limit is 1MB, applied before multipart even
 // parses anything — this was the real ceiling blocking larger uploads
 // (cover art, gallery images, message attachments), not anything in
 // multipart's own config. Raised for the whole app, not just admin routes,
 // since Fastify's bodyLimit isn't naturally scoped per-route by auth.
-const app = Fastify({ logger: true, bodyLimit: 105 * 1024 * 1024 });
+const app = Fastify({ logger: true, bodyLimit: 105 * 1024 * 1024, ignoreTrailingSlash: true });
 
 await app.register(cors, { origin: true });
 await app.register(websocketPlugin);
@@ -99,6 +100,7 @@ await app.register(fxSettingsRoutes);
 await app.register(wsRoutes);
 await app.register(discordImportRoutes);
 await app.register(storageAdminRoutes);
+await app.register(embedRoutes);
 
 const port = Number(process.env.PORT ?? 3001);
 app.listen({ port, host: "0.0.0.0" }).catch((err) => {

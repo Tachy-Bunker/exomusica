@@ -16,6 +16,30 @@ function formatTime(seconds: number): string {
 export function PlayerBar() {
   const audioRef = useRef<HTMLAudioElement>(null);
   const wrapperRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function updatePosition() {
+      const el = wrapperRef.current;
+      if (!el || !window.visualViewport) return;
+      const vv = window.visualViewport;
+      // How much of the layout viewport's bottom is currently hidden below
+      // what's actually visible (e.g. a partially-collapsed address bar) —
+      // position:fixed;bottom:0 alone anchors to the layout viewport on
+      // some mobile browsers, not the visual one, which is what put the
+      // player off-screen below the real visible area.
+      const hiddenBelow = window.innerHeight - (vv.height + vv.offsetTop);
+      el.style.bottom = `${Math.max(0, hiddenBelow)}px`;
+    }
+    updatePosition();
+    window.visualViewport?.addEventListener("resize", updatePosition);
+    window.visualViewport?.addEventListener("scroll", updatePosition);
+    window.addEventListener("resize", updatePosition);
+    return () => {
+      window.visualViewport?.removeEventListener("resize", updatePosition);
+      window.visualViewport?.removeEventListener("scroll", updatePosition);
+      window.removeEventListener("resize", updatePosition);
+    };
+  }, []);
   const rowRef = useRef<HTMLDivElement>(null);
   const isDesktop = useIsDesktop();
   const {
