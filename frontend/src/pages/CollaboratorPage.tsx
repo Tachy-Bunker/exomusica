@@ -4,6 +4,8 @@ import { api } from "../lib/api";
 import { useAudioStore } from "../lib/audioStore";
 import { useIsDesktop } from "../lib/useIsDesktop";
 import { GalleryLightbox, useLightbox } from "../components/GalleryLightbox";
+import { SpaceMap } from "../components/SpaceMap";
+import type { Branch, PlayableTrackDTO } from "../lib/types";
 
 interface DiscographyTrack {
   id: number;
@@ -41,6 +43,14 @@ export function CollaboratorPage() {
   const isDesktop = useIsDesktop();
   const play = useAudioStore((s) => s.play);
   const addToQueue = useAudioStore((s) => s.addToQueue);
+  const [showSpacemap, setShowSpacemap] = useState(false);
+  const [allBranches, setAllBranches] = useState<Branch[]>([]);
+
+  useEffect(() => {
+    if (showSpacemap && allBranches.length === 0) {
+      api<Branch[]>("/api/branches").then(setAllBranches);
+    }
+  }, [showSpacemap, allBranches.length]);
 
   useEffect(() => {
     if (!slug) return;
@@ -48,6 +58,24 @@ export function CollaboratorPage() {
   }, [slug]);
 
   if (!collaborator) return <p>Loading…</p>;
+
+  const filteredBranches = allBranches.filter((b) => collaborator.discography.some((a) => a.branchSlug === b.slug));
+  const filteredTracks: PlayableTrackDTO[] = collaborator.discography.flatMap((album) =>
+    album.tracks.map((t) => ({
+      id: t.id,
+      title: t.title,
+      fileUrl: t.fileUrl,
+      format: t.format,
+      durationSeconds: t.durationSeconds,
+      position: t.position,
+      albumTitle: album.title,
+      albumSlug: album.slug,
+      coverArtUrl: album.coverArtUrl,
+      composer: collaborator.name,
+      branchSlug: album.branchSlug,
+      bookmarks: [],
+    })),
+  );
 
   function playTrack(album: DiscographyAlbum, track: DiscographyTrack) {
     play({
@@ -66,8 +94,29 @@ export function CollaboratorPage() {
     });
   }
 
+  if (showSpacemap) {
+    return (
+      <div style={{ height: "calc(100dvh - var(--nav-height, 3.6rem) - 3rem)", display: "flex", flexDirection: "column" }}>
+        <button className="btn" onClick={() => setShowSpacemap(false)} style={{ marginBottom: "0.5rem", alignSelf: "flex-start" }}>
+          ← Back to {collaborator.name}'s profile
+        </button>
+        <div style={{ flex: 1, minHeight: 0 }}>
+          <SpaceMap
+            branches={filteredBranches}
+            centerLabel={collaborator.name}
+            centerHref={`/collaborator/${collaborator.slug}`}
+            filteredTracks={filteredTracks}
+          />
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div style={{ maxWidth: 720 }}>
+      <button className="btn" onClick={() => setShowSpacemap(true)} style={{ marginBottom: "0.8rem" }}>
+        View discography on Spacemap
+      </button>
       <div style={{ display: "flex", gap: "1.2rem", flexWrap: "wrap" }}>
         <div
           style={{

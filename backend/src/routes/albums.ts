@@ -252,16 +252,10 @@ export async function albumRoutes(app: FastifyInstance): Promise<void> {
   );
 
   // --- Collaborators --------------------------------------------------------
-  app.post<{ Body: { name: string; role: string; bio?: string; pictureUrl?: string } }>(
-    "/api/admin/collaborators",
-    { preHandler: requireAdmin },
-    async (req, reply) => {
-      const { name, role, bio, pictureUrl } = req.body ?? {};
-      if (!name || !role) return reply.code(400).send({ error: "name and role are required" });
-      const collaborator = await prisma.collaborator.create({ data: { name, role, bio, pictureUrl } });
-      return reply.code(201).send(collaborator);
-    },
-  );
+  // Collaborator creation/management now lives entirely in collaborators.ts
+  // (it also generates a slug, which this older version never did) — this
+  // duplicate registration at the same path was crashing the server on
+  // every boot with FST_ERR_DUPLICATED_ROUTE.
 
   app.post<{ Params: { id: string }; Body: { collaboratorId: number } }>(
     "/api/admin/albums/:id/collaborators",

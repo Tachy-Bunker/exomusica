@@ -799,9 +799,12 @@ th {
   min-height: 0;
   overflow: hidden;
   background: var(--bg-inset);
-  border-radius: var(--radius);
   border: 1px solid var(--border);
   cursor: grab;
+  /* Visor silhouette: angled top corners like a helmet visor's opening,
+     full-width bottom edge left uncut since the action buttons live
+     there — a cut there would risk clipping them. */
+  clip-path: polygon(6% 0%, 94% 0%, 100% 12%, 100% 100%, 0% 100%, 0% 12%);
 }
 
 .space-map:active {
@@ -1416,4 +1419,50 @@ th {
 .export-icon-btn:hover {
   color: #fff;
   transform: rotate(-20deg);
+}
+
+/* Forum topic nodes on the spacemap — deliberately angular/crystalline,
+   distinct from the organic warden shapes used for branches. A rough
+   nod to Metroid Prime Hunters' Celestial Archives: faceted, geometric,
+   glowing from within rather than textured like a creature. */
+.space-node-topic {
+  position: absolute;
+  width: 46px;
+  height: 46px;
+  cursor: pointer;
+}
+
+.space-node-topic-shape {
+  width: 100%;
+  height: 100%;
+  clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
+  background: linear-gradient(135deg, var(--accent-forum-dim), var(--accent-audio-dim));
+  border: 1px solid var(--accent-forum);
+  box-shadow: 0 0 14px var(--accent-forum-dim);
+  animation: space-node-topic-spin 14s linear infinite;
+}
+
+.space-node-topic:hover .space-node-topic-shape {
+  box-shadow: 0 0 22px var(--accent-forum);
+}
+
+.space-node-topic-label {
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  margin-top: 0.3rem;
+  font-size: 0.7rem;
+  color: var(--text-dim);
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+@keyframes space-node-topic-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
 }

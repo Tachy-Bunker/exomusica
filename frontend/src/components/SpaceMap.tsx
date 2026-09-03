@@ -38,6 +38,9 @@ const DAMPING = 4.5;
 const CAMERA_ACCEL = 1800;
 const CAMERA_FRICTION = 5;
 const CAMERA_MAX_SPEED = 900;
+const CROSSHAIR_LOOKAHEAD = 0.045; // fraction of camera velocity the crosshair leads by
+const CROSSHAIR_MAX_OFFSET = 26; // px — caps how far the crosshair can drift from center
+const CROSSHAIR_CATCHUP_RATE = 4.5; // higher = the visor catches up to the crosshair faster
 const LOCK_RADIUS = 58; // px from screen center to start locking on
 const LOCK_TIME = 0.9; // seconds of holding a target to complete the lock
 
@@ -111,7 +114,19 @@ function buildNodes(branches: Branch[]): MapNode[] {
   return nodes;
 }
 
-export function SpaceMap({ branches, centerLabel, centerHref }: { branches: Branch[]; centerLabel: string; centerHref: string }) {
+export function SpaceMap({
+  branches,
+  centerLabel,
+  centerHref,
+  filteredTracks,
+  topics,
+}: {
+  branches: Branch[];
+  centerLabel: string;
+  centerHref: string;
+  filteredTracks?: PlayableTrackDTO[];
+  topics?: { slug: string; name: string }[];
+}) {
   const navigate = useNavigate();
   const isDesktop = useIsDesktop();
   const play = useAudioStore((s) => s.play);
@@ -127,7 +142,7 @@ export function SpaceMap({ branches, centerLabel, centerHref }: { branches: Bran
   const setAmbienceEnabled = useAmbienceStore((s) => s.setEnabled);
 
   async function shufflePlay() {
-    const tracks = await api<PlayableTrackDTO[]>("/api/tracks/shuffle");
+    const tracks = filteredTracks ?? (await api<PlayableTrackDTO[]>("/api/tracks/shuffle"));
     if (tracks.length === 0) return;
     const [first, ...rest] = tracks;
     play(first);
@@ -137,6 +152,10 @@ export function SpaceMap({ branches, centerLabel, centerHref }: { branches: Bran
   const nodesRef = useRef<MapNode[]>([]);
   const [renderTick, setRenderTick] = useState(0);
   const cameraRef = useRef({ x: 0, y: 0, vx: 0, vy: 0 });
+  const reticleRef = useRef<HTMLDivElement>(null);
+  const crosshairOffsetRef = useRef({ x: 0, y: 0 });
+  const topicNodesRef = useRef<{ slug: string; name: string; worldX: number; worldY: number }[]>([]);
+  const topicElRefs = useRef<Map<string, HTMLDivElement>>(new Map());
   const keysRef = useRef<Set<string>>(new Set());
   const joystickVectorRef = useRef({ x: 0, y: 0 });
   const hoveredIdRef = useRef<number | null>(null);
@@ -211,6 +230,22 @@ export function SpaceMap({ branches, centerLabel, centerHref }: { branches: Bran
   useEffect(() => {
     nodesRef.current = buildNodes(branches);
   }, [branches]);
+
+  useEffect(() => {
+    if (!topics) {
+      topicNodesRef.current = [];
+      return;
+    }
+    topicNodesRef.current = topics.map((t, i) => {
+      // Simple deterministic hash of the slug — same topic always lands
+      // in the same spot rather than re-scattering on every load.
+      let hash = 0;
+      for (let c = 0; c < t.slug.length; c++) hash = (hash * 31 + t.slug.charCodeAt(c)) >>> 0;
+      const angle = (hash % 360) * (Math.PI / 180) + i * 0.37;
+      const radius = 480 + (hash % 140); // further out than branches, a distinct outer ring
+      return { slug: t.slug, name: t.name, worldX: Math.cos(angle) * radius, worldY: Math.sin(angle) * radius };
+    });
+  }, [topics]);
 
   const ACTION_SEGMENTS = [
     { text: isDesktop ? "Chat (E)" : "Chat", color: "var(--accent-forum)", action: openLockedChat },
@@ -340,6 +375,18 @@ export function SpaceMap({ branches, centerLabel, centerHref }: { branches: Bran
       cameraOffsetRef.x = cam.x;
       cameraOffsetRef.y = cam.y;
 
+      // --- crosshair inertia: leads the camera's velocity, then eases
+      // back to center once the camera settles, rather than tracking the
+      // camera 1:1 like a rigidly centered reticle would.
+      {
+        const targetX = Math.max(-CROSSHAIR_MAX_OFFSET, Math.min(CROSSHAIR_MAX_OFFSET, -cam.vx * CROSSHAIR_LOOKAHEAD));
+        const targetY = Math.max(-CROSSHAIR_MAX_OFFSET, Math.min(CROSSHAIR_MAX_OFFSET, -cam.vy * CROSSHAIR_LOOKAHEAD));
+        const co = crosshairOffsetRef.current;
+        co.x += (targetX - co.x) * Math.min(CROSSHAIR_CATCHUP_RATE * dt, 1);
+        co.y += (targetY - co.y) * Math.min(CROSSHAIR_CATCHUP_RATE * dt, 1);
+        if (reticleRef.current) reticleRef.current.style.transform = `translate(-50%, -50%) translate(${co.x}px, ${co.y}px)`;
+      }
+
       // --- nodes: orbit/wander home position, spring + repulsion ---
       const nodes = nodesRef.current;
       const byId = new Map(nodes.map((n) => [n.id, n]));
@@ -426,6 +473,15 @@ export function SpaceMap({ branches, centerLabel, centerHref }: { branches: Bran
             nearestDist = dist;
           }
         }
+
+        for (const t of topicNodesRef.current) {
+          const el = topicElRefs.current.get(t.slug);
+          if (el) {
+            el.style.left = `${w / 2 + cam.x + t.worldX}px`;
+            el.style.top = `${h / 2 + cam.y + t.worldY}px`;
+          }
+        }
+
 
         if (nearest?.id !== targetNodeIdRef.current) {
           targetNodeIdRef.current = nearest?.id ?? null;
@@ -570,6 +626,22 @@ export function SpaceMap({ branches, centerLabel, centerHref }: { branches: Bran
             </div>
           );
         })}
+
+        {topicNodesRef.current.map((t) => (
+          <div
+            key={t.slug}
+            ref={(el) => {
+              if (el) topicElRefs.current.set(t.slug, el);
+              else topicElRefs.current.delete(t.slug);
+            }}
+            className="space-node-topic"
+            title={t.name}
+            onClick={() => { playLinkClickSound(); navigate(`/topic/${t.slug}`); }}
+          >
+            <div className="space-node-topic-shape" />
+            <span className="space-node-topic-label">{t.name}</span>
+          </div>
+        ))}
       </div>
 
       {compassPoints.map((c, i) => (
@@ -589,7 +661,7 @@ export function SpaceMap({ branches, centerLabel, centerHref }: { branches: Bran
         </div>
       ))}
 
-      <div className="space-reticle">
+      <div className="space-reticle" ref={reticleRef}>
         <div
           className="space-reticle-ring"
           style={{
