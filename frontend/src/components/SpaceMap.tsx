@@ -38,9 +38,9 @@ const DAMPING = 4.5;
 const CAMERA_ACCEL = 1800;
 const CAMERA_FRICTION = 5;
 const CAMERA_MAX_SPEED = 900;
-const CROSSHAIR_LOOKAHEAD = 0.09; // fraction of camera velocity the crosshair leads by
-const CROSSHAIR_MAX_OFFSET = 46; // px — caps how far the crosshair can drift from center
-const CROSSHAIR_CATCHUP_RATE = 3; // higher = the visor catches up to the crosshair faster
+const CROSSHAIR_LOOKAHEAD = 0.16; // fraction of camera velocity the crosshair leads by
+const CROSSHAIR_MAX_OFFSET = 65; // px — caps how far the crosshair can drift from center
+const CROSSHAIR_CATCHUP_RATE = 2.2; // higher = the visor catches up to the crosshair faster
 const LOCK_RADIUS = 58; // px from screen center to start locking on
 const LOCK_TIME = 0.9; // seconds of holding a target to complete the lock
 
