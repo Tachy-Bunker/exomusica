@@ -50,6 +50,7 @@ import { fxSettingsRoutes } from "./routes/fxSettings.js";
 import { wsRoutes } from "./routes/ws.js";
 import { discordImportRoutes } from "./routes/discordImport.js";
 import { storageAdminRoutes } from "./routes/storageAdmin.js";
+import { initDiscordBot } from "./lib/discordBot.js";
 
 // Fastify's own default body limit is 1MB, applied before multipart even
 // parses anything — this was the real ceiling blocking larger uploads
@@ -104,3 +105,5 @@ app.listen({ port, host: "0.0.0.0" }).catch((err) => {
   app.log.error(err);
   process.exit(1);
 });
+
+initDiscordBot().catch((err) => app.log.error(err, "Discord bridge failed to initialize"));

@@ -8,6 +8,7 @@ import { sendTemplatedMail } from "../lib/emailTemplates.js";
 import { createNotification } from "../lib/notify.js";
 import { parseSearchQuery } from "../lib/searchQuery.js";
 import { walkChannelHistoryInChunks } from "../lib/messageChunking.js";
+import { forwardMessageToDiscord } from "../lib/discordBot.js";
 
 const messageInclude = {
   author: { select: { username: true, avatarUrl: true, isGhost: true, linkedUserId: true, linkedUser: { select: { username: true, avatarUrl: true } } } },
@@ -203,6 +204,7 @@ export async function messageRoutes(app: FastifyInstance): Promise<void> {
       const full = await prisma.message.findUniqueOrThrow({ where: { id: message.id }, include: messageInclude });
       const dto = await toMessageDTO(full);
       broadcast(channel.slug, { type: "message.create", message: dto });
+      void forwardMessageToDiscord(channel.slug, dto.authorUsername, contentRaw);
 
       // Fire-and-forget: followers who want replies on this specific topic
       // (global notifyFollowedReplies AND this follow's own notifyOnReply,

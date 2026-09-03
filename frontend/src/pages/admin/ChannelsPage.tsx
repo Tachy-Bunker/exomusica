@@ -12,6 +12,8 @@ interface ChannelSummary {
   category: string | null;
   position: number;
   fontId: number | null;
+  discordChannelId: string | null;
+  discordWebhookUrl: string | null;
 }
 
 interface Font {
@@ -44,7 +46,15 @@ export function ChannelsPage() {
   const [form, setForm] = useState({ slug: "", name: "", description: "", category: "" });
   const [error, setError] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<number | null>(null);
-  const [editForm, setEditForm] = useState({ name: "", description: "", contentMarkdown: "", category: "", position: "" });
+  const [editForm, setEditForm] = useState({
+    name: "",
+    description: "",
+    contentMarkdown: "",
+    category: "",
+    position: "",
+    discordChannelId: "",
+    discordWebhookUrl: "",
+  });
   const contentTextareaRef = useRef<HTMLTextAreaElement>(null);
 
   async function handleMediaUpload(e: ChangeEvent<HTMLInputElement>) {
@@ -107,6 +117,8 @@ export function ChannelsPage() {
       contentMarkdown: t.contentMarkdown ?? "",
       category: t.category ?? "",
       position: String(t.position),
+      discordChannelId: t.discordChannelId ?? "",
+      discordWebhookUrl: t.discordWebhookUrl ?? "",
     });
   }
 
@@ -119,6 +131,8 @@ export function ChannelsPage() {
         contentMarkdown: editForm.contentMarkdown,
         category: editForm.category,
         position: Number(editForm.position) || 0,
+        discordChannelId: editForm.discordChannelId || null,
+        discordWebhookUrl: editForm.discordWebhookUrl || null,
       }),
     });
     setEditingId(null);
@@ -232,6 +246,18 @@ export function ChannelsPage() {
                     value={editForm.category}
                     onChange={(e) => setEditForm((f) => ({ ...f, category: e.target.value }))}
                     style={{ marginBottom: "0.2rem" }}
+                  />
+                  <input
+                    placeholder="Discord channel ID (bridge)"
+                    value={editForm.discordChannelId}
+                    onChange={(e) => setEditForm((f) => ({ ...f, discordChannelId: e.target.value }))}
+                    style={{ marginBottom: "0.2rem", width: "100%" }}
+                  />
+                  <input
+                    placeholder="Discord webhook URL (optional — for the {username} | Exo-API format)"
+                    value={editForm.discordWebhookUrl}
+                    onChange={(e) => setEditForm((f) => ({ ...f, discordWebhookUrl: e.target.value }))}
+                    style={{ marginBottom: "0.2rem", width: "100%" }}
                   />
                   <input
                     type="number"

@@ -22,7 +22,16 @@ export async function channelRoutes(app: FastifyInstance): Promise<void> {
 
   app.patch<{
     Params: { id: string };
-    Body: Partial<{ name: string; description: string; contentMarkdown: string; category: string; position: number; fontId: number | null }>;
+    Body: Partial<{
+      name: string;
+      description: string;
+      contentMarkdown: string;
+      category: string;
+      position: number;
+      fontId: number | null;
+      discordChannelId: string | null;
+      discordWebhookUrl: string | null;
+    }>;
   }>("/api/admin/channels/:id", { preHandler: requireAdmin }, async (req) => {
     return prisma.forumChannel.update({ where: { id: Number(req.params.id) }, data: req.body ?? {} });
   });

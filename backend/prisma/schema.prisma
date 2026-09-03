@@ -135,6 +135,8 @@ model ForumChannel {
   name        String
   description String?
   contentMarkdown String? @db.Text // optional illustrative content shown on the topic's page — images, text, embeds
+  discordChannelId  String? @unique // the Discord channel this topic is bridged to
+  discordWebhookUrl String? // optional — lets outgoing messages show as "{username} | Exo-API" instead of a plain bot message prefixed with the username
   category    String?
   position    Int         @default(0)
   kind        ChannelKind
@@ -548,6 +550,7 @@ model SiteSettings {
   chatHudSfxUrl      String? // loops during the reveal
   chatSplashMessages Json?   // string[] — admin-managed rotating hints, "Write a message..." is the fallback if empty
   categoryOrder      Json?   // string[] — admin-controlled forum topic category display order
+  discordBotToken    String? // Discord bot token — the bridge is inactive if this is unset
 }
 
 model FxSettings {

@@ -3,12 +3,49 @@ import { prisma } from "../lib/prisma.js";
 import { requireAdmin } from "../lib/auth.js";
 import { saveSoundFile, saveSiteImage } from "../lib/storage.js";
 import { verifySmtpConnection } from "../lib/mailer.js";
+import { restartDiscordBotIfNeeded } from "../lib/discordBot.js";
 
 export async function siteSettingsRoutes(app: FastifyInstance): Promise<void> {
   app.get("/api/site-settings", async () => {
     const settings = await prisma.siteSettings.findUnique({
       where: { id: 1 },
-      include: { defaultFont: true, defaultWikiPage: { select: { slug: true } } },
+      select: {
+        id: true,
+        defaultFontId: true,
+        defaultFont: true,
+        ambienceUrl: true,
+        scanSfxUrl: true,
+        defaultWikiPage: { select: { slug: true } },
+        textColorPrimary: true,
+        textColorSecondary: true,
+        chatTitleColor: true,
+        accentPrimaryColor: true,
+        contentTextScaleDesktop: true,
+        contentTextScaleMobile: true,
+        caInitial: true,
+        caBurst: true,
+        moireImageUrl: true,
+        moireOpacity: true,
+        moireSize: true,
+        moireOffsetMin: true,
+        moireOffsetMax: true,
+        moireOffsetSpeed: true,
+        moireWaveform: true,
+        moireRotationSpeed: true,
+        smtpHost: true,
+        smtpPort: true,
+        smtpUser: true,
+        smtpFrom: true,
+        // smtpPassword and discordBotToken deliberately excluded — this is a
+        // public, unauthenticated endpoint
+        chatOpenSfxUrl: true,
+        joinNotifyEmail: true,
+        chatHudRevealRate: true,
+        chatHudSfxUrl: true,
+        chatSplashMessages: true,
+        categoryOrder: true,
+        linkClickSfxUrl: true,
+      },
     });
     return (
       settings ?? {
@@ -38,7 +75,6 @@ export async function siteSettingsRoutes(app: FastifyInstance): Promise<void> {
         smtpPort: null,
         smtpUser: null,
         smtpFrom: null,
-        // smtpPassword deliberately never returned to the client
         chatOpenSfxUrl: null,
         joinNotifyEmail: null,
         chatHudRevealRate: 30,
@@ -53,6 +89,11 @@ export async function siteSettingsRoutes(app: FastifyInstance): Promise<void> {
   // Admin-only view — includes whether a password is set (as a boolean,
   // never the value itself) so the form can show "configured" without
   // ever round-tripping the actual secret back to the browser.
+  app.get("/api/admin/discord-bridge/status", { preHandler: requireAdmin }, async () => {
+    const settings = await prisma.siteSettings.findUnique({ where: { id: 1 } });
+    return { discordBotTokenSet: !!settings?.discordBotToken };
+  });
+
   app.get("/api/admin/site-settings/smtp", { preHandler: requireAdmin }, async () => {
     const settings = await prisma.siteSettings.findUnique({ where: { id: 1 } });
     return {
@@ -77,6 +118,7 @@ export async function siteSettingsRoutes(app: FastifyInstance): Promise<void> {
     // empty field means "leave the existing one alone", not "clear it".
     if (req.body.smtpPassword) data.smtpPassword = req.body.smtpPassword;
     await prisma.siteSettings.upsert({ where: { id: 1 }, create: { id: 1, ...data }, update: data });
+    if ("discordBotToken" in data) void restartDiscordBotIfNeeded();
     return { status: "ok" };
   });
 
@@ -112,6 +154,7 @@ export async function siteSettingsRoutes(app: FastifyInstance): Promise<void> {
       chatHudRevealRate: number;
       chatSplashMessages: string[];
       categoryOrder: string[];
+      discordBotToken: string | null;
     }>;
   }>("/api/admin/site-settings", { preHandler: requireAdmin }, async (req) => {
     const data: Record<string, unknown> = {};
@@ -138,6 +181,7 @@ export async function siteSettingsRoutes(app: FastifyInstance): Promise<void> {
       "chatHudRevealRate",
       "chatSplashMessages",
       "categoryOrder",
+      "discordBotToken",
     ] as const) {
       if (key in body) data[key] = body[key];
     }
