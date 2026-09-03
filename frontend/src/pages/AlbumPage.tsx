@@ -4,6 +4,7 @@ import { api } from "../lib/api";
 import { useAudioStore } from "../lib/audioStore";
 import { useDocumentTitle } from "../lib/useDocumentTitle";
 import { renderMarkdown } from "../lib/markdown";
+import { GalleryLightbox, useLightbox } from "../components/GalleryLightbox";
 import { useIsDesktop } from "../lib/useIsDesktop";
 import { isTypingTarget } from "../lib/isTypingTarget";
 import type { PlayableTrackDTO } from "../lib/types";
@@ -31,6 +32,7 @@ export function AlbumPage() {
   const { slug } = useParams<{ slug: string }>();
   const navigate = useNavigate();
   const isDesktop = useIsDesktop();
+  const lightbox = useLightbox();
   const [album, setAlbum] = useState<AlbumDetail | null>(null);
   const play = useAudioStore((s) => s.play);
   const addToQueue = useAudioStore((s) => s.addToQueue);
@@ -112,24 +114,37 @@ export function AlbumPage() {
 
       {album.gallery.length > 0 && (
         <div style={{ display: "flex", gap: "0.5rem", marginTop: "1rem", overflowX: "auto" }}>
-          {album.gallery.map((g) =>
-            /\.(mp4|mov)$/i.test(g.url) ? (
-              <video
-                key={g.id}
-                src={g.url}
-                controls
-                style={{ height: 120, borderRadius: "var(--radius)", border: "1px solid var(--border)" }}
-              />
-            ) : (
-              <img
-                key={g.id}
-                src={g.url}
-                alt=""
-                style={{ height: 120, borderRadius: "var(--radius)", border: "1px solid var(--border)" }}
-              />
-            ),
-          )}
+          {(() => {
+            const imageItems = album.gallery.filter((g) => !/\.(mp4|mov)$/i.test(g.url));
+            return album.gallery.map((g) =>
+              /\.(mp4|mov)$/i.test(g.url) ? (
+                <video
+                  key={g.id}
+                  src={g.url}
+                  controls
+                  style={{ height: 120, borderRadius: "var(--radius)", border: "1px solid var(--border)" }}
+                />
+              ) : (
+                <img
+                  key={g.id}
+                  src={g.url}
+                  alt=""
+                  onClick={() => lightbox.open(imageItems.findIndex((i) => i.id === g.id))}
+                  style={{ height: 120, borderRadius: "var(--radius)", border: "1px solid var(--border)", cursor: "pointer" }}
+                />
+              ),
+            );
+          })()}
         </div>
+      )}
+
+      {lightbox.index !== null && (
+        <GalleryLightbox
+          images={album.gallery.filter((g) => !/\.(mp4|mov)$/i.test(g.url))}
+          index={lightbox.index}
+          onClose={lightbox.close}
+          onNavigate={lightbox.open}
+        />
       )}
 
       <div style={{ display: "flex", alignItems: "center", gap: "0.6rem", marginTop: "1.5rem" }}>

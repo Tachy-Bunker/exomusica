@@ -39,7 +39,10 @@ export async function accountRoutes(app: FastifyInstance): Promise<void> {
   app.get("/api/account/me", { preHandler: requireAuth }, async (req, reply) => {
     const me = await prisma.user.findUnique({
       where: { id: req.user!.id },
-      include: { followedChannels: { include: { channel: { select: { slug: true, name: true } } } } },
+      include: {
+        followedChannels: { include: { channel: { select: { slug: true, name: true } } } },
+        collaboratorProfile: { select: { slug: true } },
+      },
     });
     if (!me) return reply.code(404).send({ error: "no such user" });
     return {
@@ -48,6 +51,7 @@ export async function accountRoutes(app: FastifyInstance): Promise<void> {
       email: me.email,
       bio: me.bio,
       links: me.links,
+      collaboratorSlug: me.collaboratorProfile?.slug ?? null,
       volumeNotifications: me.volumeNotifications,
       volumeSfxIdle: me.volumeSfxIdle,
       volumeSfxPlaying: me.volumeSfxPlaying,

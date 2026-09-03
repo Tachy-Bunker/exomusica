@@ -35,6 +35,7 @@ import { NewsletterAdminPage } from "./pages/admin/NewsletterAdminPage";
 import { DiscordImportPage } from "./pages/admin/DiscordImportPage";
 import { StorageAdminPage } from "./pages/admin/StorageAdminPage";
 import { DiscordBridgePage } from "./pages/admin/DiscordBridgePage";
+import { CollaboratorsAdminPage } from "./pages/admin/CollaboratorsAdminPage";
 import { NotificationsAdminPage } from "./pages/admin/NotificationsAdminPage";
 import { GuideAssetsAdminPage } from "./pages/admin/GuideAssetsAdminPage";
 
@@ -87,6 +88,7 @@ export default function App() {
                 <Route path="discord-import" element={<DiscordImportPage />} />
                 <Route path="storage" element={<StorageAdminPage />} />
                 <Route path="discord-bridge" element={<DiscordBridgePage />} />
+                <Route path="collaborators" element={<CollaboratorsAdminPage />} />
                 <Route path="notifications" element={<NotificationsAdminPage />} />
                 <Route path="guide-assets" element={<GuideAssetsAdminPage />} />
               </Route>

@@ -3,6 +3,7 @@ import { useParams, Link } from "react-router-dom";
 import { api } from "../lib/api";
 import { useAudioStore } from "../lib/audioStore";
 import { useIsDesktop } from "../lib/useIsDesktop";
+import { GalleryLightbox, useLightbox } from "../components/GalleryLightbox";
 
 interface DiscographyTrack {
   id: number;
@@ -36,7 +37,7 @@ interface CollaboratorDetail {
 export function CollaboratorPage() {
   const { slug } = useParams<{ slug: string }>();
   const [collaborator, setCollaborator] = useState<CollaboratorDetail | null>(null);
-  const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
+  const lightbox = useLightbox();
   const isDesktop = useIsDesktop();
   const play = useAudioStore((s) => s.play);
   const addToQueue = useAudioStore((s) => s.addToQueue);
@@ -103,7 +104,7 @@ export function CollaboratorPage() {
               key={g.id}
               src={g.url}
               alt=""
-              onClick={() => setLightboxIndex(i)}
+              onClick={() => lightbox.open(i)}
               style={{ width: 100, height: 100, objectFit: "cover", borderRadius: "var(--radius)", cursor: "pointer" }}
             />
           ))}
@@ -168,45 +169,8 @@ export function CollaboratorPage() {
         </div>
       ))}
 
-      {lightboxIndex !== null && (
-        <div
-          onClick={() => setLightboxIndex(null)}
-          style={{
-            position: "fixed",
-            inset: 0,
-            background: "rgba(0,0,0,0.9)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            zIndex: 200,
-          }}
-        >
-          {lightboxIndex > 0 && (
-            <button
-              className="btn"
-              style={{ position: "absolute", left: "1rem", fontSize: "1.5rem" }}
-              onClick={(e) => {
-                e.stopPropagation();
-                setLightboxIndex((i) => (i !== null ? i - 1 : null));
-              }}
-            >
-              ‹
-            </button>
-          )}
-          <img src={collaborator.gallery[lightboxIndex].url} alt="" style={{ maxWidth: "90vw", maxHeight: "90vh", objectFit: "contain" }} />
-          {lightboxIndex < collaborator.gallery.length - 1 && (
-            <button
-              className="btn"
-              style={{ position: "absolute", right: "1rem", fontSize: "1.5rem" }}
-              onClick={(e) => {
-                e.stopPropagation();
-                setLightboxIndex((i) => (i !== null ? i + 1 : null));
-              }}
-            >
-              ›
-            </button>
-          )}
-        </div>
+      {lightbox.index !== null && (
+        <GalleryLightbox images={collaborator.gallery} index={lightbox.index} onClose={lightbox.close} onNavigate={lightbox.open} />
       )}
     </div>
   );

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 import { api, ApiError } from "../lib/api";
 import { useAuth } from "../lib/auth";
 import { useNotificationWidgetVisibility } from "../lib/notificationWidgetVisibility";
@@ -20,6 +20,7 @@ interface Me {
   avatarUrl: string | null;
   bio: string | null;
   links: { label: string; url: string }[] | null;
+  collaboratorSlug: string | null;
   caEnabled: boolean;
   moireEnabled: boolean;
   notifyWeeklySummary: boolean;
@@ -205,6 +206,11 @@ export function AccountSettingsPage() {
   return (
     <div style={{ maxWidth: 420 }}>
       <h1>Account</h1>
+      {me.collaboratorSlug && (
+        <p>
+          <Link to={`/collaborator/${me.collaboratorSlug}`}>Their exomusical contributions →</Link>
+        </p>
+      )}
       <p style={{ color: "var(--text-dim)", fontSize: "0.9rem" }}>
         {me.username} — {me.email}
       </p>

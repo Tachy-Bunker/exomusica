@@ -55,6 +55,9 @@ export function AdminLayout() {
         <NavLink to="/admin/discord-bridge" className={({ isActive }) => (isActive ? "active" : "")}>
           Discord bridge
         </NavLink>
+        <NavLink to="/admin/collaborators" className={({ isActive }) => (isActive ? "active" : "")}>
+          Collaborators
+        </NavLink>
         <NavLink to="/admin/notifications" className={({ isActive }) => (isActive ? "active" : "")}>
           Notification sounds
         </NavLink>
