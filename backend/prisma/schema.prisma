@@ -68,6 +68,11 @@ model User {
   notifyDailySummary    Boolean      @default(false)
   notifyFollowedReplies Boolean      @default(true)
   notifyPrivateMessage  Boolean      @default(true)
+  discordUsername             String?  // for the bot to DM — matched against the bot's shared-server member list, not a stored user ID
+  notifyDiscordWeeklySummary  Boolean  @default(false)
+  notifyDiscordDailySummary   Boolean  @default(false)
+  notifyDiscordFollowedReplies Boolean @default(false)
+  notifyDiscordPrivateMessage Boolean  @default(false)
   notifyNews            Boolean      @default(true)
   notifyCallsForIdeas   Boolean      @default(true)
   notifyCallsForArtists Boolean      @default(true)
@@ -558,6 +563,7 @@ model SiteSettings {
   smtpFrom           String?
   chatOpenSfxUrl     String? // plays once whenever a new chat location (branch/topic) is opened
   joinNotifyEmail    String? // admin gets emailed here whenever a new join request comes in
+  joinNotifyDiscordUsername String? // admin also gets DMed here, if the bridge bot shares a server with this Discord account
   linkClickSfxUrl    String? // plays whenever the user clicks any hyperlink, site-wide
   chatHudRevealRate  Float   @default(30) // ms per character for the letter-by-letter chat reveal
   chatHudSfxUrl      String? // loops during the reveal

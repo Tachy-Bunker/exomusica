@@ -2,6 +2,7 @@ import type { FastifyInstance } from "fastify";
 import { prisma } from "../lib/prisma.js";
 import { requireAuth } from "../lib/auth.js";
 import { sendTemplatedMail } from "../lib/emailTemplates.js";
+import { sendDiscordDM } from "../lib/discordBot.js";
 
 export async function pmRoutes(app: FastifyInstance): Promise<void> {
   // One row per conversation partner, most recent message first. Grouped
@@ -90,6 +91,12 @@ export async function pmRoutes(app: FastifyInstance): Promise<void> {
           senderUsername: sender?.username ?? "Someone",
           messageExcerpt: (contentRaw || "(attachment)").slice(0, 200),
         }).catch((err) => app.log.error(err, "sendTemplatedMail failed"));
+      }
+      if (other.notifyDiscordPrivateMessage && other.discordUsername) {
+        void sendDiscordDM(
+          other.discordUsername,
+          `${sender?.username ?? "Someone"} sent you a private message on Exomusica: "${(contentRaw || "(attachment)").slice(0, 200)}"`,
+        );
       }
       return reply.code(201).send({ id: message.id, sentAt: Math.floor(message.sentAt.getTime() / 1000) });
     },

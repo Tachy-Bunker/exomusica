@@ -76,6 +76,30 @@ async function handleIncomingDiscordMessage(message: {
  *  Call this after a message is successfully created on the website side
  *  — it's a no-op if the channel isn't bridged. Never throws; a Discord
  *  API hiccup shouldn't break sending a message on the website. */
+/** Sends a DM to a user identified by Discord username, by searching every
+ *  guild the bot is a member of for a matching member. Usernames aren't
+ *  directly resolvable to a DM-able user without either a shared server
+ *  (this) or a stored user id — since we only ask users for their
+ *  username, this is the mechanism. Silently no-ops if the bot isn't
+ *  connected, no username is given, or no match is found — notification
+ *  delivery failures shouldn't ever break the action that triggered them. */
+export async function sendDiscordDM(username: string | null | undefined, message: string): Promise<void> {
+  if (!client || !username) return;
+  try {
+    for (const guild of client.guilds.cache.values()) {
+      const members = await guild.members.fetch();
+      const match = members.find((m) => m.user.username.toLowerCase() === username.toLowerCase());
+      if (match) {
+        await match.send(message);
+        return;
+      }
+    }
+    console.warn(`Discord bridge: no member found matching username "${username}" in any shared server — DM not sent.`);
+  } catch (err) {
+    console.error("Discord bridge: failed to send DM:", err);
+  }
+}
+
 export async function forwardMessageToDiscord(channelSlug: string, authorUsername: string, content: string): Promise<void> {
   if (!client) return;
   try {
@@ -129,7 +153,7 @@ export async function initDiscordBot(): Promise<void> {
   connectionStatus = "connecting";
 
   const newClient = new Client({
-    intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages, GatewayIntentBits.MessageContent],
+    intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages, GatewayIntentBits.MessageContent, GatewayIntentBits.GuildMembers],
     partials: [Partials.Message, Partials.Channel],
   });
 

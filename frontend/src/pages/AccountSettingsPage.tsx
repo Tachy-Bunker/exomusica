@@ -27,13 +27,18 @@ interface Me {
   notifyDailySummary: boolean;
   notifyFollowedReplies: boolean;
   notifyPrivateMessage: boolean;
+  discordUsername: string | null;
+  notifyDiscordWeeklySummary: boolean;
+  notifyDiscordDailySummary: boolean;
+  notifyDiscordFollowedReplies: boolean;
+  notifyDiscordPrivateMessage: boolean;
   notifyNews: boolean;
   notifyCallsForIdeas: boolean;
   notifyCallsForArtists: boolean;
   followedChannels: FollowedChannel[];
 }
 
-type NotifyKey = Exclude<keyof Me, "username" | "email" | "followedChannels">;
+type NotifyKey = Exclude<keyof Me, "username" | "email" | "followedChannels" | "discordUsername">;
 
 interface SoundPref {
   eventId: number;
@@ -333,6 +338,25 @@ export function AccountSettingsPage() {
       {checkbox("notifyNews", "Exomusica News")}
       {checkbox("notifyCallsForIdeas", "Calls for ideas")}
       {checkbox("notifyCallsForArtists", "Calls for artists")}
+
+      <h2 style={{ fontSize: "1rem" }}>Discord notifications</h2>
+      <div className="field">
+        <label>Your Discord username</label>
+        <input
+          placeholder="e.g. tachy_bunker"
+          value={me.discordUsername ?? ""}
+          onChange={(e) => setMe({ ...me, discordUsername: e.target.value })}
+          onBlur={() => api("/api/account/notifications", { method: "PATCH", body: JSON.stringify({ discordUsername: me.discordUsername || null }) })}
+        />
+        <p style={{ fontSize: "0.75rem", color: "var(--text-dim)", marginTop: "0.2rem" }}>
+          Only works if you're in a Discord server the Exomusica bot is also in — it looks you up by this username to
+          send DMs.
+        </p>
+      </div>
+      {checkbox("notifyDiscordWeeklySummary", "Weekly activity summary")}
+      {checkbox("notifyDiscordDailySummary", "Daily activity summary")}
+      {checkbox("notifyDiscordFollowedReplies", "Replies on topics I follow")}
+      {checkbox("notifyDiscordPrivateMessage", "New private messages")}
       <p style={{ fontSize: "0.8rem", color: "var(--text-dim)" }}>
         These toggles save correctly. Whether email actually arrives depends on SMTP being configured and working —
         ask an admin if you're not receiving anything you expect to.

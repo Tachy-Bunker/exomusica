@@ -14,10 +14,15 @@ export function JoinRequestsPage() {
   const [requests, setRequests] = useState<JoinRequest[]>([]);
   const [notifyEmail, setNotifyEmail] = useState("");
   const [emailSaved, setEmailSaved] = useState(false);
+  const [notifyDiscordUsername, setNotifyDiscordUsername] = useState("");
+  const [discordSaved, setDiscordSaved] = useState(false);
 
   function load() {
     api<JoinRequest[]>("/api/admin/join-requests").then(setRequests);
-    api<{ joinNotifyEmail: string | null }>("/api/site-settings").then((s) => setNotifyEmail(s.joinNotifyEmail ?? ""));
+    api<{ joinNotifyEmail: string | null; joinNotifyDiscordUsername: string | null }>("/api/site-settings").then((s) => {
+      setNotifyEmail(s.joinNotifyEmail ?? "");
+      setNotifyDiscordUsername(s.joinNotifyDiscordUsername ?? "");
+    });
   }
 
   useEffect(load, []);
@@ -26,6 +31,12 @@ export function JoinRequestsPage() {
     await api("/api/admin/site-settings", { method: "PATCH", body: JSON.stringify({ joinNotifyEmail: notifyEmail || null }) });
     setEmailSaved(true);
     setTimeout(() => setEmailSaved(false), 2000);
+  }
+
+  async function saveNotifyDiscordUsername() {
+    await api("/api/admin/site-settings", { method: "PATCH", body: JSON.stringify({ joinNotifyDiscordUsername: notifyDiscordUsername || null }) });
+    setDiscordSaved(true);
+    setTimeout(() => setDiscordSaved(false), 2000);
   }
 
   async function decide(id: number, action: "approve" | "reject") {
@@ -45,6 +56,21 @@ export function JoinRequestsPage() {
           </button>
         </div>
         {emailSaved && <span style={{ fontSize: "0.8rem", color: "var(--accent-audio)" }}>Saved ✓</span>}
+      </div>
+      <div className="field" style={{ maxWidth: 360, marginBottom: "1rem" }}>
+        <label>Notify this Discord username on new applications</label>
+        <div style={{ display: "flex", gap: "0.5rem" }}>
+          <input
+            placeholder="your_discord_username"
+            value={notifyDiscordUsername}
+            onChange={(e) => setNotifyDiscordUsername(e.target.value)}
+            style={{ flex: 1 }}
+          />
+          <button className="btn btn-primary" onClick={saveNotifyDiscordUsername}>
+            Save
+          </button>
+        </div>
+        {discordSaved && <span style={{ fontSize: "0.8rem", color: "var(--accent-audio)" }}>Saved ✓</span>}
       </div>
       {requests.length === 0 && <p style={{ color: "var(--text-dim)" }}>Nothing pending.</p>}
       {requests.map((r) => (

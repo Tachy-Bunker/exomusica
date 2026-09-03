@@ -62,6 +62,11 @@ export async function accountRoutes(app: FastifyInstance): Promise<void> {
       notifyDailySummary: me.notifyDailySummary,
       notifyFollowedReplies: me.notifyFollowedReplies,
       notifyPrivateMessage: me.notifyPrivateMessage,
+      discordUsername: me.discordUsername,
+      notifyDiscordWeeklySummary: me.notifyDiscordWeeklySummary,
+      notifyDiscordDailySummary: me.notifyDiscordDailySummary,
+      notifyDiscordFollowedReplies: me.notifyDiscordFollowedReplies,
+      notifyDiscordPrivateMessage: me.notifyDiscordPrivateMessage,
       notifyNews: me.notifyNews,
       notifyCallsForIdeas: me.notifyCallsForIdeas,
       notifyCallsForArtists: me.notifyCallsForArtists,
@@ -82,6 +87,11 @@ export async function accountRoutes(app: FastifyInstance): Promise<void> {
       notifyNews: boolean;
       notifyCallsForIdeas: boolean;
       notifyCallsForArtists: boolean;
+      discordUsername: string | null;
+      notifyDiscordWeeklySummary: boolean;
+      notifyDiscordDailySummary: boolean;
+      notifyDiscordFollowedReplies: boolean;
+      notifyDiscordPrivateMessage: boolean;
     }>;
   }>("/api/account/notifications", { preHandler: requireAuth }, async (req) => {
     return prisma.user.update({ where: { id: req.user!.id }, data: req.body ?? {} });

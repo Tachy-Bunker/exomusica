@@ -8,7 +8,7 @@ import { sendTemplatedMail } from "../lib/emailTemplates.js";
 import { createNotification } from "../lib/notify.js";
 import { parseSearchQuery } from "../lib/searchQuery.js";
 import { walkChannelHistoryInChunks } from "../lib/messageChunking.js";
-import { forwardMessageToDiscord } from "../lib/discordBot.js";
+import { forwardMessageToDiscord, sendDiscordDM } from "../lib/discordBot.js";
 
 const messageInclude = {
   author: { select: { username: true, avatarUrl: true, isGhost: true, linkedUserId: true, linkedUser: { select: { username: true, avatarUrl: true } } } },
@@ -223,13 +223,20 @@ export async function messageRoutes(app: FastifyInstance): Promise<void> {
             `${full.author.username}: ${contentRaw.slice(0, 120)}`,
             { channelSlug: channel.slug, messageId: message.id },
           ).catch((err) => app.log.error(err, "createNotification failed"));
-          if (!f.user.notifyFollowedReplies || !f.user.email) continue;
-          void sendTemplatedMail("TOPIC_REPLY", f.user.email, f.user.username, {
-            channelName: channel.name,
-            authorUsername: full.author.username,
-            messageExcerpt: contentRaw.slice(0, 200),
-            messageUrl: `https://exomusica.com/topic/${channel.slug}#m-${message.id}`,
-          }).catch((err) => app.log.error(err, "sendTemplatedMail failed"));
+          if (f.user.notifyFollowedReplies && f.user.email) {
+            void sendTemplatedMail("TOPIC_REPLY", f.user.email, f.user.username, {
+              channelName: channel.name,
+              authorUsername: full.author.username,
+              messageExcerpt: contentRaw.slice(0, 200),
+              messageUrl: `https://exomusica.com/topic/${channel.slug}#m-${message.id}`,
+            }).catch((err) => app.log.error(err, "sendTemplatedMail failed"));
+          }
+          if (f.user.notifyDiscordFollowedReplies && f.user.discordUsername) {
+            void sendDiscordDM(
+              f.user.discordUsername,
+              `New activity in ${channel.name} — ${full.author.username}: ${contentRaw.slice(0, 150)}\nhttps://exomusica.com/topic/${channel.slug}#m-${message.id}`,
+            );
+          }
         }
       })().catch((err) => app.log.error(err, "follower-notification background task failed"));
 

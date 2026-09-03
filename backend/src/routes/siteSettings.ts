@@ -40,6 +40,7 @@ export async function siteSettingsRoutes(app: FastifyInstance): Promise<void> {
         // public, unauthenticated endpoint
         chatOpenSfxUrl: true,
         joinNotifyEmail: true,
+        joinNotifyDiscordUsername: true,
         chatHudRevealRate: true,
         chatHudSfxUrl: true,
         chatSplashMessages: true,
@@ -77,6 +78,7 @@ export async function siteSettingsRoutes(app: FastifyInstance): Promise<void> {
         smtpFrom: null,
         chatOpenSfxUrl: null,
         joinNotifyEmail: null,
+        joinNotifyDiscordUsername: null,
         chatHudRevealRate: 30,
         chatHudSfxUrl: null,
         chatSplashMessages: [],
@@ -151,6 +153,7 @@ export async function siteSettingsRoutes(app: FastifyInstance): Promise<void> {
       moireWaveform: string;
       moireRotationSpeed: number;
       joinNotifyEmail: string | null;
+      joinNotifyDiscordUsername: string | null;
       chatHudRevealRate: number;
       chatSplashMessages: string[];
       categoryOrder: string[];
@@ -178,6 +181,7 @@ export async function siteSettingsRoutes(app: FastifyInstance): Promise<void> {
       "moireWaveform",
       "moireRotationSpeed",
       "joinNotifyEmail",
+      "joinNotifyDiscordUsername",
       "chatHudRevealRate",
       "chatSplashMessages",
       "categoryOrder",
