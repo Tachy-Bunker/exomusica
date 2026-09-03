@@ -20,6 +20,7 @@ interface MapNode {
   name: string;
   parentId: number | null;
   isAnchor: boolean;
+  visibility: "VISIBLE" | "HIDDEN" | "BABY_CRYSTALS";
   x: number;
   y: number;
   homeX: number;
@@ -59,6 +60,7 @@ function buildNodes(branches: Branch[]): MapNode[] {
       name: b.name,
       parentId: null,
       isAnchor: false,
+      visibility: b.visibility ?? "VISIBLE",
       x: 0,
       y: 0,
       homeX: 0,
@@ -82,6 +84,7 @@ function buildNodes(branches: Branch[]): MapNode[] {
       name: b.name,
       parentId: null,
       isAnchor: true,
+      visibility: b.visibility ?? "VISIBLE",
       x: bx,
       y: by,
       homeX: bx,
@@ -100,6 +103,7 @@ function buildNodes(branches: Branch[]): MapNode[] {
       name: b.name,
       parentId: b.parentId,
       isAnchor: false,
+      visibility: b.visibility ?? "VISIBLE",
       x: 0,
       y: 0,
       homeX: 0,
@@ -156,6 +160,7 @@ export function SpaceMap({
   const crosshairOffsetRef = useRef({ x: 0, y: 0 });
   const topicNodesRef = useRef<{ slug: string; name: string; worldX: number; worldY: number }[]>([]);
   const topicElRefs = useRef<Map<string, HTMLDivElement>>(new Map());
+  const crystalElRefs = useRef<Map<number, HTMLDivElement>>(new Map());
   const keysRef = useRef<Set<string>>(new Set());
   const joystickVectorRef = useRef({ x: 0, y: 0 });
   const hoveredIdRef = useRef<number | null>(null);
@@ -459,6 +464,7 @@ export function SpaceMap({
             name: centerLabel,
             parentId: null,
             isAnchor: false,
+            visibility: "VISIBLE",
             x: 0,
             y: 0,
             homeX: 0,
@@ -472,7 +478,15 @@ export function SpaceMap({
         for (const n of nodes) {
           const screenX = w / 2 + cam.x + n.x;
           const screenY = h / 2 + cam.y + n.y;
-          wardenBridge.setScreenPosition(n.id, screenX, screenY);
+          if (n.visibility === "BABY_CRYSTALS") {
+            const el = crystalElRefs.current.get(n.id);
+            if (el) {
+              el.style.left = `${screenX}px`;
+              el.style.top = `${screenY}px`;
+            }
+          } else {
+            wardenBridge.setScreenPosition(n.id, screenX, screenY);
+          }
           const dist = Math.hypot(screenX - w / 2, screenY - h / 2);
           if (dist < nearestDist) {
             nearest = n;
@@ -664,6 +678,30 @@ export function SpaceMap({
             <span className="space-node-topic-label">{t.name}</span>
           </div>
         ))}
+
+        {nodesRef.current
+          .filter((n) => n.visibility === "BABY_CRYSTALS")
+          .map((n) => (
+            <div
+              key={n.id}
+              ref={(el) => {
+                if (el) crystalElRefs.current.set(n.id, el);
+                else crystalElRefs.current.delete(n.id);
+              }}
+              className="space-node-crystal"
+              title={n.name}
+              onClick={() => { playLinkClickSound(); navigate(`/branch/${n.slug}`); }}
+            >
+              <svg viewBox="0 0 80 80" className="space-node-crystal-svg">
+                <polygon points="40,4 52,30 40,26 30,32" />
+                <polygon points="58,20 76,42 56,38 62,26" />
+                <polygon points="18,18 34,36 14,34 10,24" />
+                <polygon points="30,44 48,42 44,66 32,70 22,52" />
+                <polygon points="52,48 70,54 62,72 50,68" />
+              </svg>
+              <span className="space-node-crystal-label">{n.name}</span>
+            </div>
+          ))}
       </div>
 
       {compassPoints.map((c, i) => (
@@ -694,8 +732,26 @@ export function SpaceMap({
       </div>
 
       {lockedNode && (
-        <div className="space-hud-name">
-          {lockedNode.name.slice(0, revealedCount)}
+        <div className={`space-hud-name ${lockedNode.visibility === "BABY_CRYSTALS" ? "space-hud-name-crystal" : ""}`}>
+          {lockedNode.visibility === "BABY_CRYSTALS"
+            ? lockedNode.name
+                .slice(0, revealedCount)
+                .split("")
+                .map((ch, i) => (
+                  <span
+                    key={i}
+                    style={
+                      {
+                        animationDelay: `${(i % 7) * 0.3}s`,
+                        "--jitter-x": `${((i * 37) % 5) - 2}px`,
+                        "--jitter-y": `${((i * 53) % 5) - 2}px`,
+                      } as React.CSSProperties
+                    }
+                  >
+                    {ch === " " ? "\u00A0" : ch}
+                  </span>
+                ))
+            : lockedNode.name.slice(0, revealedCount)}
           {revealedCount < lockedNode.name.length && <span className="space-hud-cursor">▌</span>}
         </div>
       )}

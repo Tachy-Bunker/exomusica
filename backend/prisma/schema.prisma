@@ -112,6 +112,12 @@ model JoinRequest {
   createdAt    DateTime          @default(now())
 }
 
+enum BranchVisibility {
+  VISIBLE
+  HIDDEN
+  BABY_CRYSTALS
+}
+
 model Branch {
   id          Int      @id @default(autoincrement())
   slug        String   @unique
@@ -122,6 +128,7 @@ model Branch {
   description String?
   coverArtUrl String?
   hidden      Boolean  @default(false) // soft take-down: excluded from public listings, data untouched
+  visibility  BranchVisibility @default(VISIBLE) // supersedes `hidden` — kept alongside it rather than migrated destructively; see deploy notes for the backfill
   isAnchor    Boolean  @default(false) // true + no parent = independent anchor elsewhere on the map, not part of the central cluster
   guideAssetId  Int?
   guideAsset    GuideAsset? @relation(fields: [guideAssetId], references: [id])

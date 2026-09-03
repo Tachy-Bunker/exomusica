@@ -106,8 +106,8 @@ export function BranchesPage() {
     load();
   }
 
-  async function toggleHidden(b: Branch) {
-    await api(`/api/admin/branches/${b.id}`, { method: "PATCH", body: JSON.stringify({ hidden: !b.hidden }) });
+  async function setVisibility(b: Branch, visibility: "VISIBLE" | "HIDDEN" | "BABY_CRYSTALS") {
+    await api(`/api/admin/branches/${b.id}`, { method: "PATCH", body: JSON.stringify({ visibility }) });
     load();
   }
 
@@ -268,7 +268,13 @@ export function BranchesPage() {
                 </>
               )}
               <td className="mono">{b.channel?.slug ?? "—"}</td>
-              <td>{b.hidden ? "hidden" : "visible"}</td>
+              <td>
+                <select value={b.visibility ?? "VISIBLE"} onChange={(e) => setVisibility(b, e.target.value as "VISIBLE" | "HIDDEN" | "BABY_CRYSTALS")}>
+                  <option value="VISIBLE">Visible</option>
+                  <option value="HIDDEN">Hidden</option>
+                  <option value="BABY_CRYSTALS">Baby Crystals</option>
+                </select>
+              </td>
               <td style={{ whiteSpace: "nowrap" }}>
                 {editingId === b.id ? (
                   <>
@@ -283,9 +289,6 @@ export function BranchesPage() {
                   <>
                     <button className="btn" onClick={() => startEdit(b)}>
                       Edit
-                    </button>{" "}
-                    <button className="btn" onClick={() => toggleHidden(b)}>
-                      {b.hidden ? "Unhide" : "Hide"}
                     </button>{" "}
                     <button className="btn btn-danger" onClick={() => handleDelete(b)}>
                       Delete

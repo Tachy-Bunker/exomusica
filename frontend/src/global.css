@@ -1459,3 +1459,82 @@ th {
     transform: rotate(360deg);
   }
 }
+
+/* Baby Crystals branch nodes — deliberately open/broken, scattered shard
+   fragments rather than one closed shape, since these are branches in
+   progress with no music yet: an unformed, still-coalescing look. */
+.space-node-crystal {
+  position: absolute;
+  width: 70px;
+  height: 70px;
+  cursor: pointer;
+  transform: translate(-50%, -50%);
+}
+
+.space-node-crystal-svg polygon {
+  fill: rgba(180, 160, 255, 0.18);
+  stroke: rgba(200, 180, 255, 0.7);
+  stroke-width: 1;
+  animation: space-crystal-drift 6s ease-in-out infinite;
+  transform-origin: center;
+}
+
+.space-node-crystal-svg polygon:nth-child(1) { animation-delay: 0s; }
+.space-node-crystal-svg polygon:nth-child(2) { animation-delay: 0.8s; }
+.space-node-crystal-svg polygon:nth-child(3) { animation-delay: 1.6s; }
+.space-node-crystal-svg polygon:nth-child(4) { animation-delay: 2.4s; }
+.space-node-crystal-svg polygon:nth-child(5) { animation-delay: 3.2s; }
+
+.space-node-crystal:hover .space-node-crystal-svg polygon {
+  stroke: rgba(220, 200, 255, 1);
+}
+
+@keyframes space-crystal-drift {
+  0%, 100% {
+    transform: translate(0, 0) scale(1);
+    opacity: 0.75;
+  }
+  50% {
+    transform: translate(1.5px, -2px) scale(1.04);
+    opacity: 1;
+  }
+}
+
+.space-node-crystal-label {
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  margin-top: 0.2rem;
+  font-size: 0.7rem;
+  color: var(--text-dim);
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+/* The "breaking apart" hint-text effect for a locked Baby Crystals node —
+   slow, subtle per-letter jitter rather than a fast glitch, matching
+   their unfinished, still-forming state. */
+.space-hud-name-crystal span {
+  display: inline-block;
+  animation: space-crystal-text-break 3.2s ease-in-out infinite;
+}
+
+@keyframes space-crystal-text-break {
+  0%, 100% {
+    transform: translate(0, 0);
+    opacity: 1;
+  }
+  45% {
+    transform: translate(0, 0);
+    opacity: 1;
+  }
+  50% {
+    transform: translate(var(--jitter-x, 1px), var(--jitter-y, -1px));
+    opacity: 0.7;
+  }
+  55% {
+    transform: translate(0, 0);
+    opacity: 1;
+  }
+}

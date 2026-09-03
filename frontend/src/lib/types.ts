@@ -37,6 +37,7 @@ export interface Branch {
   description: string | null;
   coverArtUrl: string | null;
   hidden?: boolean; // only present on the admin listing, not the public one
+  visibility?: "VISIBLE" | "HIDDEN" | "BABY_CRYSTALS";
   fontId?: number | null;
   font?: { familyName: string; fileUrl: string; format: string } | null;
   parentId: number | null;

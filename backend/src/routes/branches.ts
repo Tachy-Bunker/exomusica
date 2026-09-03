@@ -16,13 +16,14 @@ interface CreateBranchBody {
 export async function branchRoutes(app: FastifyInstance): Promise<void> {
   app.get("/api/branches", async () => {
     const branches = await prisma.branch.findMany({
-      where: { hidden: false },
+      where: { visibility: { not: "HIDDEN" } },
       select: {
         id: true,
         slug: true,
         name: true,
         description: true,
         coverArtUrl: true,
+        visibility: true,
         parentId: true,
         isAnchor: true,
         posX: true,
@@ -127,6 +128,7 @@ export async function branchRoutes(app: FastifyInstance): Promise<void> {
       description: string;
       coverArtUrl: string;
       hidden: boolean;
+      visibility: "VISIBLE" | "HIDDEN" | "BABY_CRYSTALS";
       posX: number;
       posY: number;
       fontId: number | null;
