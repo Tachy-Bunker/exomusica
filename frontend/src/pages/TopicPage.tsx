@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useParams } from "react-router-dom";
+import { useParams, useNavigate, Link } from "react-router-dom";
 import { api } from "../lib/api";
 import { useChatDockStore } from "../lib/chatDockStore";
 import { useIsDesktop } from "../lib/useIsDesktop";
@@ -7,6 +7,7 @@ import { useDocumentTitle } from "../lib/useDocumentTitle";
 import { ChannelPage } from "./ChannelPage";
 import { renderMarkdown } from "../lib/markdown";
 import { isTypingTarget } from "../lib/isTypingTarget";
+import { underlineLetter } from "../lib/underlineLetter";
 
 interface ChannelInfo {
   slug: string;
@@ -17,6 +18,7 @@ interface ChannelInfo {
 
 export function TopicPage() {
   const { slug } = useParams<{ slug: string }>();
+  const navigate = useNavigate();
   const [channel, setChannel] = useState<ChannelInfo | null>(null);
   const isDesktop = useIsDesktop();
   const openChat = useChatDockStore((s) => s.openChat);
@@ -31,10 +33,11 @@ export function TopicPage() {
         if (dockOpenChannelSlug) closeChat();
         else if (channel) openChat(channel.slug, channel.name);
       }
+      if (e.code === "KeyR") navigate("/discussion");
     }
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [isDesktop, dockOpenChannelSlug, closeChat, openChat, channel]);
+  }, [isDesktop, dockOpenChannelSlug, closeChat, openChat, channel, navigate]);
 
 
   useEffect(() => {
@@ -56,6 +59,10 @@ export function TopicPage() {
   if (isDesktop) {
     return (
       <div>
+        <p style={{ marginBottom: "0.5rem" }}>
+          <Link to="/discussion">← Return to {underlineLetter("Forums", "r")}</Link>{" "}
+          <span style={{ fontSize: "0.85rem", color: "var(--text-dim)" }}>(R)</span>
+        </p>
         <h1>
           {channel.name} <span style={{ fontSize: "0.85rem", color: "var(--text-dim)" }}>(E)</span>
         </h1>
@@ -65,5 +72,14 @@ export function TopicPage() {
     );
   }
 
-  return <ChannelPage channelSlug={channel.slug} />;
+  return (
+    <div style={{ display: "flex", flexDirection: "column", height: "calc(100dvh - var(--nav-height, 3.6rem) - 3rem)" }}>
+      <p style={{ marginBottom: "0.4rem", flexShrink: 0 }}>
+        <Link to="/discussion">← Return to Forums</Link>
+      </p>
+      <div style={{ flex: 1, minHeight: 0 }}>
+        <ChannelPage channelSlug={channel.slug} />
+      </div>
+    </div>
+  );
 }

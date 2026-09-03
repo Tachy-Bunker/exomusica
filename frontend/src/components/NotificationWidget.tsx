@@ -203,6 +203,7 @@ export function NotificationWidget({ offsetRight = 0, inline = false }: { offset
           style={{
             position: "absolute",
             right: 0,
+            zIndex: 47,
             ...(inline ? { top: "calc(100% + 0.5rem)" } : isHomepage && isDesktop ? { bottom: "calc(100% + 0.5rem)" } : { top: "calc(100% + 0.5rem)" }),
             width: 300,
             maxHeight: 420,

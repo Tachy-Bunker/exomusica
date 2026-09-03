@@ -340,6 +340,7 @@ export function ChannelPage({ channelSlug, fillHeight }: { channelSlug?: string;
   const messageListRef = useRef<HTMLDivElement>(null);
   const [loadingOlder, setLoadingOlder] = useState(false);
   const [hasMoreOlder, setHasMoreOlder] = useState(true);
+  const [showLiveChatButton, setShowLiveChatButton] = useState(false);
   const [archiveDays, setArchiveDays] = useState<{ day: string; messageCount: number }[]>([]);
   const [draft, setDraft] = useState("");
   const [emojiQuery, setEmojiQuery] = useState<string | null>(null);
@@ -574,10 +575,31 @@ export function ChannelPage({ channelSlug, fillHeight }: { channelSlug?: string;
     if (!container) return;
     function handleScroll() {
       if (container!.scrollTop < 200) loadOlderMessages();
+      const distanceFromBottom = container!.scrollHeight - container!.scrollTop - container!.clientHeight;
+      // ~60px average message height — an approximation, since actual
+      // height varies with content/attachments, but "roughly 30 messages"
+      // doesn't need to be exact to be useful here.
+      setShowLiveChatButton(distanceFromBottom > 30 * 60);
     }
     container.addEventListener("scroll", handleScroll);
     return () => container.removeEventListener("scroll", handleScroll);
   }, [loadOlderMessages]);
+
+  useEffect(() => {
+    if (mode === "search") setShowLiveChatButton(true);
+  }, [mode]);
+
+  function scrollToLive() {
+    if (mode === "search") {
+      setMode("live");
+      setActiveSearch(null);
+    }
+    const container = messageListRef.current;
+    requestAnimationFrame(() => {
+      if (container) container.scrollTo({ top: container.scrollHeight, behavior: "smooth" });
+    });
+    setShowLiveChatButton(false);
+  }
 
 
   const reportViewing = usePresenceStore((s) => s.reportViewing);
@@ -824,6 +846,16 @@ export function ChannelPage({ channelSlug, fillHeight }: { channelSlug?: string;
           ))
         )}
       </div>
+
+      {showLiveChatButton && (
+        <button
+          className="btn"
+          onClick={scrollToLive}
+          style={{ width: "100%", textAlign: "center", fontSize: `${messageFontSize}%`, marginBottom: "0.4rem" }}
+        >
+          ⇣⇣ Live chat ⇣⇣
+        </button>
+      )}
 
       {user && mode === "live" && (
         <form

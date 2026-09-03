@@ -212,9 +212,14 @@ export async function accountRoutes(app: FastifyInstance): Promise<void> {
           createdAt: true,
           _count: { select: { messages: true } },
         },
-        orderBy: [{ isGhost: "asc" }, { username: "asc" }],
+        orderBy: { username: "asc" },
         take: ghostsOnly === "true" ? undefined : 50,
       });
+      // Active, then linked ghosts, then unlinked ghosts — alphabetical
+      // within each group. Whether a ghost is linked isn't a plain scalar
+      // column Prisma can sort on directly, so rank it here instead.
+      const rank = (u: (typeof users)[number]) => (!u.isGhost ? 0 : u.linkedUserId ? 1 : 2);
+      users.sort((a, b) => rank(a) - rank(b) || a.username.localeCompare(b.username));
       return users;
     },
   );

@@ -21,6 +21,25 @@ interface Font {
 
 export function ChannelsPage() {
   const [topics, setTopics] = useState<ChannelSummary[]>([]);
+  const [categoryOrder, setCategoryOrder] = useState<string[]>([]);
+  const [categorySaved, setCategorySaved] = useState(false);
+
+  const distinctCategories = [...new Set(topics.map((t) => t.category).filter((c): c is string => !!c))];
+  const orderedCategories = [...categoryOrder.filter((c) => distinctCategories.includes(c)), ...distinctCategories.filter((c) => !categoryOrder.includes(c))];
+
+  function moveCategory(index: number, direction: -1 | 1) {
+    const next = [...orderedCategories];
+    const target = index + direction;
+    if (target < 0 || target >= next.length) return;
+    [next[index], next[target]] = [next[target], next[index]];
+    setCategoryOrder(next);
+  }
+
+  async function saveCategoryOrder() {
+    await api("/api/admin/site-settings", { method: "PATCH", body: JSON.stringify({ categoryOrder: orderedCategories }) });
+    setCategorySaved(true);
+    setTimeout(() => setCategorySaved(false), 2000);
+  }
   const [fonts, setFonts] = useState<Font[]>([]);
   const [form, setForm] = useState({ slug: "", name: "", description: "", category: "" });
   const [error, setError] = useState<string | null>(null);
@@ -47,6 +66,7 @@ export function ChannelsPage() {
   function load() {
     api<ChannelSummary[]>("/api/channels?kind=DISCUSSION").then(setTopics);
     api<Font[]>("/api/fonts").then(setFonts);
+    api<{ categoryOrder: string[] | null }>("/api/site-settings").then((s) => setCategoryOrder(s.categoryOrder ?? []));
   }
 
   useEffect(load, []);
@@ -108,6 +128,27 @@ export function ChannelsPage() {
   return (
     <div>
       <h1>Forum topics</h1>
+
+      {orderedCategories.length > 1 && (
+        <div style={{ marginBottom: "1.5rem", border: "1px solid var(--border)", borderRadius: "var(--radius)", padding: "0.8rem", maxWidth: 420 }}>
+          <h2 style={{ fontSize: "1rem", marginTop: 0 }}>Category order</h2>
+          {orderedCategories.map((c, i) => (
+            <div key={c} style={{ display: "flex", alignItems: "center", gap: "0.5rem", padding: "0.2rem 0" }}>
+              <span style={{ flex: 1 }}>{c}</span>
+              <button className="btn" style={{ padding: "0.1rem 0.5rem" }} onClick={() => moveCategory(i, -1)} disabled={i === 0}>
+                ↑
+              </button>
+              <button className="btn" style={{ padding: "0.1rem 0.5rem" }} onClick={() => moveCategory(i, 1)} disabled={i === orderedCategories.length - 1}>
+                ↓
+              </button>
+            </div>
+          ))}
+          <button className="btn btn-primary" onClick={saveCategoryOrder} style={{ marginTop: "0.5rem" }}>
+            Save order
+          </button>
+          {categorySaved && <span style={{ marginLeft: "0.6rem", fontSize: "0.85rem", color: "var(--accent-audio)" }}>Saved ✓</span>}
+        </div>
+      )}
 
       <form onSubmit={handleSubmit} style={{ maxWidth: 420, marginBottom: "2rem" }}>
         <div className="field">

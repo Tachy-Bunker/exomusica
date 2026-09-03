@@ -64,12 +64,23 @@ export const useAudioStore = create<AudioState>((set, get) => ({
 
   play: (track) => {
     const isSameTrack = get().currentTrack?.id === track.id;
+    const el = audioEl;
+    const isStuckAtEnd = !!el && (el.ended || (el.duration > 0 && el.currentTime >= el.duration - 0.1));
+
     if (!isSameTrack) {
       set({ currentTrack: track, currentTime: 0, duration: 0 });
-      if (audioEl) audioEl.src = track.fileUrl;
+      if (el) el.src = track.fileUrl;
+    } else if (isStuckAtEnd) {
+      // Same track, but the element has already finished — this happens
+      // when repeat-all replays a single track with an empty queue and
+      // history (playNext hands the same object back). Without an
+      // explicit reset here, .play() is a no-op: the element is sitting
+      // at its end position with nothing left to play.
+      set({ currentTime: 0 });
+      if (el) el.currentTime = 0;
     }
+
     set({ isPlaying: true });
-    const el = audioEl;
     el?.play().catch((err) => {
       console.error("Playback failed to start:", err, "readyState:", el?.readyState);
       // A rejection right after setting .src is a well-documented browser
@@ -154,7 +165,7 @@ export const useAudioStore = create<AudioState>((set, get) => ({
   ended: () => {
     if (get().repeatMode === "one") {
       get().seek(0);
-      audioEl?.play().catch(() => {});
+      audioEl?.play().catch((err) => console.error("Repeat-one restart failed:", err));
       return;
     }
     get().playNext();

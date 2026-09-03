@@ -44,6 +44,7 @@ export async function siteSettingsRoutes(app: FastifyInstance): Promise<void> {
         chatHudRevealRate: 30,
         chatHudSfxUrl: null,
         chatSplashMessages: [],
+        categoryOrder: [],
         linkClickSfxUrl: null,
       }
     );
@@ -110,6 +111,7 @@ export async function siteSettingsRoutes(app: FastifyInstance): Promise<void> {
       joinNotifyEmail: string | null;
       chatHudRevealRate: number;
       chatSplashMessages: string[];
+      categoryOrder: string[];
     }>;
   }>("/api/admin/site-settings", { preHandler: requireAdmin }, async (req) => {
     const data: Record<string, unknown> = {};
@@ -135,6 +137,7 @@ export async function siteSettingsRoutes(app: FastifyInstance): Promise<void> {
       "joinNotifyEmail",
       "chatHudRevealRate",
       "chatSplashMessages",
+      "categoryOrder",
     ] as const) {
       if (key in body) data[key] = body[key];
     }

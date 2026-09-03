@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, Outlet, useNavigate } from "react-router-dom";
 import { isTypingTarget } from "../lib/isTypingTarget";
+import { underlineLetter } from "../lib/underlineLetter";
 import { api } from "../lib/api";
 import { useAuth } from "../lib/auth";
 import { useCustomFont } from "../lib/useCustomFont";
@@ -25,17 +26,7 @@ function darkenHex(hex: string, amount: number): string {
   return `#${toHex(mix(r))}${toHex(mix(g))}${toHex(mix(b))}`;
 }
 
-function underlineLetter(word: string, letter: string) {
-  const idx = word.toLowerCase().indexOf(letter.toLowerCase());
-  if (idx === -1) return word;
-  return (
-    <>
-      <span style={{ textDecoration: "none" }}>{word.slice(0, idx)}</span>
-      <span style={{ textDecoration: "underline" }}>{word[idx]}</span>
-      <span style={{ textDecoration: "none" }}>{word.slice(idx + 1)}</span>
-    </>
-  );
-}
+
 import { Avatar } from "./Avatar";
 import { MailIcon, MailNotificationIcon } from "./Icons";
 import { MobileAccountHook } from "./MobileAccountHook";
@@ -273,7 +264,10 @@ export function Layout() {
             </>
           )
         ) : user ? (
-          <MobileAccountHook loggedIn avatarUrl={avatarUrl} hasUnreadPms={hasUnreadPms} username={user.username} isAdmin={user.isAdmin} />
+          <>
+            <NotificationWidget inline />
+            <MobileAccountHook loggedIn avatarUrl={avatarUrl} hasUnreadPms={hasUnreadPms} username={user.username} isAdmin={user.isAdmin} />
+          </>
         ) : (
           <MobileAccountHook loggedIn={false} />
         )}
@@ -284,7 +278,6 @@ export function Layout() {
       </main>
 
       <PlayerBar />
-      {!isDesktop && <NotificationWidget offsetRight={dockOffset} />}
       <ChatDock />
       <div className="crt-overlay" />
     </div>

@@ -21,10 +21,12 @@ export function DiscussionIndexPage() {
   const scale = useContentScaleStore((s) => (isDesktop ? s.desktop : s.mobile));
   const [topics, setTopics] = useState<ChannelSummary[]>([]);
   const [branches, setBranches] = useState<Branch[]>([]);
+  const [categoryOrder, setCategoryOrder] = useState<string[]>([]);
 
   useEffect(() => {
     api<ChannelSummary[]>("/api/channels?kind=DISCUSSION").then(setTopics);
     api<Branch[]>("/api/branches").then(setBranches);
+    api<{ categoryOrder: string[] | null }>("/api/site-settings").then((s) => setCategoryOrder(s.categoryOrder ?? []));
   }, []);
 
   // Already ordered by position from the API — group by category while
@@ -35,6 +37,14 @@ export function DiscussionIndexPage() {
     if (!groups.has(key)) groups.set(key, []);
     groups.get(key)!.push(t);
   }
+  const sortedGroups = [...groups.entries()].sort(([a], [b]) => {
+    const ai = categoryOrder.indexOf(a);
+    const bi = categoryOrder.indexOf(b);
+    if (ai === -1 && bi === -1) return 0; // preserve original encounter order for anything not explicitly ordered
+    if (ai === -1) return 1;
+    if (bi === -1) return -1;
+    return ai - bi;
+  });
 
   return (
     <div style={{ fontSize: `${scale}rem` }}>
@@ -42,7 +52,7 @@ export function DiscussionIndexPage() {
 
       {topics.length === 0 && <p style={{ color: "var(--text-dim)" }}>No topics yet.</p>}
       <div className="forums-columns">
-        {[...groups.entries()].map(([category, items]) => (
+        {sortedGroups.map(([category, items]) => (
           <div key={category || "uncategorized"} style={{ marginBottom: "1rem", breakInside: "avoid" }}>
             {category && (
               <h3 style={{ fontSize: `${0.85 * scale}rem`, color: "var(--text-dim)", textTransform: "uppercase" }}>{category}</h3>

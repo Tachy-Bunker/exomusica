@@ -547,6 +547,7 @@ model SiteSettings {
   chatHudRevealRate  Float   @default(30) // ms per character for the letter-by-letter chat reveal
   chatHudSfxUrl      String? // loops during the reveal
   chatSplashMessages Json?   // string[] — admin-managed rotating hints, "Write a message..." is the fallback if empty
+  categoryOrder      Json?   // string[] — admin-controlled forum topic category display order
 }
 
 model FxSettings {

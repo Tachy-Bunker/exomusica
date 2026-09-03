@@ -279,7 +279,7 @@ export function PlayerBar() {
             )}
 
             {queue.length > 0 && (
-              <div style={{ marginTop: "1.2rem", width: "100%", maxWidth: 480 }}>
+              <div style={{ marginTop: "1.2rem", width: "100%", maxWidth: 480, opacity: 0.35 }}>
                 <div style={{ fontSize: "0.75rem", textTransform: "uppercase", color: "var(--text-dim)", marginBottom: "0.3rem" }}>
                   Up next ({queue.length})
                 </div>

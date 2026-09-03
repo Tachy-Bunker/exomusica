@@ -7,7 +7,7 @@ export async function notificationRoutes(app: FastifyInstance): Promise<void> {
     return prisma.notification.findMany({
       where: { userId: req.user!.id },
       orderBy: { createdAt: "desc" },
-      take: 30,
+      take: 12,
     });
   });
 
