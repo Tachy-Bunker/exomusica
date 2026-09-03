@@ -1,0 +1,2 @@
+-- AlterTable
+ALTER TABLE "User" ALTER COLUMN "storageLimitBytes" SET DEFAULT 524288000;
