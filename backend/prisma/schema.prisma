@@ -54,6 +54,7 @@ model User {
   linkedUserId          Int?         // ghost's discordId is linked to this real account — resolved at read time everywhere (messages, mentions, export), not a one-time reassignment, since a future bot bridge needs this mapping to keep working for new messages too
   linkedUser            User?        @relation("GhostLink", fields: [linkedUserId], references: [id])
   linkedGhosts          User[]       @relation("GhostLink")
+  collaboratorProfile   Collaborator?
   deletedAt             DateTime? // set when a real account is ghosted (self- or admin-deleted)
   storageUsedBytes      BigInt       @default(0)
   storageLimitBytes     BigInt       @default(524288000) // 500MB — raised alongside the 100MB per-attachment limit, since local storage is meant to be temporary now (see the Storage admin tool)
@@ -337,16 +338,28 @@ model AboutFeature {
 }
 
 model Collaborator {
-  id         Int     @id @default(autoincrement())
-  name       String
-  role       String
-  bio        String? @db.Text
-  pictureUrl String?
-  links      Json?
+  id           Int     @id @default(autoincrement())
+  slug         String? @unique
+  name         String
+  role         String
+  bio          String? @db.Text
+  pictureUrl   String?
+  links        Json?
+  linkedUserId Int?    @unique
+  linkedUser   User?   @relation(fields: [linkedUserId], references: [id])
 
-  albums AlbumCollaborator[]
-  tracks TrackCollaborator[]
+  albums        AlbumCollaborator[]
+  tracks        TrackCollaborator[]
   aboutFeatures AboutFeature[]
+  galleryImages CollaboratorGalleryImage[]
+}
+
+model CollaboratorGalleryImage {
+  id             Int          @id @default(autoincrement())
+  collaboratorId Int
+  collaborator   Collaborator @relation(fields: [collaboratorId], references: [id], onDelete: Cascade)
+  url            String
+  position       Int          @default(0)
 }
 
 model AlbumCollaborator {

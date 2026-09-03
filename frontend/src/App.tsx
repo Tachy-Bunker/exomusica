@@ -13,6 +13,7 @@ import { DiscussionIndexPage } from "./pages/DiscussionIndexPage";
 import { TopicPage } from "./pages/TopicPage";
 import { BranchPage } from "./pages/BranchPage";
 import { AlbumPage } from "./pages/AlbumPage";
+import { CollaboratorPage } from "./pages/CollaboratorPage";
 import { ProfilePage } from "./pages/ProfilePage";
 import { PMsPage } from "./pages/PMsPage";
 import { AccountSettingsPage } from "./pages/AccountSettingsPage";
@@ -59,6 +60,7 @@ export default function App() {
             <Route path="discussion" element={<DiscussionIndexPage />} />
             <Route path="branch/:slug" element={<BranchPage />} />
             <Route path="album/:slug" element={<AlbumPage />} />
+            <Route path="collaborator/:slug" element={<CollaboratorPage />} />
             <Route path="topic/:slug" element={<TopicPage />} />
             <Route path="u/:username" element={<ProfilePage />} />
             <Route path="pms" element={<PMsPage />} />
