@@ -22,6 +22,7 @@ import { useCustomFont, type FontInfo } from "../lib/useCustomFont";
 import { MiniChat } from "../components/MiniChat";
 import { useSiteEffectsStore } from "../lib/siteEffectsStore";
 import { getCurrentSfxVolume } from "../lib/volumeMixerStore";
+import { playOneShotSfx } from "../lib/oneShotSfx";
 import { useChatHudReveal } from "../lib/useChatHudReveal";
 import { useFixedPortalRoot } from "../lib/useFixedPortalRoot";
 
@@ -302,9 +303,7 @@ export function ChannelPage({ channelSlug, fillHeight }: { channelSlug?: string;
     if (!slug) return;
     const url = useSiteEffectsStore.getState().chatOpenSfxUrl;
     if (!url) return;
-    const audio = new Audio(url);
-    audio.volume = getCurrentSfxVolume();
-    audio.play().catch(() => {});
+    playOneShotSfx(url, getCurrentSfxVolume());
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [slug]);
   const { user } = useAuth();
@@ -463,16 +462,22 @@ export function ChannelPage({ channelSlug, fillHeight }: { channelSlug?: string;
     let keyboardOpen = false;
     let scrollBeforeKeyboard = 0;
 
+    let composerTriggeredOpen = false;
+
     function handleViewportResize() {
       const shrunk = window.innerHeight - vv!.height > 120; // heuristic: keyboard, not just a minor UI chrome change
+      const composerFocused = document.activeElement === textareaRef.current;
       if (shrunk && !keyboardOpen) {
         keyboardOpen = true;
+        composerTriggeredOpen = composerFocused;
+        if (!composerFocused) return; // some other input (Location, search) opened the keyboard — leave the view alone
         scrollBeforeKeyboard = messageListRef.current?.scrollTop ?? window.scrollY;
         requestAnimationFrame(() => {
           textareaRef.current?.scrollIntoView({ block: "end", behavior: "smooth" });
         });
       } else if (!shrunk && keyboardOpen) {
         keyboardOpen = false;
+        if (!composerTriggeredOpen) return;
         requestAnimationFrame(() => {
           if (messageListRef.current) messageListRef.current.scrollTop = scrollBeforeKeyboard;
           else window.scrollTo({ top: scrollBeforeKeyboard });

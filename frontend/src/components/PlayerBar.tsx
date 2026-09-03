@@ -64,6 +64,60 @@ export function PlayerBar() {
     return () => observer.disconnect();
   }, [currentTrack, expanded]);
 
+  // Mobile-only: lock body scroll while the player is expanded, since it's
+  // a full-viewport overlay and background scroll would otherwise still
+  // be reachable underneath it.
+  useEffect(() => {
+    if (!expanded || isDesktop) return;
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prevOverflow;
+    };
+  }, [expanded, isDesktop]);
+
+  const [dragOffset, setDragOffset] = useState(0);
+  const [dragging, setDragging] = useState(false);
+  const overlayRef = useRef<HTMLDivElement>(null);
+
+  function handleOverlayDragStart(e: React.MouseEvent | React.TouchEvent) {
+    const target = e.target as HTMLElement;
+    if (target.closest("button, a, input")) return;
+    const startY = "touches" in e ? e.touches[0].clientY : e.clientY;
+    setDragging(true);
+
+    function onMove(ev: MouseEvent | TouchEvent) {
+      const clientY = "touches" in ev ? ev.touches[0].clientY : ev.clientY;
+      const delta = Math.max(0, clientY - startY); // only allow dragging down, not up
+      setDragOffset(delta);
+    }
+    function onUp() {
+      setDragging(false);
+      setDragOffset((current) => {
+        const overlayHeight = overlayRef.current?.getBoundingClientRect().height ?? 600;
+        if (current > overlayHeight * 0.3) {
+          // Dragged far enough — animate the rest of the way down, then
+          // actually collapse once that animation would be done.
+          setTimeout(() => setExpanded(false), 200);
+          return overlayHeight;
+        }
+        return 0; // snap back
+      });
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", onUp);
+      window.removeEventListener("touchmove", onMove);
+      window.removeEventListener("touchend", onUp);
+    }
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+    window.addEventListener("touchmove", onMove);
+    window.addEventListener("touchend", onUp);
+  }
+
+  useEffect(() => {
+    setDragOffset(0);
+  }, [expanded]);
+
   // Click/swipe-to-expand: any part of the docked row that isn't a button
   // or link expands the player. Buttons/links stopPropagation on their own
   // clicks so this only fires for genuine "tap the bar" gestures.
@@ -212,7 +266,17 @@ export function PlayerBar() {
       )}
 
       {currentTrack && expanded && (
-        <div className="player-expanded-overlay">
+        <div
+          className="player-expanded-overlay"
+          ref={overlayRef}
+          onMouseDown={handleOverlayDragStart}
+          onTouchStart={handleOverlayDragStart}
+          style={{
+            transform: `translateY(${dragOffset}px)`,
+            opacity: 1 - dragOffset / 800,
+            transition: dragging ? "none" : "transform 0.2s ease, opacity 0.2s ease",
+          }}
+        >
           <button className="btn player-expand-btn" style={{ position: "absolute", top: "1rem", right: "1rem" }} onClick={() => setExpanded(false)} title="Collapse">
             <CollapseIcon size={16} />
           </button>

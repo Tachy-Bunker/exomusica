@@ -7,12 +7,14 @@ import { useContentScaleStore } from "../lib/contentScaleStore";
 import type { Branch } from "../lib/types";
 import { ExportIcon } from "../components/Icons";
 import { exportChatHistory } from "../lib/exportChat";
+import { useChatDockStore } from "../lib/chatDockStore";
 
 interface ChannelSummary {
   slug: string;
   name: string;
   description: string | null;
   category: string | null;
+  contentMarkdown: string | null;
 }
 
 export function DiscussionIndexPage() {
@@ -22,6 +24,7 @@ export function DiscussionIndexPage() {
   const [topics, setTopics] = useState<ChannelSummary[]>([]);
   const [branches, setBranches] = useState<Branch[]>([]);
   const [categoryOrder, setCategoryOrder] = useState<string[]>([]);
+  const openChat = useChatDockStore((s) => s.openChat);
 
   useEffect(() => {
     api<ChannelSummary[]>("/api/channels?kind=DISCUSSION").then(setTopics);
@@ -60,7 +63,17 @@ export function DiscussionIndexPage() {
             <ul style={{ listStyle: "none", padding: 0 }}>
               {items.map((t) => (
                 <li key={t.slug} style={{ marginBottom: "0.5rem" }}>
-                  <Link to={`/topic/${t.slug}`}>{t.name}</Link>{" "}
+                  <Link
+                    to={`/topic/${t.slug}`}
+                    onClick={(e) => {
+                      if (isDesktop && !t.contentMarkdown) {
+                        e.preventDefault();
+                        openChat(t.slug, t.name);
+                      }
+                    }}
+                  >
+                    {t.name}
+                  </Link>{" "}
                   <button className="export-icon-btn" onClick={() => exportChatHistory(t.slug)} title="Download this topic's chat history">
                     <ExportIcon size={16} />
                   </button>
@@ -77,7 +90,12 @@ export function DiscussionIndexPage() {
       <ul style={{ listStyle: "none", padding: 0 }}>
         {branches.map((b) => (
           <li key={b.id} style={{ marginBottom: "0.5rem" }}>
-            <Link to={`/branch/${b.slug}`}>{b.name}</Link>
+            <Link to={`/branch/${b.slug}`}>{b.name}</Link>{" "}
+            {b.channel && (
+              <button className="export-icon-btn" onClick={() => exportChatHistory(b.channel!.slug)} title="Download this branch's chat history">
+                <ExportIcon size={16} />
+              </button>
+            )}
           </li>
         ))}
       </ul>

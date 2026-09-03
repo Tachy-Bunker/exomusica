@@ -105,7 +105,7 @@ export function TopicSwitcher({ label = "Location" }: { label?: string }) {
           }}
         >
           <input
-            autoFocus
+            autoFocus={isDesktop}
             placeholder="Search…"
             value={query}
             onChange={(e) => setQuery(e.target.value)}

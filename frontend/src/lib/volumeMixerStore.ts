@@ -2,6 +2,7 @@ import { create } from "zustand";
 import { api } from "./api";
 import { setMusicVolume, useAudioStore } from "./audioStore";
 import { useSiteEffectsStore } from "./siteEffectsStore";
+import { playOneShotSfx } from "./oneShotSfx";
 
 interface VolumeMixerState {
   notifications: number; // 0..1
@@ -59,7 +60,5 @@ export function getCurrentSfxVolume(): number {
 export function playLinkClickSound(): void {
   const url = useSiteEffectsStore.getState().linkClickSfxUrl;
   if (!url) return;
-  const audio = new Audio(url);
-  audio.volume = getCurrentSfxVolume();
-  audio.play().catch(() => {});
+  playOneShotSfx(url, getCurrentSfxVolume());
 }

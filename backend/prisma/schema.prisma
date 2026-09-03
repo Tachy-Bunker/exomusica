@@ -56,7 +56,7 @@ model User {
   linkedGhosts          User[]       @relation("GhostLink")
   deletedAt             DateTime? // set when a real account is ghosted (self- or admin-deleted)
   storageUsedBytes      BigInt       @default(0)
-  storageLimitBytes     BigInt       @default(68157440) // 65MB
+  storageLimitBytes     BigInt       @default(524288000) // 500MB — raised alongside the 100MB per-attachment limit, since local storage is meant to be temporary now (see the Storage admin tool)
   volumeNotifications   Float        @default(0.8)
   volumeSfxIdle         Float        @default(0.8) // SFX volume when no music is playing
   volumeSfxPlaying      Float        @default(0.6) // SFX volume while music is playing — ducked so it doesn't compete
