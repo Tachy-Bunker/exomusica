@@ -43,7 +43,12 @@ function internalPathOf(url: string): string | null {
   return null;
 }
 
-function renderInline(text: string, keyPrefix: string, onLinkClick?: (path: string) => void): ReactNode[] {
+function renderInline(
+  text: string,
+  keyPrefix: string,
+  onLinkClick?: (path: string) => void,
+  mentionCache?: Map<string, { username: string; avatarUrl: string | null }>,
+): ReactNode[] {
   const nodes: ReactNode[] = [];
   let lastIndex = 0;
   let i = 0;
@@ -67,12 +72,12 @@ function renderInline(text: string, keyPrefix: string, onLinkClick?: (path: stri
     const [, bold, italic, underline, strike, code, spoiler, linkText, linkUrl, timestamp, roleId, userId, channelId, emojiName, bareUrl] =
       match;
 
-    if (bold !== undefined) nodes.push(<strong key={key}>{renderInline(bold, key, onLinkClick)}</strong>);
-    else if (italic !== undefined) nodes.push(<em key={key}>{renderInline(italic, key, onLinkClick)}</em>);
-    else if (underline !== undefined) nodes.push(<u key={key}>{renderInline(underline, key, onLinkClick)}</u>);
-    else if (strike !== undefined) nodes.push(<s key={key}>{renderInline(strike, key, onLinkClick)}</s>);
+    if (bold !== undefined) nodes.push(<strong key={key}>{renderInline(bold, key, onLinkClick, mentionCache)}</strong>);
+    else if (italic !== undefined) nodes.push(<em key={key}>{renderInline(italic, key, onLinkClick, mentionCache)}</em>);
+    else if (underline !== undefined) nodes.push(<u key={key}>{renderInline(underline, key, onLinkClick, mentionCache)}</u>);
+    else if (strike !== undefined) nodes.push(<s key={key}>{renderInline(strike, key, onLinkClick, mentionCache)}</s>);
     else if (code !== undefined) nodes.push(<code key={key}>{code}</code>);
-    else if (spoiler !== undefined) nodes.push(<Spoiler key={key}>{renderInline(spoiler, key, onLinkClick)}</Spoiler>);
+    else if (spoiler !== undefined) nodes.push(<Spoiler key={key}>{renderInline(spoiler, key, onLinkClick, mentionCache)}</Spoiler>);
     else if (linkText !== undefined && linkUrl !== undefined)
       nodes.push(
         <a key={key} href={linkUrl} target="_blank" rel="noreferrer" onClick={linkClickHandler(linkUrl)}>
@@ -91,12 +96,14 @@ function renderInline(text: string, keyPrefix: string, onLinkClick?: (path: stri
           @role:{roleId}
         </span>,
       );
-    else if (userId !== undefined)
+    else if (userId !== undefined) {
+      const resolved = mentionCache?.get(userId);
       nodes.push(
-        <span key={key} className="mention">
-          @{userId}
+        <span key={key} className="mention" title={resolved ? undefined : "Not yet resolved"}>
+          @{resolved ? resolved.username : userId}
         </span>,
       );
+    }
     else if (channelId !== undefined)
       nodes.push(
         <span key={key} className="mention">
@@ -125,7 +132,11 @@ function renderInline(text: string, keyPrefix: string, onLinkClick?: (path: stri
   return nodes;
 }
 
-export function renderMessageContent(text: string, onLinkClick?: (url: string) => void): ReactNode {
+export function renderMessageContent(
+  text: string,
+  onLinkClick?: (url: string) => void,
+  mentionCache?: Map<string, { username: string; avatarUrl: string | null }>,
+): ReactNode {
   const lines = text.split("\n");
   return (
     <>
@@ -133,13 +144,13 @@ export function renderMessageContent(text: string, onLinkClick?: (url: string) =
         if (line.startsWith("## "))
           return (
             <h3 key={idx} style={{ margin: "0.3em 0", fontSize: "1.1rem" }}>
-              {renderInline(line.slice(3), `h${idx}`, onLinkClick)}
+              {renderInline(line.slice(3), `h${idx}`, onLinkClick, mentionCache)}
             </h3>
           );
         if (line.startsWith("-# "))
           return (
             <p key={idx} style={{ fontSize: "0.75em", color: "var(--text-dim)", margin: "0.2em 0" }}>
-              {renderInline(line.slice(3), `s${idx}`, onLinkClick)}
+              {renderInline(line.slice(3), `s${idx}`, onLinkClick, mentionCache)}
             </p>
           );
         if (line.startsWith("> "))
@@ -153,13 +164,13 @@ export function renderMessageContent(text: string, onLinkClick?: (url: string) =
                 color: "var(--text-dim)",
               }}
             >
-              {renderInline(line.slice(2), `q${idx}`, onLinkClick)}
+              {renderInline(line.slice(2), `q${idx}`, onLinkClick, mentionCache)}
             </blockquote>
           );
         if (line.trim() === "") return <br key={idx} />;
         return (
           <p key={idx} style={{ margin: "0.2em 0" }}>
-            {renderInline(line, `p${idx}`, onLinkClick)}
+            {renderInline(line, `p${idx}`, onLinkClick, mentionCache)}
           </p>
         );
       })}

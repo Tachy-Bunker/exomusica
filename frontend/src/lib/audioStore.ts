@@ -68,8 +68,27 @@ export const useAudioStore = create<AudioState>((set, get) => ({
       set({ currentTrack: track, currentTime: 0, duration: 0 });
       if (audioEl) audioEl.src = track.fileUrl;
     }
-    audioEl?.play().catch(() => set({ isPlaying: false }));
     set({ isPlaying: true });
+    const el = audioEl;
+    el?.play().catch((err) => {
+      console.error("Playback failed to start:", err, "readyState:", el?.readyState);
+      // A rejection right after setting .src is a well-documented browser
+      // race (the new source hasn't buffered enough yet) — retry once it
+      // actually can play, rather than just giving up and silently
+      // leaving the queue stuck on this track forever.
+      if (el && el.readyState < 3) {
+        const retry = () => {
+          el.removeEventListener("canplay", retry);
+          el.play().catch((err2) => {
+            console.error("Playback retry also failed:", err2);
+            set({ isPlaying: false });
+          });
+        };
+        el.addEventListener("canplay", retry);
+      } else {
+        set({ isPlaying: false });
+      }
+    });
     useAmbienceStore.getState().setEnabled(false);
   },
 

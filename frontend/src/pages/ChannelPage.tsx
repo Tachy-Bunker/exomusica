@@ -6,6 +6,7 @@ import { ExportIcon } from "../components/Icons";
 import { useAuth } from "../lib/auth";
 import { useAudioStore } from "../lib/audioStore";
 import { renderMessageContent } from "../lib/formatMessage";
+import { useMentionResolutionStore } from "../lib/mentionResolutionStore";
 import { EmojiPicker } from "../components/EmojiPicker";
 import { AttachmentPreview } from "../components/AttachmentPreview";
 import { SearchBox } from "../components/SearchBox";
@@ -186,6 +187,13 @@ function MessageBody({
   const { user } = useAuth();
   const play = useAudioStore((s) => s.play);
   const canModerate = !!user && (user.id === message.authorId || user.isAdmin);
+  const mentionCache = useMentionResolutionStore((s) => s.cache);
+  const resolveMentions = useMentionResolutionStore((s) => s.resolve);
+
+  useEffect(() => {
+    const ids = [...message.contentRaw.matchAll(/<@(\d+)>/g)].map((m) => m[1]);
+    if (ids.length > 0) resolveMentions(ids);
+  }, [message.contentRaw, resolveMentions]);
 
   if (message.isDeleted) {
     return <em style={{ color: "var(--text-dim)" }}>message deleted</em>;
@@ -199,7 +207,7 @@ function MessageBody({
           ↪ {message.replyPreview.authorUsername}: {message.replyPreview.excerpt}
         </a>
       )}
-      <div style={{ paddingRight: "1.6rem" }}>{renderMessageContent(message.contentRaw, useContext(LinkClickContext))}</div>
+      <div style={{ paddingRight: "1.6rem" }}>{renderMessageContent(message.contentRaw, useContext(LinkClickContext), mentionCache)}</div>
       {message.embeds.map((track) => (
         <div className="track-embed" key={track.id} onClick={(e) => e.stopPropagation()}>
           <button onClick={() => play(track)}>▶</button>
@@ -441,6 +449,39 @@ export function ChannelPage({ channelSlug, fillHeight }: { channelSlug?: string;
   const wsRef = useRef<WebSocket | null>(null);
   const navigate = useNavigate();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  // Mobile virtual keyboard handling: visualViewport shrinks when the
+  // keyboard opens (a real, standard signal — no guessing based on focus
+  // timing). Scroll the composer into view on open; restore the scroll
+  // position that was current right before the keyboard opened, rather
+  // than an arbitrary "scroll to top", since the user may have been
+  // reading further down when they tapped in.
+  useEffect(() => {
+    if (isDesktop || !window.visualViewport) return;
+    const vv = window.visualViewport;
+    let keyboardOpen = false;
+    let scrollBeforeKeyboard = 0;
+
+    function handleViewportResize() {
+      const shrunk = window.innerHeight - vv!.height > 120; // heuristic: keyboard, not just a minor UI chrome change
+      if (shrunk && !keyboardOpen) {
+        keyboardOpen = true;
+        scrollBeforeKeyboard = messageListRef.current?.scrollTop ?? window.scrollY;
+        requestAnimationFrame(() => {
+          textareaRef.current?.scrollIntoView({ block: "end", behavior: "smooth" });
+        });
+      } else if (!shrunk && keyboardOpen) {
+        keyboardOpen = false;
+        requestAnimationFrame(() => {
+          if (messageListRef.current) messageListRef.current.scrollTop = scrollBeforeKeyboard;
+          else window.scrollTo({ top: scrollBeforeKeyboard });
+        });
+      }
+    }
+
+    vv.addEventListener("resize", handleViewportResize);
+    return () => vv.removeEventListener("resize", handleViewportResize);
+  }, [isDesktop]);
 
   useEffect(() => {
     if (!user) return;

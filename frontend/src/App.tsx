@@ -40,7 +40,7 @@ export default function App() {
     <>
       <ChromaticAberrationLayer />
       <div id="fixed-portal-root" />
-      <div style={{ filter: "url(#caFilter)" }}>
+      <div style={{ filter: "url(#caFilter)", height: "100%" }}>
         <MoireLayer />
         <BrowserRouter>
           <AuthProvider>

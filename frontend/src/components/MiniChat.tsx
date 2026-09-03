@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import { api } from "../lib/api";
 import { renderMessageContent } from "../lib/formatMessage";
+import { useMentionResolutionStore } from "../lib/mentionResolutionStore";
 import type { MessageDTO } from "../lib/types";
 
 function upsertMessage(list: MessageDTO[], msg: MessageDTO): MessageDTO[] {
@@ -17,6 +18,13 @@ export function MiniChat({ slug, channelName }: { slug: string; channelName: str
   const [messages, setMessages] = useState<MessageDTO[]>([]);
   const [draft, setDraft] = useState("");
   const listRef = useRef<HTMLDivElement>(null);
+  const mentionCache = useMentionResolutionStore((s) => s.cache);
+  const resolveMentions = useMentionResolutionStore((s) => s.resolve);
+
+  useEffect(() => {
+    const ids = messages.flatMap((m) => [...m.contentRaw.matchAll(/<@(\d+)>/g)].map((match) => match[1]));
+    if (ids.length > 0) resolveMentions(ids);
+  }, [messages, resolveMentions]);
 
   useEffect(() => {
     api<MessageDTO[]>(`/api/channels/${slug}/messages?limit=30`).then(setMessages);
@@ -54,7 +62,7 @@ export function MiniChat({ slug, channelName }: { slug: string; channelName: str
             <span className="mono" style={{ fontSize: "0.7rem", color: "var(--text-dim)" }}>
               {new Date(m.unixTimestamp * 1000).toLocaleTimeString()}
             </span>
-            <div>{m.isDeleted ? <em style={{ color: "var(--text-dim)" }}>message deleted</em> : renderMessageContent(m.contentRaw, navigate)}</div>
+            <div>{m.isDeleted ? <em style={{ color: "var(--text-dim)" }}>message deleted</em> : renderMessageContent(m.contentRaw, navigate, mentionCache)}</div>
           </div>
         ))}
       </div>

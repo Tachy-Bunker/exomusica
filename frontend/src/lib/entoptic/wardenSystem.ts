@@ -503,7 +503,13 @@ export class WardenSystem {
     const scale = this.canvas.width / this.cssWidth;
     gw.save();
     gw.scale(scale, scale);
-    for (const o of this.wardens) this.drawOne(o, state);
+    for (const o of this.wardens) {
+      const x0 = o.screenX ?? (o.x * 0.5 + 0.5) * this.cssWidth;
+      const y0 = o.screenY ?? (1 - (o.y * 0.5 + 0.5)) * this.cssHeight;
+      const margin = o.size * 3 + 60; // covers body reach, glow layers, and trail length
+      if (x0 < -margin || x0 > this.cssWidth + margin || y0 < -margin || y0 > this.cssHeight + margin) continue;
+      this.drawOne(o, state);
+    }
     gw.restore();
   }
 

@@ -254,6 +254,25 @@ export async function accountRoutes(app: FastifyInstance): Promise<void> {
     return { status: "unlinked" };
   });
 
+  // Bulk lookup for mentions in imported content, which store a raw
+  // Discord snowflake (<@123456789>) rather than a username. Resolves
+  // through the ghost link when one is set, so a mention that says
+  // "@<ghost's discord id>" in old message text shows the linked real
+  // account's current username — without ever rewriting the message.
+  app.get<{ Querystring: { ids?: string } }>("/api/users/discord-lookup", async (req) => {
+    const ids = (req.query.ids ?? "").split(",").map((s) => s.trim()).filter(Boolean);
+    if (ids.length === 0) return [];
+    const users = await prisma.user.findMany({
+      where: { discordId: { in: ids } },
+      select: { discordId: true, username: true, avatarUrl: true, isGhost: true, linkedUser: { select: { username: true, avatarUrl: true } } },
+    });
+    return users.map((u) => ({
+      discordId: u.discordId,
+      username: u.isGhost && u.linkedUser ? u.linkedUser.username : u.username,
+      avatarUrl: u.isGhost && u.linkedUser ? u.linkedUser.avatarUrl : u.avatarUrl,
+    }));
+  });
+
   app.get<{ Params: { username: string } }>("/api/users/:username", async (req, reply) => {
     const user = await prisma.user.findUnique({
       where: { username: req.params.username },

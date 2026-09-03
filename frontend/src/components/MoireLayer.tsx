@@ -1,8 +1,6 @@
 import { useEffect, useRef } from "react";
 import { useSiteEffectsStore } from "../lib/siteEffectsStore";
 
-const BASE_TILE_PX = 200;
-
 function triangleWave(phase01: number): number {
   const p = phase01 % 1;
   return p < 0.5 ? p * 2 : 2 - p * 2;
@@ -40,7 +38,7 @@ export function MoireLayer() {
         }
 
         const bgImage = s.moireImageUrl ? `url(${s.moireImageUrl})` : "none";
-        const bgSize = `${BASE_TILE_PX * s.moireSize}px`;
+        const bgSize = `${50 / Math.max(0.2, s.moireSize)}%`;
         base.style.backgroundImage = bgImage;
         base.style.backgroundSize = bgSize;
         base.style.opacity = String(s.moireOpacity);
