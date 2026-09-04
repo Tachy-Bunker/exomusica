@@ -40,6 +40,7 @@ import { ChatDock } from "./ChatDock";
 import { NotificationWidget } from "./NotificationWidget";
 import { OnlineOrbs } from "./OnlineOrbs";
 import { PlayerBar } from "./PlayerBar";
+import { resumeSharedContextIfNeeded } from "../lib/oneShotSfx";
 
 export function Layout() {
   const { user } = useAuth();
@@ -146,6 +147,20 @@ export function Layout() {
     // document level still sees it fire on the way down.
     document.addEventListener("play", handleMediaPlay, true);
     return () => document.removeEventListener("play", handleMediaPlay, true);
+  }, []);
+
+  useEffect(() => {
+    function resumeOnce() {
+      resumeSharedContextIfNeeded();
+      window.removeEventListener("pointerdown", resumeOnce);
+      window.removeEventListener("keydown", resumeOnce);
+    }
+    window.addEventListener("pointerdown", resumeOnce);
+    window.addEventListener("keydown", resumeOnce);
+    return () => {
+      window.removeEventListener("pointerdown", resumeOnce);
+      window.removeEventListener("keydown", resumeOnce);
+    };
   }, []);
 
   const [siteFont, setSiteFont] = useState<{ familyName: string; fileUrl: string; format: string } | null>(null);

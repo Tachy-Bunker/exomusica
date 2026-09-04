@@ -7,6 +7,12 @@ function ensureContext(): AudioContext {
   return sharedCtx;
 }
 
+export function resumeSharedContextIfNeeded(): void {
+  if (sharedCtx && sharedCtx.state === "suspended") {
+    sharedCtx.resume().catch((err) => console.error("Failed to resume shared audio context:", err));
+  }
+}
+
 async function loadBuffer(url: string): Promise<AudioBuffer> {
   const cached = bufferCache.get(url);
   if (cached) return cached;
