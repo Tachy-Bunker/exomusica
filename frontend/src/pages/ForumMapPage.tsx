@@ -8,14 +8,17 @@ interface MapNode {
   parentId: number | null;
   x: number;
   y: number;
-  channel: { slug: string; name: string; kind: "DISCUSSION" | "BRANCH_LINKED"; branchId: number | null } | null;
+  channel: { slug: string; name: string } | null;
 }
+
+const NODE_STYLE: Record<MapNode["type"], { radius: number; color: string }> = {
+  TOPIC: { radius: 14, color: "#8fd3ff" },
+  ACTIVE_BRANCHES: { radius: 18, color: "#a7ffc9" },
+  GROWING_SEEDS: { radius: 18, color: "#c9a7ff" },
+};
 
 export function ForumMapPage() {
   const [nodes, setNodes] = useState<MapNode[]>([]);
-  const [hoveredSpecial, setHoveredSpecial] = useState<number | null>(null);
-  const [activeBranchChannels, setActiveBranchChannels] = useState<{ slug: string; name: string }[]>([]);
-  const [growingSeedChannels, setGrowingSeedChannels] = useState<{ slug: string; name: string }[]>([]);
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [zoom, setZoom] = useState(1);
   const dragState = useRef<{ startX: number; startY: number; panX: number; panY: number } | null>(null);
@@ -25,24 +28,8 @@ export function ForumMapPage() {
     api<MapNode[]>("/api/forum-map").then(setNodes);
   }, []);
 
-  useEffect(() => {
-    // Split matches DiscussionIndexPage exactly: BABY_CRYSTALS branches are
-    // "Growing Seeds", everything else with a channel is "Active Branches".
-    api<{ visibility: string; channel: { slug: string; name: string } | null }[]>("/api/branches").then((branches) => {
-      const withChannel = branches.filter((b) => b.channel);
-      setActiveBranchChannels(withChannel.filter((b) => b.visibility !== "BABY_CRYSTALS").map((b) => ({ slug: b.channel!.slug, name: b.channel!.name })));
-      setGrowingSeedChannels(withChannel.filter((b) => b.visibility === "BABY_CRYSTALS").map((b) => ({ slug: b.channel!.slug, name: b.channel!.name })));
-    });
-  }, []);
-
-  function nodeLabel(n: MapNode): string {
-    if (n.type === "ACTIVE_BRANCHES") return "Active Branches";
-    if (n.type === "GROWING_SEEDS") return "Growing Seeds";
-    return n.channel?.name ?? "";
-  }
-
   function handleNodeClick(n: MapNode) {
-    if (n.type === "TOPIC" && n.channel) navigate(`/topic/${n.channel.slug}`);
+    if (n.channel) navigate(`/topic/${n.channel.slug}`);
   }
 
   function onPointerDown(e: React.PointerEvent) {
@@ -78,6 +65,12 @@ export function ForumMapPage() {
       <button className="btn" style={{ position: "absolute", top: 12, left: 12, zIndex: 5 }} onClick={() => navigate("/discussion")}>
         ← Back to Discussion
       </button>
+
+      <div style={{ position: "absolute", top: 12, right: 12, zIndex: 5, display: "flex", gap: "1rem", fontSize: "0.75rem", color: "rgba(255,255,255,0.6)" }}>
+        <span><span style={{ display: "inline-block", width: 10, height: 10, borderRadius: "50%", background: "#8fd3ff", marginRight: 4 }} />Topic</span>
+        <span><span style={{ display: "inline-block", width: 10, height: 10, borderRadius: "50%", background: "#a7ffc9", marginRight: 4 }} />Active Branch</span>
+        <span><span style={{ display: "inline-block", width: 10, height: 10, borderRadius: "50%", background: "#c9a7ff", marginRight: 4 }} />Growing Seed</span>
+      </div>
 
       <svg
         viewBox="-800 -800 1600 1600"
@@ -119,60 +112,19 @@ export function ForumMapPage() {
           })}
 
         {nodes.map((n) => {
-          const isSpecial = n.type !== "TOPIC";
-          const radius = isSpecial ? 22 : 14;
-          const color = isSpecial ? "#c9a7ff" : "#8fd3ff";
+          const { radius, color } = NODE_STYLE[n.type];
           return (
             <g
               key={n.id}
               transform={`translate(${n.x}, ${n.y})`}
-              style={{ cursor: n.type === "TOPIC" ? "pointer" : "default" }}
+              style={{ cursor: n.channel ? "pointer" : "default" }}
               onClick={() => handleNodeClick(n)}
-              onMouseEnter={() => isSpecial && setHoveredSpecial(n.id)}
-              onMouseLeave={() => isSpecial && setHoveredSpecial(null)}
             >
               <circle r={radius} fill={color} opacity={0.85} filter="url(#forum-map-glow)" />
               <circle r={radius * 0.4} fill="#fff" opacity={0.9} />
               <text y={radius + 16} textAnchor="middle" fill="rgba(255,255,255,0.75)" fontSize={12} fontFamily="var(--font-display)">
-                {nodeLabel(n)}
+                {n.channel?.name ?? ""}
               </text>
-
-              {isSpecial && hoveredSpecial === n.id && (
-                <foreignObject x={radius + 10} y={-40} width={200} height={200}>
-                  <div
-                    style={{
-                      background: "rgba(15,10,25,0.92)",
-                      border: "1px solid rgba(180,150,255,0.4)",
-                      borderRadius: 8,
-                      padding: "0.5rem",
-                      fontSize: "0.8rem",
-                      color: "#e8e0ff",
-                      maxHeight: 180,
-                      overflowY: "auto",
-                    }}
-                  >
-                    {(() => {
-                      const list = n.type === "ACTIVE_BRANCHES" ? activeBranchChannels : growingSeedChannels;
-                      return list.length === 0 ? (
-                        <div style={{ opacity: 0.6 }}>Nothing here yet.</div>
-                      ) : (
-                        list.map((b) => (
-                          <div
-                            key={b.slug}
-                            style={{ padding: "0.15rem 0", cursor: "pointer" }}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              navigate(`/topic/${b.slug}`);
-                            }}
-                          >
-                            {b.name}
-                          </div>
-                        ))
-                      );
-                    })()}
-                  </div>
-                </foreignObject>
-              )}
             </g>
           );
         })}

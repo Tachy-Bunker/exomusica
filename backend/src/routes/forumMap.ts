@@ -10,14 +10,14 @@ export async function forumMapRoutes(app: FastifyInstance): Promise<void> {
     return nodes;
   });
 
-  app.post<{ Body: { type: "TOPIC" | "ACTIVE_BRANCHES" | "GROWING_SEEDS"; channelId?: number; parentId?: number | null; x: number; y: number } }>(
+  app.post<{ Body: { type: "TOPIC" | "ACTIVE_BRANCHES" | "GROWING_SEEDS"; channelId: number; parentId?: number | null; x: number; y: number } }>(
     "/api/admin/forum-map/nodes",
     { preHandler: requireAdmin },
     async (req, reply) => {
       const { type, channelId, parentId, x, y } = req.body ?? {};
-      if (type === "TOPIC" && !channelId) return reply.code(400).send({ error: "channelId is required for a topic node" });
+      if (!channelId) return reply.code(400).send({ error: "channelId is required" });
       const node = await prisma.forumMapNode.create({
-        data: { type, channelId: type === "TOPIC" ? channelId : null, parentId: parentId ?? null, x: x ?? 0, y: y ?? 0 },
+        data: { type, channelId, parentId: parentId ?? null, x: x ?? 0, y: y ?? 0 },
       });
       return reply.code(201).send(node);
     },

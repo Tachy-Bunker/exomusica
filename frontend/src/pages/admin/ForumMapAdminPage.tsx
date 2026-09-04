@@ -34,14 +34,14 @@ export function ForumMapAdminPage() {
     api<{ id: number; slug: string; name: string; branchId: number | null }[]>("/api/channels").then(setChannels);
   }, []);
 
-  const usedChannelIds = new Set(nodes.filter((n) => n.type === "TOPIC").map((n) => n.channel?.slug));
+  const usedChannelIds = new Set(nodes.map((n) => n.channel?.slug));
   const availableChannels = channels.filter((c) => !usedChannelIds.has(c.slug));
 
   async function addNode() {
-    if (newType === "TOPIC" && !newChannelId) return;
+    if (!newChannelId) return;
     await api("/api/admin/forum-map/nodes", {
       method: "POST",
-      body: JSON.stringify({ type: newType, channelId: newType === "TOPIC" ? newChannelId : undefined, x: 0, y: 0 }),
+      body: JSON.stringify({ type: newType, channelId: newChannelId, x: 0, y: 0 }),
     });
     setNewChannelId("");
     load();
@@ -103,23 +103,21 @@ export function ForumMapAdminPage() {
           <label>Node type</label>
           <select value={newType} onChange={(e) => setNewType(e.target.value as typeof newType)}>
             <option value="TOPIC">Topic</option>
-            <option value="ACTIVE_BRANCHES">Active Branches (special)</option>
-            <option value="GROWING_SEEDS">Growing Seeds (special)</option>
+            <option value="ACTIVE_BRANCHES">Active Branch (styled)</option>
+            <option value="GROWING_SEEDS">Growing Seed (styled)</option>
           </select>
         </div>
-        {newType === "TOPIC" && (
-          <div>
-            <label>Channel</label>
-            <select value={newChannelId} onChange={(e) => setNewChannelId(e.target.value ? Number(e.target.value) : "")}>
-              <option value="">— select —</option>
-              {availableChannels.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.branchId ? `[Branch] ${c.name}` : c.name}
-                </option>
-              ))}
-            </select>
-          </div>
-        )}
+        <div>
+          <label>Channel</label>
+          <select value={newChannelId} onChange={(e) => setNewChannelId(e.target.value ? Number(e.target.value) : "")}>
+            <option value="">— select —</option>
+            {availableChannels.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.branchId ? `[Branch] ${c.name}` : c.name}
+              </option>
+            ))}
+          </select>
+        </div>
         <button className="btn btn-primary" onClick={addNode}>
           Add node
         </button>
@@ -144,9 +142,13 @@ export function ForumMapAdminPage() {
           })}
         {nodes.map((n) => (
           <g key={n.id} transform={`translate(${n.x}, ${n.y})`} onPointerDown={(e) => onNodePointerDown(e, n)} style={{ cursor: "grab" }}>
-            <circle r={n.type === "TOPIC" ? 14 : 22} fill={n.type === "TOPIC" ? "#8fd3ff" : "#c9a7ff"} opacity={0.85} />
+            <circle
+              r={n.type === "TOPIC" ? 14 : 18}
+              fill={n.type === "TOPIC" ? "#8fd3ff" : n.type === "ACTIVE_BRANCHES" ? "#a7ffc9" : "#c9a7ff"}
+              opacity={0.85}
+            />
             <text y={n.type === "TOPIC" ? 30 : 38} textAnchor="middle" fill="#fff" fontSize={11}>
-              {n.type === "TOPIC" ? n.channel?.name : n.type === "ACTIVE_BRANCHES" ? "Active Branches" : "Growing Seeds"}
+              {n.type === "ACTIVE_BRANCHES" ? `[Active] ${n.channel?.name}` : n.type === "GROWING_SEEDS" ? `[Growing] ${n.channel?.name}` : n.channel?.name}
             </text>
           </g>
         ))}
@@ -163,7 +165,7 @@ export function ForumMapAdminPage() {
         <tbody>
           {nodes.map((n) => (
             <tr key={n.id}>
-              <td>{n.type === "TOPIC" ? n.channel?.name : n.type === "ACTIVE_BRANCHES" ? "Active Branches" : "Growing Seeds"}</td>
+              <td>{n.type === "ACTIVE_BRANCHES" ? `[Active] ${n.channel?.name}` : n.type === "GROWING_SEEDS" ? `[Growing] ${n.channel?.name}` : n.channel?.name}</td>
               <td>
                 <select value={n.parentId ?? ""} onChange={(e) => setParent(n.id, e.target.value ? Number(e.target.value) : null)}>
                   <option value="">— none (root) —</option>
