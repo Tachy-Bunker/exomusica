@@ -6,6 +6,7 @@ import { useCustomFont, type FontInfo } from "../lib/useCustomFont";
 import { useIsDesktop } from "../lib/useIsDesktop";
 import { useContentScaleStore } from "../lib/contentScaleStore";
 import { BranchIndexList } from "../components/BranchIndexList";
+import { CollaboratorIndexList } from "../components/CollaboratorIndexList";
 
 interface WikiSummary {
   id: number;
@@ -76,7 +77,11 @@ export function WikiPage() {
       {!slug && <p style={{ color: "var(--text-dim)" }}>Pick a page from the list.</p>}
       {slug && !current && <p>Loading…</p>}
       {current &&
-        (current.contentMarkdown.trim() === "@branch-index" ? <BranchIndexList /> : renderMarkdown(current.contentMarkdown, navigate))}
+        (current.contentMarkdown.trim() === "@branch-index"
+          ? <BranchIndexList />
+          : current.contentMarkdown.trim() === "@collaborator-index"
+          ? <CollaboratorIndexList />
+          : renderMarkdown(current.contentMarkdown, navigate))}
     </div>
   );
 

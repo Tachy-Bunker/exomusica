@@ -22,22 +22,22 @@ export function TopicPage() {
   const [channel, setChannel] = useState<ChannelInfo | null>(null);
   const isDesktop = useIsDesktop();
   const openChat = useChatDockStore((s) => s.openChat);
-  const closeChat = useChatDockStore((s) => s.close);
   const dockOpenChannelSlug = useChatDockStore((s) => s.openChannelSlug);
+  const toggleDockCollapse = useChatDockStore((s) => s.toggleCollapse);
 
   useEffect(() => {
     if (!isDesktop) return;
     function handleKeyDown(e: KeyboardEvent) {
       if (isTypingTarget(e.target)) return;
       if (e.code === "KeyE") {
-        if (dockOpenChannelSlug) closeChat();
+        if (dockOpenChannelSlug === channel?.slug) toggleDockCollapse();
         else if (channel) openChat(channel.slug, channel.name);
       }
       if (e.code === "KeyR") navigate("/discussion");
     }
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [isDesktop, dockOpenChannelSlug, closeChat, openChat, channel, navigate]);
+  }, [isDesktop, dockOpenChannelSlug, toggleDockCollapse, openChat, channel, navigate]);
 
 
   useEffect(() => {

@@ -40,6 +40,15 @@ export function CollaboratorsAdminPage() {
     load();
   }
 
+  async function moveCollaborator(index: number, delta: number) {
+    const newOrder = [...collaborators];
+    const target = index + delta;
+    if (target < 0 || target >= newOrder.length) return;
+    [newOrder[index], newOrder[target]] = [newOrder[target], newOrder[index]];
+    setCollaborators(newOrder); // optimistic, so the reorder feels instant
+    await api("/api/admin/collaborators/reorder", { method: "POST", body: JSON.stringify({ orderedIds: newOrder.map((c) => c.id) }) });
+  }
+
   async function openDetail(id: number) {
     const slug = collaborators.find((c) => c.id === id)?.slug;
     let d: CollaboratorDetail;
@@ -119,11 +128,17 @@ export function CollaboratorsAdminPage() {
       </div>
 
       <div style={{ display: "flex", gap: "1.5rem" }}>
-        <ul style={{ listStyle: "none", padding: 0, minWidth: 200 }}>
-          {collaborators.map((c) => (
-            <li key={c.id} style={{ marginBottom: "0.3rem" }}>
-              <button className={`btn ${editingId === c.id ? "btn-primary" : ""}`} onClick={() => openDetail(c.id)} style={{ width: "100%", textAlign: "left" }}>
+        <ul style={{ listStyle: "none", padding: 0, minWidth: 220 }}>
+          {collaborators.map((c, i) => (
+            <li key={c.id} style={{ marginBottom: "0.3rem", display: "flex", alignItems: "center", gap: "0.3rem" }}>
+              <button className={`btn ${editingId === c.id ? "btn-primary" : ""}`} onClick={() => openDetail(c.id)} style={{ flex: 1, textAlign: "left" }}>
                 {c.name} — {c.role}
+              </button>
+              <button className="btn" disabled={i === 0} onClick={() => moveCollaborator(i, -1)} title="Move up" style={{ padding: "0.1rem 0.4rem" }}>
+                ↑
+              </button>
+              <button className="btn" disabled={i === collaborators.length - 1} onClick={() => moveCollaborator(i, 1)} title="Move down" style={{ padding: "0.1rem 0.4rem" }}>
+                ↓
               </button>
             </li>
           ))}

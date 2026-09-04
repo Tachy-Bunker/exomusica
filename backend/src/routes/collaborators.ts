@@ -26,8 +26,8 @@ async function uniqueSlug(base: string, excludeId?: number): Promise<string> {
 export async function collaboratorRoutes(app: FastifyInstance): Promise<void> {
   app.get("/api/collaborators", async () => {
     return prisma.collaborator.findMany({
-      select: { id: true, slug: true, name: true, role: true, bio: true, pictureUrl: true, links: true },
-      orderBy: { name: "asc" },
+      select: { id: true, slug: true, name: true, role: true, bio: true, pictureUrl: true, links: true, position: true },
+      orderBy: { position: "asc" },
     });
   });
 
@@ -83,8 +83,16 @@ export async function collaboratorRoutes(app: FastifyInstance): Promise<void> {
     const { name, role } = req.body ?? {};
     if (!name || !role) return reply.code(400).send({ error: "name and role are required" });
     const slug = await uniqueSlug(name);
-    const collaborator = await prisma.collaborator.create({ data: { name, role, slug } });
+    const maxPosition = await prisma.collaborator.aggregate({ _max: { position: true } });
+    const collaborator = await prisma.collaborator.create({ data: { name, role, slug, position: (maxPosition._max.position ?? -1) + 1 } });
     return reply.code(201).send(collaborator);
+  });
+
+  app.post<{ Body: { orderedIds: number[] } }>("/api/admin/collaborators/reorder", { preHandler: requireAdmin }, async (req, reply) => {
+    const { orderedIds } = req.body ?? {};
+    if (!Array.isArray(orderedIds)) return reply.code(400).send({ error: "orderedIds must be an array" });
+    await Promise.all(orderedIds.map((id, index) => prisma.collaborator.update({ where: { id }, data: { position: index } })));
+    return { status: "ok" };
   });
 
   app.patch<{ Params: { id: string }; Body: Partial<{ name: string; role: string; bio: string; links: { label: string; url: string }[] }> }>(

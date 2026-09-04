@@ -22,8 +22,8 @@ export function BranchPage() {
   const fontFamily = useCustomFont(branch?.font);
   const isDesktop = useIsDesktop();
   const openChat = useChatDockStore((s) => s.openChat);
-  const closeChat = useChatDockStore((s) => s.close);
   const dockOpenChannelSlug = useChatDockStore((s) => s.openChannelSlug);
+  const toggleDockCollapse = useChatDockStore((s) => s.toggleCollapse);
   const [showIntro, setShowIntro] = useState(false);
   const [pendingPlayAlbumSlug, setPendingPlayAlbumSlug] = useState<string | null>(null);
 
@@ -81,13 +81,13 @@ export function BranchPage() {
       if (isTypingTarget(e.target)) return;
       if (e.code === "KeyR") navigate("/");
       if (e.code === "KeyE") {
-        if (dockOpenChannelSlug) closeChat();
+        if (dockOpenChannelSlug === branch?.channel?.slug) toggleDockCollapse();
         else if (branch?.channel) openChat(branch.channel.slug, branch.name, branch.slug);
       }
     }
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [isDesktop, navigate, dockOpenChannelSlug, closeChat, openChat, branch]);
+  }, [isDesktop, navigate, dockOpenChannelSlug, toggleDockCollapse, openChat, branch]);
 
   if (!branch) return <p>Loading…</p>;
 
@@ -102,7 +102,15 @@ export function BranchPage() {
         </p>
         <h1>{branch.name}</h1>
         {branch.description && <p style={{ color: "var(--text-dim)", maxWidth: 640 }}>{branch.description}</p>}
+      </div>
 
+      {!isDesktop && branch.channel && (
+        <div style={{ flexShrink: 0, maxHeight: "34dvh", marginTop: "0.6rem", marginBottom: "0.6rem" }}>
+          <ChannelPage channelSlug={branch.channel.slug} />
+        </div>
+      )}
+
+      <div style={isDesktop ? {} : { flexShrink: 0, overflowY: "auto" }}>
         <h2 style={{ fontSize: "1.1rem", color: "var(--accent-audio)" }}>Music</h2>
         {albums.length === 0 ? (
           <p style={{ color: "var(--text-dim)" }}>
@@ -160,15 +168,13 @@ export function BranchPage() {
         {isDesktop && <h2 style={{ fontSize: "1.1rem", color: "var(--accent-forum)" }}>Forum</h2>}
       </div>
 
-      {!branch.channel ? (
-        isDesktop && <p>No topic yet.</p>
-      ) : isDesktop ? (
-        <p style={{ color: "var(--text-dim)", fontSize: "0.9rem" }}>This topic's chat is open in the dock → (E)</p>
-      ) : (
-        <div style={{ flex: 1, minHeight: "30vh", marginTop: "0.6rem" }}>
-          <ChannelPage channelSlug={branch.channel.slug} />
-        </div>
-      )}
+      {isDesktop &&
+        (!branch.channel ? (
+          <p>No topic yet.</p>
+        ) : (
+          <p style={{ color: "var(--text-dim)", fontSize: "0.9rem" }}>This topic's chat is open in the dock → (E)</p>
+        ))}
+      {!isDesktop && !branch.channel && <p style={{ color: "var(--text-dim)" }}>No topic yet.</p>}
 
       {showIntro && branch.guideAsset && (
         <BranchIntroOverlay

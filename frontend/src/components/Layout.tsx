@@ -135,12 +135,8 @@ export function Layout() {
     function handleMediaPlay(e: Event) {
       if (!useSiteEffectsStore.getState().exclusiveMediaPlayback) return;
       const target = e.target as HTMLMediaElement;
-      console.log("[player-debug] exclusive-playback handler fired, target:", target, "target.currentSrc:", target?.currentSrc);
       document.querySelectorAll("audio, video").forEach((el) => {
-        if (el !== target && !(el as HTMLMediaElement).paused) {
-          console.log("[player-debug] exclusive-playback PAUSING:", el, "currentSrc:", (el as HTMLMediaElement).currentSrc);
-          (el as HTMLMediaElement).pause();
-        }
+        if (el !== target && !(el as HTMLMediaElement).paused) (el as HTMLMediaElement).pause();
       });
     }
     // 'play' doesn't bubble on media elements, but capture phase at the

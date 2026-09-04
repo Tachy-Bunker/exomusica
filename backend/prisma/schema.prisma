@@ -367,6 +367,7 @@ model Collaborator {
   slug         String? @unique
   name         String
   role         String
+  position     Int     @default(0) // admin-controlled order for the all-collaborators wiki index
   bio          String? @db.Text
   pictureUrl   String?
   links        Json?

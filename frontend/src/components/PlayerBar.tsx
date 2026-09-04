@@ -195,16 +195,13 @@ export function PlayerBar() {
           bindAudioElement(el);
         }}
         crossOrigin="anonymous"
-        onTimeUpdate={(e) => {
-          console.log("[player-debug] timeupdate fired:", e.currentTarget.currentTime);
-          setProgress(e.currentTarget.currentTime, e.currentTarget.duration || 0);
-        }}
+        onTimeUpdate={(e) => setProgress(e.currentTarget.currentTime, e.currentTarget.duration || 0)}
         onLoadedMetadata={(e) => setProgress(e.currentTarget.currentTime, e.currentTarget.duration || 0)}
         onPause={() => useAudioStore.setState({ isPlaying: false })}
         onPlay={() => useAudioStore.setState({ isPlaying: true })}
         onError={(e) => {
           const el = e.currentTarget;
-          console.error("[player-debug] AUDIO ERROR:", {
+          console.error("Audio playback error:", {
             code: el.error?.code,
             message: el.error?.message,
             networkState: el.networkState,
