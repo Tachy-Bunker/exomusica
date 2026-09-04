@@ -3,6 +3,7 @@ import { prisma } from "../lib/prisma.js";
 import { requireAdmin } from "../lib/auth.js";
 import { trackToDTO } from "../lib/embeds.js";
 import { saveSiteImage, saveGalleryFile } from "../lib/storage.js";
+import { probeAudioDuration } from "../lib/audioProbe.js";
 
 export async function albumRoutes(app: FastifyInstance): Promise<void> {
   // Every track site-wide, shuffled server-side — powers the homepage's
@@ -178,9 +179,13 @@ export async function albumRoutes(app: FastifyInstance): Promise<void> {
     Params: { id: string };
     Body: { title: string; fileUrl: string; format: string; durationSeconds?: number; position?: number };
   }>("/api/admin/albums/:id/tracks", { preHandler: requireAdmin }, async (req, reply) => {
-    const { title, fileUrl, format, durationSeconds, position } = req.body ?? {};
+    const { title, fileUrl, format, position } = req.body ?? {};
+    let { durationSeconds } = req.body ?? {};
     if (!title || !fileUrl || !format) {
       return reply.code(400).send({ error: "title, fileUrl, and format are required" });
+    }
+    if (durationSeconds === undefined) {
+      durationSeconds = (await probeAudioDuration(fileUrl)) ?? undefined;
     }
     const albumId = Number(req.params.id);
     const resolvedPosition = position ?? (await prisma.track.count({ where: { albumId } }));
@@ -201,9 +206,15 @@ export async function albumRoutes(app: FastifyInstance): Promise<void> {
     Params: { id: string };
     Body: Partial<{ title: string; fileUrl: string; format: string; durationSeconds: number }>;
   }>("/api/admin/tracks/:id", { preHandler: requireAdmin }, async (req) => {
+    const data = { ...req.body };
+    // If the fileUrl is changing and no explicit duration was given,
+    // re-probe — the old duration would belong to the previous file.
+    if (data.fileUrl && data.durationSeconds === undefined) {
+      data.durationSeconds = (await probeAudioDuration(data.fileUrl)) ?? undefined;
+    }
     return prisma.track.update({
       where: { id: Number(req.params.id) },
-      data: req.body as never, // format, if present, is validated against the AudioFormat enum at the DB layer
+      data: data as never, // format, if present, is validated against the AudioFormat enum at the DB layer
     });
   });
 
