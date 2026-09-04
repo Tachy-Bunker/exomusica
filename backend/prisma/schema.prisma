@@ -590,6 +590,7 @@ model SiteSettings {
   forumMapInitialX    Float @default(0)
   forumMapInitialY    Float @default(0)
   forumMapInitialZoom Float @default(1)
+  forumMapNavSpeed    Float @default(1) // multiplier on WASD/joystick acceleration — independent of zoom level
   ambienceUrl    String? // idle-landing ambient loop, plays when nothing else is
   scanSfxUrl     String? // spacemap text-reveal loop (branch lock-on + F/E/T hint)
   defaultWikiPageId Int?

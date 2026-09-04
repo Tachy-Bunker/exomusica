@@ -33,6 +33,7 @@ export function ForumMapAdminPage() {
   const [newChannelId, setNewChannelId] = useState<number | "">("");
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [zoom, setZoom] = useState(1);
+  const [navSpeed, setNavSpeed] = useState(1);
   const dragNodeId = useRef<number | null>(null);
   const dragOffset = useRef({ x: 0, y: 0 });
   const panDrag = useRef<{ startX: number; startY: number; panX: number; panY: number } | null>(null);
@@ -46,9 +47,10 @@ export function ForumMapAdminPage() {
     api<ChannelOption[]>("/api/channels").then(setChannels);
   }, []);
   useEffect(() => {
-    api<{ forumMapInitialX: number; forumMapInitialY: number; forumMapInitialZoom: number }>("/api/site-settings").then((s) => {
+    api<{ forumMapInitialX: number; forumMapInitialY: number; forumMapInitialZoom: number; forumMapNavSpeed: number }>("/api/site-settings").then((s) => {
       setPan({ x: s.forumMapInitialX ?? 0, y: s.forumMapInitialY ?? 0 });
       setZoom(s.forumMapInitialZoom ?? 1);
+      setNavSpeed(s.forumMapNavSpeed ?? 1);
     });
   }, []);
 
@@ -83,9 +85,9 @@ export function ForumMapAdminPage() {
   async function saveDefaultView() {
     await api("/api/admin/site-settings", {
       method: "PATCH",
-      body: JSON.stringify({ forumMapInitialX: pan.x, forumMapInitialY: pan.y, forumMapInitialZoom: zoom }),
+      body: JSON.stringify({ forumMapInitialX: pan.x, forumMapInitialY: pan.y, forumMapInitialZoom: zoom, forumMapNavSpeed: navSpeed }),
     });
-    alert("Saved. This is now the view visitors land on when opening the map.");
+    alert("Saved. This is now the view and navigation speed visitors get when opening the map.");
   }
 
   function svgPoint(clientX: number, clientY: number) {
@@ -165,7 +167,11 @@ export function ForumMapAdminPage() {
         <button className="btn btn-primary" onClick={addNode}>
           Add node
         </button>
-        <button className="btn" onClick={saveDefaultView} title="Save the current pan/zoom as what visitors see when they first open the map">
+        <div>
+          <label>Nav speed</label>
+          <input type="number" min={0.1} max={5} step={0.1} value={navSpeed} onChange={(e) => setNavSpeed(Number(e.target.value))} style={{ width: 55 }} />
+        </div>
+        <button className="btn" onClick={saveDefaultView} title="Save the current pan/zoom and nav speed as what visitors get when they first open the map">
           Set current view as default
         </button>
       </div>

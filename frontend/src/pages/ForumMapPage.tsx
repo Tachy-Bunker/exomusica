@@ -32,6 +32,18 @@ const NODE_STYLE: Record<MapNode["type"], { radius: number; color: string }> = {
   GROWING_SEEDS: { radius: 19, color: "#4fa8e0" },
 };
 
+// Matches the spacemap's own camera feel exactly, just adapted to
+// screen-pixel-equivalent units (converted to SVG units per frame via
+// pxToSvgUnits) so speed stays consistent regardless of zoom level —
+// the admin's configured multiplier applies on top of this baseline.
+const CAMERA_ACCEL = 900;
+const CAMERA_FRICTION = 5;
+const CAMERA_MAX_SPEED = 450;
+const CROSSHAIR_LOOKAHEAD = 0.16;
+const CROSSHAIR_MAX_OFFSET = 65;
+const CROSSHAIR_CATCHUP_RATE = 2.2;
+const LOCK_RADIUS_PX = 60;
+
 function seededRand(seed: number): () => number {
   let s = seed;
   return () => {
@@ -73,21 +85,26 @@ export function ForumMapPage() {
   const [nodes, setNodes] = useState<MapNode[]>([]);
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [zoom, setZoom] = useState(1);
+  const [navSpeed, setNavSpeed] = useState(1);
   const [activeNodeId, setActiveNodeId] = useState<number | null>(null);
   const [preview, setPreview] = useState<PreviewMessage[]>([]);
   const containerRef = useRef<HTMLDivElement>(null);
-  const dragState = useRef<{ startClientX: number; startClientY: number; panX: number; panY: number; moved: boolean } | null>(null);
+  const reticleRef = useRef<HTMLDivElement>(null);
+  const dragState = useRef<{ startClientX: number; startClientY: number; panX: number; panY: number; moved: boolean; startNodeId: number | null } | null>(null);
   const pinchState = useRef<{ startDist: number; startZoom: number } | null>(null);
   const isDesktop = useIsDesktop();
   const navigate = useNavigate();
   const openChat = useChatDockStore((s) => s.openChat);
   const keysRef = useRef<Set<string>>(new Set());
   const joystickVectorRef = useRef({ x: 0, y: 0 });
-  const velocityRef = useRef({ vx: 0, vy: 0 });
+  const cameraVelRef = useRef({ vx: 0, vy: 0 });
+  const crosshairOffsetRef = useRef({ x: 0, y: 0 });
   const panRef = useRef(pan);
   panRef.current = pan;
   const zoomRef = useRef(zoom);
   zoomRef.current = zoom;
+  const navSpeedRef = useRef(navSpeed);
+  navSpeedRef.current = navSpeed;
   const [lockedNodeId, setLockedNodeId] = useState<number | null>(null);
   const lockedNodeIdRef = useRef<number | null>(null);
   const nodesRef = useRef<MapNode[]>([]);
@@ -95,9 +112,10 @@ export function ForumMapPage() {
 
   useEffect(() => {
     api<MapNode[]>("/api/forum-map").then(setNodes);
-    api<{ forumMapInitialX: number; forumMapInitialY: number; forumMapInitialZoom: number }>("/api/site-settings").then((s) => {
+    api<{ forumMapInitialX: number; forumMapInitialY: number; forumMapInitialZoom: number; forumMapNavSpeed: number }>("/api/site-settings").then((s) => {
       setPan({ x: s.forumMapInitialX ?? 0, y: s.forumMapInitialY ?? 0 });
       setZoom(s.forumMapInitialZoom ?? 1);
+      setNavSpeed(s.forumMapNavSpeed ?? 1);
     });
   }, []);
 
@@ -151,32 +169,58 @@ export function ForumMapPage() {
   }, []);
 
   useEffect(() => {
-    const ACCEL = 22;
-    const FRICTION = 0.86;
-    const LOCK_RADIUS_PX = 60;
+    let lastTime = performance.now();
     let frameId: number;
 
-    function frame() {
+    function frame(now: number) {
+      const dt = Math.min((now - lastTime) / 1000, 0.05);
+      lastTime = now;
+
       const keys = keysRef.current;
       const joy = joystickVectorRef.current;
       let ax = 0;
       let ay = 0;
-      if (keys.has("KeyW")) ay -= ACCEL;
-      if (keys.has("KeyS")) ay += ACCEL;
-      if (keys.has("KeyA")) ax -= ACCEL;
-      if (keys.has("KeyD")) ax += ACCEL;
-      ax += joy.x * ACCEL;
-      ay += joy.y * ACCEL;
+      if (keys.has("KeyA")) ax += CAMERA_ACCEL;
+      if (keys.has("KeyD")) ax -= CAMERA_ACCEL;
+      if (keys.has("KeyW")) ay += CAMERA_ACCEL;
+      if (keys.has("KeyS")) ay -= CAMERA_ACCEL;
+      ax -= joy.x * CAMERA_ACCEL;
+      ay -= joy.y * CAMERA_ACCEL;
+      ax *= navSpeedRef.current;
+      ay *= navSpeedRef.current;
 
-      const v = velocityRef.current;
-      v.vx = (v.vx + ax) * FRICTION;
-      v.vy = (v.vy + ay) * FRICTION;
+      const cam = cameraVelRef.current;
+      if (!dragState.current) {
+        cam.vx += ax * dt;
+        cam.vy += ay * dt;
+        cam.vx *= 1 - Math.min(CAMERA_FRICTION * dt, 1);
+        cam.vy *= 1 - Math.min(CAMERA_FRICTION * dt, 1);
+        const speed = Math.hypot(cam.vx, cam.vy);
+        const maxSpeed = CAMERA_MAX_SPEED * navSpeedRef.current;
+        if (speed > maxSpeed) {
+          cam.vx = (cam.vx / speed) * maxSpeed;
+          cam.vy = (cam.vy / speed) * maxSpeed;
+        }
+        if (Math.abs(cam.vx) > 0.05 || Math.abs(cam.vy) > 0.05) {
+          const el = containerRef.current;
+          const vbSize = 1600 / zoomRef.current;
+          const pxToUnit = el ? vbSize / el.clientWidth : 1;
+          const p = panRef.current;
+          const next = { x: p.x - cam.vx * dt * pxToUnit, y: p.y - cam.vy * dt * pxToUnit };
+          panRef.current = next;
+          setPan(next);
+        }
+      }
 
-      if (Math.abs(v.vx) > 0.05 || Math.abs(v.vy) > 0.05) {
-        const p = panRef.current;
-        const next = { x: p.x - v.vx, y: p.y - v.vy };
-        panRef.current = next;
-        setPan(next);
+      // Crosshair inertia — leads the camera's velocity, then eases back
+      // to center once it settles, same feel as the spacemap reticle.
+      {
+        const targetX = Math.max(-CROSSHAIR_MAX_OFFSET, Math.min(CROSSHAIR_MAX_OFFSET, -cam.vx * CROSSHAIR_LOOKAHEAD));
+        const targetY = Math.max(-CROSSHAIR_MAX_OFFSET, Math.min(CROSSHAIR_MAX_OFFSET, -cam.vy * CROSSHAIR_LOOKAHEAD));
+        const co = crosshairOffsetRef.current;
+        co.x += (targetX - co.x) * Math.min(CROSSHAIR_CATCHUP_RATE * dt, 1);
+        co.y += (targetY - co.y) * Math.min(CROSSHAIR_CATCHUP_RATE * dt, 1);
+        if (reticleRef.current) reticleRef.current.style.transform = `translate(-50%, -50%) translate(${co.x}px, ${co.y}px)`;
       }
 
       // Lock-on: nearest node to screen center, within radius, converted
@@ -246,7 +290,9 @@ export function ForumMapPage() {
     if (e.pointerType === "touch") return; // touch handled separately, for pinch support
     if ((e.target as HTMLElement).closest?.("button, a")) return; // let clicks on controls behave normally, uninterfered with
     e.currentTarget.setPointerCapture?.(e.pointerId);
-    dragState.current = { startClientX: e.clientX, startClientY: e.clientY, panX: pan.x, panY: pan.y, moved: false };
+    const nodeEl = (e.target as HTMLElement).closest?.("[data-node-id]");
+    const startNodeId = nodeEl ? Number(nodeEl.getAttribute("data-node-id")) : null;
+    dragState.current = { startClientX: e.clientX, startClientY: e.clientY, panX: pan.x, panY: pan.y, moved: false, startNodeId };
   }
   function onPointerMove(e: React.PointerEvent) {
     if (!dragState.current) return;
@@ -255,15 +301,28 @@ export function ForumMapPage() {
     if (Math.abs(rawDx) + Math.abs(rawDy) > 4) dragState.current.moved = true;
     setPan({ x: dragState.current.panX + pxToSvgUnits(rawDx), y: dragState.current.panY + pxToSvgUnits(rawDy) });
   }
+  // Clicks are detected here, on pointerup, rather than relying on the
+  // browser's native "click" event — setPointerCapture on the container
+  // (needed so a fast drag can't slip outside the element mid-gesture)
+  // retargets pointerup to the container too, which can prevent a
+  // separately-synthesized click from ever reaching the node that was
+  // actually pressed. Tracking which node (if any) the gesture started on
+  // ourselves sidesteps that entirely.
   function onPointerUp() {
+    const drag = dragState.current;
     dragState.current = null;
+    if (!drag || drag.moved || drag.startNodeId === null) return;
+    const n = nodesRef.current.find((n) => n.id === drag.startNodeId);
+    if (n) onNodeInteract(n);
   }
 
   // Touch: one finger pans, two fingers pinch-zoom (and pan together).
   function onTouchStart(e: React.TouchEvent) {
     if (e.touches.length === 1) {
       const t = e.touches[0];
-      dragState.current = { startClientX: t.clientX, startClientY: t.clientY, panX: pan.x, panY: pan.y, moved: false };
+      const nodeEl = (e.target as HTMLElement).closest?.("[data-node-id]");
+      const startNodeId = nodeEl ? Number(nodeEl.getAttribute("data-node-id")) : null;
+      dragState.current = { startClientX: t.clientX, startClientY: t.clientY, panX: pan.x, panY: pan.y, moved: false, startNodeId };
     } else if (e.touches.length === 2) {
       dragState.current = null;
       const [a, b] = [e.touches[0], e.touches[1]];
@@ -288,8 +347,12 @@ export function ForumMapPage() {
     }
   }
   function onTouchEnd() {
+    const drag = dragState.current;
     dragState.current = null;
     pinchState.current = null;
+    if (!drag || drag.moved || drag.startNodeId === null) return;
+    const n = nodesRef.current.find((n) => n.id === drag.startNodeId);
+    if (n) onNodeInteract(n);
   }
 
   const byId = new Map(nodes.map((n) => [n.id, n]));
@@ -363,39 +426,25 @@ export function ForumMapPage() {
       </div>
 
       {isDesktop && (
-        <div
-          style={{
-            position: "absolute",
-            top: "50%",
-            left: "50%",
-            transform: "translate(-50%, -50%)",
-            width: 24,
-            height: 24,
-            zIndex: 4,
-            pointerEvents: "none",
-          }}
-        >
-          <div style={{ position: "absolute", top: "50%", left: 0, right: 0, height: 1, background: "rgba(255,255,255,0.4)" }} />
-          <div style={{ position: "absolute", left: "50%", top: 0, bottom: 0, width: 1, background: "rgba(255,255,255,0.4)" }} />
-          {lockedNodeId !== null && (
-            <div
-              style={{
-                position: "absolute",
-                inset: -8,
-                border: "1px solid var(--accent-forum)",
-                borderRadius: "50%",
-                animation: "forumMapTwinkle 1.5s ease-in-out infinite",
-              }}
-            />
+        <div className="space-reticle" ref={reticleRef}>
+          <div
+            className="space-reticle-ring"
+            style={{ background: lockedNodeId !== null ? "conic-gradient(var(--accent-forum) 360deg, transparent 0deg)" : undefined }}
+          />
+          <div className="space-reticle-cross" />
+        </div>
+      )}
+      {isDesktop && (
+        <div style={{ position: "absolute", bottom: 16, left: "50%", transform: "translateX(-50%)", zIndex: 5, fontSize: lockedNodeId !== null ? "0.85rem" : "0.75rem", color: lockedNodeId !== null ? "var(--text)" : "var(--text-dim)", textAlign: "center" }}>
+          {lockedNodeId !== null ? (
+            <>
+              Press <strong style={{ color: "var(--accent-forum)" }}>E</strong> to enter
+            </>
+          ) : (
+            "WASD to navigate"
           )}
         </div>
       )}
-      {isDesktop && lockedNodeId !== null && (
-        <div style={{ position: "absolute", bottom: 16, left: "50%", transform: "translateX(-50%)", zIndex: 5, fontSize: "0.8rem", color: "var(--text-dim)" }}>
-          Press <strong style={{ color: "var(--text)" }}>E</strong> to enter
-        </div>
-      )}
-      {isDesktop && lockedNodeId === null && <p style={{ position: "absolute", bottom: 16, left: "50%", transform: "translateX(-50%)", zIndex: 5, fontSize: "0.75rem", color: "var(--text-dim)" }}>WASD to navigate</p>}
       {!isDesktop && (
         <div style={{ position: "absolute", bottom: 16, left: 16, zIndex: 5 }}>
           <Joystick onMove={handleJoystickMove} onRelease={handleJoystickRelease} />
@@ -448,13 +497,9 @@ export function ForumMapPage() {
           return (
             <g
               key={n.id}
+              data-node-id={n.id}
               transform={`translate(${n.x}, ${n.y})`}
               style={{ cursor: n.channel ? "pointer" : "default" }}
-              onClick={(e) => {
-                if (dragState.current?.moved) return;
-                e.stopPropagation();
-                onNodeInteract(n);
-              }}
               onMouseEnter={() => isDesktop && setActiveNodeId(n.id)}
               onMouseLeave={() => isDesktop && setActiveNodeId((id) => (id === n.id ? null : id))}
             >
