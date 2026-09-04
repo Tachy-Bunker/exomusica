@@ -169,6 +169,7 @@ model ForumChannel {
   createdAt   DateTime    @default(now())
 
   messages Message[]
+  mapNode  ForumMapNode?
   follows  ChannelFollow[]
 }
 
@@ -286,13 +287,28 @@ model Album {
 
 // Replaces the old fixed streamUrl/downloadUrl pair — named, unlimited,
 // reorderable (Spotify, Bandcamp, archive.org, whatever else).
+model LinkIcon {
+  id   Int    @id @default(autoincrement())
+  name String @unique
+  url  String
+}
+
+model LinkIcon {
+  id  Int    @id @default(autoincrement())
+  name String
+  url  String
+  albumLinks AlbumLink[]
+}
+
 model AlbumLink {
   id       Int    @id @default(autoincrement())
   albumId  Int
   album    Album  @relation(fields: [albumId], references: [id], onDelete: Cascade)
   label    String
   url      String
-  iconUrl  String? // when set, shows instead of the text label — label becomes the hover title
+  iconUrl  String? // legacy per-link upload — kept for anything set before the icon library existed
+  linkIconId Int?
+  linkIcon   LinkIcon? @relation(fields: [linkIconId], references: [id])
   position Int    @default(0)
 }
 
@@ -672,4 +688,22 @@ model AuditLog {
   targetId   Int?
   meta       Json?
   createdAt  DateTime @default(now())
+}
+
+enum ForumMapNodeType {
+  TOPIC
+  ACTIVE_BRANCHES
+  GROWING_SEEDS
+}
+
+model ForumMapNode {
+  id        Int              @id @default(autoincrement())
+  type      ForumMapNodeType @default(TOPIC)
+  channelId Int?             @unique
+  channel   ForumChannel?    @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  parentId  Int?
+  parent    ForumMapNode?    @relation("MapTree", fields: [parentId], references: [id], onDelete: SetNull)
+  children  ForumMapNode[]   @relation("MapTree")
+  x         Float            @default(0)
+  y         Float            @default(0)
 }

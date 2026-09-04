@@ -46,7 +46,7 @@ export async function albumRoutes(app: FastifyInstance): Promise<void> {
       include: {
         branch: { select: { slug: true, name: true } },
         collaborators: { include: { collaborator: true } },
-        links: { orderBy: { position: "asc" } },
+        links: { orderBy: { position: "asc" }, include: { linkIcon: true } },
         galleryImages: { orderBy: { position: "asc" } },
         tracks: {
           orderBy: { position: "asc" },
@@ -142,16 +142,24 @@ export async function albumRoutes(app: FastifyInstance): Promise<void> {
   );
 
   // --- Streaming/download links (named, unlimited) -----------------------
-  app.post<{ Params: { id: string }; Body: { label: string; url: string } }>(
+  app.post<{ Params: { id: string }; Body: { label: string; url: string; linkIconId?: number | null } }>(
     "/api/admin/albums/:id/links",
     { preHandler: requireAdmin },
     async (req, reply) => {
-      const { label, url } = req.body ?? {};
+      const { label, url, linkIconId } = req.body ?? {};
       if (!label || !url) return reply.code(400).send({ error: "label and url are required" });
       const albumId = Number(req.params.id);
       const position = await prisma.albumLink.count({ where: { albumId } });
-      const link = await prisma.albumLink.create({ data: { albumId, label, url, position } });
+      const link = await prisma.albumLink.create({ data: { albumId, label, url, linkIconId: linkIconId ?? null, position } });
       return reply.code(201).send(link);
+    },
+  );
+
+  app.patch<{ Params: { id: string }; Body: { linkIconId: number | null } }>(
+    "/api/admin/album-links/:id/icon-choice",
+    { preHandler: requireAdmin },
+    async (req) => {
+      return prisma.albumLink.update({ where: { id: Number(req.params.id) }, data: { linkIconId: req.body.linkIconId, iconUrl: null } });
     },
   );
 

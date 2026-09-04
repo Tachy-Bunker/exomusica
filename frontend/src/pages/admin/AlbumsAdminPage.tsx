@@ -24,7 +24,7 @@ interface AlbumDetail {
   description: string | null;
   contentMarkdown: string | null;
   coverArtUrl: string | null;
-  links: { id: number; label: string; url: string; iconUrl: string | null }[];
+  links: { id: number; label: string; url: string; iconUrl: string | null; linkIconId: number | null; linkIcon: { id: number; name: string; url: string } | null }[];
   gallery: { id: number; url: string }[];
   collaborators: { id: number; name: string }[];
   tracks: { id: number; title: string; fileUrl: string; format: string; position: number; composers: { id: number }[] }[];
@@ -72,6 +72,10 @@ export function AlbumsAdminPage() {
   }
   const coverInput = useRef<HTMLInputElement>(null);
   const galleryInput = useRef<HTMLInputElement>(null);
+  const [linkIcons, setLinkIcons] = useState<{ id: number; name: string; url: string }[]>([]);
+  useEffect(() => {
+    api<{ id: number; name: string; url: string }[]>("/api/link-icons").then(setLinkIcons);
+  }, []);
 
   function loadCollaborators() {
     api<CollaboratorSummary[]>("/api/collaborators").then(setCollaborators);
@@ -231,11 +235,9 @@ export function AlbumsAdminPage() {
     loadDetail(detail.slug);
   }
 
-  async function handleUploadLinkIcon(linkId: number, file: File) {
+  async function setLinkIcon(linkId: number, linkIconId: number | null) {
     if (!detail) return;
-    const formData = new FormData();
-    formData.append("file", file);
-    await api(`/api/admin/album-links/${linkId}/icon`, { method: "POST", body: formData });
+    await api(`/api/admin/album-links/${linkId}/icon-choice`, { method: "PATCH", body: JSON.stringify({ linkIconId }) });
     loadDetail(detail.slug);
   }
 
@@ -416,27 +418,32 @@ export function AlbumsAdminPage() {
           </div>
 
           <h3 style={{ fontSize: "0.9rem", marginTop: "1rem" }}>Streaming/download links</h3>
-          {detail.links.map((l) => (
-            <div key={l.id} style={{ display: "flex", gap: "0.5rem", alignItems: "center", marginBottom: "0.4rem" }}>
-              {l.iconUrl && <img src={l.iconUrl} alt="" style={{ width: 20, height: 20, objectFit: "contain" }} />}
-              <span style={{ fontSize: "0.85rem" }}>
-                {l.label} — <span style={{ color: "var(--text-dim)" }}>{l.url}</span>
-              </span>
-              <input
-                type="file"
-                accept="image/svg+xml,image/png"
-                style={{ fontSize: "0.7rem", width: 140 }}
-                onChange={(e) => {
-                  const file = e.target.files?.[0];
-                  if (file) handleUploadLinkIcon(l.id, file);
-                }}
-                title="Upload an icon (SVG or PNG) to show instead of the text label"
-              />
-              <button className="btn btn-danger" style={{ fontSize: "0.7rem", padding: "0.1rem 0.4rem" }} onClick={() => handleDeleteLink(l.id)}>
-                remove
-              </button>
-            </div>
-          ))}
+          {detail.links.map((l) => {
+            const currentIconUrl = l.linkIcon?.url ?? l.iconUrl;
+            return (
+              <div key={l.id} style={{ display: "flex", gap: "0.5rem", alignItems: "center", marginBottom: "0.4rem" }}>
+                {currentIconUrl && <img src={currentIconUrl} alt="" style={{ width: 20, height: 20, objectFit: "contain" }} />}
+                <span style={{ fontSize: "0.85rem" }}>
+                  {l.label} — <span style={{ color: "var(--text-dim)" }}>{l.url}</span>
+                </span>
+                <select
+                  value={l.linkIconId ?? ""}
+                  onChange={(e) => setLinkIcon(l.id, e.target.value ? Number(e.target.value) : null)}
+                  style={{ fontSize: "0.75rem" }}
+                >
+                  <option value="">No image</option>
+                  {linkIcons.map((icon) => (
+                    <option key={icon.id} value={icon.id}>
+                      {icon.name}
+                    </option>
+                  ))}
+                </select>
+                <button className="btn btn-danger" style={{ fontSize: "0.7rem", padding: "0.1rem 0.4rem" }} onClick={() => handleDeleteLink(l.id)}>
+                  remove
+                </button>
+              </div>
+            );
+          })}
           <form onSubmit={handleAddLink} style={{ display: "flex", gap: "0.5rem", marginTop: "0.4rem" }}>
             <input placeholder="Label (e.g. Bandcamp)" required value={linkForm.label} onChange={(e) => setLinkForm((f) => ({ ...f, label: e.target.value }))} />
             <input placeholder="URL" required value={linkForm.url} onChange={(e) => setLinkForm((f) => ({ ...f, url: e.target.value }))} style={{ flex: 1 }} />

@@ -77,6 +77,12 @@ export function AdminLayout() {
         <NavLink to="/admin/embeds" className={({ isActive }) => (isActive ? "active" : "")}>
           Favicon & Embeds
         </NavLink>
+        <NavLink to="/admin/icon-library" className={({ isActive }) => (isActive ? "active" : "")}>
+          Icon Library
+        </NavLink>
+        <NavLink to="/admin/forum-map" className={({ isActive }) => (isActive ? "active" : "")}>
+          Forum Map
+        </NavLink>
         <NavLink to="/admin/notifications" className={({ isActive }) => (isActive ? "active" : "")}>
           Notification sounds
         </NavLink>

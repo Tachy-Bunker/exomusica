@@ -10,6 +10,7 @@ import { JoinPage } from "./pages/JoinPage";
 import { WikiPage } from "./pages/WikiPage";
 import { NewsPage } from "./pages/NewsPage";
 import { DiscussionIndexPage } from "./pages/DiscussionIndexPage";
+import { ForumMapPage } from "./pages/ForumMapPage";
 import { TopicPage } from "./pages/TopicPage";
 import { BranchPage } from "./pages/BranchPage";
 import { AlbumPage } from "./pages/AlbumPage";
@@ -38,6 +39,8 @@ import { StorageAdminPage } from "./pages/admin/StorageAdminPage";
 import { DiscordBridgePage } from "./pages/admin/DiscordBridgePage";
 import { CollaboratorsAdminPage } from "./pages/admin/CollaboratorsAdminPage";
 import { EmbedsAdminPage } from "./pages/admin/EmbedsAdminPage";
+import { IconLibraryAdminPage } from "./pages/admin/IconLibraryAdminPage";
+import { ForumMapAdminPage } from "./pages/admin/ForumMapAdminPage";
 import { NotificationsAdminPage } from "./pages/admin/NotificationsAdminPage";
 import { GuideAssetsAdminPage } from "./pages/admin/GuideAssetsAdminPage";
 
@@ -61,6 +64,7 @@ export default function App() {
             <Route path="news" element={<NewsPage />} />
             <Route path="news/:slug" element={<NewsPage />} />
             <Route path="discussion" element={<DiscussionIndexPage />} />
+            <Route path="discussion/map" element={<ForumMapPage />} />
             <Route path="branch/:slug" element={<BranchPage />} />
             <Route path="album/:slug" element={<AlbumPage />} />
             <Route path="collaborator/:slug" element={<CollaboratorPage />} />
@@ -93,6 +97,8 @@ export default function App() {
                 <Route path="discord-bridge" element={<DiscordBridgePage />} />
                 <Route path="collaborators" element={<CollaboratorsAdminPage />} />
                 <Route path="embeds" element={<EmbedsAdminPage />} />
+                <Route path="icon-library" element={<IconLibraryAdminPage />} />
+                <Route path="forum-map" element={<ForumMapAdminPage />} />
                 <Route path="notifications" element={<NotificationsAdminPage />} />
                 <Route path="guide-assets" element={<GuideAssetsAdminPage />} />
               </Route>
