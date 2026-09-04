@@ -62,6 +62,27 @@ export function PlayerBar() {
     setProgress,
     ended,
   } = useAudioStore();
+
+  const endedFiredRef = useRef(false);
+
+  useEffect(() => {
+    endedFiredRef.current = false;
+  }, [currentTrack?.id]);
+
+  useEffect(() => {
+    if (!isPlaying) return;
+    const interval = setInterval(() => {
+      const el = audioRef.current;
+      if (!el) return;
+      setProgress(el.currentTime, el.duration || 0);
+      const knownDuration = el.duration || currentTrack?.durationSeconds || 0;
+      if (knownDuration > 0 && el.currentTime >= knownDuration - 0.35 && !endedFiredRef.current) {
+        endedFiredRef.current = true;
+        ended();
+      }
+    }, 250);
+    return () => clearInterval(interval);
+  }, [isPlaying, currentTrack?.id, currentTrack?.durationSeconds, setProgress, ended]);
   // The audio element's own .duration sometimes never resolves for some
   // sources (observed with archive.org-hosted files) even though playback
   // itself works fine — falling back to the track's own stored duration
@@ -194,7 +215,11 @@ export function PlayerBar() {
         onLoadedMetadata={(e) => setProgress(e.currentTarget.currentTime, e.currentTarget.duration || 0)}
         onPause={() => useAudioStore.setState({ isPlaying: false })}
         onPlay={() => useAudioStore.setState({ isPlaying: true })}
-        onEnded={ended}
+        onEnded={() => {
+          if (endedFiredRef.current) return;
+          endedFiredRef.current = true;
+          ended();
+        }}
       />
 
       {currentTrack && !expanded && (
