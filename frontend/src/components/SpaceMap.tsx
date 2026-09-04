@@ -267,6 +267,8 @@ export function SpaceMap({
   ] as const;
   const ACTION_HINT = ACTION_SEGMENTS.map((s) => s.text).join("");
   const CENTER_ACTION_TEXT = isDesktop ? "(Enter)" : "Enter";
+  const CRYSTAL_MYSTERY_TEXT = "??? ??????";
+  const lockedNodeDisplayName = lockedNode ? (lockedNode.visibility === "BABY_CRYSTALS" ? CRYSTAL_MYSTERY_TEXT : lockedNode.name) : "";
   const currentActionLength = lockedNode?.id === -1 ? CENTER_ACTION_TEXT.length : ACTION_HINT.length;
 
   useEffect(() => {
@@ -275,7 +277,7 @@ export function SpaceMap({
     setActionRevealedCount(0);
     const interval = setInterval(() => {
       setRevealedCount((prev) => {
-        if (prev >= lockedNode.name.length) {
+        if (prev >= lockedNodeDisplayName.length) {
           clearInterval(interval);
           return prev;
         }
@@ -286,7 +288,7 @@ export function SpaceMap({
   }, [lockedNode]);
 
   useEffect(() => {
-    if (!lockedNode || revealedCount < lockedNode.name.length) return;
+    if (!lockedNode || revealedCount < lockedNodeDisplayName.length) return;
     setActionRevealedCount(0);
     const interval = setInterval(() => {
       setActionRevealedCount((prev) => {
@@ -303,7 +305,7 @@ export function SpaceMap({
   const wasRevealingRef = useRef(false);
   useEffect(() => {
     if (!scanSfxUrl) return;
-    const isRevealing = !!lockedNode && (revealedCount < lockedNode.name.length || actionRevealedCount < currentActionLength);
+    const isRevealing = !!lockedNode && (revealedCount < lockedNodeDisplayName.length || actionRevealedCount < currentActionLength);
     if (isRevealing === wasRevealingRef.current) return; // no state change — don't re-trigger the fade
     wasRevealingRef.current = isRevealing;
 
@@ -481,8 +483,13 @@ export function SpaceMap({
           if (n.visibility === "BABY_CRYSTALS") {
             const el = crystalElRefs.current.get(n.id);
             if (el) {
-              el.style.left = `${screenX}px`;
-              el.style.top = `${screenY}px`;
+              // Pure world coordinates — this element lives inside
+              // .space-map-field, which is already centered (left/top:
+              // 50%) and camera-panned via its own CSS transform. Adding
+              // w/2+cam.x here would double-apply that offset (the bug
+              // that made these drift far from their visual home).
+              el.style.left = `${n.x}px`;
+              el.style.top = `${n.y}px`;
             }
           } else {
             wardenBridge.setScreenPosition(n.id, screenX, screenY);
@@ -501,8 +508,8 @@ export function SpaceMap({
           const screenX = w / 2 + cam.x + t.worldX;
           const screenY = h / 2 + cam.y + t.worldY;
           if (el) {
-            el.style.left = `${screenX}px`;
-            el.style.top = `${screenY}px`;
+            el.style.left = `${t.worldX}px`;
+            el.style.top = `${t.worldY}px`;
           }
           const dist = Math.hypot(screenX - w / 2, screenY - h / 2);
           if (dist < nearestTopicDist) {
@@ -689,7 +696,6 @@ export function SpaceMap({
                 else crystalElRefs.current.delete(n.id);
               }}
               className="space-node-crystal"
-              title={n.name}
               onClick={() => { playLinkClickSound(); navigate(`/branch/${n.slug}`); }}
             >
               <svg viewBox="0 0 80 80" className="space-node-crystal-svg">
@@ -699,7 +705,6 @@ export function SpaceMap({
                 <polygon points="30,44 48,42 44,66 32,70 22,52" />
                 <polygon points="52,48 70,54 62,72 50,68" />
               </svg>
-              <span className="space-node-crystal-label">{n.name}</span>
             </div>
           ))}
       </div>
@@ -734,7 +739,7 @@ export function SpaceMap({
       {lockedNode && (
         <div className={`space-hud-name ${lockedNode.visibility === "BABY_CRYSTALS" ? "space-hud-name-crystal" : ""}`}>
           {lockedNode.visibility === "BABY_CRYSTALS"
-            ? lockedNode.name
+            ? lockedNodeDisplayName
                 .slice(0, revealedCount)
                 .split("")
                 .map((ch, i) => (
@@ -751,8 +756,8 @@ export function SpaceMap({
                     {ch === " " ? "\u00A0" : ch}
                   </span>
                 ))
-            : lockedNode.name.slice(0, revealedCount)}
-          {revealedCount < lockedNode.name.length && <span className="space-hud-cursor">▌</span>}
+            : lockedNodeDisplayName.slice(0, revealedCount)}
+          {revealedCount < lockedNodeDisplayName.length && <span className="space-hud-cursor">▌</span>}
         </div>
       )}
       {!lockedNode && lockedTopic && (
@@ -773,7 +778,7 @@ export function SpaceMap({
           </div>
         </>
       )}
-      {lockedNode && revealedCount >= lockedNode.name.length && actionRevealedCount > 0 && (
+      {lockedNode && revealedCount >= lockedNodeDisplayName.length && actionRevealedCount > 0 && (
         <div className="space-hud-action">
           {lockedNode.id === -1 ? (
             <span
