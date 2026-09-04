@@ -66,6 +66,9 @@ export async function siteSettingsRoutes(app: FastifyInstance): Promise<void> {
         ogForumDefaultTitle: true,
         ogForumDefaultDescription: true,
         ogForumDefaultImageUrl: true,
+        forumMapInitialX: true,
+        forumMapInitialY: true,
+        forumMapInitialZoom: true,
       },
     });
     return (
@@ -124,6 +127,9 @@ export async function siteSettingsRoutes(app: FastifyInstance): Promise<void> {
         ogForumDefaultTitle: null,
         ogForumDefaultDescription: null,
         ogForumDefaultImageUrl: null,
+        forumMapInitialX: 0,
+        forumMapInitialY: 0,
+        forumMapInitialZoom: 1,
       }
     );
   });

@@ -45,8 +45,8 @@ export function ForumMapAdminPage() {
   }, []);
   useEffect(() => {
     api<{ forumMapInitialX: number; forumMapInitialY: number; forumMapInitialZoom: number }>("/api/site-settings").then((s) => {
-      setPan({ x: s.forumMapInitialX, y: s.forumMapInitialY });
-      setZoom(s.forumMapInitialZoom);
+      setPan({ x: s.forumMapInitialX ?? 0, y: s.forumMapInitialY ?? 0 });
+      setZoom(s.forumMapInitialZoom ?? 1);
     });
   }, []);
 
