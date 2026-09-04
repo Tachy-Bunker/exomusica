@@ -63,11 +63,11 @@ export const useAudioStore = create<AudioState>((set, get) => ({
   expanded: false,
 
   play: (track) => {
+    const isSameTrack = get().currentTrack?.id === track.id;
     const el = audioEl;
-    set({ currentTrack: track, currentTime: 0, duration: get().currentTrack?.id === track.id ? get().duration : 0 });
-    if (el) {
-      if (el.currentSrc !== track.fileUrl) el.src = track.fileUrl;
-      el.currentTime = 0;
+    if (!isSameTrack) {
+      set({ currentTrack: track, currentTime: 0, duration: 0 });
+      if (el) el.src = track.fileUrl;
     }
     set({ isPlaying: true });
     el?.play().catch((err) => {

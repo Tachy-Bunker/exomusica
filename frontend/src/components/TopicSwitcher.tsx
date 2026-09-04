@@ -10,6 +10,7 @@ interface SwitchableBranch {
   name: string;
   lastActivityAt: string | null;
   channel: { slug: string } | null;
+  visibility?: "VISIBLE" | "HIDDEN" | "BABY_CRYSTALS";
 }
 
 interface SwitchableTopic {
@@ -116,25 +117,49 @@ export function TopicSwitcher({ label = "Location" }: { label?: string }) {
             <p style={{ fontSize: "0.8rem", color: "var(--text-dim)" }}>No matches.</p>
           )}
 
-          {filteredBranches.length > 0 && (
+          {filteredBranches.filter((b) => b.visibility !== "BABY_CRYSTALS").length > 0 && (
             <div style={{ fontSize: "0.7rem", textTransform: "uppercase", color: "var(--text-dim)", margin: "0.3rem 0 0.15rem" }}>
               Branches
             </div>
           )}
-          {filteredBranches.map((b) => {
-            const hasViewers = !!b.channel && viewersByChannel.has(b.channel.slug);
-            return (
-              <button
-                key={b.slug}
-                className="btn"
-                onClick={() => selectBranch(b)}
-                style={{ display: "flex", alignItems: "center", gap: "0.4rem", width: "100%", textAlign: "left", marginBottom: "0.15rem" }}
-              >
-                {hasViewers && <span className="presence-pulse" title="Someone's here" />}
-                {b.name}
-              </button>
-            );
-          })}
+          {filteredBranches
+            .filter((b) => b.visibility !== "BABY_CRYSTALS")
+            .map((b) => {
+              const hasViewers = !!b.channel && viewersByChannel.has(b.channel.slug);
+              return (
+                <button
+                  key={b.slug}
+                  className="btn"
+                  onClick={() => selectBranch(b)}
+                  style={{ display: "flex", alignItems: "center", gap: "0.4rem", width: "100%", textAlign: "left", marginBottom: "0.15rem" }}
+                >
+                  {hasViewers && <span className="presence-pulse" title="Someone's here" />}
+                  {b.name}
+                </button>
+              );
+            })}
+
+          {filteredBranches.filter((b) => b.visibility === "BABY_CRYSTALS").length > 0 && (
+            <div style={{ fontSize: "0.7rem", textTransform: "uppercase", color: "var(--text-dim)", margin: "0.5rem 0 0.15rem" }}>
+              Growing Seeds
+            </div>
+          )}
+          {filteredBranches
+            .filter((b) => b.visibility === "BABY_CRYSTALS")
+            .map((b) => {
+              const hasViewers = !!b.channel && viewersByChannel.has(b.channel.slug);
+              return (
+                <button
+                  key={b.slug}
+                  className="btn"
+                  onClick={() => selectBranch(b)}
+                  style={{ display: "flex", alignItems: "center", gap: "0.4rem", width: "100%", textAlign: "left", marginBottom: "0.15rem" }}
+                >
+                  {hasViewers && <span className="presence-pulse" title="Someone's here" />}
+                  {b.name}
+                </button>
+              );
+            })}
 
           {[...topicsByCategory.entries()].map(([category, items]) => (
             <div key={category || "uncategorized"}>

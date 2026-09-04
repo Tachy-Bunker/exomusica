@@ -558,7 +558,7 @@ export function SpaceMap({
   const fxSettings = useFxSettings();
 
   useEffect(() => {
-    wardenBridge.bindToBranches(branches.map((b) => ({ id: b.id, slug: b.slug })));
+    wardenBridge.bindToBranches(branches.filter((b) => b.visibility !== "BABY_CRYSTALS").map((b) => ({ id: b.id, slug: b.slug })));
   }, [branches]);
   const { containerRef: fieldContainerRef, fieldCanvasRef, wardenCanvasRef } = useSpacemapField(fxSettings);
 

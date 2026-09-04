@@ -86,19 +86,41 @@ export function DiscussionIndexPage() {
       </div>
 
       <h2 style={{ fontSize: `${scale}rem`, color: "var(--text)", marginTop: "1.5rem" }}>Branches</h2>
-      {branches.length === 0 && <p style={{ color: "var(--text-dim)" }}>No branches yet.</p>}
+      {branches.filter((b) => b.visibility !== "BABY_CRYSTALS").length === 0 && <p style={{ color: "var(--text-dim)" }}>No branches yet.</p>}
       <ul style={{ listStyle: "none", padding: 0 }}>
-        {branches.map((b) => (
-          <li key={b.id} style={{ marginBottom: "0.5rem" }}>
-            <Link to={`/branch/${b.slug}`}>{b.name}</Link>{" "}
-            {b.channel && (
-              <button className="export-icon-btn" onClick={() => exportChatHistory(b.channel!.slug)} title="Download this branch's chat history">
-                <ExportIcon size={16} />
-              </button>
-            )}
-          </li>
-        ))}
+        {branches
+          .filter((b) => b.visibility !== "BABY_CRYSTALS")
+          .map((b) => (
+            <li key={b.id} style={{ marginBottom: "0.5rem" }}>
+              <Link to={`/branch/${b.slug}`}>{b.name}</Link>{" "}
+              {b.channel && (
+                <button className="export-icon-btn" onClick={() => exportChatHistory(b.channel!.slug)} title="Download this branch's chat history">
+                  <ExportIcon size={16} />
+                </button>
+              )}
+            </li>
+          ))}
       </ul>
+
+      {branches.filter((b) => b.visibility === "BABY_CRYSTALS").length > 0 && (
+        <>
+          <h2 style={{ fontSize: `${scale}rem`, color: "var(--text)", marginTop: "1.5rem" }}>Growing Seeds</h2>
+          <ul style={{ listStyle: "none", padding: 0 }}>
+            {branches
+              .filter((b) => b.visibility === "BABY_CRYSTALS")
+              .map((b) => (
+                <li key={b.id} style={{ marginBottom: "0.5rem" }}>
+                  <Link to={`/branch/${b.slug}`}>{b.name}</Link>{" "}
+                  {b.channel && (
+                    <button className="export-icon-btn" onClick={() => exportChatHistory(b.channel!.slug)} title="Download this branch's chat history">
+                      <ExportIcon size={16} />
+                    </button>
+                  )}
+                </li>
+              ))}
+          </ul>
+        </>
+      )}
     </div>
   );
 }

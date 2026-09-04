@@ -26,6 +26,24 @@ ${imageUrl ? `<meta name="twitter:image" content="${escapeHtml(imageUrl)}">` : "
 </html>`;
 }
 
+function substitute(template: string, data: Record<string, string | number>): string {
+  return template.replace(/\{(\w+)(?::(\d+))?\}/g, (match, key: string, charCount?: string) => {
+    const value = data[key];
+    if (value === undefined) return match;
+    const str = String(value);
+    return charCount ? str.slice(0, Number(charCount)) : str;
+  });
+}
+
+function stripMarkdown(md: string): string {
+  return md
+    .replace(/!\[.*?\]\(.*?\)/g, "") // images
+    .replace(/\[(.*?)\]\(.*?\)/g, "$1") // links -> just the text
+    .replace(/[#*_`>~-]/g, "") // common markdown punctuation
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 export async function embedRoutes(app: FastifyInstance): Promise<void> {
   const baseUrl = "https://exomusica.com";
 
@@ -48,10 +66,13 @@ export async function embedRoutes(app: FastifyInstance): Promise<void> {
       prisma.siteSettings.findUnique({ where: { id: 1 } }),
     ]);
     if (!branch) return reply.code(404).send("Not found");
+    const data = { title: branch.name, description: branch.description ?? "" };
+    const titleTemplate = branch.ogTitle ?? s?.ogBranchDefaultTitle ?? "{title}";
+    const descTemplate = branch.ogDescription ?? s?.ogBranchDefaultDescription ?? "{description}";
     reply.type("text/html").send(
       renderEmbedHtml({
-        title: branch.ogTitle ?? s?.ogBranchDefaultTitle ?? branch.name,
-        description: branch.ogDescription ?? s?.ogBranchDefaultDescription ?? branch.description ?? "A branch on Exomusica.",
+        title: substitute(titleTemplate, data) || branch.name,
+        description: substitute(descTemplate, data) || "A branch on Exomusica.",
         imageUrl: branch.ogImageUrl ?? s?.ogBranchDefaultImageUrl ?? null,
         faviconUrl: s?.faviconUrl ?? null,
         url: `${baseUrl}/branch/${branch.slug}`,
@@ -61,14 +82,27 @@ export async function embedRoutes(app: FastifyInstance): Promise<void> {
 
   app.get<{ Params: { slug: string } }>("/embed/album/:slug", async (req, reply) => {
     const [album, s] = await Promise.all([
-      prisma.album.findUnique({ where: { slug: req.params.slug } }),
+      prisma.album.findUnique({
+        where: { slug: req.params.slug },
+        include: {
+          tracks: { include: { collaborators: { include: { collaborator: { select: { name: true } } } } } },
+          collaborators: { include: { collaborator: { select: { name: true } } } },
+        },
+      }),
       prisma.siteSettings.findUnique({ where: { id: 1 } }),
     ]);
     if (!album) return reply.code(404).send("Not found");
+    const composerNames =
+      album.collaborators.map((c) => c.collaborator.name).join(", ") ||
+      [...new Set(album.tracks.flatMap((t) => t.collaborators.map((c) => c.collaborator.name)))].join(", ") ||
+      "Unknown";
+    const data = { title: album.title, trackCount: album.tracks.length, composer: composerNames };
+    const titleTemplate = album.ogTitle ?? s?.ogAlbumDefaultTitle ?? "{title}";
+    const descTemplate = album.ogDescription ?? s?.ogAlbumDefaultDescription ?? "{trackCount} tracks by {composer}";
     reply.type("text/html").send(
       renderEmbedHtml({
-        title: album.ogTitle ?? s?.ogAlbumDefaultTitle ?? album.title,
-        description: album.ogDescription ?? s?.ogAlbumDefaultDescription ?? "An album on Exomusica.",
+        title: substitute(titleTemplate, data) || album.title,
+        description: substitute(descTemplate, data) || "An album on Exomusica.",
         imageUrl: album.ogImageUrl ?? s?.ogAlbumDefaultImageUrl ?? album.coverArtUrl ?? null,
         faviconUrl: s?.faviconUrl ?? null,
         url: `${baseUrl}/album/${album.slug}`,
@@ -82,10 +116,13 @@ export async function embedRoutes(app: FastifyInstance): Promise<void> {
       prisma.siteSettings.findUnique({ where: { id: 1 } }),
     ]);
     if (!page) return reply.code(404).send("Not found");
+    const data = { title: page.title, content: stripMarkdown(page.contentMarkdown) };
+    const titleTemplate = page.ogTitle ?? s?.ogWikiDefaultTitle ?? "{title}";
+    const descTemplate = page.ogDescription ?? s?.ogWikiDefaultDescription ?? "{content:160}";
     reply.type("text/html").send(
       renderEmbedHtml({
-        title: page.ogTitle ?? s?.ogWikiDefaultTitle ?? page.title,
-        description: page.ogDescription ?? s?.ogWikiDefaultDescription ?? "A wiki page on Exomusica.",
+        title: substitute(titleTemplate, data) || page.title,
+        description: substitute(descTemplate, data) || "A wiki page on Exomusica.",
         imageUrl: page.ogImageUrl ?? s?.ogWikiDefaultImageUrl ?? null,
         faviconUrl: s?.faviconUrl ?? null,
         url: `${baseUrl}/wiki/${page.slug}`,
@@ -112,10 +149,13 @@ export async function embedRoutes(app: FastifyInstance): Promise<void> {
       prisma.siteSettings.findUnique({ where: { id: 1 } }),
     ]);
     if (!post) return reply.code(404).send("Not found");
+    const data = { title: post.title, content: stripMarkdown(post.contentMarkdown) };
+    const titleTemplate = post.ogTitle ?? s?.ogNewsDefaultTitle ?? "{title}";
+    const descTemplate = post.ogDescription ?? s?.ogNewsDefaultDescription ?? "{content:160}";
     reply.type("text/html").send(
       renderEmbedHtml({
-        title: post.ogTitle ?? s?.ogNewsDefaultTitle ?? post.title,
-        description: post.ogDescription ?? s?.ogNewsDefaultDescription ?? "A news post on Exomusica.",
+        title: substitute(titleTemplate, data) || post.title,
+        description: substitute(descTemplate, data) || "A news post on Exomusica.",
         imageUrl: post.ogImageUrl ?? s?.ogNewsDefaultImageUrl ?? null,
         faviconUrl: s?.faviconUrl ?? null,
         url: `${baseUrl}/news/${post.slug}`,
@@ -129,10 +169,13 @@ export async function embedRoutes(app: FastifyInstance): Promise<void> {
       prisma.siteSettings.findUnique({ where: { id: 1 } }),
     ]);
     if (!channel) return reply.code(404).send("Not found");
+    const data = { title: channel.name, description: channel.description ?? "" };
+    const titleTemplate = channel.ogTitle ?? s?.ogForumDefaultTitle ?? "{title}";
+    const descTemplate = channel.ogDescription ?? s?.ogForumDefaultDescription ?? "{description}";
     reply.type("text/html").send(
       renderEmbedHtml({
-        title: channel.ogTitle ?? s?.ogForumDefaultTitle ?? channel.name,
-        description: channel.ogDescription ?? s?.ogForumDefaultDescription ?? channel.description ?? "A forum topic on Exomusica.",
+        title: substitute(titleTemplate, data) || channel.name,
+        description: substitute(descTemplate, data) || "A forum topic on Exomusica.",
         imageUrl: channel.ogImageUrl ?? s?.ogForumDefaultImageUrl ?? null,
         faviconUrl: s?.faviconUrl ?? null,
         url: `${baseUrl}/topic/${channel.slug}`,

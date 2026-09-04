@@ -756,7 +756,7 @@ export function ChannelPage({ channelSlug, fillHeight }: { channelSlug?: string;
               ...(isMobileWindow
                 ? isChatFullscreen
                   ? { position: "fixed" as const, inset: 0, zIndex: 55, background: "var(--bg)" }
-                  : { height: "calc(100dvh - var(--nav-height, 3.6rem) - 3rem)", background: "var(--bg)" }
+                  : { height: "calc(100dvh - var(--nav-height, 3.6rem) - 3rem - var(--player-height, 0px))", background: "var(--bg)" }
                 : { height: "100%" }),
             }
           : { fontFamily }
@@ -862,6 +862,17 @@ export function ChannelPage({ channelSlug, fillHeight }: { channelSlug?: string;
         </button>
       )}
 
+      {!user && mode === "live" && (
+        <div style={{ marginTop: effectiveFillHeight ? 0 : "1rem", paddingTop: effectiveFillHeight ? "1rem" : 0, borderTop: effectiveFillHeight ? "1px solid var(--border)" : "none", flexShrink: 0, textAlign: "center" }}>
+          <Link to="/join" className="btn btn-primary join-to-chat-reveal" style={{ display: "inline-flex" }}>
+            {"Join to chat".split("").map((ch, i) => (
+              <span key={i} style={{ animationDelay: `${i * 0.045}s` }}>
+                {ch === " " ? "\u00A0" : ch}
+              </span>
+            ))}
+          </Link>
+        </div>
+      )}
       {user && mode === "live" && (
         <form
           onSubmit={handleSend}

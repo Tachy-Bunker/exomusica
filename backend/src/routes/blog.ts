@@ -7,15 +7,67 @@ import { sendDiscordAnnouncement } from "../lib/discordBot.js";
 
 export async function blogRoutes(app: FastifyInstance): Promise<void> {
   app.get("/api/admin/newsletter-subscriptions", { preHandler: requireAdmin }, async () => {
-    return prisma.newsletterSubscription.findMany({
-      select: { id: true, email: true, confirmed: true, createdAt: true },
-      orderBy: { createdAt: "desc" },
-    });
+    const [formSubs, accountSubs] = await Promise.all([
+      prisma.newsletterSubscription.findMany({
+        select: { id: true, email: true, confirmed: true, subscribed: true, createdAt: true },
+        orderBy: { createdAt: "desc" },
+      }),
+      prisma.user.findMany({
+        where: { notifyNews: true, isGhost: false },
+        select: { id: true, email: true, username: true, createdAt: true },
+      }),
+    ]);
+    const formEmails = new Set(formSubs.map((s) => s.email.toLowerCase()));
+    return [
+      ...formSubs.map((s) => ({ id: `form:${s.id}`, email: s.email, subscribed: s.subscribed, source: "form" as const, createdAt: s.createdAt })),
+      // Skip account-based entries whose email already appears as a form
+      // signup — same person, don't list them twice.
+      ...accountSubs
+        .filter((u) => !formEmails.has(u.email.toLowerCase()))
+        .map((u) => ({ id: `account:${u.id}`, email: u.email, subscribed: true, source: "account" as const, createdAt: u.createdAt, username: u.username })),
+    ];
   });
 
-  app.delete<{ Params: { id: string } }>("/api/admin/newsletter-subscriptions/:id", { preHandler: requireAdmin }, async (req) => {
-    await prisma.newsletterSubscription.delete({ where: { id: Number(req.params.id) } });
+  app.patch<{ Params: { id: string }; Body: { subscribed: boolean } }>(
+    "/api/admin/newsletter-subscriptions/:id",
+    { preHandler: requireAdmin },
+    async (req, reply) => {
+      const [kind, rawId] = req.params.id.split(":");
+      const id = Number(rawId);
+      if (kind === "form") {
+        return prisma.newsletterSubscription.update({ where: { id }, data: { subscribed: req.body.subscribed } });
+      }
+      if (kind === "account") {
+        return prisma.user.update({ where: { id }, data: { notifyNews: req.body.subscribed } });
+      }
+      return reply.code(400).send({ error: "unknown subscriber id format" });
+    },
+  );
+
+  app.delete<{ Params: { id: string } }>("/api/admin/newsletter-subscriptions/:id", { preHandler: requireAdmin }, async (req, reply) => {
+    const [kind, rawId] = req.params.id.split(":");
+    if (kind !== "form") return reply.code(400).send({ error: "account-based subscribers can only be unsubscribed, not deleted here — that's their account preference" });
+    await prisma.newsletterSubscription.delete({ where: { id: Number(rawId) } });
     return { status: "ok" };
+  });
+
+  // Bulk-add from a pasted/uploaded list — one email per line. Skips
+  // anything already in the table (by email) rather than erroring, and
+  // ignores blank lines and anything that doesn't look like an email.
+  app.post<{ Body: { emails: string[] } }>("/api/admin/newsletter-subscriptions/bulk-import", { preHandler: requireAdmin }, async (req, reply) => {
+    const emails = req.body?.emails ?? [];
+    const valid = [...new Set(emails.map((e) => e.trim().toLowerCase()).filter((e) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e)))];
+    if (valid.length === 0) return reply.code(400).send({ error: "no valid email addresses found" });
+
+    const existing = await prisma.newsletterSubscription.findMany({ where: { email: { in: valid } }, select: { email: true } });
+    const existingSet = new Set(existing.map((e) => e.email));
+    const toCreate = valid.filter((e) => !existingSet.has(e));
+
+    await prisma.newsletterSubscription.createMany({
+      data: toCreate.map((email) => ({ email, confirmed: true, subscribed: true, unsubscribeToken: randomUUID() })),
+    });
+
+    return { added: toCreate.length, skippedDuplicates: valid.length - toCreate.length };
   });
 
   app.get("/api/blog", async () => {
@@ -86,7 +138,7 @@ export async function blogRoutes(app: FastifyInstance): Promise<void> {
       if (!post || !post.publishedAt) return reply.code(400).send({ error: "post must be published first" });
 
       const [subs, members] = await Promise.all([
-        prisma.newsletterSubscription.findMany({ select: { email: true } }),
+        prisma.newsletterSubscription.findMany({ where: { subscribed: true }, select: { email: true } }),
         prisma.user.findMany({ where: { notifyNews: true, isGhost: false }, select: { username: true, email: true } }),
       ]);
 

@@ -437,6 +437,7 @@ model NewsletterSubscription {
   userId           Int?     @unique
   user             User?    @relation(fields: [userId], references: [id])
   confirmed        Boolean  @default(false)
+  subscribed       Boolean  @default(true) // admin can uncheck this without deleting the row or losing the email address
   unsubscribeToken String   @unique
   createdAt        DateTime @default(now())
 }
