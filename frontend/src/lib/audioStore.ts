@@ -65,15 +65,27 @@ export const useAudioStore = create<AudioState>((set, get) => ({
   play: (track) => {
     const isSameTrack = get().currentTrack?.id === track.id;
     const el = audioEl;
+    console.log("[player-debug] play() called:", {
+      trackTitle: track.title,
+      trackFileUrl: track.fileUrl,
+      isSameTrack,
+      audioElExists: !!el,
+      audioElReadyState: el?.readyState,
+      audioElSrcBefore: el?.src,
+    });
     if (!isSameTrack) {
       set({ currentTrack: track, currentTime: 0, duration: 0 });
       if (el) el.src = track.fileUrl;
     }
     set({ isPlaying: true });
-    el?.play().catch((err) => {
-      console.error("Playback failed to start:", err);
-      set({ isPlaying: false });
-    });
+    el?.play()
+      .then(() => {
+        console.log("[player-debug] .play() resolved successfully. el.paused =", el?.paused, "el.currentSrc =", el?.currentSrc);
+      })
+      .catch((err) => {
+        console.error("[player-debug] .play() REJECTED:", err);
+        set({ isPlaying: false });
+      });
     useAmbienceStore.getState().setEnabled(false);
   },
 
