@@ -75,7 +75,7 @@ export function Layout() {
           navigate("/news");
           break;
         case "KeyM":
-          navigate("/discussion");
+          navigate("/discussion/map");
           break;
         case "KeyE":
           if (dockPageChannel && dockOpenChannelSlug !== dockPageChannel.slug) {
@@ -285,7 +285,7 @@ export function Layout() {
         <nav>
           <Link to="/wiki">{isDesktop ? underlineLetter("Wiki", "k") : "Wiki"}</Link>
           <Link to="/news">{isDesktop ? underlineLetter("News", "n") : "News"}</Link>
-          <Link to="/discussion">{isDesktop ? underlineLetter("Forums", "m") : "Forums"}</Link>
+          <Link to="/discussion/map">{isDesktop ? underlineLetter("Forums", "m") : "Forums"}</Link>
         </nav>
         <div className="spacer" />
         {user && isDesktop && <OnlineOrbs />}

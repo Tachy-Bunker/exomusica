@@ -120,6 +120,7 @@ export function PlayerBar() {
     setDragging(true);
 
     function onMove(ev: MouseEvent | TouchEvent) {
+      if ("touches" in ev) ev.preventDefault(); // stop this from also being read as a page scroll/pull-to-refresh gesture
       const clientY = "touches" in ev ? ev.touches[0].clientY : ev.clientY;
       const delta = Math.max(0, clientY - startY); // only allow dragging down, not up
       setDragOffset(delta);
@@ -143,7 +144,7 @@ export function PlayerBar() {
     }
     window.addEventListener("mousemove", onMove);
     window.addEventListener("mouseup", onUp);
-    window.addEventListener("touchmove", onMove);
+    window.addEventListener("touchmove", onMove, { passive: false });
     window.addEventListener("touchend", onUp);
   }
 

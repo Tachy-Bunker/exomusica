@@ -94,6 +94,7 @@ export function BranchPage() {
 
   const coverMinWidth = isDesktop ? "160px" : "28vw";
   const coverTextScale = isDesktop ? 1 : 0.6;
+  const albumTextScale = isDesktop ? coverTextScale : coverTextScale * 2.2;
 
   return (
     <div style={{ fontFamily, ...(isDesktop ? {} : { display: "flex", flexDirection: "column", height: "calc(100dvh - var(--nav-height, 3.6rem) - 3rem - var(--player-height, 0px))", marginTop: "-0.6rem" }) }}>
@@ -157,9 +158,9 @@ export function BranchPage() {
                       +
                     </button>
                   </div>
-                  <div style={{ fontSize: `${0.9 * coverTextScale}rem`, marginTop: "0.3rem" }}>{a.title}</div>
+                  <div style={{ fontSize: `${0.9 * albumTextScale}rem`, marginTop: "0.3rem", overflowWrap: "break-word", wordBreak: "break-word" }}>{a.title}</div>
                 </Link>
-                <div style={{ fontSize: `${0.8 * coverTextScale}rem`, color: "var(--text-dim)" }}>{a.composer}</div>
+                <div style={{ fontSize: `${0.8 * albumTextScale}rem`, color: "var(--text-dim)", overflowWrap: "break-word", wordBreak: "break-word" }}>{a.composer}</div>
               </div>
             ))}
           </div>

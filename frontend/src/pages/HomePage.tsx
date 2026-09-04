@@ -9,16 +9,14 @@ export function HomePage() {
   useDocumentTitle("");
   const { user } = useAuth();
   const [branches, setBranches] = useState<Branch[]>([]);
-  const [topics, setTopics] = useState<{ slug: string; name: string }[]>([]);
 
   useEffect(() => {
     api<Branch[]>("/api/branches").then(setBranches);
-    api<{ slug: string; name: string }[]>("/api/channels?kind=DISCUSSION").then(setTopics);
   }, []);
 
   return (
     <div className="homepage-fill">
-      <SpaceMap branches={branches} centerLabel={user ? "About" : "Join"} centerHref={user ? "/wiki" : "/join"} topics={topics} />
+      <SpaceMap branches={branches} centerLabel={user ? "About" : "Join"} centerHref={user ? "/wiki" : "/join"} />
     </div>
   );
 }

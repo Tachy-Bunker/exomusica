@@ -41,6 +41,7 @@ body {
   color: var(--text);
   font-family: var(--font-body);
   -webkit-font-smoothing: antialiased;
+  overscroll-behavior-y: contain;
 }
 
 h1,
@@ -621,6 +622,7 @@ th {
   background: var(--bg);
   z-index: 60;
   overflow-y: auto;
+  overscroll-behavior-y: contain;
 }
 
 .player-expanded-content {

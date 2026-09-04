@@ -160,13 +160,11 @@ export function SpaceMap({
   centerLabel,
   centerHref,
   filteredTracks,
-  topics,
 }: {
   branches: Branch[];
   centerLabel: string;
   centerHref: string;
   filteredTracks?: PlayableTrackDTO[];
-  topics?: { slug: string; name: string }[];
 }) {
   const navigate = useNavigate();
   const fxSettings = useFxSettings();
@@ -196,8 +194,6 @@ export function SpaceMap({
   const cameraRef = useRef({ x: 0, y: 0, vx: 0, vy: 0 });
   const reticleRef = useRef<HTMLDivElement>(null);
   const crosshairOffsetRef = useRef({ x: 0, y: 0 });
-  const topicNodesRef = useRef<{ slug: string; name: string; worldX: number; worldY: number }[]>([]);
-  const topicElRefs = useRef<Map<string, HTMLDivElement>>(new Map());
   const crystalElRefs = useRef<Map<number, HTMLDivElement>>(new Map());
   const keysRef = useRef<Set<string>>(new Set());
   const joystickVectorRef = useRef({ x: 0, y: 0 });
@@ -210,8 +206,6 @@ export function SpaceMap({
   const targetNodeIdRef = useRef<number | null>(null);
   const lockProgressRef = useRef(0);
   const [lockedNode, setLockedNode] = useState<MapNode | null>(null);
-  const [lockedTopic, setLockedTopic] = useState<{ slug: string; name: string } | null>(null);
-  const lockedTopicRef = useRef<{ slug: string; name: string } | null>(null);
   const lockedNodeRef = useRef<MapNode | null>(null);
   useEffect(() => {
     lockedNodeRef.current = lockedNode;
@@ -241,10 +235,6 @@ export function SpaceMap({
 
   function enterCenter() {
     if (lockedNodeRef.current?.id === -1) navigate(centerHref);
-    else if (!lockedNodeRef.current && lockedTopicRef.current) {
-      playLinkClickSound();
-      navigate(`/topic/${lockedTopicRef.current.slug}`);
-    }
   }
 
   function viewLockedDetails() {
@@ -280,22 +270,6 @@ export function SpaceMap({
     nodesRef.current = buildNodes(branches, fxSettings.spacingMultiplier ?? 1);
   }, [branches, fxSettings.spacingMultiplier]);
 
-  useEffect(() => {
-    if (!topics) {
-      topicNodesRef.current = [];
-      return;
-    }
-    topicNodesRef.current = topics.map((t, i) => {
-      // Simple deterministic hash of the slug — same topic always lands
-      // in the same spot rather than re-scattering on every load.
-      let hash = 0;
-      for (let c = 0; c < t.slug.length; c++) hash = (hash * 31 + t.slug.charCodeAt(c)) >>> 0;
-      const angle = (hash % 360) * (Math.PI / 180) + i * 0.37;
-      const radius = 480 + (hash % 140); // further out than branches, a distinct outer ring
-      return { slug: t.slug, name: t.name, worldX: Math.cos(angle) * radius, worldY: Math.sin(angle) * radius };
-    });
-  }, [topics]);
-
   const ACTION_SEGMENTS =
     lockedNode?.visibility === "BABY_CRYSTALS"
       ? [
@@ -314,7 +288,6 @@ export function SpaceMap({
   const CENTER_ACTION_TEXT = isDesktop ? "(Enter)" : "Enter";
   const lockedNodeDisplayName = lockedNode ? lockedNode.name : "";
   const glitchedNodeName = useGlitchText(lockedNodeDisplayName.slice(0, revealedCount));
-  const glitchedTopicName = useGlitchText(lockedTopic?.name ?? "");
   const currentActionLength = lockedNode?.id === -1 ? CENTER_ACTION_TEXT.length : ACTION_HINT.length;
 
   useEffect(() => {
@@ -549,30 +522,7 @@ export function SpaceMap({
           }
         }
 
-        let nearestTopic: { slug: string; name: string } | null = null;
-        let nearestTopicDist = LOCK_RADIUS;
-        for (const t of topicNodesRef.current) {
-          const el = topicElRefs.current.get(t.slug);
-          const screenX = w / 2 + cam.x + t.worldX;
-          const screenY = h / 2 + cam.y + t.worldY;
-          if (el) {
-            el.style.left = `${t.worldX}px`;
-            el.style.top = `${t.worldY}px`;
-          }
-          const dist = Math.hypot(screenX - w / 2, screenY - h / 2);
-          if (dist < nearestTopicDist) {
-            nearestTopicDist = dist;
-            nearestTopic = t;
-          }
-        }
-        // Branches take priority when both are in range — topics only
-        // lock when nothing closer is competing for the reticle.
-        const topicWins = nearestTopic && (!nearest || nearestTopicDist < nearestDist);
-        const nextLockedTopic = topicWins ? nearestTopic : null;
-        if (nextLockedTopic?.slug !== lockedTopicRef.current?.slug) {
-          lockedTopicRef.current = nextLockedTopic;
-          setLockedTopic(nextLockedTopic);
-        }
+
 
         if (nearest?.id !== targetNodeIdRef.current) {
           targetNodeIdRef.current = nearest?.id ?? null;
@@ -716,22 +666,6 @@ export function SpaceMap({
           );
         })}
 
-        {topicNodesRef.current.map((t) => (
-          <div
-            key={t.slug}
-            ref={(el) => {
-              if (el) topicElRefs.current.set(t.slug, el);
-              else topicElRefs.current.delete(t.slug);
-            }}
-            className="space-node-topic"
-            title={t.name}
-            onClick={() => { playLinkClickSound(); navigate(`/topic/${t.slug}`); }}
-          >
-            <div className="space-node-topic-shape" />
-            <span className="space-node-topic-label">{t.name}</span>
-          </div>
-        ))}
-
         {nodesRef.current
           .filter((n) => n.visibility === "BABY_CRYSTALS")
           .map((n) => (
@@ -798,39 +732,6 @@ export function SpaceMap({
           ))}
           {revealedCount < lockedNodeDisplayName.length && <span className="space-hud-cursor">▌</span>}
         </div>
-      )}
-      {!lockedNode && lockedTopic && (
-        <>
-          <div className="space-hud-name space-hud-name-crystal">
-            {glitchedTopicName.split("").map((ch, i) => (
-              <span
-                key={i}
-                style={
-                  {
-                    animationDelay: `${(i % 7) * 0.3}s`,
-                    "--jitter-x": `${((i * 37) % 5) - 2}px`,
-                    "--jitter-y": `${((i * 53) % 5) - 2}px`,
-                  } as React.CSSProperties
-                }
-              >
-                {ch === " " ? "\u00A0" : ch}
-              </span>
-            ))}
-          </div>
-          <div className="space-hud-action">
-            <span
-              className="space-hud-action-link"
-              style={{ color: "var(--accent-forum)" }}
-              onClick={(e) => {
-                e.stopPropagation();
-                playLinkClickSound();
-                navigate(`/topic/${lockedTopic.slug}`);
-              }}
-            >
-              Enter{isDesktop ? " (Enter)" : ""}
-            </span>
-          </div>
-        </>
       )}
       {lockedNode && revealedCount >= lockedNodeDisplayName.length && actionRevealedCount > 0 && (
         <div className="space-hud-action">

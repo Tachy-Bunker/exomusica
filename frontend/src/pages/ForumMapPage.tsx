@@ -18,16 +18,14 @@ interface PreviewMessage {
   contentRaw: string;
 }
 
+// Site's own accent colors, not arbitrary ones — forum's established
+// identity is the accretion-disk orange-red, audio's is the pulsar blue.
 const NODE_STYLE: Record<MapNode["type"], { radius: number; color: string }> = {
-  TOPIC: { radius: 14, color: "#8fd3ff" },
-  ACTIVE_BRANCHES: { radius: 18, color: "#a7ffc9" },
-  GROWING_SEEDS: { radius: 18, color: "#c9a7ff" },
+  TOPIC: { radius: 14, color: "#e2703f" },
+  ACTIVE_BRANCHES: { radius: 19, color: "#f0a06a" },
+  GROWING_SEEDS: { radius: 19, color: "#4fa8e0" },
 };
 
-// Deterministic pseudo-random satellite orbs per node, "The Void"-style —
-// a handful of small dangling lights on thin strands around each node,
-// varied but stable across re-renders (seeded from the node's own id
-// rather than Math.random(), so they don't reshuffle every render).
 function seededRand(seed: number): () => number {
   let s = seed;
   return () => {
@@ -35,15 +33,26 @@ function seededRand(seed: number): () => number {
     return s / 233280;
   };
 }
-function satellites(nodeId: number, baseRadius: number) {
+// Neural-dendrite-style branches per node: each one forks partway, like
+// the synapse reference images, rather than a single straight strand out
+// to a satellite orb.
+function dendrites(nodeId: number, baseRadius: number) {
   const rand = seededRand(nodeId * 7919);
-  const count = 3 + Math.floor(rand() * 3); // 3-5
+  const count = 4 + Math.floor(rand() * 3); // 4-6
   return Array.from({ length: count }, (_, i) => {
-    const angle = (i / count) * Math.PI * 2 + rand() * 0.6;
-    const dist = baseRadius + 18 + rand() * 22;
-    const size = 2 + rand() * 3;
-    return { x: Math.cos(angle) * dist, y: Math.sin(angle) * dist, size, delay: rand() * 3 };
+    const angle = (i / count) * Math.PI * 2 + rand() * 0.5;
+    const len1 = baseRadius + 14 + rand() * 16;
+    const len2 = len1 + 10 + rand() * 14;
+    const forkAngle = angle + (rand() - 0.5) * 0.9;
+    const mid = { x: Math.cos(angle) * len1, y: Math.sin(angle) * len1 };
+    const tip = { x: mid.x + Math.cos(angle) * (len2 - len1), y: mid.y + Math.sin(angle) * (len2 - len1) };
+    const forkTip = { x: mid.x + Math.cos(forkAngle) * (len2 - len1) * 0.8, y: mid.y + Math.sin(forkAngle) * (len2 - len1) * 0.8 };
+    return { mid, tip, forkTip, glowSize: 1.5 + rand() * 2, delay: rand() * 3 };
   });
+}
+
+function dist(a: { x: number; y: number }, b: { x: number; y: number }) {
+  return Math.hypot(a.x - b.x, a.y - b.y);
 }
 
 export function ForumMapPage() {
@@ -52,7 +61,9 @@ export function ForumMapPage() {
   const [zoom, setZoom] = useState(1);
   const [activeNodeId, setActiveNodeId] = useState<number | null>(null);
   const [preview, setPreview] = useState<PreviewMessage[]>([]);
-  const dragState = useRef<{ startX: number; startY: number; panX: number; panY: number; moved: boolean } | null>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const dragState = useRef<{ startClientX: number; startClientY: number; panX: number; panY: number; moved: boolean } | null>(null);
+  const pinchState = useRef<{ startDist: number; startZoom: number } | null>(null);
   const isDesktop = useIsDesktop();
   const navigate = useNavigate();
 
@@ -79,32 +90,68 @@ export function ForumMapPage() {
   }
 
   function onNodeInteract(n: MapNode) {
-    if (isDesktop) return; // desktop uses hover, not click
+    if (isDesktop) return; // desktop uses hover, not tap
     setActiveNodeId((id) => (id === n.id ? null : n.id));
   }
 
-  function svgPoint(clientX: number, clientY: number, svg: SVGSVGElement) {
-    const pt = svg.createSVGPoint();
-    pt.x = clientX;
-    pt.y = clientY;
-    const ctm = svg.getScreenCTM();
-    if (!ctm) return { x: 0, y: 0 };
-    const local = pt.matrixTransform(ctm.inverse());
-    return { x: local.x, y: local.y };
+  // Screen-pixel deltas converted through the container's actual rendered
+  // size against the viewBox size, not just divided by zoom — the earlier
+  // version assumed the container was exactly as wide as the base viewBox,
+  // which is essentially never true, so panning felt broken/unresponsive.
+  function pxToSvgUnits(px: number) {
+    const el = containerRef.current;
+    if (!el) return px;
+    const vbSize = 1600 / zoom;
+    return (px / el.clientWidth) * vbSize;
   }
 
   function onPointerDown(e: React.PointerEvent) {
-    dragState.current = { startX: e.clientX, startY: e.clientY, panX: pan.x, panY: pan.y, moved: false };
+    if (e.pointerType === "touch") return; // touch handled separately, for pinch support
+    (e.target as Element).setPointerCapture?.(e.pointerId);
+    dragState.current = { startClientX: e.clientX, startClientY: e.clientY, panX: pan.x, panY: pan.y, moved: false };
   }
   function onPointerMove(e: React.PointerEvent) {
     if (!dragState.current) return;
-    const dx = (e.clientX - dragState.current.startX) / zoom;
-    const dy = (e.clientY - dragState.current.startY) / zoom;
-    if (Math.abs(dx) + Math.abs(dy) > 3) dragState.current.moved = true;
+    const dx = pxToSvgUnits(e.clientX - dragState.current.startClientX);
+    const dy = pxToSvgUnits(e.clientY - dragState.current.startClientY);
+    if (Math.abs(dx) + Math.abs(dy) > 2) dragState.current.moved = true;
     setPan({ x: dragState.current.panX + dx, y: dragState.current.panY + dy });
   }
   function onPointerUp() {
     dragState.current = null;
+  }
+
+  // Touch: one finger pans, two fingers pinch-zoom (and pan together).
+  function onTouchStart(e: React.TouchEvent) {
+    if (e.touches.length === 1) {
+      const t = e.touches[0];
+      dragState.current = { startClientX: t.clientX, startClientY: t.clientY, panX: pan.x, panY: pan.y, moved: false };
+    } else if (e.touches.length === 2) {
+      dragState.current = null;
+      const [a, b] = [e.touches[0], e.touches[1]];
+      pinchState.current = { startDist: dist({ x: a.clientX, y: a.clientY }, { x: b.clientX, y: b.clientY }), startZoom: zoom };
+    }
+  }
+  function onTouchMove(e: React.TouchEvent) {
+    if (e.touches.length === 2 && pinchState.current) {
+      e.preventDefault();
+      const [a, b] = [e.touches[0], e.touches[1]];
+      const d = dist({ x: a.clientX, y: a.clientY }, { x: b.clientX, y: b.clientY });
+      const ratio = d / pinchState.current.startDist;
+      setZoom(Math.min(2.5, Math.max(0.4, pinchState.current.startZoom * ratio)));
+      return;
+    }
+    if (e.touches.length === 1 && dragState.current) {
+      const t = e.touches[0];
+      const dx = pxToSvgUnits(t.clientX - dragState.current.startClientX);
+      const dy = pxToSvgUnits(t.clientY - dragState.current.startClientY);
+      if (Math.abs(dx) + Math.abs(dy) > 2) dragState.current.moved = true;
+      setPan({ x: dragState.current.panX + dx, y: dragState.current.panY + dy });
+    }
+  }
+  function onTouchEnd() {
+    dragState.current = null;
+    pinchState.current = null;
   }
 
   const byId = new Map(nodes.map((n) => [n.id, n]));
@@ -112,40 +159,60 @@ export function ForumMapPage() {
 
   return (
     <div
+      ref={containerRef}
       style={{
         position: "relative",
         height: "calc(100dvh - var(--nav-height, 3.6rem) - 3rem - var(--player-height, 0px))",
-        background: "radial-gradient(ellipse at center, #0d0a14 0%, #050308 70%)",
+        background: "radial-gradient(ellipse at center, var(--bg-elevated) 0%, var(--bg-inset) 70%)",
         overflow: "hidden",
         borderRadius: "var(--radius)",
         border: "1px solid var(--border)",
         cursor: dragState.current ? "grabbing" : "grab",
+        touchAction: "none",
       }}
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}
       onPointerLeave={onPointerUp}
+      onTouchStart={onTouchStart}
+      onTouchMove={onTouchMove}
+      onTouchEnd={onTouchEnd}
       onWheel={(e) => setZoom((z) => Math.min(2.5, Math.max(0.4, z - e.deltaY * 0.001)))}
     >
       <style>{`
         @keyframes forumMapTwinkle {
-          0%, 100% { opacity: 0.35; }
-          50% { opacity: 0.9; }
+          0%, 100% { opacity: 0.4; }
+          50% { opacity: 1; }
         }
         @keyframes forumMapPulse {
           0%, 100% { r: var(--pulse-r-min); }
           50% { r: var(--pulse-r-max); }
         }
+        @keyframes forumMapCrackle {
+          0%, 100% { opacity: 0.55; }
+          50% { opacity: 0.9; }
+        }
       `}</style>
 
       <button className="btn" style={{ position: "absolute", top: 12, left: 12, zIndex: 5 }} onClick={() => navigate("/discussion")}>
-        ← Back to Discussion
+        View as list
       </button>
 
-      <div style={{ position: "absolute", top: 12, right: 12, zIndex: 5, display: "flex", gap: "1rem", fontSize: "0.75rem", color: "rgba(255,255,255,0.6)" }}>
-        <span><span style={{ display: "inline-block", width: 10, height: 10, borderRadius: "50%", background: "#8fd3ff", marginRight: 4 }} />Topic</span>
-        <span><span style={{ display: "inline-block", width: 10, height: 10, borderRadius: "50%", background: "#a7ffc9", marginRight: 4 }} />Active Branch</span>
-        <span><span style={{ display: "inline-block", width: 10, height: 10, borderRadius: "50%", background: "#c9a7ff", marginRight: 4 }} />Growing Seed</span>
+      {isDesktop && (
+        <div style={{ position: "absolute", top: 12, left: "50%", transform: "translateX(-50%)", zIndex: 5, display: "flex", gap: "0.3rem" }}>
+          <button className="btn" style={{ padding: "0.2rem 0.7rem" }} onClick={() => setZoom((z) => Math.min(2.5, z + 0.15))} title="Zoom in">
+            +
+          </button>
+          <button className="btn" style={{ padding: "0.2rem 0.7rem" }} onClick={() => setZoom((z) => Math.max(0.4, z - 0.15))} title="Zoom out">
+            −
+          </button>
+        </div>
+      )}
+
+      <div style={{ position: "absolute", top: 12, right: 12, zIndex: 5, display: "flex", gap: "1rem", fontSize: "0.75rem", color: "var(--text-dim)" }}>
+        <span><span style={{ display: "inline-block", width: 10, height: 10, borderRadius: "50%", background: NODE_STYLE.TOPIC.color, marginRight: 4 }} />Topic</span>
+        <span><span style={{ display: "inline-block", width: 10, height: 10, borderRadius: "50%", background: NODE_STYLE.ACTIVE_BRANCHES.color, marginRight: 4 }} />Active Branch</span>
+        <span><span style={{ display: "inline-block", width: 10, height: 10, borderRadius: "50%", background: NODE_STYLE.GROWING_SEEDS.color, marginRight: 4 }} />Growing Seed</span>
       </div>
 
       <svg
@@ -162,27 +229,33 @@ export function ForumMapPage() {
           </filter>
         </defs>
 
+        {/* Thick, jagged synapse-like connections between nodes — Phazon
+            crack aesthetic rather than a smooth clean curve. */}
         {nodes
           .filter((n) => n.parentId !== null)
           .map((n) => {
             const parent = byId.get(n.parentId!);
             if (!parent) return null;
-            const midX = (parent.x + n.x) / 2;
-            const midY = (parent.y + n.y) / 2 - 30;
+            const midX = (parent.x + n.x) / 2 + (n.id % 7) - 3;
+            const midY = (parent.y + n.y) / 2 - 30 + (n.id % 5) - 2;
             return (
-              <path
-                key={`edge-${n.id}`}
-                d={`M ${parent.x} ${parent.y} Q ${midX} ${midY} ${n.x} ${n.y}`}
-                fill="none"
-                stroke="rgba(150,120,220,0.35)"
-                strokeWidth={1.5}
-              />
+              <g key={`edge-${n.id}`}>
+                <path
+                  d={`M ${parent.x} ${parent.y} Q ${midX} ${midY} ${n.x} ${n.y}`}
+                  fill="none"
+                  stroke="var(--accent-forum-dim)"
+                  strokeWidth={2.5}
+                  opacity={0.5}
+                  style={{ animation: "forumMapCrackle 3.5s ease-in-out infinite" }}
+                />
+                <path d={`M ${parent.x} ${parent.y} Q ${midX} ${midY} ${n.x} ${n.y}`} fill="none" stroke="var(--accent-forum)" strokeWidth={0.8} opacity={0.6} />
+              </g>
             );
           })}
 
         {nodes.map((n) => {
           const { radius, color } = NODE_STYLE[n.type];
-          const orbs = satellites(n.id, radius);
+          const branches = dendrites(n.id, radius);
           return (
             <g
               key={n.id}
@@ -196,16 +269,25 @@ export function ForumMapPage() {
               onMouseEnter={() => isDesktop && setActiveNodeId(n.id)}
               onMouseLeave={() => isDesktop && setActiveNodeId((id) => (id === n.id ? null : id))}
             >
-              {/* Void-style satellite lights, each on its own thin strand */}
-              {orbs.map((o, i) => (
+              {/* Neural dendrites — forked branches with a small glowing
+                  terminal at each fork, like a synapse. */}
+              {branches.map((b, i) => (
                 <g key={i}>
-                  <path d={`M 0 0 Q ${o.x * 0.5} ${o.y * 0.5 - 6} ${o.x} ${o.y}`} fill="none" stroke="rgba(200,190,255,0.25)" strokeWidth={0.8} />
+                  <path d={`M 0 0 L ${b.mid.x} ${b.mid.y} L ${b.tip.x} ${b.tip.y}`} fill="none" stroke={color} strokeWidth={1.2} opacity={0.5} />
+                  <path d={`M ${b.mid.x} ${b.mid.y} L ${b.forkTip.x} ${b.forkTip.y}`} fill="none" stroke={color} strokeWidth={1} opacity={0.4} />
                   <circle
-                    cx={o.x}
-                    cy={o.y}
-                    r={o.size}
+                    cx={b.tip.x}
+                    cy={b.tip.y}
+                    r={b.glowSize}
                     fill={color}
-                    style={{ animation: `forumMapTwinkle ${2.5 + o.delay}s ease-in-out infinite`, animationDelay: `${o.delay}s` }}
+                    style={{ animation: `forumMapTwinkle ${2.5 + b.delay}s ease-in-out infinite`, animationDelay: `${b.delay}s` }}
+                  />
+                  <circle
+                    cx={b.forkTip.x}
+                    cy={b.forkTip.y}
+                    r={b.glowSize * 0.7}
+                    fill={color}
+                    style={{ animation: `forumMapTwinkle ${2.5 + b.delay}s ease-in-out infinite`, animationDelay: `${b.delay + 1}s` }}
                   />
                 </g>
               ))}
@@ -217,8 +299,8 @@ export function ForumMapPage() {
                 filter="url(#forum-map-glow)"
                 style={{ "--pulse-r-min": `${radius}px`, "--pulse-r-max": `${radius * 1.15}px`, animation: "forumMapPulse 4s ease-in-out infinite" } as React.CSSProperties}
               />
-              <circle r={radius * 0.4} fill="#fff" opacity={0.9} />
-              <text y={radius + 16} textAnchor="middle" fill="rgba(255,255,255,0.75)" fontSize={12} fontFamily="var(--font-display)">
+              <circle r={radius * 0.4} fill="var(--text)" opacity={0.9} />
+              <text y={radius + 16} textAnchor="middle" fill="var(--text-dim)" fontSize={12} fontFamily="var(--font-display)">
                 {n.channel?.name ?? ""}
               </text>
 
@@ -226,12 +308,12 @@ export function ForumMapPage() {
                 <foreignObject x={radius + 12} y={-50} width={220} height={220} style={{ pointerEvents: isDesktop ? "none" : "auto" }}>
                   <div
                     style={{
-                      background: "rgba(15,10,25,0.94)",
-                      border: "1px solid rgba(180,150,255,0.4)",
+                      background: "var(--bg-elevated)",
+                      border: "1px solid var(--border)",
                       borderRadius: 8,
                       padding: "0.6rem",
                       fontSize: "0.75rem",
-                      color: "#e8e0ff",
+                      color: "var(--text)",
                       maxHeight: 190,
                       display: "flex",
                       flexDirection: "column",
@@ -241,11 +323,11 @@ export function ForumMapPage() {
                     <div style={{ fontWeight: "bold", marginBottom: "0.1rem" }}>{n.channel?.name}</div>
                     <div style={{ overflowY: "auto", flex: 1, minHeight: 0 }}>
                       {preview.length === 0 ? (
-                        <div style={{ opacity: 0.6 }}>No messages yet.</div>
+                        <div style={{ color: "var(--text-dim)" }}>No messages yet.</div>
                       ) : (
                         [...preview].reverse().map((m) => (
                           <div key={m.id} style={{ marginBottom: "0.25rem", overflowWrap: "break-word" }}>
-                            <span style={{ color: "#a7c9ff" }}>{m.authorUsername}:</span> {m.contentRaw.slice(0, 80)}
+                            <span style={{ color: "var(--accent-audio)" }}>{m.authorUsername}:</span> {m.contentRaw.slice(0, 80)}
                           </div>
                         ))
                       )}
