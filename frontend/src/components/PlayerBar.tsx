@@ -69,26 +69,6 @@ export function PlayerBar() {
     endedFiredRef.current = false;
   }, [currentTrack?.id]);
 
-  // Native `timeupdate` is confirmed (via direct logging) to never fire
-  // for these files in this browser, even though playback genuinely
-  // starts (.play() resolves, el.paused stays false). Driving progress
-  // from a rAF loop instead — it reads the element's own currentTime
-  // directly every frame, independent of whether the browser ever fires
-  // the timeupdate event for this particular audio source. Deliberately
-  // NOT touching ended() detection here, to isolate whether that's a
-  // separate problem from progress tracking.
-  useEffect(() => {
-    if (!isPlaying) return;
-    let frameId: number;
-    const tick = () => {
-      const el = audioRef.current;
-      if (el) setProgress(el.currentTime, el.duration || 0);
-      frameId = requestAnimationFrame(tick);
-    };
-    frameId = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(frameId);
-  }, [isPlaying, setProgress]);
-
   // The audio element's own .duration sometimes never resolves for some
   // sources (observed with archive.org-hosted files) even though playback
   // itself works fine — falling back to the track's own stored duration
@@ -216,11 +196,7 @@ export function PlayerBar() {
           here, in Layout, outside the router's <Outlet />. */}
       <audio
         ref={audioRef}
-        preload="metadata"
-        onTimeUpdate={(e) => {
-          console.log("[player-debug] native timeupdate:", { currentTime: e.currentTarget.currentTime, duration: e.currentTarget.duration, paused: e.currentTarget.paused, readyState: e.currentTarget.readyState });
-          setProgress(e.currentTarget.currentTime, e.currentTarget.duration || 0);
-        }}
+        onTimeUpdate={(e) => setProgress(e.currentTarget.currentTime, e.currentTarget.duration || 0)}
         onLoadedMetadata={(e) => setProgress(e.currentTarget.currentTime, e.currentTarget.duration || 0)}
         onPause={() => useAudioStore.setState({ isPlaying: false })}
         onPlay={() => useAudioStore.setState({ isPlaying: true })}
@@ -233,10 +209,6 @@ export function PlayerBar() {
             src: el.currentSrc,
           });
         }}
-        onAbort={() => console.warn("[player-debug] audio ABORT event fired")}
-        onStalled={() => console.warn("[player-debug] audio STALLED event fired")}
-        onSuspend={() => console.warn("[player-debug] audio SUSPEND event fired")}
-        onEmptied={() => console.warn("[player-debug] audio EMPTIED event fired — element was reset")}
         onEnded={() => {
           if (endedFiredRef.current) return;
           endedFiredRef.current = true;
