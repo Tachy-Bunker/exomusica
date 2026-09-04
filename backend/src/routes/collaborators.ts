@@ -26,7 +26,7 @@ async function uniqueSlug(base: string, excludeId?: number): Promise<string> {
 export async function collaboratorRoutes(app: FastifyInstance): Promise<void> {
   app.get("/api/collaborators", async () => {
     return prisma.collaborator.findMany({
-      select: { id: true, slug: true, name: true, role: true, bio: true, pictureUrl: true, links: true, position: true },
+      select: { id: true, slug: true, name: true, role: true, bio: true, pictureUrl: true, position: true },
       orderBy: { position: "asc" },
     });
   });
@@ -37,6 +37,7 @@ export async function collaboratorRoutes(app: FastifyInstance): Promise<void> {
       include: {
         galleryImages: { orderBy: { position: "asc" } },
         linkedUser: { select: { username: true } },
+        links: { orderBy: { position: "asc" }, include: { linkIcon: true } },
         tracks: {
           include: {
             track: {
@@ -95,13 +96,39 @@ export async function collaboratorRoutes(app: FastifyInstance): Promise<void> {
     return { status: "ok" };
   });
 
-  app.patch<{ Params: { id: string }; Body: Partial<{ name: string; role: string; bio: string; links: { label: string; url: string }[] }> }>(
+  app.patch<{ Params: { id: string }; Body: Partial<{ name: string; role: string; bio: string }> }>(
     "/api/admin/collaborators/:id",
     { preHandler: requireAdmin },
     async (req) => {
       return prisma.collaborator.update({ where: { id: Number(req.params.id) }, data: req.body ?? {} });
     },
   );
+
+  app.post<{ Params: { id: string }; Body: { label: string; url: string; linkIconId?: number | null } }>(
+    "/api/admin/collaborators/:id/links",
+    { preHandler: requireAdmin },
+    async (req, reply) => {
+      const { label, url, linkIconId } = req.body ?? {};
+      if (!label || !url) return reply.code(400).send({ error: "label and url are required" });
+      const collaboratorId = Number(req.params.id);
+      const position = await prisma.collaboratorLink.count({ where: { collaboratorId } });
+      const link = await prisma.collaboratorLink.create({ data: { collaboratorId, label, url, linkIconId: linkIconId ?? null, position } });
+      return reply.code(201).send(link);
+    },
+  );
+
+  app.patch<{ Params: { linkId: string }; Body: { linkIconId: number | null } }>(
+    "/api/admin/collaborator-links/:linkId/icon-choice",
+    { preHandler: requireAdmin },
+    async (req) => {
+      return prisma.collaboratorLink.update({ where: { id: Number(req.params.linkId) }, data: { linkIconId: req.body.linkIconId } });
+    },
+  );
+
+  app.delete<{ Params: { linkId: string } }>("/api/admin/collaborator-links/:linkId", { preHandler: requireAdmin }, async (req) => {
+    await prisma.collaboratorLink.delete({ where: { id: Number(req.params.linkId) } });
+    return { status: "ok" };
+  });
 
   app.post<{ Params: { id: string } }>("/api/admin/collaborators/:id/ensure-slug", { preHandler: requireAdmin }, async (req, reply) => {
     const collaborator = await prisma.collaborator.findUnique({ where: { id: Number(req.params.id) } });

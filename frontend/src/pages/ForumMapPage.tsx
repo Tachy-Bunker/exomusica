@@ -14,7 +14,8 @@ interface MapNode {
 export function ForumMapPage() {
   const [nodes, setNodes] = useState<MapNode[]>([]);
   const [hoveredSpecial, setHoveredSpecial] = useState<number | null>(null);
-  const [branchChannels, setBranchChannels] = useState<{ slug: string; name: string }[]>([]);
+  const [activeBranchChannels, setActiveBranchChannels] = useState<{ slug: string; name: string }[]>([]);
+  const [growingSeedChannels, setGrowingSeedChannels] = useState<{ slug: string; name: string }[]>([]);
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [zoom, setZoom] = useState(1);
   const dragState = useRef<{ startX: number; startY: number; panX: number; panY: number } | null>(null);
@@ -25,10 +26,12 @@ export function ForumMapPage() {
   }, []);
 
   useEffect(() => {
-    // "Active Branches" / "Growing Seeds" need every branch-linked topic's
-    // name to build their hover list — pulled once, used client-side.
-    api<{ channel: { slug: string; name: string } | null }[]>("/api/branches").then((branches) => {
-      setBranchChannels(branches.filter((b) => b.channel).map((b) => ({ slug: b.channel!.slug, name: b.channel!.name })));
+    // Split matches DiscussionIndexPage exactly: BABY_CRYSTALS branches are
+    // "Growing Seeds", everything else with a channel is "Active Branches".
+    api<{ visibility: string; channel: { slug: string; name: string } | null }[]>("/api/branches").then((branches) => {
+      const withChannel = branches.filter((b) => b.channel);
+      setActiveBranchChannels(withChannel.filter((b) => b.visibility !== "BABY_CRYSTALS").map((b) => ({ slug: b.channel!.slug, name: b.channel!.name })));
+      setGrowingSeedChannels(withChannel.filter((b) => b.visibility === "BABY_CRYSTALS").map((b) => ({ slug: b.channel!.slug, name: b.channel!.name })));
     });
   }, []);
 
@@ -148,22 +151,25 @@ export function ForumMapPage() {
                       overflowY: "auto",
                     }}
                   >
-                    {branchChannels.length === 0 ? (
-                      <div style={{ opacity: 0.6 }}>Nothing here yet.</div>
-                    ) : (
-                      branchChannels.map((b) => (
-                        <div
-                          key={b.slug}
-                          style={{ padding: "0.15rem 0", cursor: "pointer" }}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            navigate(`/topic/${b.slug}`);
-                          }}
-                        >
-                          {b.name}
-                        </div>
-                      ))
-                    )}
+                    {(() => {
+                      const list = n.type === "ACTIVE_BRANCHES" ? activeBranchChannels : growingSeedChannels;
+                      return list.length === 0 ? (
+                        <div style={{ opacity: 0.6 }}>Nothing here yet.</div>
+                      ) : (
+                        list.map((b) => (
+                          <div
+                            key={b.slug}
+                            style={{ padding: "0.15rem 0", cursor: "pointer" }}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              navigate(`/topic/${b.slug}`);
+                            }}
+                          >
+                            {b.name}
+                          </div>
+                        ))
+                      );
+                    })()}
                   </div>
                 </foreignObject>
               )}

@@ -8,12 +8,12 @@ interface CollaboratorSummary {
   role: string;
   bio: string | null;
   pictureUrl: string | null;
-  links: { label: string; url: string }[] | null;
 }
 
 interface CollaboratorDetail extends CollaboratorSummary {
   linkedUsername: string | null;
   gallery: { id: number; url: string }[];
+  links: { id: number; label: string; url: string; linkIconId: number | null; linkIcon: { id: number; name: string; url: string } | null }[];
 }
 
 export function CollaboratorsAdminPage() {
@@ -24,8 +24,15 @@ export function CollaboratorsAdminPage() {
   const [detail, setDetail] = useState<CollaboratorDetail | null>(null);
   const [editForm, setEditForm] = useState({ name: "", role: "", bio: "" });
   const [linkUsername, setLinkUsername] = useState("");
+  const [newLinkLabel, setNewLinkLabel] = useState("");
+  const [newLinkUrl, setNewLinkUrl] = useState("");
+  const [linkIcons, setLinkIcons] = useState<{ id: number; name: string; url: string }[]>([]);
   const pictureInputRef = useRef<HTMLInputElement>(null);
   const galleryInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    api<{ id: number; name: string; url: string }[]>("/api/link-icons").then(setLinkIcons);
+  }, []);
 
   function load() {
     api<CollaboratorSummary[]>("/api/collaborators").then(setCollaborators);
@@ -87,6 +94,30 @@ export function CollaboratorsAdminPage() {
     formData.append("file", file);
     await api(`/api/admin/collaborators/${editingId}/gallery`, { method: "POST", body: formData });
     if (galleryInputRef.current) galleryInputRef.current.value = "";
+    openDetail(editingId);
+  }
+
+  async function addCollaboratorLink(e: React.FormEvent) {
+    e.preventDefault();
+    if (!editingId || !newLinkLabel.trim() || !newLinkUrl.trim()) return;
+    await api(`/api/admin/collaborators/${editingId}/links`, {
+      method: "POST",
+      body: JSON.stringify({ label: newLinkLabel.trim(), url: newLinkUrl.trim() }),
+    });
+    setNewLinkLabel("");
+    setNewLinkUrl("");
+    openDetail(editingId);
+  }
+
+  async function setCollaboratorLinkIcon(linkId: number, linkIconId: number | null) {
+    if (!editingId) return;
+    await api(`/api/admin/collaborator-links/${linkId}/icon-choice`, { method: "PATCH", body: JSON.stringify({ linkIconId }) });
+    openDetail(editingId);
+  }
+
+  async function deleteCollaboratorLink(linkId: number) {
+    if (!editingId) return;
+    await api(`/api/admin/collaborator-links/${linkId}`, { method: "DELETE" });
     openDetail(editingId);
   }
 
@@ -197,6 +228,40 @@ export function CollaboratorsAdminPage() {
                   Add
                 </button>
               </div>
+            </div>
+
+            <div className="field">
+              <label>Links</label>
+              {detail.links.map((l) => (
+                <div key={l.id} style={{ display: "flex", gap: "0.5rem", alignItems: "center", marginBottom: "0.3rem" }}>
+                  {(l.linkIcon?.url) && <img src={l.linkIcon.url} alt="" style={{ width: 18, height: 18, objectFit: "contain" }} />}
+                  <span style={{ fontSize: "0.85rem" }}>
+                    {l.label} — <span style={{ color: "var(--text-dim)" }}>{l.url}</span>
+                  </span>
+                  <select
+                    value={l.linkIconId ?? ""}
+                    onChange={(e) => setCollaboratorLinkIcon(l.id, e.target.value ? Number(e.target.value) : null)}
+                    style={{ fontSize: "0.75rem" }}
+                  >
+                    <option value="">No image</option>
+                    {linkIcons.map((icon) => (
+                      <option key={icon.id} value={icon.id}>
+                        {icon.name}
+                      </option>
+                    ))}
+                  </select>
+                  <button className="btn btn-danger" style={{ fontSize: "0.7rem", padding: "0.1rem 0.4rem" }} onClick={() => deleteCollaboratorLink(l.id)}>
+                    remove
+                  </button>
+                </div>
+              ))}
+              <form onSubmit={addCollaboratorLink} style={{ display: "flex", gap: "0.5rem", marginTop: "0.3rem" }}>
+                <input placeholder="label" value={newLinkLabel} onChange={(e) => setNewLinkLabel(e.target.value)} style={{ fontSize: "0.85rem" }} />
+                <input placeholder="url" value={newLinkUrl} onChange={(e) => setNewLinkUrl(e.target.value)} style={{ fontSize: "0.85rem", flex: 1 }} />
+                <button className="btn" type="submit">
+                  Add link
+                </button>
+              </form>
             </div>
 
             <div className="field">

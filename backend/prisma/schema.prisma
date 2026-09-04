@@ -298,6 +298,7 @@ model LinkIcon {
   name String
   url  String
   albumLinks AlbumLink[]
+  collaboratorLinks CollaboratorLink[]
 }
 
 model AlbumLink {
@@ -386,7 +387,8 @@ model Collaborator {
   position     Int     @default(0) // admin-controlled order for the all-collaborators wiki index
   bio          String? @db.Text
   pictureUrl   String?
-  links        Json?
+  legacyLinksJson Json? // old unedited links blob — kept for the one-time migration script, no longer read by the app
+  links        CollaboratorLink[]
   linkedUserId Int?    @unique
   linkedUser   User?   @relation(fields: [linkedUserId], references: [id])
 
@@ -394,6 +396,17 @@ model Collaborator {
   tracks        TrackCollaborator[]
   aboutFeatures AboutFeature[]
   galleryImages CollaboratorGalleryImage[]
+}
+
+model CollaboratorLink {
+  id             Int          @id @default(autoincrement())
+  collaboratorId Int
+  collaborator   Collaborator @relation(fields: [collaboratorId], references: [id], onDelete: Cascade)
+  label          String
+  url            String
+  linkIconId     Int?
+  linkIcon       LinkIcon?    @relation(fields: [linkIconId], references: [id])
+  position       Int          @default(0)
 }
 
 model CollaboratorGalleryImage {

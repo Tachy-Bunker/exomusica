@@ -29,7 +29,7 @@ interface CollaboratorDetail {
   role: string;
   bio: string | null;
   pictureUrl: string | null;
-  links: { label: string; url: string }[] | null;
+  links: { id: number; label: string; url: string; linkIcon: { url: string } | null }[];
   linkedUsername: string | null;
   gallery: { id: number; url: string }[];
   discography: DiscographyAlbum[];
@@ -101,13 +101,19 @@ export function CollaboratorPage() {
           <h1 style={{ marginBottom: "0.1rem" }}>{collaborator.name}</h1>
           <p style={{ color: "var(--text-dim)", marginTop: 0 }}>{collaborator.role}</p>
           {collaborator.bio && <p style={{ maxWidth: 560 }}>{collaborator.bio}</p>}
-          {collaborator.links && collaborator.links.length > 0 && (
-            <div style={{ display: "flex", gap: "0.8rem", flexWrap: "wrap" }}>
-              {collaborator.links.map((l, i) => (
-                <a key={i} href={l.url} target="_blank" rel="noreferrer">
-                  {l.label}
-                </a>
-              ))}
+          {collaborator.links.length > 0 && (
+            <div style={{ display: "flex", gap: "0.8rem", flexWrap: "wrap", alignItems: "center" }}>
+              {collaborator.links.map((l) =>
+                l.linkIcon ? (
+                  <a key={l.id} className="album-link-icon" href={l.url} target="_blank" rel="noreferrer" title={l.label}>
+                    <img src={l.linkIcon.url} alt={l.label} />
+                  </a>
+                ) : (
+                  <a key={l.id} href={l.url} target="_blank" rel="noreferrer">
+                    {l.label}
+                  </a>
+                ),
+              )}
             </div>
           )}
         </div>
