@@ -1,5 +1,5 @@
 import { useEffect, useState, type FormEvent } from "react";
-import { useParams, Link } from "react-router-dom";
+import { useParams, Link, useNavigate } from "react-router-dom";
 import { api, ApiError } from "../lib/api";
 import { renderMarkdown } from "../lib/markdown";
 import { useCustomFont, type FontInfo } from "../lib/useCustomFont";
@@ -48,6 +48,7 @@ function NewsletterForm() {
 
 export function NewsPage() {
   const { slug } = useParams<{ slug?: string }>();
+  const navigate = useNavigate();
   const isDesktop = useIsDesktop();
   const scale = useContentScaleStore((s) => (isDesktop ? s.desktop : s.mobile));
   const [posts, setPosts] = useState<PostSummary[]>([]);
@@ -79,7 +80,7 @@ export function NewsPage() {
             <p className="mono" style={{ fontSize: `${0.8 * scale}rem`, color: "var(--text-dim)" }}>
               {new Date(current.publishedAt).toLocaleDateString()}
             </p>
-            {renderMarkdown(current.contentMarkdown)}
+            {renderMarkdown(current.contentMarkdown, navigate)}
           </>
         )}
       </div>

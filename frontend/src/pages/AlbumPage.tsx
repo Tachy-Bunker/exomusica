@@ -10,7 +10,7 @@ import { isTypingTarget } from "../lib/isTypingTarget";
 import type { PlayableTrackDTO } from "../lib/types";
 
 interface TrackWithComposers extends PlayableTrackDTO {
-  composers: { id: number; name: string }[];
+  composers: { id: number; name: string; slug: string | null }[];
 }
 
 interface AlbumDetail {
@@ -24,7 +24,7 @@ interface AlbumDetail {
   links: { id: number; label: string; url: string; iconUrl: string | null }[];
   gallery: { id: number; url: string }[];
   branch: { slug: string; name: string };
-  collaborators: { id: number; name: string; role: string; bio: string | null; pictureUrl: string | null }[];
+  collaborators: { id: number; slug: string | null; name: string; role: string; bio: string | null; pictureUrl: string | null }[];
   tracks: TrackWithComposers[];
 }
 
@@ -116,7 +116,7 @@ export function AlbumPage() {
       </div>
 
       {album.description && <p style={{ marginTop: "1.2rem" }}>{album.description}</p>}
-      {album.contentMarkdown && <div style={{ marginTop: "1rem" }}>{renderMarkdown(album.contentMarkdown)}</div>}
+      {album.contentMarkdown && <div style={{ marginTop: "1rem" }}>{renderMarkdown(album.contentMarkdown, navigate)}</div>}
 
       {album.gallery.length > 0 && (
         <div style={{ display: "flex", gap: "0.5rem", marginTop: "1rem", overflowX: "auto" }}>
@@ -186,7 +186,13 @@ export function AlbumPage() {
               {t.composers.length > 0 && (
                 <span style={{ color: "var(--text-dim)", fontSize: "0.8rem" }}>
                   {" "}
-                  — {t.composers.map((c) => c.name).join(", ")}
+                  —{" "}
+                  {t.composers.map((c, i) => (
+                    <span key={c.id}>
+                      {i > 0 && ", "}
+                      {c.slug ? <Link to={`/collaborator/${c.slug}`}>{c.name}</Link> : c.name}
+                    </span>
+                  ))}
                 </span>
               )}
             </span>
@@ -201,20 +207,31 @@ export function AlbumPage() {
         <>
           <h2 style={{ fontSize: "1rem", marginTop: "1.5rem" }}>Collaborators</h2>
           <div style={{ display: "flex", gap: "0.8rem", flexWrap: "wrap" }}>
-            {album.collaborators.map((c) => (
-              <div key={c.id} style={{ maxWidth: 200 }}>
-                <div
-                  style={{
-                    width: 48,
-                    height: 48,
-                    borderRadius: "50%",
-                    background: c.pictureUrl ? `url(${c.pictureUrl}) center/cover` : "var(--bg-elevated)",
-                  }}
-                />
-                <div style={{ fontFamily: "var(--font-display)", fontSize: "0.9rem" }}>{c.name}</div>
-                <div style={{ fontSize: "0.8rem", color: "var(--accent-forum)" }}>{c.role}</div>
-              </div>
-            ))}
+            {album.collaborators.map((c) => {
+              const card = (
+                <>
+                  <div
+                    style={{
+                      width: 48,
+                      height: 48,
+                      borderRadius: "50%",
+                      background: c.pictureUrl ? `url(${c.pictureUrl}) center/cover` : "var(--bg-elevated)",
+                    }}
+                  />
+                  <div style={{ fontFamily: "var(--font-display)", fontSize: "0.9rem", overflowWrap: "break-word" }}>{c.name}</div>
+                  <div style={{ fontSize: "0.8rem", color: "var(--accent-forum)", overflowWrap: "break-word" }}>{c.role}</div>
+                </>
+              );
+              return c.slug ? (
+                <Link key={c.id} to={`/collaborator/${c.slug}`} style={{ maxWidth: 200, textDecoration: "none", color: "inherit" }}>
+                  {card}
+                </Link>
+              ) : (
+                <div key={c.id} style={{ maxWidth: 200 }}>
+                  {card}
+                </div>
+              );
+            })}
           </div>
         </>
       )}

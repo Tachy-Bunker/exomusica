@@ -67,7 +67,7 @@ export function TopicPage() {
           {channel.name} <span style={{ fontSize: "0.85rem", color: "var(--text-dim)" }}>(E)</span>
         </h1>
         {channel.description && <p style={{ color: "var(--text-dim)", maxWidth: 640 }}>{channel.description}</p>}
-        {channel.contentMarkdown && <div style={{ maxWidth: 640 }}>{renderMarkdown(channel.contentMarkdown)}</div>}
+        {channel.contentMarkdown && <div style={{ maxWidth: 640 }}>{renderMarkdown(channel.contentMarkdown, navigate)}</div>}
       </div>
     );
   }

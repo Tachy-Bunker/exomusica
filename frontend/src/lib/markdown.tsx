@@ -1,6 +1,17 @@
 import type { ReactNode } from "react";
 
-function renderInline(text: string): ReactNode[] {
+function internalPathOf(url: string): string | null {
+  if (url.startsWith("/") && !url.startsWith("//")) return url;
+  try {
+    const parsed = new URL(url, window.location.origin);
+    if (parsed.origin === window.location.origin) return parsed.pathname + parsed.search + parsed.hash;
+  } catch {
+    // malformed URL — treat as external, let the browser's own error handling apply
+  }
+  return null;
+}
+
+function renderInline(text: string, onLinkClick?: (path: string) => void): ReactNode[] {
   const pattern = /\*\*(.+?)\*\*|\*(.+?)\*|\[(.+?)\]\((https?:\/\/[^\s)]+)\)/g;
   const nodes: ReactNode[] = [];
   let lastIndex = 0;
@@ -12,12 +23,21 @@ function renderInline(text: string): ReactNode[] {
     const key = `i-${i++}`;
     if (bold !== undefined) nodes.push(<strong key={key}>{bold}</strong>);
     else if (italic !== undefined) nodes.push(<em key={key}>{italic}</em>);
-    else if (linkText !== undefined)
+    else if (linkText !== undefined) {
+      const internalPath = linkUrl ? internalPathOf(linkUrl) : null;
+      const clickHandler =
+        internalPath && onLinkClick
+          ? (e: React.MouseEvent) => {
+              e.preventDefault();
+              onLinkClick(internalPath);
+            }
+          : undefined;
       nodes.push(
-        <a key={key} href={linkUrl} target="_blank" rel="noreferrer">
+        <a key={key} href={linkUrl} target="_blank" rel="noreferrer" onClick={clickHandler}>
           {linkText}
         </a>,
       );
+    }
     lastIndex = match.index + match[0].length;
   }
   if (lastIndex < text.length) nodes.push(text.slice(lastIndex));
@@ -32,7 +52,7 @@ const AUDIO_LINE = /^@audio\((\S+)\)$/;
 const VIDEO_LINE = /^@video\((\S+)\)$/;
 const FILE_LINE = /^@file\((\S+)\)(?:\[(.*?)\])?$/;
 
-export function renderMarkdown(markdown: string): ReactNode {
+export function renderMarkdown(markdown: string, onLinkClick?: (path: string) => void): ReactNode {
   const lines = markdown.split("\n");
   const blocks: ReactNode[] = [];
   let listBuffer: string[] = [];
@@ -43,7 +63,7 @@ export function renderMarkdown(markdown: string): ReactNode {
     blocks.push(
       <ul key={`ul-${key++}`}>
         {listBuffer.map((item, i) => (
-          <li key={i}>{renderInline(item)}</li>
+          <li key={i}>{renderInline(item, onLinkClick)}</li>
         ))}
       </ul>,
     );
@@ -58,13 +78,13 @@ export function renderMarkdown(markdown: string): ReactNode {
 
     if (line.startsWith("# ")) {
       flushList();
-      blocks.push(<h1 key={key++}>{renderInline(line.slice(2))}</h1>);
+      blocks.push(<h1 key={key++}>{renderInline(line.slice(2), onLinkClick)}</h1>);
     } else if (line.startsWith("## ")) {
       flushList();
-      blocks.push(<h2 key={key++}>{renderInline(line.slice(3))}</h2>);
+      blocks.push(<h2 key={key++}>{renderInline(line.slice(3), onLinkClick)}</h2>);
     } else if (line.startsWith("### ")) {
       flushList();
-      blocks.push(<h3 key={key++}>{renderInline(line.slice(4))}</h3>);
+      blocks.push(<h3 key={key++}>{renderInline(line.slice(4), onLinkClick)}</h3>);
     } else if (line.startsWith("- ")) {
       listBuffer.push(line.slice(2));
     } else if (image) {
@@ -88,7 +108,7 @@ export function renderMarkdown(markdown: string): ReactNode {
       flushList();
     } else {
       flushList();
-      blocks.push(<p key={key++}>{renderInline(line)}</p>);
+      blocks.push(<p key={key++}>{renderInline(line, onLinkClick)}</p>);
     }
   }
   flushList();

@@ -67,6 +67,7 @@ export function FontsAdminPage() {
   const [smtpUser, setSmtpUser] = useState("");
   const [smtpPassword, setSmtpPassword] = useState("");
   const [smtpFrom, setSmtpFrom] = useState("");
+  const [smtpFromName, setSmtpFromName] = useState("");
   const [smtpPasswordSet, setSmtpPasswordSet] = useState(false);
   const [smtpSaved, setSmtpSaved] = useState(false);
   const [smtpTestResult, setSmtpTestResult] = useState<{ ok: boolean; error?: string } | null>(null);
@@ -78,12 +79,14 @@ export function FontsAdminPage() {
       smtpPort: number | null;
       smtpUser: string | null;
       smtpFrom: string | null;
+      smtpFromName: string | null;
       smtpPasswordSet: boolean;
     }>("/api/admin/site-settings/smtp").then((s) => {
       setSmtpHost(s.smtpHost ?? "");
       setSmtpPort(s.smtpPort ?? 587);
       setSmtpUser(s.smtpUser ?? "");
       setSmtpFrom(s.smtpFrom ?? "");
+      setSmtpFromName(s.smtpFromName ?? "");
       setSmtpPasswordSet(s.smtpPasswordSet);
     });
   }, []);
@@ -121,6 +124,7 @@ export function FontsAdminPage() {
         smtpUser: smtpUser || null,
         smtpPassword: smtpPassword || undefined,
         smtpFrom: smtpFrom || null,
+        smtpFromName: smtpFromName || null,
       }),
     });
     if (smtpPassword) setSmtpPasswordSet(true);
@@ -645,6 +649,12 @@ export function FontsAdminPage() {
           style={{ marginBottom: "0.3rem" }}
         />
         <input placeholder="From address" value={smtpFrom} onChange={(e) => setSmtpFrom(e.target.value)} style={{ marginBottom: "0.5rem" }} />
+        <input
+          placeholder="Display name (e.g. Exomusica) — shown instead of the address's own prefix"
+          value={smtpFromName}
+          onChange={(e) => setSmtpFromName(e.target.value)}
+          style={{ marginBottom: "0.5rem" }}
+        />
         <button className="btn btn-primary" onClick={saveSmtp}>
           Save SMTP
         </button>{" "}

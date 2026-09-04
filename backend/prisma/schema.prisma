@@ -587,6 +587,7 @@ model SiteSettings {
   smtpUser           String?
   smtpPassword       String?
   smtpFrom           String?
+  smtpFromName       String? // display name shown to recipients — without this, most email clients just show the address's own prefix
   chatOpenSfxUrl     String? // plays once whenever a new chat location (branch/topic) is opened
   joinNotifyEmail    String? // admin gets emailed here whenever a new join request comes in
   joinNotifyDiscordUsername String? // admin also gets DMed here, if the bridge bot shares a server with this Discord account

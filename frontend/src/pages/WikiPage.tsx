@@ -76,7 +76,7 @@ export function WikiPage() {
       {!slug && <p style={{ color: "var(--text-dim)" }}>Pick a page from the list.</p>}
       {slug && !current && <p>Loading…</p>}
       {current &&
-        (current.contentMarkdown.trim() === "@branch-index" ? <BranchIndexList /> : renderMarkdown(current.contentMarkdown))}
+        (current.contentMarkdown.trim() === "@branch-index" ? <BranchIndexList /> : renderMarkdown(current.contentMarkdown, navigate))}
     </div>
   );
 

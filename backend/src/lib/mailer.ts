@@ -18,6 +18,10 @@ interface SmtpConfig {
   from: string;
 }
 
+function formatFrom(email: string, name: string | null | undefined): string {
+  return name ? `${name} <${email}>` : email;
+}
+
 async function resolveSmtpConfig(): Promise<SmtpConfig | null> {
   const settings = await prisma.siteSettings.findUnique({ where: { id: 1 } });
   if (settings?.smtpHost && settings?.smtpUser && settings?.smtpPassword) {
@@ -26,7 +30,7 @@ async function resolveSmtpConfig(): Promise<SmtpConfig | null> {
       port: settings.smtpPort ?? 587,
       user: settings.smtpUser,
       password: settings.smtpPassword,
-      from: settings.smtpFrom ?? settings.smtpUser,
+      from: formatFrom(settings.smtpFrom ?? settings.smtpUser, settings.smtpFromName),
     };
   }
   if (ENV_HOST && ENV_USER && ENV_PASSWORD) {

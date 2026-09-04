@@ -148,18 +148,20 @@ export async function siteSettingsRoutes(app: FastifyInstance): Promise<void> {
       smtpPort: settings?.smtpPort ?? null,
       smtpUser: settings?.smtpUser ?? null,
       smtpFrom: settings?.smtpFrom ?? null,
+      smtpFromName: settings?.smtpFromName ?? null,
       smtpPasswordSet: !!settings?.smtpPassword,
     };
   });
 
   app.put<{
-    Body: { smtpHost: string | null; smtpPort: number | null; smtpUser: string | null; smtpPassword?: string; smtpFrom: string | null };
+    Body: { smtpHost: string | null; smtpPort: number | null; smtpUser: string | null; smtpPassword?: string; smtpFrom: string | null; smtpFromName: string | null };
   }>("/api/admin/site-settings/smtp", { preHandler: requireAdmin }, async (req) => {
     const data: Record<string, unknown> = {
       smtpHost: req.body.smtpHost,
       smtpPort: req.body.smtpPort,
       smtpUser: req.body.smtpUser,
       smtpFrom: req.body.smtpFrom,
+      smtpFromName: req.body.smtpFromName,
     };
     // Only overwrite the password if a new one was actually typed — an
     // empty field means "leave the existing one alone", not "clear it".

@@ -71,7 +71,7 @@ export async function albumRoutes(app: FastifyInstance): Promise<void> {
       collaborators: album.collaborators.map((c) => c.collaborator),
       tracks: album.tracks.map((t) => ({
         ...trackToDTO(t),
-        composers: t.collaborators.map((tc) => ({ id: tc.collaborator.id, name: tc.collaborator.name })),
+        composers: t.collaborators.map((tc) => ({ id: tc.collaborator.id, name: tc.collaborator.name, slug: tc.collaborator.slug })),
       })),
     };
   });

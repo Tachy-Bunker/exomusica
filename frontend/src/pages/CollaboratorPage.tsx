@@ -4,8 +4,7 @@ import { api } from "../lib/api";
 import { useAudioStore } from "../lib/audioStore";
 import { useIsDesktop } from "../lib/useIsDesktop";
 import { GalleryLightbox, useLightbox } from "../components/GalleryLightbox";
-import { SpaceMap } from "../components/SpaceMap";
-import type { Branch, PlayableTrackDTO } from "../lib/types";
+import type { PlayableTrackDTO } from "../lib/types";
 
 interface DiscographyTrack {
   id: number;
@@ -43,14 +42,7 @@ export function CollaboratorPage() {
   const isDesktop = useIsDesktop();
   const play = useAudioStore((s) => s.play);
   const addToQueue = useAudioStore((s) => s.addToQueue);
-  const [showSpacemap, setShowSpacemap] = useState(false);
-  const [allBranches, setAllBranches] = useState<Branch[]>([]);
-
-  useEffect(() => {
-    if (showSpacemap && allBranches.length === 0) {
-      api<Branch[]>("/api/branches").then(setAllBranches);
-    }
-  }, [showSpacemap, allBranches.length]);
+  const clearQueue = useAudioStore((s) => s.clearQueue);
 
   useEffect(() => {
     if (!slug) return;
@@ -59,64 +51,39 @@ export function CollaboratorPage() {
 
   if (!collaborator) return <p>Loading…</p>;
 
-  const filteredBranches = allBranches.filter((b) => collaborator.discography.some((a) => a.branchSlug === b.slug));
-  const filteredTracks: PlayableTrackDTO[] = collaborator.discography.flatMap((album) =>
-    album.tracks.map((t) => ({
-      id: t.id,
-      title: t.title,
-      fileUrl: t.fileUrl,
-      format: t.format,
-      durationSeconds: t.durationSeconds,
-      position: t.position,
-      albumTitle: album.title,
-      albumSlug: album.slug,
-      coverArtUrl: album.coverArtUrl,
-      composer: collaborator.name,
-      branchSlug: album.branchSlug,
-      bookmarks: [],
-    })),
+  const allPageTracks: (PlayableTrackDTO & { albumSlug: string })[] = collaborator.discography.flatMap((album) =>
+    [...album.tracks]
+      .sort((a, b) => a.position - b.position)
+      .map((t) => ({
+        id: t.id,
+        title: t.title,
+        fileUrl: t.fileUrl,
+        format: t.format,
+        durationSeconds: t.durationSeconds,
+        position: t.position,
+        albumTitle: album.title,
+        albumSlug: album.slug,
+        coverArtUrl: album.coverArtUrl,
+        composer: collaborator.name,
+        branchSlug: album.branchSlug,
+        bookmarks: [],
+      })),
   );
 
   function playTrack(album: DiscographyAlbum, track: DiscographyTrack) {
-    play({
-      id: track.id,
-      title: track.title,
-      fileUrl: track.fileUrl,
-      format: track.format,
-      durationSeconds: track.durationSeconds,
-      position: track.position,
-      albumTitle: album.title,
-      albumSlug: album.slug,
-      coverArtUrl: album.coverArtUrl,
-      composer: collaborator!.name,
-      branchSlug: album.branchSlug,
-      bookmarks: [],
-    });
-  }
-
-  if (showSpacemap) {
-    return (
-      <div style={{ height: "calc(100dvh - var(--nav-height, 3.6rem) - 3rem)", display: "flex", flexDirection: "column" }}>
-        <button className="btn" onClick={() => setShowSpacemap(false)} style={{ marginBottom: "0.5rem", alignSelf: "flex-start" }}>
-          ← Back to {collaborator.name}'s profile
-        </button>
-        <div style={{ flex: 1, minHeight: 0 }}>
-          <SpaceMap
-            branches={filteredBranches}
-            centerLabel={collaborator.name}
-            centerHref={`/collaborator/${collaborator.slug}`}
-            filteredTracks={filteredTracks}
-          />
-        </div>
-      </div>
-    );
+    const index = allPageTracks.findIndex((t) => t.id === track.id && t.albumSlug === album.slug);
+    if (index === -1) return;
+    const [first, ...rest] = allPageTracks.slice(index);
+    play(first);
+    clearQueue();
+    addToQueue(rest);
   }
 
   return (
     <div style={{ maxWidth: 720 }}>
-      <button className="btn" onClick={() => setShowSpacemap(true)} style={{ marginBottom: "0.8rem" }}>
+      <Link to={`/collaborator/${collaborator.slug}/spacemap`} className="btn" style={{ marginBottom: "0.8rem", display: "inline-block" }}>
         View discography on Spacemap
-      </button>
+      </Link>
       <div style={{ display: "flex", gap: "1.2rem", flexWrap: "wrap" }}>
         <div
           style={{
