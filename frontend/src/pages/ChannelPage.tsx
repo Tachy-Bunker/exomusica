@@ -8,6 +8,7 @@ import { useAudioStore } from "../lib/audioStore";
 import { renderMessageContent } from "../lib/formatMessage";
 import { useMentionResolutionStore } from "../lib/mentionResolutionStore";
 import { EmojiPicker } from "../components/EmojiPicker";
+import { MentionPicker } from "../components/MentionPicker";
 import { AttachmentPreview } from "../components/AttachmentPreview";
 import { SearchBox } from "../components/SearchBox";
 import { TopicSwitcher } from "../components/TopicSwitcher";
@@ -343,6 +344,7 @@ export function ChannelPage({ channelSlug, fillHeight }: { channelSlug?: string;
   const [archiveDays, setArchiveDays] = useState<{ day: string; messageCount: number }[]>([]);
   const [draft, setDraft] = useState("");
   const [emojiQuery, setEmojiQuery] = useState<string | null>(null);
+  const [mentionQuery, setMentionQuery] = useState<string | null>(null);
   const [following, setFollowing] = useState(false);
   const [channelName, setChannelName] = useState<string | null>(null);
   const [channelFont, setChannelFont] = useState<FontInfo | null>(null);
@@ -697,8 +699,10 @@ export function ChannelPage({ channelSlug, fillHeight }: { channelSlug?: string;
     const value = e.target.value;
     setDraft(value);
     const cursor = e.target.selectionStart ?? value.length;
-    const match = value.slice(0, cursor).match(/:([a-z0-9_]*)$/i);
-    setEmojiQuery(match ? match[1] : null);
+    const emojiMatch = value.slice(0, cursor).match(/:([a-z0-9_]*)$/i);
+    setEmojiQuery(emojiMatch ? emojiMatch[1] : null);
+    const mentionMatch = value.slice(0, cursor).match(/(?:^|\s)@([a-zA-Z0-9_.-]*)$/);
+    setMentionQuery(mentionMatch ? mentionMatch[1] : null);
   }
 
   function handlePaste(e: ClipboardEvent<HTMLTextAreaElement>) {
@@ -735,6 +739,23 @@ export function ChannelPage({ channelSlug, fillHeight }: { channelSlug?: string;
     requestAnimationFrame(() => {
       el.focus();
       const newCursor = start + emoji.name.length + 3;
+      el.setSelectionRange(newCursor, newCursor);
+    });
+  }
+
+  function insertMention(username: string) {
+    const el = textareaRef.current;
+    if (!el) return;
+    const cursor = el.selectionStart ?? draft.length;
+    const match = draft.slice(0, cursor).match(/(?:^|\s)@([a-zA-Z0-9_.-]*)$/);
+    if (!match) return;
+    const start = cursor - match[0].length + (match[0][0] === " " ? 1 : 0);
+    const next = `${draft.slice(0, start)}@${username} ${draft.slice(cursor)}`;
+    setDraft(next);
+    setMentionQuery(null);
+    requestAnimationFrame(() => {
+      el.focus();
+      const newCursor = start + username.length + 2;
       el.setSelectionRange(newCursor, newCursor);
     });
   }
@@ -910,6 +931,7 @@ export function ChannelPage({ channelSlug, fillHeight }: { channelSlug?: string;
           )}
           <div style={{ display: "flex", gap: "0.5rem", position: "relative" }}>
             {emojiQuery !== null && <EmojiPicker filter={emojiQuery} onSelect={insertEmoji} />}
+            {mentionQuery !== null && <MentionPicker filter={mentionQuery} onSelect={insertMention} />}
             <input ref={fileInputRef} type="file" multiple onChange={handleFileSelect} style={{ display: "none" }} />
             <button type="button" className="btn" onClick={() => fileInputRef.current?.click()} title="Attach a file">
               📎

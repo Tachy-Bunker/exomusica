@@ -18,11 +18,12 @@ export async function blogRoutes(app: FastifyInstance): Promise<void> {
       }),
     ]);
     const formEmails = new Set(formSubs.map((s) => s.email.toLowerCase()));
+    const accountSubsWithEmail = accountSubs.filter((u): u is typeof u & { email: string } => !!u.email);
     return [
       ...formSubs.map((s) => ({ id: `form:${s.id}`, email: s.email, subscribed: s.subscribed, source: "form" as const, createdAt: s.createdAt })),
       // Skip account-based entries whose email already appears as a form
       // signup — same person, don't list them twice.
-      ...accountSubs
+      ...accountSubsWithEmail
         .filter((u) => !formEmails.has(u.email.toLowerCase()))
         .map((u) => ({ id: `account:${u.id}`, email: u.email, subscribed: true, source: "account" as const, createdAt: u.createdAt, username: u.username })),
     ];

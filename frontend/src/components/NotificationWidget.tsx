@@ -218,21 +218,42 @@ export function NotificationWidget({ offsetRight = 0, inline = false }: { offset
             <strong style={{ fontSize: "0.85rem" }}>Notifications</strong>
           </div>
           {notifications.length === 0 && <p style={{ padding: "0.7rem 0.7rem 0.3rem", fontSize: "0.8rem", color: "var(--text-dim)" }}>Nothing yet.</p>}
-          {notifications.map((n) => (
-            <div
-              key={n.id}
-              onClick={() => handleNotificationClick(n)}
-              style={{
-                padding: "0.5rem 0.7rem",
-                borderBottom: "1px solid var(--border)",
-                cursor: n.channelSlug ? "pointer" : "default",
-                fontSize: "0.8rem",
-              }}
-            >
-              <div style={{ fontWeight: 600 }}>{n.title}</div>
-              <div style={{ color: "var(--text-dim)" }}>{n.body}</div>
-            </div>
-          ))}
+          {(() => {
+            const priorityKeys = new Set(["mention", "message_followed_topic"]);
+            const priority = notifications.filter((n) => priorityKeys.has(n.eventKey));
+            const other = notifications.filter((n) => !priorityKeys.has(n.eventKey));
+            const renderNotification = (n: (typeof notifications)[number]) => (
+              <div
+                key={n.id}
+                onClick={() => handleNotificationClick(n)}
+                style={{
+                  padding: "0.5rem 0.7rem",
+                  borderBottom: "1px solid var(--border)",
+                  cursor: n.channelSlug ? "pointer" : "default",
+                  fontSize: "0.8rem",
+                }}
+              >
+                <div style={{ fontWeight: 600 }}>{n.title}</div>
+                <div style={{ color: "var(--text-dim)" }}>{n.body}</div>
+              </div>
+            );
+            return (
+              <>
+                {priority.length > 0 && (
+                  <>
+                    <div style={{ padding: "0.3rem 0.7rem", fontSize: "0.7rem", textTransform: "uppercase", color: "var(--accent-forum)" }}>Priority</div>
+                    {priority.map(renderNotification)}
+                  </>
+                )}
+                {other.length > 0 && (
+                  <>
+                    <div style={{ padding: "0.3rem 0.7rem", fontSize: "0.7rem", textTransform: "uppercase", color: "var(--text-dim)" }}>Other</div>
+                    {other.map(renderNotification)}
+                  </>
+                )}
+              </>
+            );
+          })()}
 
           <div style={{ padding: "0.4rem 0.7rem", fontSize: "0.7rem", textTransform: "uppercase", color: "var(--text-dim)", borderTop: "1px solid var(--border)" }}>
             Recent activity — any topic

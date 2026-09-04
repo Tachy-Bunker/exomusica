@@ -6,6 +6,7 @@ import { toMessageDTO } from "../lib/messageDto.js";
 import { broadcast } from "../lib/chatHub.js";
 import { sendTemplatedMail } from "../lib/emailTemplates.js";
 import { createNotification } from "../lib/notify.js";
+import { resolveMentions, translateMentionsForDiscord } from "../lib/mentions.js";
 import { parseSearchQuery } from "../lib/searchQuery.js";
 import { walkChannelHistoryInChunks } from "../lib/messageChunking.js";
 import { forwardMessageToDiscord, sendDiscordDM } from "../lib/discordBot.js";
@@ -204,7 +205,20 @@ export async function messageRoutes(app: FastifyInstance): Promise<void> {
       const full = await prisma.message.findUniqueOrThrow({ where: { id: message.id }, include: messageInclude });
       const dto = await toMessageDTO(full);
       broadcast(channel.slug, { type: "message.create", message: dto });
-      void forwardMessageToDiscord(channel.slug, dto.authorUsername, contentRaw, {
+
+      const mentioned = await resolveMentions(prisma, contentRaw, req.user!.id);
+      for (const m of mentioned) {
+        void createNotification(
+          m.id,
+          "mention",
+          `${dto.authorUsername} mentioned you`,
+          `In ${channel.name}: ${contentRaw.slice(0, 120)}`,
+          { channelSlug: channel.slug, messageId: message.id },
+        ).catch((err) => app.log.error(err, "mention createNotification failed"));
+      }
+
+      const contentForDiscord = translateMentionsForDiscord(contentRaw, mentioned);
+      void forwardMessageToDiscord(channel.slug, dto.authorUsername, contentForDiscord, {
         discordUserId: full.author.discordUserId,
         discordUsername: full.author.discordUsername,
       });

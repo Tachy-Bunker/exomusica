@@ -91,13 +91,38 @@ export async function importDiscordRows(
       continue;
     }
 
-    const author = await findOrCreateGhostUser(prisma, row.AuthorID, row.Author);
+    // Messages forwarded by our own bridge (website -> Discord) are all
+    // posted through one webhook, which shares a single Discord author id
+    // across every website user's message — that id is not a useful
+    // ghost identity, since it doesn't distinguish between senders.
+    // Detect this pattern and attribute the message to the real website
+    // account directly instead.
+    const exoApiMatch = row.Author.match(/^(.+?)\s*\|\s*Exo-API$/);
+    let author;
+    if (exoApiMatch) {
+      const realUsername = exoApiMatch[1].trim();
+      const realUser = await prisma.user.findUnique({ where: { username: realUsername } });
+      if (realUser) {
+        author = realUser;
+      } else {
+        // Real user not found (renamed, deleted) — fall back to a ghost
+        // under this synthetic name rather than dropping the message.
+        author = await findOrCreateGhostUser(prisma, `exo-api:${realUsername}`, realUsername);
+      }
+    } else {
+      author = await findOrCreateGhostUser(prisma, row.AuthorID, row.Author);
+    }
+
     const createdAt = parseDiscordTimestamp(row.Date);
     const dayKey = toDayKey(createdAt);
     const importedFrom = `discord:${row.AuthorID}:${createdAt.toISOString()}`;
 
-    const duplicate = await prisma.message.findUnique({
-      where: { channelId_importedFrom: { channelId, importedFrom } },
+    const duplicate = await prisma.message.findFirst({
+      where: {
+        channelId,
+        isDeleted: false,
+        OR: [{ importedFrom }, { createdAt, contentRaw: row.Content }],
+      },
     });
     if (duplicate) {
       summary.skippedDuplicate++;

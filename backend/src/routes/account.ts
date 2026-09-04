@@ -298,6 +298,18 @@ export async function accountRoutes(app: FastifyInstance): Promise<void> {
     }));
   });
 
+  app.get<{ Querystring: { q?: string } }>("/api/users/mention-search", { preHandler: requireAuth }, async (req) => {
+    const q = (req.query.q ?? "").trim();
+    if (q.length === 0) return [];
+    const users = await prisma.user.findMany({
+      where: { username: { startsWith: q, mode: "insensitive" } },
+      select: { username: true, avatarUrl: true, isGhost: true },
+      take: 8,
+      orderBy: { username: "asc" },
+    });
+    return users;
+  });
+
   app.get<{ Params: { username: string } }>("/api/users/:username", async (req, reply) => {
     const user = await prisma.user.findUnique({
       where: { username: req.params.username },

@@ -4,6 +4,8 @@ import { findOrCreateGhostUser } from "./discordImport.js";
 import { toDayKey } from "./dayKey.js";
 import { broadcast } from "./chatHub.js";
 import { toMessageDTO } from "./messageDto.js";
+import { resolveMentions, translateMentionsFromDiscord } from "./mentions.js";
+import { createNotification } from "./notify.js";
 
 let client: Client | null = null;
 let startedWithToken: string | null = null;
@@ -57,9 +59,10 @@ async function handleIncomingDiscordMessage(message: {
   const author = await findOrCreateGhostUser(prisma, message.author.id, message.author.username);
   const createdAt = message.createdAt;
   const dayKey = toDayKey(createdAt);
+  const translatedContent = await translateMentionsFromDiscord(prisma, message.content);
 
   const created = await prisma.message.create({
-    data: { channelId: channel.id, authorId: author.id, createdAt, dayKey, contentRaw: message.content, importedFrom },
+    data: { channelId: channel.id, authorId: author.id, createdAt, dayKey, contentRaw: translatedContent, importedFrom },
     include: {
       author: { select: { username: true, avatarUrl: true, isGhost: true, linkedUserId: true, linkedUser: { select: { username: true, avatarUrl: true } } } },
       reactions: { include: { emoji: true, user: { select: { username: true } } } },
@@ -70,6 +73,17 @@ async function handleIncomingDiscordMessage(message: {
 
   const dto = await toMessageDTO(created);
   broadcast(channel.slug, { type: "message.create", message: dto });
+
+  const mentioned = await resolveMentions(prisma, translatedContent, author.id);
+  for (const m of mentioned) {
+    void createNotification(
+      m.id,
+      "mention",
+      `${dto.authorUsername} mentioned you`,
+      `In ${channel.name}: ${translatedContent.slice(0, 120)}`,
+      { channelSlug: channel.slug, messageId: created.id },
+    ).catch((err) => console.error("Discord bridge: mention notification failed:", err));
+  }
 }
 
 /** Posts a website message out to its linked Discord channel, if any.

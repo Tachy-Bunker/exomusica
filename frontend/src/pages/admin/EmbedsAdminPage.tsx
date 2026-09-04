@@ -18,7 +18,7 @@ const PAGE_TYPES: { key: string; label: string; placeholders: string }[] = [
 export function EmbedsAdminPage() {
   const [settings, setSettings] = useState<EmbedSettings | null>(null);
   const [drafts, setDrafts] = useState<Record<string, string>>({});
-  const [savedField, setSavedField] = useState<string | null>(null);
+  const [statusByKey, setStatusByKey] = useState<Record<string, string>>({});
   const faviconInputRef = useRef<HTMLInputElement>(null);
   const imageInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
 
@@ -30,10 +30,18 @@ export function EmbedsAdminPage() {
   }
   useEffect(load, []);
 
-  async function saveField(field: string) {
-    await api("/api/admin/site-settings", { method: "PATCH", body: JSON.stringify({ [field]: drafts[field] || null }) });
-    setSavedField(field);
-    setTimeout(() => setSavedField(null), 1800);
+  // One Save per page-type section, saving title + description together —
+  // matching the Email Templates page's pattern (edit everything for a
+  // type, one Save button) rather than a save per individual field.
+  async function saveSection(key: string) {
+    const titleField = `og${key}Title`;
+    const descField = `og${key}Description`;
+    await api("/api/admin/site-settings", {
+      method: "PATCH",
+      body: JSON.stringify({ [titleField]: drafts[titleField] || null, [descField]: drafts[descField] || null }),
+    });
+    setStatusByKey((s) => ({ ...s, [key]: "Saved." }));
+    setTimeout(() => setStatusByKey((s) => ({ ...s, [key]: "" })), 2000);
     load();
   }
 
@@ -89,34 +97,18 @@ export function EmbedsAdminPage() {
             <p style={{ fontSize: "0.75rem", color: "var(--text-dim)", marginTop: "-0.3rem" }}>Placeholders: {placeholders}</p>
             <div className="field">
               <label>Title template</label>
-              <div style={{ display: "flex", gap: "0.5rem" }}>
-                <input
-                  value={drafts[titleField] ?? ""}
-                  onChange={(e) => setDrafts((d) => ({ ...d, [titleField]: e.target.value }))}
-                  style={{ flex: 1 }}
-                />
-                <button className="btn btn-primary" onClick={() => saveField(titleField)}>
-                  Save
-                </button>
-              </div>
-              {savedField === titleField && <span style={{ fontSize: "0.8rem", color: "var(--accent-audio)" }}>Saved ✓</span>}
+              <input value={drafts[titleField] ?? ""} onChange={(e) => setDrafts((d) => ({ ...d, [titleField]: e.target.value }))} />
             </div>
             <div className="field">
               <label>Description template</label>
-              <div style={{ display: "flex", gap: "0.5rem" }}>
-                <textarea
-                  rows={2}
-                  style={{ flex: 1 }}
-                  value={drafts[descField] ?? ""}
-                  onChange={(e) => setDrafts((d) => ({ ...d, [descField]: e.target.value }))}
-                />
-                <button className="btn btn-primary" onClick={() => saveField(descField)}>
-                  Save
-                </button>
-              </div>
-              {savedField === descField && <span style={{ fontSize: "0.8rem", color: "var(--accent-audio)" }}>Saved ✓</span>}
+              <textarea rows={2} style={{ width: "100%" }} value={drafts[descField] ?? ""} onChange={(e) => setDrafts((d) => ({ ...d, [descField]: e.target.value }))} />
             </div>
-            <div className="field">
+            {statusByKey[key] && <p style={{ fontSize: "0.85rem", color: "var(--accent-audio)" }}>{statusByKey[key]}</p>}
+            <button className="btn btn-primary" onClick={() => saveSection(key)}>
+              Save
+            </button>
+
+            <div className="field" style={{ marginTop: "0.8rem" }}>
               <label>Image</label>
               {settings[imageField] && (
                 <img src={settings[imageField]!} alt="" style={{ width: 120, display: "block", marginBottom: "0.4rem", borderRadius: "var(--radius)" }} />
