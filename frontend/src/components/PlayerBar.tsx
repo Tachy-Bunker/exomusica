@@ -77,11 +77,6 @@ export function PlayerBar() {
   // (looking exactly like the track restarting).
   const effectiveDuration = duration || currentTrack?.durationSeconds || 0;
 
-  useEffect(() => {
-    bindAudioElement(audioRef.current);
-    return () => bindAudioElement(null);
-  }, []);
-
   // Real measured height, not a guess — every layout consumer (main content
   // padding, the homepage's height calc) reads this instead of assuming a
   // fixed player height, so nothing ever sits hidden behind it regardless
@@ -195,7 +190,10 @@ export function PlayerBar() {
           navigation". No special persistence logic needed beyond living
           here, in Layout, outside the router's <Outlet />. */}
       <audio
-        ref={audioRef}
+        ref={(el) => {
+          audioRef.current = el;
+          bindAudioElement(el);
+        }}
         crossOrigin="anonymous"
         onTimeUpdate={(e) => {
           console.log("[player-debug] timeupdate fired:", e.currentTarget.currentTime);
