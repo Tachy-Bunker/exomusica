@@ -840,7 +840,7 @@ export function ChannelPage({ channelSlug, fillHeight, parentControlsHeight }: {
         )}
         {(!isMobileWindow || isChatFullscreen) && (
           <>
-            <TopicSwitcher />
+            <TopicSwitcher label={!isDesktop && channelName ? channelName : undefined} />
             {isDesktop && (
               <button className="btn" onClick={popOutChat} title="Open in a floating window">
                 ↗ Pop out

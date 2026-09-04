@@ -716,4 +716,6 @@ model ForumMapNode {
   children  ForumMapNode[]   @relation("MapTree")
   x         Float            @default(0)
   y         Float            @default(0)
+  color     String? // admin override — falls back to a type-based default when unset
+  size      Float?  // admin override for the node's radius — same fallback
 }

@@ -7,6 +7,8 @@ interface MapNode {
   parentId: number | null;
   x: number;
   y: number;
+  color: string | null;
+  size: number | null;
   channel: { slug: string; name: string } | null;
 }
 
@@ -70,6 +72,11 @@ export function ForumMapAdminPage() {
 
   async function setParent(id: number, parentId: number | null) {
     await api(`/api/admin/forum-map/nodes/${id}`, { method: "PATCH", body: JSON.stringify({ parentId }) });
+    load();
+  }
+
+  async function setNodeStyle(id: number, patch: { color?: string | null; size?: number | null }) {
+    await api(`/api/admin/forum-map/nodes/${id}`, { method: "PATCH", body: JSON.stringify(patch) });
     load();
   }
 
@@ -166,8 +173,11 @@ export function ForumMapAdminPage() {
       <svg
         ref={svgRef}
         viewBox={`${-vbSize / 2 - pan.x} ${-vbSize / 2 - pan.y} ${vbSize} ${vbSize}`}
-        style={{ width: "100%", height: "60vh", background: "#0d0a14", borderRadius: "var(--radius)", border: "1px solid var(--border)", cursor: panDrag.current ? "grabbing" : "grab" }}
-        onPointerDown={onBackgroundPointerDown}
+        style={{ width: "100%", height: "60vh", background: "#0d0a14", borderRadius: "var(--radius)", border: "1px solid var(--border)", cursor: panDrag.current ? "grabbing" : "grab", userSelect: "none" }}
+        onPointerDown={(e) => {
+          e.preventDefault();
+          onBackgroundPointerDown(e);
+        }}
         onPointerMove={onSvgPointerMove}
         onPointerUp={onSvgPointerUp}
         onPointerLeave={onSvgPointerUp}
@@ -192,8 +202,8 @@ export function ForumMapAdminPage() {
         {nodes.map((n) => (
           <g key={n.id} transform={`translate(${n.x}, ${n.y})`} onPointerDown={(e) => onNodePointerDown(e, n)} style={{ cursor: "grab" }}>
             <circle
-              r={n.type === "TOPIC" ? 14 : 18}
-              fill={n.type === "TOPIC" ? "#8fd3ff" : n.type === "ACTIVE_BRANCHES" ? "#a7ffc9" : "#c9a7ff"}
+              r={n.size ?? (n.type === "TOPIC" ? 14 : 18)}
+              fill={n.color ?? (n.type === "TOPIC" ? "#8fd3ff" : n.type === "ACTIVE_BRANCHES" ? "#a7ffc9" : "#c9a7ff")}
               opacity={0.85}
             />
             <text y={n.type === "TOPIC" ? 30 : 38} textAnchor="middle" fill="#fff" fontSize={11}>
@@ -208,6 +218,8 @@ export function ForumMapAdminPage() {
           <tr>
             <th style={{ textAlign: "left" }}>Node</th>
             <th style={{ textAlign: "left" }}>Parent</th>
+            <th style={{ textAlign: "left" }}>Color</th>
+            <th style={{ textAlign: "left" }}>Size</th>
             <th />
           </tr>
         </thead>
@@ -226,6 +238,29 @@ export function ForumMapAdminPage() {
                       </option>
                     ))}
                 </select>
+              </td>
+              <td>
+                <input
+                  type="color"
+                  value={n.color ?? (n.type === "TOPIC" ? "#e2703f" : n.type === "ACTIVE_BRANCHES" ? "#f0a06a" : "#4fa8e0")}
+                  onChange={(e) => setNodeStyle(n.id, { color: e.target.value })}
+                  style={{ width: 32, height: 24, padding: 0 }}
+                />
+                {n.color && (
+                  <button className="btn" style={{ fontSize: "0.65rem", marginLeft: "0.2rem", padding: "0.1rem 0.3rem" }} onClick={() => setNodeStyle(n.id, { color: null })} title="Reset to default color">
+                    reset
+                  </button>
+                )}
+              </td>
+              <td>
+                <input
+                  type="number"
+                  min={4}
+                  max={60}
+                  value={n.size ?? (n.type === "TOPIC" ? 14 : 19)}
+                  onChange={(e) => setNodeStyle(n.id, { size: Number(e.target.value) })}
+                  style={{ width: 55 }}
+                />
               </td>
               <td>
                 <button className="btn btn-danger" style={{ fontSize: "0.75rem" }} onClick={() => removeNode(n.id)}>

@@ -24,6 +24,9 @@ interface UserDetail extends UserSummary {
 export function UsersPage() {
   const [query, setQuery] = useState("");
   const [users, setUsers] = useState<UserSummary[]>([]);
+  const [page, setPage] = useState(1);
+  const [total, setTotal] = useState(0);
+  const pageSize = 50;
   const [ghosts, setGhosts] = useState<UserSummary[]>([]);
   const [mergeTargets, setMergeTargets] = useState<Record<number, string>>({});
   const [editingId, setEditingId] = useState<number | null>(null);
@@ -32,20 +35,24 @@ export function UsersPage() {
   const avatarInputRef = useRef<HTMLInputElement>(null);
 
   function load() {
-    api<UserSummary[]>(`/api/admin/users?q=${encodeURIComponent(query)}`).then(setUsers);
+    api<{ users: UserSummary[]; total: number }>(`/api/admin/users?q=${encodeURIComponent(query)}&page=${page}`).then((r) => {
+      setUsers(r.users);
+      setTotal(r.total);
+    });
   }
 
   function loadGhosts() {
-    api<UserSummary[]>("/api/admin/users?ghostsOnly=true").then(setGhosts);
+    api<{ users: UserSummary[] }>("/api/admin/users?ghostsOnly=true").then((r) => setGhosts(r.users));
   }
 
-  useEffect(load, [query]);
+  useEffect(load, [query, page]);
   useEffect(loadGhosts, []);
+  useEffect(() => setPage(1), [query]); // a new search should always start back at page 1
 
   async function linkGhost(ghostId: number) {
     const targetUsername = mergeTargets[ghostId]?.trim();
     if (!targetUsername) return;
-    const matches = await api<UserSummary[]>(`/api/admin/users?q=${encodeURIComponent(targetUsername)}`);
+    const { users: matches } = await api<{ users: UserSummary[] }>(`/api/admin/users?q=${encodeURIComponent(targetUsername)}`);
     const target = matches.find((u) => u.username.toLowerCase() === targetUsername.toLowerCase());
     if (!target) {
       alert(`No account found with username "${targetUsername}" — check the spelling.`);
@@ -181,6 +188,19 @@ export function UsersPage() {
         onChange={(e) => setQuery(e.target.value)}
         style={{ marginBottom: "1rem", maxWidth: 300 }}
       />
+      {total > pageSize && (
+        <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.5rem", fontSize: "0.85rem" }}>
+          <button className="btn" disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>
+            ← Prev
+          </button>
+          <span>
+            Page {page} of {Math.ceil(total / pageSize)} ({total} users total)
+          </span>
+          <button className="btn" disabled={page >= Math.ceil(total / pageSize)} onClick={() => setPage((p) => p + 1)}>
+            Next →
+          </button>
+        </div>
+      )}
       <table>
         <thead>
           <tr>

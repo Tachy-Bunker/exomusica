@@ -9,6 +9,8 @@ interface MapNode {
   parentId: number | null;
   x: number;
   y: number;
+  color: string | null;
+  size: number | null;
   channel: { slug: string; name: string } | null;
 }
 
@@ -111,6 +113,7 @@ export function ForumMapPage() {
   function onPointerDown(e: React.PointerEvent) {
     if (e.pointerType === "touch") return; // touch handled separately, for pinch support
     if ((e.target as HTMLElement).closest?.("button, a")) return; // let clicks on controls behave normally, uninterfered with
+    e.preventDefault();
     e.currentTarget.setPointerCapture?.(e.pointerId);
     dragState.current = { startClientX: e.clientX, startClientY: e.clientY, panX: pan.x, panY: pan.y, moved: false };
   }
@@ -173,6 +176,8 @@ export function ForumMapPage() {
         border: "1px solid var(--border)",
         cursor: dragState.current ? "grabbing" : "grab",
         touchAction: "none",
+        userSelect: "none",
+        WebkitUserSelect: "none",
       }}
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
@@ -258,7 +263,9 @@ export function ForumMapPage() {
           })}
 
         {nodes.map((n) => {
-          const { radius, color } = NODE_STYLE[n.type];
+          const fallback = NODE_STYLE[n.type];
+          const radius = n.size ?? fallback.radius;
+          const color = n.color ?? fallback.color;
           const branches = dendrites(n.id, radius);
           return (
             <g
