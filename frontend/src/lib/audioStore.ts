@@ -146,7 +146,10 @@ export const useAudioStore = create<AudioState>((set, get) => ({
   },
 
   setExpanded: (expanded) => set({ expanded }),
-  setProgress: (currentTime, duration) => set({ currentTime, duration }),
+  setProgress: (currentTime, duration) => {
+    console.log("[player-debug] setProgress called:", currentTime, duration);
+    set({ currentTime, duration });
+  },
 
   ended: () => {
     if (get().repeatMode === "one") {

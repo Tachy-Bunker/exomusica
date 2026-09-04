@@ -196,7 +196,10 @@ export function PlayerBar() {
           here, in Layout, outside the router's <Outlet />. */}
       <audio
         ref={audioRef}
-        onTimeUpdate={(e) => setProgress(e.currentTarget.currentTime, e.currentTarget.duration || 0)}
+        onTimeUpdate={(e) => {
+          console.log("[player-debug] timeupdate fired:", e.currentTarget.currentTime);
+          setProgress(e.currentTarget.currentTime, e.currentTarget.duration || 0);
+        }}
         onLoadedMetadata={(e) => setProgress(e.currentTarget.currentTime, e.currentTarget.duration || 0)}
         onPause={() => useAudioStore.setState({ isPlaying: false })}
         onPlay={() => useAudioStore.setState({ isPlaying: true })}
