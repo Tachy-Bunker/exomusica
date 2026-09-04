@@ -196,6 +196,7 @@ export function PlayerBar() {
           here, in Layout, outside the router's <Outlet />. */}
       <audio
         ref={audioRef}
+        crossOrigin="anonymous"
         onTimeUpdate={(e) => {
           console.log("[player-debug] timeupdate fired:", e.currentTarget.currentTime);
           setProgress(e.currentTarget.currentTime, e.currentTarget.duration || 0);
