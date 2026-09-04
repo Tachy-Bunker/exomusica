@@ -1,15 +1,13 @@
 // Run inside the backend container:
-//   docker compose exec backend node -e "$(cat cleanup-exo-api-ghosts.js)"
-// This defaults to a DRY RUN — it only prints what it would do. To actually
-// apply the fix, add CONFIRM=yes:
-//   docker compose exec -e CONFIRM=yes backend node -e "$(cat cleanup-exo-api-ghosts.js)"
+//   docker compose cp cleanup-exo-api-ghosts.js backend:/app/cleanup.js
+//   docker compose exec backend node /app/cleanup.js
+// Applies changes directly — prints what it did as it goes.
 
 const { PrismaClient } = require("@prisma/client");
 const prisma = new PrismaClient();
 
 async function main() {
-  const dryRun = process.env.CONFIRM !== "yes";
-  console.log(dryRun ? "DRY RUN — no changes will be made.\n" : "LIVE RUN — changes will be applied.\n");
+  console.log("Scanning for Exo-API bot ghost accounts to reassign...\n");
 
   // The sanitizer that created these ghosts replaces every non
   // [a-z0-9_.-] character with "_", so "someuser | Exo-API" became
@@ -47,13 +45,11 @@ async function main() {
 
     console.log(`Ghost "${ghost.username}" (id ${ghost.id}, ${messageCount} messages) -> reassigning to real user "${realUser.username}" (id ${realUser.id}).`);
 
-    if (!dryRun) {
-      await prisma.message.updateMany({ where: { authorId: ghost.id }, data: { authorId: realUser.id } });
-      await prisma.attachment.updateMany({ where: { uploaderId: ghost.id }, data: { uploaderId: realUser.id } });
-    }
+    await prisma.message.updateMany({ where: { authorId: ghost.id }, data: { authorId: realUser.id } });
+    await prisma.attachment.updateMany({ where: { uploaderId: ghost.id }, data: { uploaderId: realUser.id } });
   }
 
-  console.log(dryRun ? "\nDry run complete. Review the above, then re-run with CONFIRM=yes to apply." : "\nDone.");
+  console.log("\nDone.");
   await prisma.$disconnect();
 }
 
