@@ -288,12 +288,6 @@ model Album {
 // Replaces the old fixed streamUrl/downloadUrl pair — named, unlimited,
 // reorderable (Spotify, Bandcamp, archive.org, whatever else).
 model LinkIcon {
-  id   Int    @id @default(autoincrement())
-  name String @unique
-  url  String
-}
-
-model LinkIcon {
   id  Int    @id @default(autoincrement())
   name String
   url  String

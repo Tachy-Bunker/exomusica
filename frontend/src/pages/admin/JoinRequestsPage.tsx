@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { api } from "../../lib/api";
+import { api, ApiError } from "../../lib/api";
 
 interface JoinRequest {
   id: number;
@@ -44,6 +44,17 @@ export function JoinRequestsPage() {
       await api(`/api/admin/join-requests/${id}/${action}`, { method: "POST" });
       load();
     } catch (err) {
+      if (action === "approve" && err instanceof ApiError && err.status === 409 && err.message.includes("ghost account")) {
+        if (confirm(`${err.message}\n\nLink this join request to that ghost's history?`)) {
+          try {
+            await api(`/api/admin/join-requests/${id}/approve`, { method: "POST", body: JSON.stringify({ confirmClaimGhost: true }) });
+            load();
+          } catch (retryErr) {
+            alert(retryErr instanceof Error ? retryErr.message : "Failed to approve this request.");
+          }
+        }
+        return;
+      }
       alert(err instanceof Error ? err.message : `Failed to ${action} this request.`);
     }
   }

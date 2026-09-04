@@ -65,7 +65,7 @@ export async function joinRoutes(app: FastifyInstance): Promise<void> {
     });
   });
 
-  app.post<{ Params: { id: string } }>(
+  app.post<{ Params: { id: string }; Body: { confirmClaimGhost?: boolean } }>(
     "/api/admin/join-requests/:id/approve",
     { preHandler: requireAdmin },
     async (req, reply) => {
@@ -84,6 +84,17 @@ export async function joinRoutes(app: FastifyInstance): Promise<void> {
       if (existingRealUser) {
         return reply.code(409).send({
           error: `A real account already exists with the username "${existingRealUser.username}" — this join request can't be approved as-is. Rename or reject it.`,
+        });
+      }
+
+      // A username match with a ghost does NOT mean it's the same person —
+      // ghost usernames come from Discord display names, which anyone could
+      // coincidentally pick when signing up for real. Never merge silently;
+      // require the admin to explicitly confirm after seeing who the ghost
+      // actually is (its Discord identity), sent back on the first attempt.
+      if (existingGhost && !req.body?.confirmClaimGhost) {
+        return reply.code(409).send({
+          error: `A ghost account already exists with this exact username, imported from Discord (Discord identity: ${existingGhost.discordUsername ?? existingGhost.discordId ?? "unknown"}, created ${existingGhost.createdAt.toISOString().slice(0, 10)}). A matching username does NOT guarantee it's the same person. If you're confident it is, confirm to link their imported message history to this account. If you're not sure, cancel and reject the request or ask them to pick a different username instead.`,
         });
       }
 
@@ -119,7 +130,7 @@ export async function joinRoutes(app: FastifyInstance): Promise<void> {
         await tx.auditLog.create({
           data: {
             actorId: req.user!.id,
-            action: "join.approve",
+            action: existingGhost ? "join.approve_claim_ghost" : "join.approve",
             targetType: "User",
             targetId: created.id,
           },
