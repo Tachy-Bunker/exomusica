@@ -12,6 +12,7 @@ const SLIDERS: { key: keyof FxSettings; label: string; min: number; max: number;
   { key: "drift", label: "Drift speed", min: 0, max: 1, step: 0.01 },
   { key: "lurk", label: "Lurker", min: 0, max: 1, step: 0.01 },
   { key: "bgBright", label: "Bg brightness", min: 0, max: 1, step: 0.01 },
+  { key: "rmsBrightnessAmount", label: "Bg brightness reactivity to audio (RMS)", min: 0, max: 1, step: 0.01 },
   { key: "bgSat", label: "Bg saturation", min: 0, max: 1, step: 0.01 },
   { key: "bgContrast", label: "Bg contrast", min: 0, max: 1, step: 0.01 },
   { key: "vignette", label: "Vignette", min: 0, max: 1, step: 0.01 },

@@ -660,6 +660,7 @@ model FxSettings {
   drift              Float  @default(0.38)
   lurk               Float  @default(0.45)
   bgBright           Float  @default(0.5)
+  rmsBrightnessAmount Float @default(0.3) // how much audio RMS pushes background brightness above bgBright while playing — 0 disables the effect
   bgSat              Float  @default(0.5)
   bgContrast         Float  @default(0.5)
   vignette           Float  @default(0.5)

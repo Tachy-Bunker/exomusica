@@ -24,6 +24,7 @@ const DEFAULTS = {
   glowHue: 280,
   glowSat: 0.6,
   glowBright: 0.45,
+  rmsBrightnessAmount: 0.3,
 };
 
 export async function fxSettingsRoutes(app: FastifyInstance): Promise<void> {

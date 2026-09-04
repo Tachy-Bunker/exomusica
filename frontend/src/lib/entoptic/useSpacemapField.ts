@@ -1,6 +1,7 @@
 import { useEffect, useRef } from "react";
 import { FieldRenderer } from "./fieldRenderer";
 import { WardenSystem } from "./wardenSystem";
+import { getRMS } from "../audioAnalyser";
 
 // Matches the prototype's <div class="hud"> default slider values exactly.
 export const FX_DEFAULTS = {
@@ -28,6 +29,7 @@ export const FX_DEFAULTS = {
   glowHue: 280,
   glowSat: 0.6,
   glowBright: 0.45,
+  rmsBrightnessAmount: 0.3,
 };
 
 export type FxSettings = typeof FX_DEFAULTS;
@@ -128,7 +130,7 @@ export function useSpacemapField(settings: FxSettings = FX_DEFAULTS) {
         split: s.split,
         chaos: s.chaos,
         lurk: s.lurk,
-        bgBright: s.bgBright * 2,
+        bgBright: Math.min(2, s.bgBright * 2 + getRMS() * (s.rmsBrightnessAmount ?? 0.3) * 2),
         bgSat: s.bgSat * 2,
         bgContrast: s.bgContrast * 2,
         sources: fieldSources,

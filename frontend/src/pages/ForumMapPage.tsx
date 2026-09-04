@@ -2,6 +2,10 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { api } from "../lib/api";
 import { useIsDesktop } from "../lib/useIsDesktop";
+import { useChatDockStore } from "../lib/chatDockStore";
+import { Joystick } from "../components/Joystick";
+import { isTypingTarget } from "../lib/isTypingTarget";
+import { getRMS } from "../lib/audioAnalyser";
 
 interface MapNode {
   id: number;
@@ -11,7 +15,7 @@ interface MapNode {
   y: number;
   color: string | null;
   size: number | null;
-  channel: { slug: string; name: string } | null;
+  channel: { slug: string; name: string; contentMarkdown: string | null } | null;
 }
 
 interface PreviewMessage {
@@ -49,7 +53,15 @@ function dendrites(nodeId: number, baseRadius: number) {
     const mid = { x: Math.cos(angle) * len1, y: Math.sin(angle) * len1 };
     const tip = { x: mid.x + Math.cos(angle) * (len2 - len1), y: mid.y + Math.sin(angle) * (len2 - len1) };
     const forkTip = { x: mid.x + Math.cos(forkAngle) * (len2 - len1) * 0.8, y: mid.y + Math.sin(forkAngle) * (len2 - len1) * 0.8 };
-    return { mid, tip, forkTip, glowSize: 1.5 + rand() * 2, delay: rand() * 3 };
+    return {
+      mid,
+      tip,
+      forkTip,
+      glowSize: 1.5 + rand() * 2,
+      delay: rand() * 3,
+      pluckDuration: 6 + rand() * 8, // 6-14s idle cycle, most of it still
+      pluckDelay: rand() * 12,
+    };
   });
 }
 
@@ -68,6 +80,18 @@ export function ForumMapPage() {
   const pinchState = useRef<{ startDist: number; startZoom: number } | null>(null);
   const isDesktop = useIsDesktop();
   const navigate = useNavigate();
+  const openChat = useChatDockStore((s) => s.openChat);
+  const keysRef = useRef<Set<string>>(new Set());
+  const joystickVectorRef = useRef({ x: 0, y: 0 });
+  const velocityRef = useRef({ vx: 0, vy: 0 });
+  const panRef = useRef(pan);
+  panRef.current = pan;
+  const zoomRef = useRef(zoom);
+  zoomRef.current = zoom;
+  const [lockedNodeId, setLockedNodeId] = useState<number | null>(null);
+  const lockedNodeIdRef = useRef<number | null>(null);
+  const nodesRef = useRef<MapNode[]>([]);
+  nodesRef.current = nodes;
 
   useEffect(() => {
     api<MapNode[]>("/api/forum-map").then(setNodes);
@@ -88,15 +112,123 @@ export function ForumMapPage() {
   }, [activeNode]);
 
   function goToNode(n: MapNode) {
-    if (n.channel) navigate(`/topic/${n.channel.slug}`);
+    if (!n.channel) return;
+    if (isDesktop && !n.channel.contentMarkdown) {
+      openChat(n.channel.slug, n.channel.name);
+      return;
+    }
+    navigate(`/topic/${n.channel.slug}`);
   }
 
   function onNodeInteract(n: MapNode) {
     if (isDesktop) {
-      goToNode(n); // hover already shows the preview, so a click just navigates
+      goToNode(n); // hover already shows the preview, so a click/E-lock just acts
       return;
     }
     setActiveNodeId((id) => (id === n.id ? null : n.id));
+  }
+
+  // --- WASD + crosshair lock-on (desktop) / joystick (mobile) -----------
+  useEffect(() => {
+    function onKeyDown(e: KeyboardEvent) {
+      if (isTypingTarget(e.target)) return;
+      if (["KeyW", "KeyA", "KeyS", "KeyD"].includes(e.code)) keysRef.current.add(e.code);
+      if (e.code === "KeyE") {
+        const n = nodesRef.current.find((n) => n.id === lockedNodeIdRef.current);
+        if (n) onNodeInteract(n);
+      }
+    }
+    function onKeyUp(e: KeyboardEvent) {
+      keysRef.current.delete(e.code);
+    }
+    window.addEventListener("keydown", onKeyDown);
+    window.addEventListener("keyup", onKeyUp);
+    return () => {
+      window.removeEventListener("keydown", onKeyDown);
+      window.removeEventListener("keyup", onKeyUp);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    const ACCEL = 22;
+    const FRICTION = 0.86;
+    const LOCK_RADIUS_PX = 60;
+    let frameId: number;
+
+    function frame() {
+      const keys = keysRef.current;
+      const joy = joystickVectorRef.current;
+      let ax = 0;
+      let ay = 0;
+      if (keys.has("KeyW")) ay -= ACCEL;
+      if (keys.has("KeyS")) ay += ACCEL;
+      if (keys.has("KeyA")) ax -= ACCEL;
+      if (keys.has("KeyD")) ax += ACCEL;
+      ax += joy.x * ACCEL;
+      ay += joy.y * ACCEL;
+
+      const v = velocityRef.current;
+      v.vx = (v.vx + ax) * FRICTION;
+      v.vy = (v.vy + ay) * FRICTION;
+
+      if (Math.abs(v.vx) > 0.05 || Math.abs(v.vy) > 0.05) {
+        const p = panRef.current;
+        const next = { x: p.x - v.vx, y: p.y - v.vy };
+        panRef.current = next;
+        setPan(next);
+      }
+
+      // Lock-on: nearest node to screen center, within radius, converted
+      // through the same viewBox math the rest of the map uses.
+      const el = containerRef.current;
+      if (el) {
+        const vbSize = 1600 / zoomRef.current;
+        const pxPerUnit = el.clientWidth / vbSize;
+        let nearest: MapNode | null = null;
+        let nearestDist = LOCK_RADIUS_PX;
+        for (const n of nodesRef.current) {
+          const screenX = (n.x + panRef.current.x) * pxPerUnit;
+          const screenY = (n.y + panRef.current.y) * pxPerUnit;
+          const d = Math.hypot(screenX, screenY);
+          if (d < nearestDist) {
+            nearestDist = d;
+            nearest = n;
+          }
+        }
+        const nextLockedId = nearest?.id ?? null;
+        if (nextLockedId !== lockedNodeIdRef.current) {
+          lockedNodeIdRef.current = nextLockedId;
+          setLockedNodeId(nextLockedId);
+          if (isDesktop) setActiveNodeId(nextLockedId);
+        }
+      }
+
+      frameId = requestAnimationFrame(frame);
+    }
+    frameId = requestAnimationFrame(frame);
+    return () => cancelAnimationFrame(frameId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isDesktop]);
+
+  // RMS-driven pluck intensity — throttled well below animation-frame
+  // rate since this only needs to feel responsive, not be perfectly
+  // smooth, and updates the CSS variable directly rather than through
+  // React state to avoid re-rendering the whole node tree constantly.
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const rms = getRMS(); // 0 when nothing's playing
+      const intensity = 0.3 + Math.min(1, rms * 3) * 0.9; // baseline idle life, boosted while audio plays
+      containerRef.current?.style.setProperty("--rms", intensity.toFixed(2));
+    }, 120);
+    return () => clearInterval(interval);
+  }, []);
+
+  function handleJoystickMove(dx: number, dy: number) {
+    joystickVectorRef.current = { x: dx, y: dy };
+  }
+  function handleJoystickRelease() {
+    joystickVectorRef.current = { x: 0, y: 0 };
   }
 
   // Screen-pixel deltas converted through the container's actual rendered
@@ -201,6 +333,13 @@ export function ForumMapPage() {
           0%, 100% { opacity: 0.55; }
           50% { opacity: 0.9; }
         }
+        @keyframes forumMapPluck {
+          0% { transform: rotate(0deg); }
+          2% { transform: rotate(calc(4deg * var(--rms, 0.35))); }
+          4% { transform: rotate(calc(-3deg * var(--rms, 0.35))); }
+          6% { transform: rotate(calc(2deg * var(--rms, 0.35))); }
+          8%, 100% { transform: rotate(0deg); }
+        }
       `}</style>
 
       <button className="btn" style={{ position: "absolute", top: 12, left: 12, zIndex: 5 }} onClick={() => navigate("/discussion")}>
@@ -223,6 +362,46 @@ export function ForumMapPage() {
         <span><span style={{ display: "inline-block", width: 10, height: 10, borderRadius: "50%", background: NODE_STYLE.ACTIVE_BRANCHES.color, marginRight: 4 }} />Active Branch</span>
         <span><span style={{ display: "inline-block", width: 10, height: 10, borderRadius: "50%", background: NODE_STYLE.GROWING_SEEDS.color, marginRight: 4 }} />Growing Seed</span>
       </div>
+
+      {isDesktop && (
+        <div
+          style={{
+            position: "absolute",
+            top: "50%",
+            left: "50%",
+            transform: "translate(-50%, -50%)",
+            width: 24,
+            height: 24,
+            zIndex: 4,
+            pointerEvents: "none",
+          }}
+        >
+          <div style={{ position: "absolute", top: "50%", left: 0, right: 0, height: 1, background: "rgba(255,255,255,0.4)" }} />
+          <div style={{ position: "absolute", left: "50%", top: 0, bottom: 0, width: 1, background: "rgba(255,255,255,0.4)" }} />
+          {lockedNodeId !== null && (
+            <div
+              style={{
+                position: "absolute",
+                inset: -8,
+                border: "1px solid var(--accent-forum)",
+                borderRadius: "50%",
+                animation: "forumMapTwinkle 1.5s ease-in-out infinite",
+              }}
+            />
+          )}
+        </div>
+      )}
+      {isDesktop && lockedNodeId !== null && (
+        <div style={{ position: "absolute", bottom: 16, left: "50%", transform: "translateX(-50%)", zIndex: 5, fontSize: "0.8rem", color: "var(--text-dim)" }}>
+          Press <strong style={{ color: "var(--text)" }}>E</strong> to enter
+        </div>
+      )}
+      {isDesktop && lockedNodeId === null && <p style={{ position: "absolute", bottom: 16, left: "50%", transform: "translateX(-50%)", zIndex: 5, fontSize: "0.75rem", color: "var(--text-dim)" }}>WASD to navigate</p>}
+      {!isDesktop && (
+        <div style={{ position: "absolute", bottom: 16, left: 16, zIndex: 5 }}>
+          <Joystick onMove={handleJoystickMove} onRelease={handleJoystickRelease} />
+        </div>
+      )}
 
       <svg
         viewBox={`${-vbSize / 2 - pan.x} ${-vbSize / 2 - pan.y} ${vbSize} ${vbSize}`}
@@ -283,7 +462,14 @@ export function ForumMapPage() {
               {/* Neural dendrites — forked branches with a small glowing
                   terminal at each fork, like a synapse. */}
               {branches.map((b, i) => (
-                <g key={i}>
+                <g
+                  key={i}
+                  style={{
+                    transformOrigin: "0px 0px",
+                    animation: `forumMapPluck ${b.pluckDuration}s ease-in-out infinite`,
+                    animationDelay: `${b.pluckDelay}s`,
+                  }}
+                >
                   <path d={`M 0 0 L ${b.mid.x} ${b.mid.y} L ${b.tip.x} ${b.tip.y}`} fill="none" stroke={color} strokeWidth={1.2} opacity={0.5} />
                   <path d={`M ${b.mid.x} ${b.mid.y} L ${b.forkTip.x} ${b.forkTip.y}`} fill="none" stroke={color} strokeWidth={1} opacity={0.4} />
                   <circle

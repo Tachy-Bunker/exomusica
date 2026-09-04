@@ -31,6 +31,7 @@ export function useFxSettings(): FxSettings {
       glowHue: number;
       glowSat: number;
       glowBright: number;
+      rmsBrightnessAmount: number;
     }>("/api/fx-settings").then((s) => setSettings(s));
   }, []);
 

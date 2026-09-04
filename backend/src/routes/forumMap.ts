@@ -5,7 +5,7 @@ import { requireAdmin } from "../lib/auth.js";
 export async function forumMapRoutes(app: FastifyInstance): Promise<void> {
   app.get("/api/forum-map", async () => {
     const nodes = await prisma.forumMapNode.findMany({
-      include: { channel: { select: { slug: true, name: true, kind: true, branchId: true } } },
+      include: { channel: { select: { slug: true, name: true, kind: true, branchId: true, contentMarkdown: true } } },
     });
     return nodes;
   });
