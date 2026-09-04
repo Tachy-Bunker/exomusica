@@ -102,7 +102,7 @@ export async function saveSiteImage(
   filename: string,
   mimeType: string,
   buffer: Buffer,
-  subfolder: "albums" | "about" | "guide" | "avatars" | "moire" | "og-images",
+  subfolder: "albums" | "about" | "guide" | "avatars" | "moire" | "og-images" | "link-icons",
 ): Promise<{ url: string }> {
   const ext =
     ALLOWED_IMAGE_TYPES[mimeType] ??

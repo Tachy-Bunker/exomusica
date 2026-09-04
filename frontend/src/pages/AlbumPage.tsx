@@ -21,7 +21,7 @@ interface AlbumDetail {
   coverArtUrl: string | null;
   description: string | null;
   contentMarkdown: string | null;
-  links: { id: number; label: string; url: string }[];
+  links: { id: number; label: string; url: string; iconUrl: string | null }[];
   gallery: { id: number; url: string }[];
   branch: { slug: string; name: string };
   collaborators: { id: number; name: string; role: string; bio: string | null; pictureUrl: string | null }[];
@@ -99,12 +99,18 @@ export function AlbumPage() {
           >
             {album.composer}
           </p>
-          <div style={{ display: "flex", gap: "0.6rem", flexWrap: "wrap" }}>
-            {album.links.map((l) => (
-              <a key={l.id} className="btn" href={l.url} target="_blank" rel="noreferrer">
-                {l.label}
-              </a>
-            ))}
+          <div style={{ display: "flex", gap: "0.6rem", flexWrap: "wrap", alignItems: "center" }}>
+            {album.links.map((l) =>
+              l.iconUrl ? (
+                <a key={l.id} className="album-link-icon" href={l.url} target="_blank" rel="noreferrer" title={l.label}>
+                  <img src={l.iconUrl} alt={l.label} />
+                </a>
+              ) : (
+                <a key={l.id} className="btn" href={l.url} target="_blank" rel="noreferrer">
+                  {l.label}
+                </a>
+              ),
+            )}
           </div>
         </div>
       </div>

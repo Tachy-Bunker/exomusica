@@ -291,6 +291,7 @@ model AlbumLink {
   album    Album  @relation(fields: [albumId], references: [id], onDelete: Cascade)
   label    String
   url      String
+  iconUrl  String? // when set, shows instead of the text label — label becomes the hover title
   position Int    @default(0)
 }
 

@@ -1555,3 +1555,33 @@ th {
     transform: translateY(0);
   }
 }
+
+.admin-nav-pending-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #4a9eff;
+  display: inline-block;
+  flex-shrink: 0;
+}
+
+.album-link-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border-radius: var(--radius);
+  transition: transform 0.2s ease, filter 0.2s ease;
+}
+
+.album-link-icon img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.album-link-icon:hover {
+  transform: scale(1.15) rotate(-4deg);
+  filter: drop-shadow(0 0 6px var(--accent-forum-dim));
+}

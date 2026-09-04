@@ -24,7 +24,7 @@ interface AlbumDetail {
   description: string | null;
   contentMarkdown: string | null;
   coverArtUrl: string | null;
-  links: { id: number; label: string; url: string }[];
+  links: { id: number; label: string; url: string; iconUrl: string | null }[];
   gallery: { id: number; url: string }[];
   collaborators: { id: number; name: string }[];
   tracks: { id: number; title: string; fileUrl: string; format: string; position: number; composers: { id: number }[] }[];
@@ -231,6 +231,14 @@ export function AlbumsAdminPage() {
     loadDetail(detail.slug);
   }
 
+  async function handleUploadLinkIcon(linkId: number, file: File) {
+    if (!detail) return;
+    const formData = new FormData();
+    formData.append("file", file);
+    await api(`/api/admin/album-links/${linkId}/icon`, { method: "POST", body: formData });
+    loadDetail(detail.slug);
+  }
+
   async function handleToggleComposer(trackId: number, collaboratorId: number, currentIds: number[]) {
     if (!detail) return;
     const next = currentIds.includes(collaboratorId)
@@ -409,10 +417,21 @@ export function AlbumsAdminPage() {
 
           <h3 style={{ fontSize: "0.9rem", marginTop: "1rem" }}>Streaming/download links</h3>
           {detail.links.map((l) => (
-            <div key={l.id} style={{ display: "flex", gap: "0.5rem", alignItems: "center", marginBottom: "0.2rem" }}>
+            <div key={l.id} style={{ display: "flex", gap: "0.5rem", alignItems: "center", marginBottom: "0.4rem" }}>
+              {l.iconUrl && <img src={l.iconUrl} alt="" style={{ width: 20, height: 20, objectFit: "contain" }} />}
               <span style={{ fontSize: "0.85rem" }}>
                 {l.label} — <span style={{ color: "var(--text-dim)" }}>{l.url}</span>
               </span>
+              <input
+                type="file"
+                accept="image/svg+xml,image/png"
+                style={{ fontSize: "0.7rem", width: 140 }}
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) handleUploadLinkIcon(l.id, file);
+                }}
+                title="Upload an icon (SVG or PNG) to show instead of the text label"
+              />
               <button className="btn btn-danger" style={{ fontSize: "0.7rem", padding: "0.1rem 0.4rem" }} onClick={() => handleDeleteLink(l.id)}>
                 remove
               </button>

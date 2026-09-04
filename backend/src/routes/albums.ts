@@ -159,6 +159,20 @@ export async function albumRoutes(app: FastifyInstance): Promise<void> {
     return reply.code(204).send();
   });
 
+  app.post<{ Params: { id: string } }>("/api/admin/album-links/:id/icon", { preHandler: requireAdmin }, async (req, reply) => {
+    const file = await req.file();
+    if (!file) return reply.code(400).send({ error: "no file uploaded" });
+    if (!["image/svg+xml", "image/png"].includes(file.mimetype)) return reply.code(400).send({ error: "only SVG or PNG icons are supported" });
+    const buffer = await file.toBuffer();
+    try {
+      const { url } = await saveSiteImage(file.filename, file.mimetype, buffer, "link-icons");
+      const link = await prisma.albumLink.update({ where: { id: Number(req.params.id) }, data: { iconUrl: url } });
+      return { iconUrl: link.iconUrl };
+    } catch (err) {
+      return reply.code(400).send({ error: err instanceof Error ? err.message : "upload failed" });
+    }
+  });
+
   // --- Tracks -------------------------------------------------------------
   app.post<{
     Params: { id: string };

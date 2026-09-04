@@ -1,11 +1,27 @@
 import { NavLink, Outlet } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { api } from "../../lib/api";
 
 export function AdminLayout() {
+  const [pendingCount, setPendingCount] = useState(0);
+
+  useEffect(() => {
+    function checkPending() {
+      api<{ status: string }[]>("/api/admin/join-requests").then((reqs) => {
+        setPendingCount(reqs.filter((r) => r.status === "PENDING").length);
+      });
+    }
+    checkPending();
+    const interval = setInterval(checkPending, 30000);
+    return () => clearInterval(interval);
+  }, []);
+
   return (
     <div className="admin-layout">
       <nav className="admin-nav">
-        <NavLink to="/admin/join-requests" className={({ isActive }) => (isActive ? "active" : "")}>
+        <NavLink to="/admin/join-requests" className={({ isActive }) => (isActive ? "active" : "")} style={{ display: "inline-flex", alignItems: "center", gap: "0.35rem" }}>
           Join requests
+          {pendingCount > 0 && <span className="admin-nav-pending-dot" title={`${pendingCount} pending`} />}
         </NavLink>
         <NavLink to="/admin/branches" className={({ isActive }) => (isActive ? "active" : "")}>
           Branches
