@@ -40,8 +40,12 @@ export function JoinRequestsPage() {
   }
 
   async function decide(id: number, action: "approve" | "reject") {
-    await api(`/api/admin/join-requests/${id}/${action}`, { method: "POST" });
-    load();
+    try {
+      await api(`/api/admin/join-requests/${id}/${action}`, { method: "POST" });
+      load();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : `Failed to ${action} this request.`);
+    }
   }
 
   return (

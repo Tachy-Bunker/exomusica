@@ -296,7 +296,7 @@ function MessageGroup({
   );
 }
 
-export function ChannelPage({ channelSlug, fillHeight }: { channelSlug?: string; fillHeight?: boolean } = {}) {
+export function ChannelPage({ channelSlug, fillHeight, parentControlsHeight }: { channelSlug?: string; fillHeight?: boolean; parentControlsHeight?: boolean } = {}) {
   const params = useParams<{ slug: string }>();
   const slug = channelSlug ?? params.slug;
 
@@ -777,6 +777,8 @@ export function ChannelPage({ channelSlug, fillHeight }: { channelSlug?: string;
               ...(isMobileWindow
                 ? isChatFullscreen
                   ? { position: "fixed" as const, inset: 0, zIndex: 55, background: "var(--bg)" }
+                  : parentControlsHeight
+                  ? { height: "100%", background: "var(--bg)" }
                   : { height: "calc(100dvh - var(--nav-height, 3.6rem) - 3rem - var(--player-height, 0px))", background: "var(--bg)" }
                 : { height: "100%" }),
             }
@@ -785,7 +787,12 @@ export function ChannelPage({ channelSlug, fillHeight }: { channelSlug?: string;
     >
       <div className="channel-toolbar" style={{ display: "flex", gap: "0.6rem", marginBottom: effectiveFillHeight ? "0.6rem" : "1rem", flexWrap: "wrap", flexShrink: 0, alignItems: "center" }}>
         {isMobileWindow && (
-          <button className="btn" onClick={toggleChatFullscreen} title={isChatFullscreen ? "Exit fullscreen" : "Fullscreen"}>
+          <button
+            className="btn"
+            onClick={toggleChatFullscreen}
+            title={isChatFullscreen ? "Exit fullscreen" : "Fullscreen"}
+            style={{ fontSize: "1.3rem", lineHeight: 1, color: "var(--accent-forum, #fff)", padding: "0.3rem 0.5rem" }}
+          >
             {isChatFullscreen ? "⤡" : "⤢"}
           </button>
         )}

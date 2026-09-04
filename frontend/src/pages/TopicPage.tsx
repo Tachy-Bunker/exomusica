@@ -73,12 +73,12 @@ export function TopicPage() {
   }
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", height: "calc(100dvh - var(--nav-height, 3.6rem) - 3rem)" }}>
+    <div style={{ display: "flex", flexDirection: "column", height: "calc(100dvh - var(--nav-height, 3.6rem) - 3rem - var(--player-height, 0px))" }}>
       <p style={{ marginBottom: "0.4rem", flexShrink: 0 }}>
         <Link to="/discussion">← Return to Forums</Link>
       </p>
       <div style={{ flex: 1, minHeight: 0 }}>
-        <ChannelPage channelSlug={channel.slug} />
+        <ChannelPage channelSlug={channel.slug} parentControlsHeight />
       </div>
     </div>
   );

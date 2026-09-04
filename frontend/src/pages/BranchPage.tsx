@@ -105,8 +105,8 @@ export function BranchPage() {
       </div>
 
       {!isDesktop && branch.channel && (
-        <div style={{ flexShrink: 0, maxHeight: "34dvh", marginTop: "0.6rem", marginBottom: "0.6rem" }}>
-          <ChannelPage channelSlug={branch.channel.slug} />
+        <div style={{ flexShrink: 0, height: "34dvh", marginTop: "0.6rem", marginBottom: "0.6rem" }}>
+          <ChannelPage channelSlug={branch.channel.slug} parentControlsHeight />
         </div>
       )}
 

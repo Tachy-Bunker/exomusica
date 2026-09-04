@@ -75,17 +75,43 @@ export async function joinRoutes(app: FastifyInstance): Promise<void> {
         return reply.code(404).send({ error: "no pending join request with that id" });
       }
 
-      const user = await prisma.$transaction(async (tx) => {
-        const created = await tx.user.create({
-          data: {
-            username: joinRequest.username,
-            email: joinRequest.email,
-            passwordHash: joinRequest.passwordHash,
-            avatarUrl: joinRequest.avatarUrl,
-            bio: joinRequest.bio,
-            links: joinRequest.links ?? undefined,
-          },
+      const existingGhost = await prisma.user.findFirst({
+        where: { username: { equals: joinRequest.username, mode: "insensitive" }, isGhost: true },
+      });
+      const existingRealUser = await prisma.user.findFirst({
+        where: { username: { equals: joinRequest.username, mode: "insensitive" }, isGhost: false },
+      });
+      if (existingRealUser) {
+        return reply.code(409).send({
+          error: `A real account already exists with the username "${existingRealUser.username}" — this join request can't be approved as-is. Rename or reject it.`,
         });
+      }
+
+      const user = await prisma.$transaction(async (tx) => {
+        const created = existingGhost
+          ? await tx.user.update({
+              where: { id: existingGhost.id },
+              data: {
+                email: joinRequest.email,
+                passwordHash: joinRequest.passwordHash,
+                avatarUrl: joinRequest.avatarUrl ?? existingGhost.avatarUrl,
+                bio: joinRequest.bio ?? existingGhost.bio,
+                links: joinRequest.links ?? undefined,
+                isGhost: false,
+                ghostReason: null,
+                claimToken: null,
+              },
+            })
+          : await tx.user.create({
+              data: {
+                username: joinRequest.username,
+                email: joinRequest.email,
+                passwordHash: joinRequest.passwordHash,
+                avatarUrl: joinRequest.avatarUrl,
+                bio: joinRequest.bio,
+                links: joinRequest.links ?? undefined,
+              },
+            });
         await tx.joinRequest.update({
           where: { id },
           data: { status: "APPROVED", reviewedById: req.user!.id },
