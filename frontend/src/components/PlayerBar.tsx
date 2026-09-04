@@ -64,6 +64,8 @@ export function PlayerBar() {
   } = useAudioStore();
 
   const endedFiredRef = useRef(false);
+  const latestRef = useRef({ currentTrack, ended, setProgress });
+  latestRef.current = { currentTrack, ended, setProgress };
 
   useEffect(() => {
     endedFiredRef.current = false;
@@ -71,18 +73,36 @@ export function PlayerBar() {
 
   useEffect(() => {
     if (!isPlaying) return;
+    console.log("[player-debug] polling started, isPlaying=true");
     const interval = setInterval(() => {
       const el = audioRef.current;
-      if (!el) return;
-      setProgress(el.currentTime, el.duration || 0);
+      const { currentTrack, ended, setProgress } = latestRef.current;
+      if (!el) {
+        console.log("[player-debug] poll tick: no audio element ref");
+        return;
+      }
       const knownDuration = el.duration || currentTrack?.durationSeconds || 0;
+      console.log("[player-debug] poll tick:", {
+        elCurrentTime: el.currentTime,
+        elDuration: el.duration,
+        elPaused: el.paused,
+        elReadyState: el.readyState,
+        trackDurationSeconds: currentTrack?.durationSeconds,
+        knownDuration,
+        endedFired: endedFiredRef.current,
+      });
+      setProgress(el.currentTime, el.duration || 0);
       if (knownDuration > 0 && el.currentTime >= knownDuration - 0.35 && !endedFiredRef.current) {
+        console.log("[player-debug] triggering ended() from poll");
         endedFiredRef.current = true;
         ended();
       }
     }, 250);
-    return () => clearInterval(interval);
-  }, [isPlaying, currentTrack?.id, currentTrack?.durationSeconds, setProgress, ended]);
+    return () => {
+      console.log("[player-debug] polling stopped");
+      clearInterval(interval);
+    };
+  }, [isPlaying]);
   // The audio element's own .duration sometimes never resolves for some
   // sources (observed with archive.org-hosted files) even though playback
   // itself works fine — falling back to the track's own stored duration
