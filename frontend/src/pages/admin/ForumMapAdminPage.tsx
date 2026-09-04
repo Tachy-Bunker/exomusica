@@ -14,6 +14,7 @@ interface ChannelOption {
   slug: string;
   name: string;
   id: number;
+  branchId: number | null;
 }
 
 export function ForumMapAdminPage() {
@@ -30,7 +31,7 @@ export function ForumMapAdminPage() {
   }
   useEffect(load, []);
   useEffect(() => {
-    api<{ id: number; slug: string; name: string }[]>("/api/admin/channels").then(setChannels);
+    api<{ id: number; slug: string; name: string; branchId: number | null }[]>("/api/channels").then(setChannels);
   }, []);
 
   const usedChannelIds = new Set(nodes.filter((n) => n.type === "TOPIC").map((n) => n.channel?.slug));
@@ -113,7 +114,7 @@ export function ForumMapAdminPage() {
               <option value="">— select —</option>
               {availableChannels.map((c) => (
                 <option key={c.id} value={c.id}>
-                  {c.name}
+                  {c.branchId ? `[Branch] ${c.name}` : c.name}
                 </option>
               ))}
             </select>
