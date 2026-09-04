@@ -64,45 +64,11 @@ export function PlayerBar() {
   } = useAudioStore();
 
   const endedFiredRef = useRef(false);
-  const latestRef = useRef({ currentTrack, ended, setProgress });
-  latestRef.current = { currentTrack, ended, setProgress };
 
   useEffect(() => {
     endedFiredRef.current = false;
   }, [currentTrack?.id]);
 
-  useEffect(() => {
-    if (!isPlaying) return;
-    console.log("[player-debug] polling started, isPlaying=true");
-    const interval = setInterval(() => {
-      const el = audioRef.current;
-      const { currentTrack, ended, setProgress } = latestRef.current;
-      if (!el) {
-        console.log("[player-debug] poll tick: no audio element ref");
-        return;
-      }
-      const knownDuration = el.duration || currentTrack?.durationSeconds || 0;
-      console.log("[player-debug] poll tick:", {
-        elCurrentTime: el.currentTime,
-        elDuration: el.duration,
-        elPaused: el.paused,
-        elReadyState: el.readyState,
-        trackDurationSeconds: currentTrack?.durationSeconds,
-        knownDuration,
-        endedFired: endedFiredRef.current,
-      });
-      setProgress(el.currentTime, el.duration || 0);
-      if (knownDuration > 0 && el.currentTime >= knownDuration - 0.35 && !endedFiredRef.current) {
-        console.log("[player-debug] triggering ended() from poll");
-        endedFiredRef.current = true;
-        ended();
-      }
-    }, 250);
-    return () => {
-      console.log("[player-debug] polling stopped");
-      clearInterval(interval);
-    };
-  }, [isPlaying]);
   // The audio element's own .duration sometimes never resolves for some
   // sources (observed with archive.org-hosted files) even though playback
   // itself works fine — falling back to the track's own stored duration
@@ -231,7 +197,10 @@ export function PlayerBar() {
       <audio
         ref={audioRef}
         preload="metadata"
-        onTimeUpdate={(e) => setProgress(e.currentTarget.currentTime, e.currentTarget.duration || 0)}
+        onTimeUpdate={(e) => {
+          console.log("[player-debug] native timeupdate:", { currentTime: e.currentTarget.currentTime, duration: e.currentTarget.duration, paused: e.currentTarget.paused, readyState: e.currentTarget.readyState });
+          setProgress(e.currentTarget.currentTime, e.currentTarget.duration || 0);
+        }}
         onLoadedMetadata={(e) => setProgress(e.currentTarget.currentTime, e.currentTarget.duration || 0)}
         onPause={() => useAudioStore.setState({ isPlaying: false })}
         onPlay={() => useAudioStore.setState({ isPlaying: true })}
