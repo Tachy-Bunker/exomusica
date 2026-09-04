@@ -89,40 +89,44 @@ export async function joinRoutes(app: FastifyInstance): Promise<void> {
 
       // A username match with a ghost does NOT mean it's the same person —
       // ghost usernames come from Discord display names, which anyone could
-      // coincidentally pick when signing up for real. Never merge silently;
+      // coincidentally pick when signing up for real. Never link silently;
       // require the admin to explicitly confirm after seeing who the ghost
       // actually is (its Discord identity), sent back on the first attempt.
       if (existingGhost && !req.body?.confirmClaimGhost) {
         return reply.code(409).send({
-          error: `A ghost account already exists with this exact username, imported from Discord (Discord identity: ${existingGhost.discordUsername ?? existingGhost.discordId ?? "unknown"}, created ${existingGhost.createdAt.toISOString().slice(0, 10)}). A matching username does NOT guarantee it's the same person. If you're confident it is, confirm to link their imported message history to this account. If you're not sure, cancel and reject the request or ask them to pick a different username instead.`,
+          error: `A ghost account already exists with this exact username, imported from Discord (Discord identity: ${existingGhost.discordUsername ?? existingGhost.discordId ?? "unknown"}, created ${existingGhost.createdAt.toISOString().slice(0, 10)}). A matching username does NOT guarantee it's the same person. If you're confident it is, confirm to link the ghost's imported message history to this new account (same as the manual link-ghost tool in Users — the ghost keeps its own row, nothing is merged). If you're not sure, cancel and reject the request or ask them to pick a different username instead.`,
         });
       }
 
       const user = await prisma.$transaction(async (tx) => {
-        const created = existingGhost
-          ? await tx.user.update({
-              where: { id: existingGhost.id },
-              data: {
-                email: joinRequest.email,
-                passwordHash: joinRequest.passwordHash,
-                avatarUrl: joinRequest.avatarUrl ?? existingGhost.avatarUrl,
-                bio: joinRequest.bio ?? existingGhost.bio,
-                links: joinRequest.links ?? undefined,
-                isGhost: false,
-                ghostReason: null,
-                claimToken: null,
-              },
-            })
-          : await tx.user.create({
-              data: {
-                username: joinRequest.username,
-                email: joinRequest.email,
-                passwordHash: joinRequest.passwordHash,
-                avatarUrl: joinRequest.avatarUrl,
-                bio: joinRequest.bio,
-                links: joinRequest.links ?? undefined,
-              },
-            });
+        // Same non-destructive linking used by the manual admin
+        // link-ghost tool: the ghost keeps its own row and message
+        // history untouched, just renamed out of the way so its
+        // original username is free for the new real account. Readers
+        // resolve a linked ghost's messages through to the real account
+        // at display time — nothing here rewrites message.authorId.
+        if (existingGhost) {
+          await tx.user.update({
+            where: { id: existingGhost.id },
+            data: { username: `${existingGhost.username}-ghost-${existingGhost.id}` },
+          });
+        }
+        const created = await tx.user.create({
+          data: {
+            username: joinRequest.username,
+            email: joinRequest.email,
+            passwordHash: joinRequest.passwordHash,
+            avatarUrl: joinRequest.avatarUrl,
+            bio: joinRequest.bio,
+            links: joinRequest.links ?? undefined,
+          },
+        });
+        if (existingGhost) {
+          await tx.user.update({ where: { id: existingGhost.id }, data: { linkedUserId: created.id } });
+          if (existingGhost.discordId) {
+            await tx.user.update({ where: { id: created.id }, data: { discordUserId: existingGhost.discordId } });
+          }
+        }
         await tx.joinRequest.update({
           where: { id },
           data: { status: "APPROVED", reviewedById: req.user!.id },
@@ -130,7 +134,7 @@ export async function joinRoutes(app: FastifyInstance): Promise<void> {
         await tx.auditLog.create({
           data: {
             actorId: req.user!.id,
-            action: existingGhost ? "join.approve_claim_ghost" : "join.approve",
+            action: existingGhost ? "join.approve_link_ghost" : "join.approve",
             targetType: "User",
             targetId: created.id,
           },
