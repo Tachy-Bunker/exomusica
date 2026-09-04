@@ -245,16 +245,15 @@ export function ForumMapPage() {
   function onPointerDown(e: React.PointerEvent) {
     if (e.pointerType === "touch") return; // touch handled separately, for pinch support
     if ((e.target as HTMLElement).closest?.("button, a")) return; // let clicks on controls behave normally, uninterfered with
-    e.preventDefault();
     e.currentTarget.setPointerCapture?.(e.pointerId);
     dragState.current = { startClientX: e.clientX, startClientY: e.clientY, panX: pan.x, panY: pan.y, moved: false };
   }
   function onPointerMove(e: React.PointerEvent) {
     if (!dragState.current) return;
-    const dx = pxToSvgUnits(e.clientX - dragState.current.startClientX);
-    const dy = pxToSvgUnits(e.clientY - dragState.current.startClientY);
-    if (Math.abs(dx) + Math.abs(dy) > 2) dragState.current.moved = true;
-    setPan({ x: dragState.current.panX + dx, y: dragState.current.panY + dy });
+    const rawDx = e.clientX - dragState.current.startClientX;
+    const rawDy = e.clientY - dragState.current.startClientY;
+    if (Math.abs(rawDx) + Math.abs(rawDy) > 4) dragState.current.moved = true;
+    setPan({ x: dragState.current.panX + pxToSvgUnits(rawDx), y: dragState.current.panY + pxToSvgUnits(rawDy) });
   }
   function onPointerUp() {
     dragState.current = null;
@@ -282,10 +281,10 @@ export function ForumMapPage() {
     }
     if (e.touches.length === 1 && dragState.current) {
       const t = e.touches[0];
-      const dx = pxToSvgUnits(t.clientX - dragState.current.startClientX);
-      const dy = pxToSvgUnits(t.clientY - dragState.current.startClientY);
-      if (Math.abs(dx) + Math.abs(dy) > 2) dragState.current.moved = true;
-      setPan({ x: dragState.current.panX + dx, y: dragState.current.panY + dy });
+      const rawDx = t.clientX - dragState.current.startClientX;
+      const rawDy = t.clientY - dragState.current.startClientY;
+      if (Math.abs(rawDx) + Math.abs(rawDy) > 4) dragState.current.moved = true;
+      setPan({ x: dragState.current.panX + pxToSvgUnits(rawDx), y: dragState.current.panY + pxToSvgUnits(rawDy) });
     }
   }
   function onTouchEnd() {
