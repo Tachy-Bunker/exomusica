@@ -235,6 +235,19 @@ export function PlayerBar() {
         onLoadedMetadata={(e) => setProgress(e.currentTarget.currentTime, e.currentTarget.duration || 0)}
         onPause={() => useAudioStore.setState({ isPlaying: false })}
         onPlay={() => useAudioStore.setState({ isPlaying: true })}
+        onError={(e) => {
+          const el = e.currentTarget;
+          console.error("[player-debug] AUDIO ERROR:", {
+            code: el.error?.code,
+            message: el.error?.message,
+            networkState: el.networkState,
+            src: el.currentSrc,
+          });
+        }}
+        onAbort={() => console.warn("[player-debug] audio ABORT event fired")}
+        onStalled={() => console.warn("[player-debug] audio STALLED event fired")}
+        onSuspend={() => console.warn("[player-debug] audio SUSPEND event fired")}
+        onEmptied={() => console.warn("[player-debug] audio EMPTIED event fired — element was reset")}
         onEnded={() => {
           if (endedFiredRef.current) return;
           endedFiredRef.current = true;
