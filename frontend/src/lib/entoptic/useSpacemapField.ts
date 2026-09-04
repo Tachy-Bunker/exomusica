@@ -4,6 +4,7 @@ import { WardenSystem } from "./wardenSystem";
 
 // Matches the prototype's <div class="hud"> default slider values exactly.
 export const FX_DEFAULTS = {
+  spacingMultiplier: 1.3,
   debrisCount: 320,
   wardenSizeMin: 24,
   wardenSizeMax: 44,

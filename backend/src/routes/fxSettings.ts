@@ -4,6 +4,7 @@ import { requireAdmin } from "../lib/auth.js";
 
 const DEFAULTS = {
   id: 1,
+  spacingMultiplier: 1.3,
   debrisCount: 320,
   wardenSizeMin: 24,
   wardenSizeMax: 44,

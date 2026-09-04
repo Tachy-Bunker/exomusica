@@ -42,4 +42,9 @@ export async function guideAssetRoutes(app: FastifyInstance): Promise<void> {
       return reply.code(400).send({ error: err instanceof Error ? err.message : "upload failed" });
     }
   });
+
+  app.delete<{ Params: { id: string } }>("/api/admin/branches/:id/voiceover", { preHandler: requireAdmin }, async (req) => {
+    await prisma.branch.update({ where: { id: Number(req.params.id) }, data: { voiceoverUrl: null } });
+    return { status: "ok" };
+  });
 }

@@ -3,6 +3,7 @@ import { api } from "../../lib/api";
 import { FX_DEFAULTS, type FxSettings } from "../../lib/entoptic/useSpacemapField";
 
 const SLIDERS: { key: keyof FxSettings; label: string; min: number; max: number; step: number }[] = [
+  { key: "spacingMultiplier", label: "Spacing between entities", min: 0.5, max: 3, step: 0.05 },
   { key: "debrisCount", label: "Debris", min: 10, max: 1500, step: 1 },
   { key: "wardenSizeMin", label: "Warden size (min)", min: 8, max: 100, step: 1 },
   { key: "wardenSizeMax", label: "Warden size (max)", min: 8, max: 100, step: 1 },

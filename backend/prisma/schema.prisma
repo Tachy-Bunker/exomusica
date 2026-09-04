@@ -129,6 +129,7 @@ model Branch {
   coverArtUrl String?
   hidden      Boolean  @default(false) // soft take-down: excluded from public listings, data untouched
   visibility  BranchVisibility @default(VISIBLE) // supersedes `hidden` — kept alongside it rather than migrated destructively; see deploy notes for the backfill
+  crystalCount Int @default(5) // number of shard fragments rendered for a Baby Crystals branch, admin-controlled to reflect project progress
   isAnchor    Boolean  @default(false) // true + no parent = independent anchor elsewhere on the map, not part of the central cluster
   guideAssetId  Int?
   guideAsset    GuideAsset? @relation(fields: [guideAssetId], references: [id])
@@ -623,6 +624,7 @@ model SiteSettings {
 
 model FxSettings {
   id                 Int    @id @default(1)
+  spacingMultiplier  Float  @default(1.3) // scales repulsion radius/strength and world spread — raised above 1.0 by default since the map was reported as too cluttered
   debrisCount        Int    @default(320)
   wardenSizeMin      Float  @default(24)
   wardenSizeMax      Float  @default(44)

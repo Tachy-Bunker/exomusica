@@ -106,8 +106,19 @@ export function BranchesPage() {
     load();
   }
 
+  async function removeVoiceover(branchId: number) {
+    await api(`/api/admin/branches/${branchId}/voiceover`, { method: "DELETE" });
+    load();
+  }
+
   async function setVisibility(b: Branch, visibility: "VISIBLE" | "HIDDEN" | "BABY_CRYSTALS") {
     await api(`/api/admin/branches/${b.id}`, { method: "PATCH", body: JSON.stringify({ visibility }) });
+    load();
+  }
+
+  async function setCrystalCount(b: Branch, crystalCount: number) {
+    if (!Number.isFinite(crystalCount) || crystalCount < 1) return;
+    await api(`/api/admin/branches/${b.id}`, { method: "PATCH", body: JSON.stringify({ crystalCount: Math.round(crystalCount) }) });
     load();
   }
 
@@ -258,7 +269,14 @@ export function BranchesPage() {
                     <button className="btn" onClick={() => uploadVoiceover(b.id)}>
                       Upload voiceover
                     </button>
-                    {b.voiceoverUrl && <span style={{ fontSize: "0.75rem", color: "var(--text-dim)" }}>has audio ✓</span>}
+                    {b.voiceoverUrl && (
+                      <>
+                        <span style={{ fontSize: "0.75rem", color: "var(--text-dim)" }}>has audio ✓</span>
+                        <button className="btn btn-danger" style={{ fontSize: "0.75rem", padding: "0.1rem 0.4rem" }} onClick={() => removeVoiceover(b.id)}>
+                          Remove
+                        </button>
+                      </>
+                    )}
                   </div>
                 </td>
               ) : (
@@ -274,6 +292,17 @@ export function BranchesPage() {
                   <option value="HIDDEN">Hidden</option>
                   <option value="BABY_CRYSTALS">Baby Crystals</option>
                 </select>
+                {b.visibility === "BABY_CRYSTALS" && (
+                  <input
+                    type="number"
+                    min={1}
+                    max={20}
+                    defaultValue={b.crystalCount ?? 5}
+                    title="Number of crystal shards"
+                    style={{ width: 50, marginLeft: "0.3rem" }}
+                    onBlur={(e) => setCrystalCount(b, Number(e.target.value))}
+                  />
+                )}
               </td>
               <td style={{ whiteSpace: "nowrap" }}>
                 {editingId === b.id ? (

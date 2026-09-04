@@ -13,6 +13,7 @@ import { useFxSettings } from "../lib/entoptic/useFxSettings";
 import { useAudioStore } from "../lib/audioStore";
 import { api } from "../lib/api";
 import type { PlayableTrackDTO } from "../lib/types";
+import { useGlitchText } from "../lib/useGlitchText";
 
 interface MapNode {
   id: number;
@@ -21,6 +22,7 @@ interface MapNode {
   parentId: number | null;
   isAnchor: boolean;
   visibility: "VISIBLE" | "HIDDEN" | "BABY_CRYSTALS";
+  crystalCount: number;
   x: number;
   y: number;
   homeX: number;
@@ -45,7 +47,39 @@ const CROSSHAIR_CATCHUP_RATE = 2.2; // higher = the visor catches up to the cros
 const LOCK_RADIUS = 58; // px from screen center to start locking on
 const LOCK_TIME = 0.9; // seconds of holding a target to complete the lock
 
-function buildNodes(branches: Branch[]): MapNode[] {
+/** Generates `count` scattered, jagged shard polygons for a Baby Crystals
+ *  branch, deterministic per branch id (a hash-based seed) so the same
+ *  branch always renders the same cluster shape rather than re-randomizing
+ *  on every load. Occasionally lets one shard drift further from center,
+ *  per the "don't be afraid to make one crystal far from its origin"
+ *  brief — the actual jitter/orbit motion is applied via CSS animation
+ *  delay offsets, not here. */
+function generateCrystalShards(count: number, seedBase: number): string[] {
+  const shards: string[] = [];
+  for (let i = 0; i < count; i++) {
+    const seed = seedBase * 31 + i * 17;
+    const angle = ((seed * 137.5) % 360) * (Math.PI / 180);
+    const isOutlier = i > 0 && seed % 7 === 0; // occasionally send one shard further out
+    const dist = (isOutlier ? 34 + (seed % 12) : 10 + (seed % 14)) as number;
+    const cx = 40 + Math.cos(angle) * dist;
+    const cy = 40 + Math.sin(angle) * dist;
+    const size = 8 + (seed % 10);
+    const rot = seed % 360;
+    const points = [0, 1, 2, 3]
+      .map((p) => {
+        const a = rot + p * 90 + (seed % 40) - 20;
+        const r = size * (0.6 + ((seed + p * 13) % 5) / 10);
+        const x = cx + Math.cos((a * Math.PI) / 180) * r;
+        const y = cy + Math.sin((a * Math.PI) / 180) * r;
+        return `${x.toFixed(1)},${y.toFixed(1)}`;
+      })
+      .join(" ");
+    shards.push(points);
+  }
+  return shards;
+}
+
+function buildNodes(branches: Branch[], spacing: number): MapNode[] {
   const centralOrbiters = branches.filter((b) => !b.parentId && !b.isAnchor);
   const anchors = branches.filter((b) => !b.parentId && b.isAnchor);
   const children = branches.filter((b) => !!b.parentId);
@@ -53,7 +87,7 @@ function buildNodes(branches: Branch[]): MapNode[] {
   const nodes: MapNode[] = [];
 
   centralOrbiters.forEach((b, i) => {
-    const radius = 160 + (i % 5) * 70;
+    const radius = (160 + (i % 5) * 70) * spacing;
     nodes.push({
       id: b.id,
       slug: b.slug,
@@ -61,6 +95,7 @@ function buildNodes(branches: Branch[]): MapNode[] {
       parentId: null,
       isAnchor: false,
       visibility: b.visibility ?? "VISIBLE",
+      crystalCount: b.crystalCount ?? 5,
       x: 0,
       y: 0,
       homeX: 0,
@@ -75,7 +110,7 @@ function buildNodes(branches: Branch[]): MapNode[] {
   anchors.forEach((b) => {
     // Uneven scatter — not a clean grid or perfect circle, deliberately.
     const angle = Math.random() * Math.PI * 2;
-    const radius = 350 + Math.random() * WORLD_SPREAD;
+    const radius = (350 + Math.random() * WORLD_SPREAD) * spacing;
     const bx = Math.cos(angle) * radius;
     const by = Math.sin(angle) * radius;
     nodes.push({
@@ -85,6 +120,7 @@ function buildNodes(branches: Branch[]): MapNode[] {
       parentId: null,
       isAnchor: true,
       visibility: b.visibility ?? "VISIBLE",
+      crystalCount: b.crystalCount ?? 5,
       x: bx,
       y: by,
       homeX: bx,
@@ -104,12 +140,13 @@ function buildNodes(branches: Branch[]): MapNode[] {
       parentId: b.parentId,
       isAnchor: false,
       visibility: b.visibility ?? "VISIBLE",
+      crystalCount: b.crystalCount ?? 5,
       x: 0,
       y: 0,
       homeX: 0,
       homeY: 0,
       angle: (i / 3) * Math.PI * 2,
-      orbitRadius: 60 + (i % 3) * 30,
+      orbitRadius: (60 + (i % 3) * 30) * spacing,
       orbitSpeed: 0.08 + Math.random() * 0.06,
       wanderSeed: Math.random() * 1000,
     });
@@ -132,6 +169,7 @@ export function SpaceMap({
   topics?: { slug: string; name: string }[];
 }) {
   const navigate = useNavigate();
+  const fxSettings = useFxSettings();
   const isDesktop = useIsDesktop();
   const play = useAudioStore((s) => s.play);
   const addToQueue = useAudioStore((s) => s.addToQueue);
@@ -239,8 +277,8 @@ export function SpaceMap({
   }
 
   useEffect(() => {
-    nodesRef.current = buildNodes(branches);
-  }, [branches]);
+    nodesRef.current = buildNodes(branches, fxSettings.spacingMultiplier ?? 1);
+  }, [branches, fxSettings.spacingMultiplier]);
 
   useEffect(() => {
     if (!topics) {
@@ -258,17 +296,25 @@ export function SpaceMap({
     });
   }, [topics]);
 
-  const ACTION_SEGMENTS = [
-    { text: isDesktop ? "Chat (E)" : "Chat", color: "var(--accent-forum)", action: openLockedChat },
-    { text: "  |  ", color: undefined, action: null },
-    { text: isDesktop ? "Play (F)" : "Play", color: "var(--accent-audio)", action: () => void shuffleLockedBranch() },
-    { text: "  |  ", color: undefined, action: null },
-    { text: isDesktop ? "Details (T)" : "Details", color: "var(--accent-danger)", action: viewLockedDetails },
-  ] as const;
+  const ACTION_SEGMENTS =
+    lockedNode?.visibility === "BABY_CRYSTALS"
+      ? [
+          { text: isDesktop ? "Chat (E)" : "Chat", color: "var(--accent-forum)", action: openLockedChat },
+          { text: "  |  ", color: undefined, action: null },
+          { text: isDesktop ? "Details (T)" : "Details", color: "var(--accent-danger)", action: viewLockedDetails },
+        ]
+      : [
+          { text: isDesktop ? "Chat (E)" : "Chat", color: "var(--accent-forum)", action: openLockedChat },
+          { text: "  |  ", color: undefined, action: null },
+          { text: isDesktop ? "Play (F)" : "Play", color: "var(--accent-audio)", action: () => void shuffleLockedBranch() },
+          { text: "  |  ", color: undefined, action: null },
+          { text: isDesktop ? "Details (T)" : "Details", color: "var(--accent-danger)", action: viewLockedDetails },
+        ];
   const ACTION_HINT = ACTION_SEGMENTS.map((s) => s.text).join("");
   const CENTER_ACTION_TEXT = isDesktop ? "(Enter)" : "Enter";
-  const CRYSTAL_MYSTERY_TEXT = "??? ??????";
-  const lockedNodeDisplayName = lockedNode ? (lockedNode.visibility === "BABY_CRYSTALS" ? CRYSTAL_MYSTERY_TEXT : lockedNode.name) : "";
+  const lockedNodeDisplayName = lockedNode ? lockedNode.name : "";
+  const glitchedNodeName = useGlitchText(lockedNodeDisplayName.slice(0, revealedCount));
+  const glitchedTopicName = useGlitchText(lockedTopic?.name ?? "");
   const currentActionLength = lockedNode?.id === -1 ? CENTER_ACTION_TEXT.length : ACTION_HINT.length;
 
   useEffect(() => {
@@ -438,8 +484,9 @@ export function SpaceMap({
           const dx = n.x - other.x;
           const dy = n.y - other.y;
           const dist = Math.sqrt(dx * dx + dy * dy) || 0.001;
-          if (dist < REPEL_RADIUS) {
-            const push = ((REPEL_RADIUS - dist) / REPEL_RADIUS) * REPEL_STRENGTH;
+          const effectiveRepelRadius = REPEL_RADIUS * (fxSettings.spacingMultiplier ?? 1);
+          if (dist < effectiveRepelRadius) {
+            const push = ((effectiveRepelRadius - dist) / effectiveRepelRadius) * REPEL_STRENGTH;
             fx += (dx / dist) * push;
             fy += (dy / dist) * push;
           }
@@ -467,6 +514,7 @@ export function SpaceMap({
             parentId: null,
             isAnchor: false,
             visibility: "VISIBLE",
+            crystalCount: 0,
             x: 0,
             y: 0,
             homeX: 0,
@@ -561,8 +609,6 @@ export function SpaceMap({
   }
 
   const scale = isDesktop ? 2 : 1.5;
-
-  const fxSettings = useFxSettings();
 
   useEffect(() => {
     wardenBridge.bindToBranches(branches.filter((b) => b.visibility !== "BABY_CRYSTALS").map((b) => ({ id: b.id, slug: b.slug })));
@@ -699,11 +745,9 @@ export function SpaceMap({
               onClick={() => { playLinkClickSound(); navigate(`/branch/${n.slug}`); }}
             >
               <svg viewBox="0 0 80 80" className="space-node-crystal-svg">
-                <polygon points="40,4 52,30 40,26 30,32" />
-                <polygon points="58,20 76,42 56,38 62,26" />
-                <polygon points="18,18 34,36 14,34 10,24" />
-                <polygon points="30,44 48,42 44,66 32,70 22,52" />
-                <polygon points="52,48 70,54 62,72 50,68" />
+                {generateCrystalShards(n.crystalCount, n.id).map((points, i) => (
+                  <polygon key={i} points={points} style={{ animationDelay: `${i * 0.8}s` }} />
+                ))}
               </svg>
             </div>
           ))}
@@ -737,32 +781,42 @@ export function SpaceMap({
       </div>
 
       {lockedNode && (
-        <div className={`space-hud-name ${lockedNode.visibility === "BABY_CRYSTALS" ? "space-hud-name-crystal" : ""}`}>
-          {lockedNode.visibility === "BABY_CRYSTALS"
-            ? lockedNodeDisplayName
-                .slice(0, revealedCount)
-                .split("")
-                .map((ch, i) => (
-                  <span
-                    key={i}
-                    style={
-                      {
-                        animationDelay: `${(i % 7) * 0.3}s`,
-                        "--jitter-x": `${((i * 37) % 5) - 2}px`,
-                        "--jitter-y": `${((i * 53) % 5) - 2}px`,
-                      } as React.CSSProperties
-                    }
-                  >
-                    {ch === " " ? "\u00A0" : ch}
-                  </span>
-                ))
-            : lockedNodeDisplayName.slice(0, revealedCount)}
+        <div className="space-hud-name space-hud-name-crystal">
+          {glitchedNodeName.split("").map((ch, i) => (
+            <span
+              key={i}
+              style={
+                {
+                  animationDelay: `${(i % 7) * 0.3}s`,
+                  "--jitter-x": `${((i * 37) % 5) - 2}px`,
+                  "--jitter-y": `${((i * 53) % 5) - 2}px`,
+                } as React.CSSProperties
+              }
+            >
+              {ch === " " ? "\u00A0" : ch}
+            </span>
+          ))}
           {revealedCount < lockedNodeDisplayName.length && <span className="space-hud-cursor">▌</span>}
         </div>
       )}
       {!lockedNode && lockedTopic && (
         <>
-          <div className="space-hud-name">{lockedTopic.name}</div>
+          <div className="space-hud-name space-hud-name-crystal">
+            {glitchedTopicName.split("").map((ch, i) => (
+              <span
+                key={i}
+                style={
+                  {
+                    animationDelay: `${(i % 7) * 0.3}s`,
+                    "--jitter-x": `${((i * 37) % 5) - 2}px`,
+                    "--jitter-y": `${((i * 53) % 5) - 2}px`,
+                  } as React.CSSProperties
+                }
+              >
+                {ch === " " ? "\u00A0" : ch}
+              </span>
+            ))}
+          </div>
           <div className="space-hud-action">
             <span
               className="space-hud-action-link"

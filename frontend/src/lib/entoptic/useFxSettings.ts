@@ -7,6 +7,7 @@ export function useFxSettings(): FxSettings {
 
   useEffect(() => {
     api<{
+      spacingMultiplier: number;
       debrisCount: number;
       wardenSizeMin: number;
       wardenSizeMax: number;

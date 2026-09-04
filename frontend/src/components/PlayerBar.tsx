@@ -62,6 +62,13 @@ export function PlayerBar() {
     setProgress,
     ended,
   } = useAudioStore();
+  // The audio element's own .duration sometimes never resolves for some
+  // sources (observed with archive.org-hosted files) even though playback
+  // itself works fine — falling back to the track's own stored duration
+  // means the seek bar still gets a real max instead of 0, which is what
+  // was making any seek attempt silently resolve to seeking to position 0
+  // (looking exactly like the track restarting).
+  const effectiveDuration = duration || currentTrack?.durationSeconds || 0;
 
   useEffect(() => {
     bindAudioElement(audioRef.current);
@@ -164,14 +171,14 @@ export function PlayerBar() {
   }
 
   function handleSeekStripClick(e: React.MouseEvent<HTMLDivElement>) {
-    if (!duration) return;
+    if (!effectiveDuration) return;
     const rect = e.currentTarget.getBoundingClientRect();
     const frac = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
-    seek(frac * duration);
+    seek(frac * effectiveDuration);
   }
 
   const [seekPreview, setSeekPreview] = useState<number | null>(null);
-  const progressPct = duration ? ((seekPreview ?? currentTime) / duration) * 100 : 0;
+  const progressPct = effectiveDuration ? ((seekPreview ?? currentTime) / effectiveDuration) * 100 : 0;
   const portalRoot = useFixedPortalRoot();
 
   const content = (
@@ -286,7 +293,7 @@ export function PlayerBar() {
               <input
                 type="range"
                 min={0}
-                max={duration || 0}
+                max={effectiveDuration || 0}
                 step={0.1}
                 value={seekPreview ?? currentTime}
                 onChange={(e) => setSeekPreview(Number(e.target.value))}
@@ -299,7 +306,7 @@ export function PlayerBar() {
                   setSeekPreview(null);
                 }}
               />
-              <span className="mono">{formatTime(duration)}</span>
+              <span className="mono">{formatTime(effectiveDuration)}</span>
             </div>
 
             <div className="player-transport" style={{ justifyContent: "center", marginTop: "0.8rem" }}>

@@ -24,6 +24,7 @@ export async function branchRoutes(app: FastifyInstance): Promise<void> {
         description: true,
         coverArtUrl: true,
         visibility: true,
+        crystalCount: true,
         parentId: true,
         isAnchor: true,
         posX: true,
@@ -129,6 +130,7 @@ export async function branchRoutes(app: FastifyInstance): Promise<void> {
       coverArtUrl: string;
       hidden: boolean;
       visibility: "VISIBLE" | "HIDDEN" | "BABY_CRYSTALS";
+      crystalCount: number;
       posX: number;
       posY: number;
       fontId: number | null;
