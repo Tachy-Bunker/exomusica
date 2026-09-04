@@ -45,9 +45,9 @@ export function ChatDock() {
           padding: "0.6rem 0.8rem",
           zIndex: 45,
         }}
-        title={`Reopen chat: ${openChannelName}`}
+        title={`Reopen chat: ${openChannelName} (E)`}
       >
-        💬 {openChannelName}
+        💬 {openChannelName} <span style={{ opacity: 0.7, fontSize: "0.8em" }}>(E)</span>
       </button>,
       portalRoot,
     );

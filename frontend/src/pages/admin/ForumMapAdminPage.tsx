@@ -17,13 +17,23 @@ interface ChannelOption {
   branchId: number | null;
 }
 
+function nodeLabel(n: MapNode): string {
+  const name = n.channel?.name ?? "";
+  if (n.type === "ACTIVE_BRANCHES") return `[Active] ${name}`;
+  if (n.type === "GROWING_SEEDS") return `[Growing] ${name}`;
+  return name;
+}
+
 export function ForumMapAdminPage() {
   const [nodes, setNodes] = useState<MapNode[]>([]);
   const [channels, setChannels] = useState<ChannelOption[]>([]);
   const [newType, setNewType] = useState<"TOPIC" | "ACTIVE_BRANCHES" | "GROWING_SEEDS">("TOPIC");
   const [newChannelId, setNewChannelId] = useState<number | "">("");
+  const [pan, setPan] = useState({ x: 0, y: 0 });
+  const [zoom, setZoom] = useState(1);
   const dragNodeId = useRef<number | null>(null);
   const dragOffset = useRef({ x: 0, y: 0 });
+  const panDrag = useRef<{ startX: number; startY: number; panX: number; panY: number } | null>(null);
   const svgRef = useRef<SVGSVGElement>(null);
 
   function load() {
@@ -31,7 +41,13 @@ export function ForumMapAdminPage() {
   }
   useEffect(load, []);
   useEffect(() => {
-    api<{ id: number; slug: string; name: string; branchId: number | null }[]>("/api/channels").then(setChannels);
+    api<ChannelOption[]>("/api/channels").then(setChannels);
+  }, []);
+  useEffect(() => {
+    api<{ forumMapInitialX: number; forumMapInitialY: number; forumMapInitialZoom: number }>("/api/site-settings").then((s) => {
+      setPan({ x: s.forumMapInitialX, y: s.forumMapInitialY });
+      setZoom(s.forumMapInitialZoom);
+    });
   }, []);
 
   const usedChannelIds = new Set(nodes.map((n) => n.channel?.slug));
@@ -41,7 +57,7 @@ export function ForumMapAdminPage() {
     if (!newChannelId) return;
     await api("/api/admin/forum-map/nodes", {
       method: "POST",
-      body: JSON.stringify({ type: newType, channelId: newChannelId, x: 0, y: 0 }),
+      body: JSON.stringify({ type: newType, channelId: newChannelId, x: -pan.x, y: -pan.y }),
     });
     setNewChannelId("");
     load();
@@ -55,6 +71,14 @@ export function ForumMapAdminPage() {
   async function setParent(id: number, parentId: number | null) {
     await api(`/api/admin/forum-map/nodes/${id}`, { method: "PATCH", body: JSON.stringify({ parentId }) });
     load();
+  }
+
+  async function saveDefaultView() {
+    await api("/api/admin/site-settings", {
+      method: "PATCH",
+      body: JSON.stringify({ forumMapInitialX: pan.x, forumMapInitialY: pan.y, forumMapInitialZoom: zoom }),
+    });
+    alert("Saved. This is now the view visitors land on when opening the map.");
   }
 
   function svgPoint(clientX: number, clientY: number) {
@@ -75,13 +99,24 @@ export function ForumMapAdminPage() {
     dragNodeId.current = n.id;
     dragOffset.current = { x: p.x - n.x, y: p.y - n.y };
   }
+  function onBackgroundPointerDown(e: React.PointerEvent) {
+    panDrag.current = { startX: e.clientX, startY: e.clientY, panX: pan.x, panY: pan.y };
+  }
   function onSvgPointerMove(e: React.PointerEvent) {
-    if (dragNodeId.current === null) return;
-    const p = svgPoint(e.clientX, e.clientY);
-    const id = dragNodeId.current;
-    setNodes((prev) => prev.map((n) => (n.id === id ? { ...n, x: p.x - dragOffset.current.x, y: p.y - dragOffset.current.y } : n)));
+    if (dragNodeId.current !== null) {
+      const p = svgPoint(e.clientX, e.clientY);
+      const id = dragNodeId.current;
+      setNodes((prev) => prev.map((n) => (n.id === id ? { ...n, x: p.x - dragOffset.current.x, y: p.y - dragOffset.current.y } : n)));
+      return;
+    }
+    if (panDrag.current) {
+      const dx = (e.clientX - panDrag.current.startX) / zoom;
+      const dy = (e.clientY - panDrag.current.startY) / zoom;
+      setPan({ x: panDrag.current.panX + dx, y: panDrag.current.panY + dy });
+    }
   }
   async function onSvgPointerUp() {
+    panDrag.current = null;
     const id = dragNodeId.current;
     dragNodeId.current = null;
     if (id === null) return;
@@ -90,15 +125,17 @@ export function ForumMapAdminPage() {
   }
 
   const byId = new Map(nodes.map((n) => [n.id, n]));
+  const vbSize = 1600 / zoom;
 
   return (
     <div>
       <h1>Forum Map</h1>
       <p style={{ fontSize: "0.85rem", color: "var(--text-dim)" }}>
-        Drag nodes to position them. Set each node's parent below to draw a branch to it.
+        Drag nodes to position them. Drag the background to pan, scroll to zoom. Set each node's parent below to draw
+        a branch to it. New nodes are added wherever the canvas is currently centered.
       </p>
 
-      <div style={{ display: "flex", gap: "0.5rem", alignItems: "flex-end", marginBottom: "1rem" }}>
+      <div style={{ display: "flex", gap: "0.5rem", alignItems: "flex-end", marginBottom: "1rem", flexWrap: "wrap" }}>
         <div>
           <label>Node type</label>
           <select value={newType} onChange={(e) => setNewType(e.target.value as typeof newType)}>
@@ -121,16 +158,28 @@ export function ForumMapAdminPage() {
         <button className="btn btn-primary" onClick={addNode}>
           Add node
         </button>
+        <button className="btn" onClick={saveDefaultView} title="Save the current pan/zoom as what visitors see when they first open the map">
+          Set current view as default
+        </button>
       </div>
 
       <svg
         ref={svgRef}
-        viewBox="-800 -800 1600 1600"
-        style={{ width: "100%", height: "60vh", background: "#0d0a14", borderRadius: "var(--radius)", border: "1px solid var(--border)" }}
+        viewBox={`${-vbSize / 2 - pan.x} ${-vbSize / 2 - pan.y} ${vbSize} ${vbSize}`}
+        style={{ width: "100%", height: "60vh", background: "#0d0a14", borderRadius: "var(--radius)", border: "1px solid var(--border)", cursor: panDrag.current ? "grabbing" : "grab" }}
+        onPointerDown={onBackgroundPointerDown}
         onPointerMove={onSvgPointerMove}
         onPointerUp={onSvgPointerUp}
         onPointerLeave={onSvgPointerUp}
+        onWheel={(e) => {
+          e.preventDefault();
+          setZoom((z) => Math.min(2.5, Math.max(0.4, z - e.deltaY * 0.001)));
+        }}
       >
+        {/* Crosshair marking the exact point that will become the default view center */}
+        <line x1={-15} y1={0} x2={15} y2={0} stroke="rgba(255,255,255,0.3)" strokeWidth={1} />
+        <line x1={0} y1={-15} x2={0} y2={15} stroke="rgba(255,255,255,0.3)" strokeWidth={1} />
+
         {nodes
           .filter((n) => n.parentId !== null)
           .map((n) => {
@@ -148,7 +197,7 @@ export function ForumMapAdminPage() {
               opacity={0.85}
             />
             <text y={n.type === "TOPIC" ? 30 : 38} textAnchor="middle" fill="#fff" fontSize={11}>
-              {n.type === "ACTIVE_BRANCHES" ? `[Active] ${n.channel?.name}` : n.type === "GROWING_SEEDS" ? `[Growing] ${n.channel?.name}` : n.channel?.name}
+              {nodeLabel(n)}
             </text>
           </g>
         ))}
@@ -165,7 +214,7 @@ export function ForumMapAdminPage() {
         <tbody>
           {nodes.map((n) => (
             <tr key={n.id}>
-              <td>{n.type === "ACTIVE_BRANCHES" ? `[Active] ${n.channel?.name}` : n.type === "GROWING_SEEDS" ? `[Growing] ${n.channel?.name}` : n.channel?.name}</td>
+              <td>{nodeLabel(n)}</td>
               <td>
                 <select value={n.parentId ?? ""} onChange={(e) => setParent(n.id, e.target.value ? Number(e.target.value) : null)}>
                   <option value="">— none (root) —</option>
@@ -173,7 +222,7 @@ export function ForumMapAdminPage() {
                     .filter((c) => c.id !== n.id)
                     .map((c) => (
                       <option key={c.id} value={c.id}>
-                        {c.type === "TOPIC" ? c.channel?.name : c.type === "ACTIVE_BRANCHES" ? "Active Branches" : "Growing Seeds"}
+                        {nodeLabel(c)}
                       </option>
                     ))}
                 </select>

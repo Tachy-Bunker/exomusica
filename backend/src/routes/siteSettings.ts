@@ -220,6 +220,9 @@ export async function siteSettingsRoutes(app: FastifyInstance): Promise<void> {
       ogNewsDefaultDescription: string | null;
       ogForumDefaultTitle: string | null;
       ogForumDefaultDescription: string | null;
+      forumMapInitialX: number;
+      forumMapInitialY: number;
+      forumMapInitialZoom: number;
     }>;
   }>("/api/admin/site-settings", { preHandler: requireAdmin }, async (req) => {
     const data: Record<string, unknown> = {};
@@ -263,6 +266,9 @@ export async function siteSettingsRoutes(app: FastifyInstance): Promise<void> {
       "ogNewsDefaultDescription",
       "ogForumDefaultTitle",
       "ogForumDefaultDescription",
+      "forumMapInitialX",
+      "forumMapInitialY",
+      "forumMapInitialZoom",
     ] as const) {
       if (key in body) data[key] = body[key];
     }

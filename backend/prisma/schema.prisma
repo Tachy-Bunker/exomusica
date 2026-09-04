@@ -587,6 +587,9 @@ model SiteSettings {
   id             Int         @id @default(1)
   defaultFontId  Int?
   defaultFont    CustomFont? @relation(fields: [defaultFontId], references: [id])
+  forumMapInitialX    Float @default(0)
+  forumMapInitialY    Float @default(0)
+  forumMapInitialZoom Float @default(1)
   ambienceUrl    String? // idle-landing ambient loop, plays when nothing else is
   scanSfxUrl     String? // spacemap text-reveal loop (branch lock-on + F/E/T hint)
   defaultWikiPageId Int?

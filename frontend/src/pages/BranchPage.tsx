@@ -22,8 +22,6 @@ export function BranchPage() {
   const fontFamily = useCustomFont(branch?.font);
   const isDesktop = useIsDesktop();
   const openChat = useChatDockStore((s) => s.openChat);
-  const dockOpenChannelSlug = useChatDockStore((s) => s.openChannelSlug);
-  const toggleDockCollapse = useChatDockStore((s) => s.toggleCollapse);
   const [showIntro, setShowIntro] = useState(false);
   const [pendingPlayAlbumSlug, setPendingPlayAlbumSlug] = useState<string | null>(null);
 
@@ -75,19 +73,22 @@ export function BranchPage() {
 
   useDocumentTitle(branch?.name ?? "");
 
+  const setPageChannel = useChatDockStore((s) => s.setPageChannel);
+  useEffect(() => {
+    if (!branch?.channel) return;
+    setPageChannel({ slug: branch.channel.slug, name: branch.name, branchSlug: branch.slug });
+    return () => setPageChannel(null);
+  }, [branch?.channel, branch?.name, branch?.slug, setPageChannel]);
+
   useEffect(() => {
     if (!isDesktop) return;
     function handleKeyDown(e: KeyboardEvent) {
       if (isTypingTarget(e.target)) return;
       if (e.code === "KeyR") navigate("/");
-      if (e.code === "KeyE") {
-        if (dockOpenChannelSlug === branch?.channel?.slug) toggleDockCollapse();
-        else if (branch?.channel) openChat(branch.channel.slug, branch.name, branch.slug);
-      }
     }
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [isDesktop, navigate, dockOpenChannelSlug, toggleDockCollapse, openChat, branch]);
+  }, [isDesktop, navigate]);
 
   if (!branch) return <p>Loading…</p>;
 
@@ -95,7 +96,7 @@ export function BranchPage() {
   const coverTextScale = isDesktop ? 1 : 0.6;
 
   return (
-    <div style={{ fontFamily, ...(isDesktop ? {} : { display: "flex", flexDirection: "column", height: "calc(100dvh - var(--nav-height, 3.6rem) - 3rem)" }) }}>
+    <div style={{ fontFamily, ...(isDesktop ? {} : { display: "flex", flexDirection: "column", height: "calc(100dvh - var(--nav-height, 3.6rem) - 3rem - var(--player-height, 0px))", marginTop: "-0.6rem" }) }}>
       <div style={isDesktop ? {} : { flexShrink: 0, overflowY: "auto" }}>
         <p style={{ marginBottom: "0.5rem" }}>
           <Link to="/">{isDesktop ? "← back to Exo-Lands (R)" : "← Back to Exo-Lands"}</Link>
@@ -105,7 +106,7 @@ export function BranchPage() {
       </div>
 
       {!isDesktop && branch.channel && (
-        <div style={{ flexShrink: 0, height: "34dvh", marginTop: "0.6rem", marginBottom: "0.6rem" }}>
+        <div style={{ flexShrink: 0, height: "42dvh", marginTop: "0.6rem", marginBottom: "0.6rem" }}>
           <ChannelPage channelSlug={branch.channel.slug} parentControlsHeight />
         </div>
       )}

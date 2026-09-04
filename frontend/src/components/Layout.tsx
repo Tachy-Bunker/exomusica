@@ -54,6 +54,11 @@ export function Layout() {
     window.open("https://paypal.me/tachybunker", "_blank", "popup=1,width=460,height=640");
   }
 
+  const dockOpenChannelSlug = useChatDockStore((s) => s.openChannelSlug);
+  const dockPageChannel = useChatDockStore((s) => s.pageChannel);
+  const dockOpenChat = useChatDockStore((s) => s.openChat);
+  const dockToggleCollapse = useChatDockStore((s) => s.toggleCollapse);
+
   useEffect(() => {
     if (!isDesktop) return;
     function handleShortcut(e: KeyboardEvent) {
@@ -72,11 +77,18 @@ export function Layout() {
         case "KeyM":
           navigate("/discussion");
           break;
+        case "KeyE":
+          if (dockPageChannel && dockOpenChannelSlug !== dockPageChannel.slug) {
+            dockOpenChat(dockPageChannel.slug, dockPageChannel.name, dockPageChannel.branchSlug);
+          } else if (dockOpenChannelSlug) {
+            dockToggleCollapse();
+          }
+          break;
       }
     }
     window.addEventListener("keydown", handleShortcut);
     return () => window.removeEventListener("keydown", handleShortcut);
-  }, [isDesktop, navigate]);
+  }, [isDesktop, navigate, dockPageChannel, dockOpenChannelSlug, dockOpenChat, dockToggleCollapse]);
   const dockOpen = useChatDockStore((s) => !!s.openChannelSlug);
   const dockCollapsed = useChatDockStore((s) => s.collapsed);
   const dockWidth = useChatDockStore((s) => s.width);
