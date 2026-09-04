@@ -143,6 +143,17 @@ export async function messageRoutes(app: FastifyInstance): Promise<void> {
     return rows.map((r) => r.author.username);
   });
 
+  // Ephemeral — no persistence, just relayed to everyone else currently
+  // watching this channel. The client is responsible for re-sending every
+  // few seconds while the composer has content, and for clearing its own
+  // display of this after a short timeout if no further ping arrives (so a
+  // dropped connection or closed tab doesn't leave a stale "typing" shown
+  // forever to everyone else).
+  app.post<{ Params: { slug: string } }>("/api/channels/:slug/typing", { preHandler: requireAuth }, async (req, reply) => {
+    broadcast(req.params.slug, { type: "typing", username: req.user!.username });
+    return reply.code(204).send();
+  });
+
   app.get("/api/channels/:slug/archive", async (req, reply) => {
     const { slug } = req.params as { slug: string };
     const channel = await prisma.forumChannel.findUnique({ where: { slug } });

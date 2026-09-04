@@ -343,6 +343,19 @@ export function ChannelPage({ channelSlug, fillHeight, parentControlsHeight }: {
   const [showLiveChatButton, setShowLiveChatButton] = useState(false);
   const [archiveDays, setArchiveDays] = useState<{ day: string; messageCount: number }[]>([]);
   const [draft, setDraft] = useState("");
+  const [typingUsers, setTypingUsers] = useState<Record<string, number>>({});
+  const lastTypingPingRef = useRef(0);
+  const typingNames = Object.keys(typingUsers);
+  const typingLabel =
+    typingNames.length === 0
+      ? null
+      : typingNames.length === 1
+      ? `${typingNames[0]} is typing…`
+      : typingNames.length === 2
+      ? `${typingNames[0]}, ${typingNames[1]} are typing…`
+      : typingNames.length === 3
+      ? `${typingNames[0]}, ${typingNames[1]}, ${typingNames[2]} are typing…`
+      : "The galaxy is typing…";
   const [emojiQuery, setEmojiQuery] = useState<string | null>(null);
   const [mentionQuery, setMentionQuery] = useState<string | null>(null);
   const [following, setFollowing] = useState(false);
@@ -636,10 +649,31 @@ export function ChannelPage({ channelSlug, fillHeight, parentControlsHeight }: {
         setMessages((prev) =>
           prev.map((m) => (m.id === event.messageId ? { ...m, isDeleted: true, contentRaw: "", embeds: [] } : m)),
         );
+      } else if (event.type === "typing" && event.username !== user?.username) {
+        setTypingUsers((prev) => ({ ...prev, [event.username]: Date.now() }));
       }
     };
     return () => ws.close();
-  }, [slug, mode]);
+  }, [slug, mode, user?.username]);
+
+  // Prune anyone who hasn't sent a fresh ping in a while — covers a
+  // dropped connection or a closed tab that never got to say "stopped
+  // typing", so the indicator doesn't get stuck showing someone forever.
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setTypingUsers((prev) => {
+        const cutoff = Date.now() - 4000;
+        const next: Record<string, number> = {};
+        let changed = false;
+        for (const [name, at] of Object.entries(prev)) {
+          if (at >= cutoff) next[name] = at;
+          else changed = true;
+        }
+        return changed ? next : prev;
+      });
+    }, 1000);
+    return () => clearInterval(interval);
+  }, []);
 
   async function sendMessage() {
     if ((!draft.trim() && pendingAttachments.length === 0) || !slug) return;
@@ -703,6 +737,14 @@ export function ChannelPage({ channelSlug, fillHeight, parentControlsHeight }: {
     setEmojiQuery(emojiMatch ? emojiMatch[1] : null);
     const mentionMatch = value.slice(0, cursor).match(/(?:^|\s)@([a-zA-Z0-9_.-]*)$/);
     setMentionQuery(mentionMatch ? mentionMatch[1] : null);
+
+    if (value.trim().length > 0 && slug && mode === "live" && user) {
+      const now = Date.now();
+      if (now - lastTypingPingRef.current > 2500) {
+        lastTypingPingRef.current = now;
+        void api(`/api/channels/${slug}/typing`, { method: "POST" }).catch(() => {});
+      }
+    }
   }
 
   function handlePaste(e: ClipboardEvent<HTMLTextAreaElement>) {
@@ -916,6 +958,9 @@ export function ChannelPage({ channelSlug, fillHeight, parentControlsHeight }: {
             position: "relative",
           }}
         >
+          {typingLabel && (
+            <div style={{ fontSize: "0.75rem", color: "var(--text-dim)", fontStyle: "italic" }}>{typingLabel}</div>
+          )}
           {replyTarget && (
             <div style={{ fontSize: "0.8rem", color: "var(--text-dim)", display: "flex", gap: "0.4rem", alignItems: "center" }}>
               Replying to <strong>{replyTarget.authorUsername}</strong>: {replyTarget.excerpt}

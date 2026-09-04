@@ -90,7 +90,10 @@ export function ForumMapPage() {
   }
 
   function onNodeInteract(n: MapNode) {
-    if (isDesktop) return; // desktop uses hover, not tap
+    if (isDesktop) {
+      goToNode(n); // hover already shows the preview, so a click just navigates
+      return;
+    }
     setActiveNodeId((id) => (id === n.id ? null : n.id));
   }
 
@@ -107,7 +110,8 @@ export function ForumMapPage() {
 
   function onPointerDown(e: React.PointerEvent) {
     if (e.pointerType === "touch") return; // touch handled separately, for pinch support
-    (e.target as Element).setPointerCapture?.(e.pointerId);
+    if ((e.target as HTMLElement).closest?.("button, a")) return; // let clicks on controls behave normally, uninterfered with
+    e.currentTarget.setPointerCapture?.(e.pointerId);
     dragState.current = { startClientX: e.clientX, startClientY: e.clientY, panX: pan.x, panY: pan.y, moved: false };
   }
   function onPointerMove(e: React.PointerEvent) {
