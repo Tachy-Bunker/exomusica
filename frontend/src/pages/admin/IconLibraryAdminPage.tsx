@@ -21,8 +21,8 @@ export function IconLibraryAdminPage() {
     const file = fileInputRef.current?.files?.[0];
     if (!file || !name.trim()) return;
     const formData = new FormData();
-    formData.append("file", file);
     formData.append("name", name.trim());
+    formData.append("file", file);
     await api("/api/admin/link-icons", { method: "POST", body: formData });
     setName("");
     if (fileInputRef.current) fileInputRef.current.value = "";

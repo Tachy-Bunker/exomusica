@@ -208,6 +208,7 @@ model Message {
   isDeleted    Boolean      @default(false)
   editedAt     DateTime?
   importedFrom String? // e.g. "discord:<author-id>:<timestamp>" for traceability
+  discordMessageId String? @unique // set once forwarded to Discord — lets a Discord-side reply resolve back to this message
 
   reactions   Reaction[]
   bookmarks   Bookmark[]

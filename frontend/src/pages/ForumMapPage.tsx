@@ -120,8 +120,6 @@ export function ForumMapPage() {
     });
   }, []);
 
-  const activeNode = useMemo(() => nodes.find((n) => n.id === activeNodeId) ?? null, [nodes, activeNodeId]);
-
   const { visibleIds, handleIds } = useMemo(() => {
     const byId = new Map(nodes.map((n) => [n.id, n]));
     const visible = new Set<number>();
@@ -145,6 +143,13 @@ export function ForumMapPage() {
     }
     return { visibleIds: visible, handleIds: handles };
   }, [nodes, revealedIds]);
+
+  // Excludes handle nodes — a handle isn't revealed yet, so it should
+  // never trigger the preview fetch/popup, only the crosshair's hint.
+  const activeNode = useMemo(() => {
+    const n = nodes.find((n) => n.id === activeNodeId) ?? null;
+    return n && handleIds.has(n.id) ? null : n;
+  }, [nodes, activeNodeId, handleIds]);
 
   useEffect(() => {
     lockableIdsRef.current = new Set([...visibleIds, ...handleIds]);
@@ -194,6 +199,8 @@ export function ForumMapPage() {
     }
     setActiveNodeId((id) => (id === n.id ? null : n.id));
   }
+  const onNodeInteractRef = useRef(onNodeInteract);
+  onNodeInteractRef.current = onNodeInteract;
 
   // --- WASD + crosshair lock-on (desktop) / joystick (mobile) -----------
   useEffect(() => {
@@ -202,7 +209,7 @@ export function ForumMapPage() {
       if (["KeyW", "KeyA", "KeyS", "KeyD"].includes(e.code)) keysRef.current.add(e.code);
       if (e.code === "KeyE") {
         const n = nodesRef.current.find((n) => n.id === lockedNodeIdRef.current);
-        if (n) onNodeInteract(n);
+        if (n) onNodeInteractRef.current(n);
       }
     }
     function onKeyUp(e: KeyboardEvent) {

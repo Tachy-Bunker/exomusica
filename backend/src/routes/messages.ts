@@ -15,7 +15,7 @@ const messageInclude = {
   author: { select: { username: true, avatarUrl: true, isGhost: true, discordUsername: true, discordUserId: true, linkedUserId: true, linkedUser: { select: { username: true, avatarUrl: true } } } },
   reactions: { include: { emoji: true, user: { select: { username: true } } } },
   attachments: true,
-  replyTo: { select: { id: true, contentRaw: true, author: { select: { username: true } } } },
+  replyTo: { select: { id: true, contentRaw: true, discordMessageId: true, author: { select: { username: true } } } },
 } as const;
 
 interface MessageQuery {
@@ -229,10 +229,20 @@ export async function messageRoutes(app: FastifyInstance): Promise<void> {
       }
 
       const contentForDiscord = translateMentionsForDiscord(contentRaw, mentioned);
-      void forwardMessageToDiscord(channel.slug, dto.authorUsername, contentForDiscord, {
-        discordUserId: full.author.discordUserId,
-        discordUsername: full.author.discordUsername,
-      });
+      void forwardMessageToDiscord(
+        channel.slug,
+        dto.authorUsername,
+        contentForDiscord,
+        { discordUserId: full.author.discordUserId, discordUsername: full.author.discordUsername },
+        {
+          attachments: dto.attachments.map((a) => ({ url: `https://exomusica.com${a.url}`, filename: a.filename })),
+          replyTo: dto.replyPreview
+            ? { discordMessageId: full.replyTo?.discordMessageId ?? null, authorUsername: dto.replyPreview.authorUsername, excerpt: dto.replyPreview.excerpt }
+            : null,
+        },
+      ).then((discordMessageId) => {
+        if (discordMessageId) return prisma.message.update({ where: { id: message.id }, data: { discordMessageId } });
+      }).catch((err) => app.log.error(err, "Discord forward failed"));
 
       // Fire-and-forget: followers who want replies on this specific topic
       // (global notifyFollowedReplies AND this follow's own notifyOnReply,

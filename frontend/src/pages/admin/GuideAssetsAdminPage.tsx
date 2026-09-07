@@ -23,8 +23,8 @@ export function GuideAssetsAdminPage() {
     if (!file) return;
     setError(null);
     const formData = new FormData();
-    formData.append("file", file);
     if (name.trim()) formData.append("name", name.trim());
+    formData.append("file", file);
     try {
       await api("/api/admin/guide-assets", { method: "POST", body: formData });
       setName("");

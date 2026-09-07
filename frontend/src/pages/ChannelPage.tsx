@@ -696,8 +696,19 @@ export function ChannelPage({ channelSlug, fillHeight, parentControlsHeight }: {
   async function handleFileSelect(e: ChangeEvent<HTMLInputElement>) {
     const files = e.target.files;
     if (!files || files.length === 0) return;
+    const MAX_ATTACHMENTS_PER_MESSAGE = 10;
+    const remaining = MAX_ATTACHMENTS_PER_MESSAGE - pendingAttachments.length;
+    if (remaining <= 0) {
+      alert(`You can attach up to ${MAX_ATTACHMENTS_PER_MESSAGE} files per message.`);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+      return;
+    }
+    const selected = [...files].slice(0, remaining);
+    if (files.length > remaining) {
+      alert(`Only the first ${remaining} file${remaining !== 1 ? "s" : ""} were added — up to ${MAX_ATTACHMENTS_PER_MESSAGE} attachments are allowed per message.`);
+    }
     const formData = new FormData();
-    for (const f of files) formData.append("files", f);
+    for (const f of selected) formData.append("files", f);
     const result = await api<{ created: { id: number; filename: string }[] }>("/api/attachments", {
       method: "POST",
       body: formData,

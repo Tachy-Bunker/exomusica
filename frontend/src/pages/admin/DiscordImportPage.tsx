@@ -35,9 +35,9 @@ export function DiscordImportPage() {
     setSummary(null);
     try {
       const formData = new FormData();
-      formData.append("file", file);
       formData.append("channelSlug", channelSlug);
       if (archiveOrgPrefix) formData.append("archiveOrgPrefix", archiveOrgPrefix);
+      formData.append("file", file);
       const result = await api<ImportSummary>("/api/admin/import/discord-csv", { method: "POST", body: formData });
       setSummary(result);
     } catch (err) {

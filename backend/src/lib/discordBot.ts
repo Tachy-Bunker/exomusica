@@ -6,6 +6,7 @@ import { broadcast } from "./chatHub.js";
 import { toMessageDTO } from "./messageDto.js";
 import { resolveMentions, translateMentionsFromDiscord } from "./mentions.js";
 import { createNotification } from "./notify.js";
+import { saveMessageAttachment } from "./storage.js";
 
 let client: Client | null = null;
 let startedWithToken: string | null = null;
@@ -33,6 +34,8 @@ async function handleIncomingDiscordMessage(message: {
   id: string;
   content: string;
   createdAt: Date;
+  attachments: { url: string; filename: string; contentType: string | null }[];
+  referencedMessageId: string | null;
 }) {
   // Feedback-loop prevention, part 1: never re-import anything the bot
   // account itself posted (the plain-bot-message fallback path).
@@ -50,7 +53,9 @@ async function handleIncomingDiscordMessage(message: {
     if (ourWebhookId && message.webhookId === ourWebhookId) return;
   }
 
-  if (!message.content.trim()) return; // e.g. attachment-only messages with no text; nothing to import yet
+  // No text and no attachments — genuinely nothing to import (e.g. a
+  // sticker-only message). Attachment-only messages now DO get imported.
+  if (!message.content.trim() && message.attachments.length === 0) return;
 
   const importedFrom = `discord-live:${message.id}`;
   const existing = await prisma.message.findUnique({ where: { channelId_importedFrom: { channelId: channel.id, importedFrom } } });
@@ -61,17 +66,55 @@ async function handleIncomingDiscordMessage(message: {
   const dayKey = toDayKey(createdAt);
   const translatedContent = await translateMentionsFromDiscord(prisma, message.content);
 
+  // Resolve a Discord reply back to a website message — either one that
+  // originated on Discord itself (via the id embedded in importedFrom)
+  // or one that started on the website and was forwarded out (via its
+  // stored discordMessageId).
+  let replyToId: number | null = null;
+  if (message.referencedMessageId) {
+    const referenced = await prisma.message.findFirst({
+      where: {
+        OR: [
+          { channelId: channel.id, importedFrom: `discord-live:${message.referencedMessageId}` },
+          { channelId: channel.id, discordMessageId: message.referencedMessageId },
+        ],
+      },
+      select: { id: true },
+    });
+    replyToId = referenced?.id ?? null;
+  }
+
+  const messageInclude = {
+    author: { select: { username: true, avatarUrl: true, isGhost: true, linkedUserId: true, linkedUser: { select: { username: true, avatarUrl: true } } } },
+    reactions: { include: { emoji: true, user: { select: { username: true } } } },
+    attachments: true,
+    replyTo: { select: { id: true, contentRaw: true, author: { select: { username: true } } } },
+  } as const;
+
   const created = await prisma.message.create({
-    data: { channelId: channel.id, authorId: author.id, createdAt, dayKey, contentRaw: translatedContent, importedFrom },
-    include: {
-      author: { select: { username: true, avatarUrl: true, isGhost: true, linkedUserId: true, linkedUser: { select: { username: true, avatarUrl: true } } } },
-      reactions: { include: { emoji: true, user: { select: { username: true } } } },
-      attachments: true,
-      replyTo: { select: { id: true, contentRaw: true, author: { select: { username: true } } } },
-    },
+    data: { channelId: channel.id, authorId: author.id, createdAt, dayKey, contentRaw: translatedContent, importedFrom, replyToId, discordMessageId: message.id },
+    include: messageInclude,
   });
 
-  const dto = await toMessageDTO(created);
+  // Download and save each Discord attachment as our own Attachment row,
+  // linked to this message. Best-effort per file — one failure shouldn't
+  // block the message import or the rest of the batch.
+  if (message.attachments.length > 0) {
+    for (const a of message.attachments) {
+      try {
+        const res = await fetch(a.url);
+        if (!res.ok) continue;
+        const buffer = Buffer.from(await res.arrayBuffer());
+        const attachment = await saveMessageAttachment(author.id, a.filename, a.contentType ?? "application/octet-stream", buffer, { bypassQuota: true });
+        await prisma.attachment.update({ where: { id: attachment.id }, data: { messageId: created.id } });
+      } catch (err) {
+        console.error("Discord bridge: failed to import attachment:", err);
+      }
+    }
+  }
+
+  const full = message.attachments.length > 0 ? await prisma.message.findUniqueOrThrow({ where: { id: created.id }, include: messageInclude }) : created;
+  const dto = await toMessageDTO(full);
   broadcast(channel.slug, { type: "message.create", message: dto });
 
   const mentioned = await resolveMentions(prisma, translatedContent, author.id);
@@ -178,28 +221,68 @@ export async function forwardMessageToDiscord(
   authorUsername: string,
   content: string,
   authorDiscordIdentity?: DiscordIdentity,
-): Promise<void> {
-  if (!client) return;
+  options?: {
+    attachments?: { url: string; filename: string }[];
+    replyTo?: { discordMessageId: string | null; authorUsername: string; excerpt: string } | null;
+  },
+): Promise<string | null> {
+  if (!client) return null;
   try {
     const channel = await prisma.forumChannel.findUnique({ where: { slug: channelSlug } });
-    if (!channel?.discordChannelId) return;
+    if (!channel?.discordChannelId) return null;
+
+    const attachments = options?.attachments ?? [];
+    const replyTo = options?.replyTo ?? null;
 
     if (channel.discordWebhookUrl) {
       const avatarUrl = authorDiscordIdentity ? await findDiscordAvatarUrl(authorDiscordIdentity) : null;
-      await fetch(channel.discordWebhookUrl, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username: `${authorUsername} | Exo-API`, content, ...(avatarUrl ? { avatar_url: avatarUrl } : {}) }),
-      });
-      return;
+      // Webhooks can't use Discord's native reply feature (no shared
+      // message-reference mechanism), so a reply is represented as a
+      // plain quote line prepended to the content instead.
+      const quotedContent = replyTo ? `> replying to **${replyTo.authorUsername}**: ${replyTo.excerpt}\n${content}` : content;
+
+      let res: Response;
+      if (attachments.length > 0) {
+        // Discord's webhook endpoint needs actual file bytes in a
+        // multipart body for real attachments — a plain JSON payload
+        // can't reference a remote URL as a file the way discord.js's
+        // bot-send path can, so each attachment is fetched from our own
+        // storage first and re-uploaded as multipart form parts.
+        const form = new FormData();
+        form.append("payload_json", JSON.stringify({ username: `${authorUsername} | Exo-API`, content: quotedContent, ...(avatarUrl ? { avatar_url: avatarUrl } : {}) }));
+        for (let i = 0; i < attachments.length; i++) {
+          const a = attachments[i];
+          const fileRes = await fetch(a.url);
+          if (!fileRes.ok) continue;
+          const blob = await fileRes.blob();
+          form.append(`files[${i}]`, blob, a.filename);
+        }
+        res = await fetch(`${channel.discordWebhookUrl}?wait=true`, { method: "POST", body: form });
+      } else {
+        res = await fetch(`${channel.discordWebhookUrl}?wait=true`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ username: `${authorUsername} | Exo-API`, content: quotedContent, ...(avatarUrl ? { avatar_url: avatarUrl } : {}) }),
+        });
+      }
+      if (!res.ok) return null;
+      const posted = (await res.json()) as { id: string };
+      return posted.id;
     }
 
     const discordChannel = await client.channels.fetch(channel.discordChannelId);
     if (discordChannel?.isTextBased() && "send" in discordChannel) {
-      await discordChannel.send(`${authorUsername}: ${content}`);
+      const sent = await discordChannel.send({
+        content: `${authorUsername}: ${content}`,
+        files: attachments.map((a) => ({ attachment: a.url, name: a.filename })),
+        ...(replyTo?.discordMessageId ? { reply: { messageReference: replyTo.discordMessageId } } : {}),
+      });
+      return sent.id;
     }
+    return null;
   } catch (err) {
     console.error("Failed to forward message to Discord:", err);
+    return null;
   }
 }
 
@@ -244,6 +327,8 @@ export async function initDiscordBot(): Promise<void> {
       id: message.id,
       content: message.content,
       createdAt: message.createdAt,
+      attachments: [...message.attachments.values()].map((a) => ({ url: a.url, filename: a.name, contentType: a.contentType })),
+      referencedMessageId: message.reference?.messageId ?? null,
     }).catch((err) => console.error("Discord bridge: failed to process incoming message:", err));
   });
 

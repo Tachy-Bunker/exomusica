@@ -33,8 +33,8 @@ export function NotificationsAdminPage() {
     if (!file) return;
     setError(null);
     const formData = new FormData();
-    formData.append("file", file);
     if (soundName.trim()) formData.append("name", soundName.trim());
+    formData.append("file", file);
     try {
       await api("/api/admin/notification-sounds", { method: "POST", body: formData });
       setSoundName("");

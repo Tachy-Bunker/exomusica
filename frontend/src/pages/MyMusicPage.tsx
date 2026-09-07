@@ -118,10 +118,10 @@ export function MyMusicPage() {
     if (!file || !newTrackTitle.trim()) return;
     setUploadError(null);
     const formData = new FormData();
-    formData.append("file", file);
     formData.append("title", newTrackTitle.trim());
     formData.append("permission", newTrackPermission);
     if (remixOfId) formData.append("remixOfId", String(remixOfId));
+    formData.append("file", file);
     try {
       await api(`/api/community-albums/${albumId}/tracks`, { method: "POST", body: formData });
       setNewTrackTitle("");

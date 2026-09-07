@@ -41,6 +41,7 @@ import { NotificationWidget } from "./NotificationWidget";
 import { OnlineOrbs } from "./OnlineOrbs";
 import { PlayerBar } from "./PlayerBar";
 import { resumeSharedContextIfNeeded } from "../lib/oneShotSfx";
+import { resumeAnalyserContextIfNeeded } from "../lib/audioAnalyser";
 
 export function Layout() {
   const { user } = useAuth();
@@ -163,6 +164,7 @@ export function Layout() {
   useEffect(() => {
     function resumeOnce() {
       resumeSharedContextIfNeeded();
+      resumeAnalyserContextIfNeeded();
       window.removeEventListener("pointerdown", resumeOnce);
       window.removeEventListener("keydown", resumeOnce);
     }

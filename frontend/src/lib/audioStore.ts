@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import type { PlayableTrackDTO } from "./types";
 import { useAmbienceStore } from "./ambienceStore";
+import { resumeAnalyserContextIfNeeded } from "./audioAnalyser";
 
 type RepeatMode = "off" | "all" | "one";
 
@@ -63,6 +64,7 @@ export const useAudioStore = create<AudioState>((set, get) => ({
   expanded: false,
 
   play: (track) => {
+    resumeAnalyserContextIfNeeded();
     const isSameTrack = get().currentTrack?.id === track.id;
     const el = audioEl;
     if (!isSameTrack) {

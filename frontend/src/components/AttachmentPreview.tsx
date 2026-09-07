@@ -22,19 +22,35 @@ function guessKind(filename: string): "image" | "audio" | "video" | "text" | "ot
 
 export function AttachmentPreview({ attachment }: { attachment: AttachmentInfo }) {
   const kind = guessKind(attachment.filename);
+  const filenameLabel = (
+    <div style={{ fontSize: "0.7rem", color: "var(--text-dim)", marginTop: "0.3rem" }}>{attachment.filename}</div>
+  );
 
   if (kind === "image") {
     return (
-      <a href={attachment.url} target="_blank" rel="noreferrer">
-        <img src={attachment.url} alt={attachment.filename} style={{ maxWidth: 320, maxHeight: 240, borderRadius: "var(--radius)", display: "block", marginTop: "0.3rem" }} />
-      </a>
+      <div>
+        {filenameLabel}
+        <a href={attachment.url} target="_blank" rel="noreferrer">
+          <img src={attachment.url} alt={attachment.filename} style={{ maxWidth: 320, maxHeight: 240, borderRadius: "var(--radius)", display: "block" }} />
+        </a>
+      </div>
     );
   }
   if (kind === "audio") {
-    return <audio controls src={attachment.url} style={{ display: "block", marginTop: "0.3rem", maxWidth: 320 }} />;
+    return (
+      <div>
+        {filenameLabel}
+        <audio controls src={attachment.url} style={{ display: "block", maxWidth: 320 }} />
+      </div>
+    );
   }
   if (kind === "video") {
-    return <video controls src={attachment.url} style={{ display: "block", marginTop: "0.3rem", maxWidth: 320, borderRadius: "var(--radius)" }} />;
+    return (
+      <div>
+        {filenameLabel}
+        <video controls src={attachment.url} style={{ display: "block", maxWidth: 320, borderRadius: "var(--radius)" }} />
+      </div>
+    );
   }
   return (
     <a

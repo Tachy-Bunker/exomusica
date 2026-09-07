@@ -35,10 +35,10 @@ export function SampleBankPage() {
     if (!file || !title.trim()) return;
     setError(null);
     const formData = new FormData();
-    formData.append("file", file);
     formData.append("title", title.trim());
     if (description.trim()) formData.append("description", description.trim());
     formData.append("tags", tags);
+    formData.append("file", file);
     try {
       await api("/api/sample-bank", { method: "POST", body: formData });
       setTitle("");

@@ -41,6 +41,20 @@ export function initAnalyser(el: HTMLAudioElement): void {
   }
 }
 
+/** This context is created suspended by default and browsers require an
+ *  explicit resume tied to a user gesture — without this, the main
+ *  player's audio (routed through this context once initAnalyser runs)
+ *  goes completely silent with no error, since .play() on the element
+ *  still succeeds even though the graph it feeds into isn't running.
+ *  Called from audioStore.play() itself, synchronously, so the resume
+ *  request happens in the exact same gesture as the click that triggered
+ *  playback — the safest possible timing for browser autoplay policy. */
+export function resumeAnalyserContextIfNeeded(): void {
+  if (ctx && ctx.state === "suspended") {
+    ctx.resume().catch((err) => console.error("Failed to resume analyser audio context:", err));
+  }
+}
+
 /** Current RMS amplitude, roughly 0 (silence) to ~1 (loud). Returns 0 if
  *  the analyser isn't set up, the context is suspended, or nothing is
  *  actually playing right now. */
