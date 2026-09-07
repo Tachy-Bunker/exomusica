@@ -128,10 +128,11 @@ export class FieldRenderer {
   resize(cssWidth: number, cssHeight: number): void {
     this.cssWidth = cssWidth;
     this.cssHeight = cssHeight;
-    const dpr = Math.min(window.devicePixelRatio || 1, 1.4);
-    const maxPixels = 480000;
+    const isMobile = cssWidth < 768;
+    const dpr = Math.min(window.devicePixelRatio || 1, isMobile ? 1 : 1.4);
+    const maxPixels = isMobile ? 220000 : 480000;
     const fit = Math.sqrt(maxPixels / (cssWidth * cssHeight));
-    const bgScale = Math.max(0.4, Math.min(0.62, dpr, fit));
+    const bgScale = Math.max(0.28, Math.min(isMobile ? 0.45 : 0.62, dpr, fit));
     this.canvas.width = Math.max(1, (cssWidth * bgScale) | 0);
     this.canvas.height = Math.max(1, (cssHeight * bgScale) | 0);
     if (this.gl) this.gl.viewport(0, 0, this.canvas.width, this.canvas.height);

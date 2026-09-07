@@ -43,14 +43,16 @@ import { IconLibraryAdminPage } from "./pages/admin/IconLibraryAdminPage";
 import { ForumMapAdminPage } from "./pages/admin/ForumMapAdminPage";
 import { NotificationsAdminPage } from "./pages/admin/NotificationsAdminPage";
 import { GuideAssetsAdminPage } from "./pages/admin/GuideAssetsAdminPage";
+import { useIsDesktop } from "./lib/useIsDesktop";
 
 export default function App() {
+  const isDesktop = useIsDesktop();
   return (
     <>
-      <ChromaticAberrationLayer />
+      {isDesktop && <ChromaticAberrationLayer />}
       <div id="fixed-portal-root" />
-      <div style={{ filter: "url(#caFilter)", minHeight: "100%" }}>
-        <MoireLayer />
+      <div style={isDesktop ? { filter: "url(#caFilter)", minHeight: "100%" } : { minHeight: "100%" }}>
+        {isDesktop && <MoireLayer />}
         <BrowserRouter>
           <AuthProvider>
             <Routes>

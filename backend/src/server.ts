@@ -54,6 +54,7 @@ import { initDiscordBot } from "./lib/discordBot.js";
 import { embedRoutes } from "./routes/embeds.js";
 import { linkIconRoutes } from "./routes/linkIcons.js";
 import { forumMapRoutes } from "./routes/forumMap.js";
+import { communityMusicRoutes } from "./routes/communityMusic.js";
 
 // Fastify's own default body limit is 1MB, applied before multipart even
 // parses anything — this was the real ceiling blocking larger uploads
@@ -105,6 +106,7 @@ await app.register(storageAdminRoutes);
 await app.register(embedRoutes);
 await app.register(linkIconRoutes);
 await app.register(forumMapRoutes);
+await app.register(communityMusicRoutes);
 
 const port = Number(process.env.PORT ?? 3001);
 app.listen({ port, host: "0.0.0.0" }).catch((err) => {

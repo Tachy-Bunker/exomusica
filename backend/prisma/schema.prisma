@@ -83,6 +83,8 @@ model User {
   messages         Message[]
   reactions        Reaction[]
   attachments      Attachment[]
+  communityAlbums  CommunityAlbum[]
+  playlists        Playlist[]
   bookmarks        Bookmark[]
   emojisUploaded   CustomEmoji[]
   sentPMs          PrivateMessage[] @relation("PMSender")
@@ -262,6 +264,7 @@ model Attachment {
   sizeBytes        BigInt
   storagePath      String
   createdAt        DateTime        @default(now())
+  communityTrack   CommunityTrack?
 }
 
 model Album {
@@ -327,6 +330,7 @@ model Track {
 
   bookmarks    AudioBookmark[]
   collaborators TrackCollaborator[] // per-track composer/credit override, checkbox-selected from the album's collaborators
+  playlistItems PlaylistItem[]
 }
 
 // Multi-select ("checkboxes") credit per track — a track can have more than
@@ -721,4 +725,64 @@ model ForumMapNode {
   color     String? // admin override — falls back to a type-based default when unset
   size      Float?  // admin override for the node's radius — same fallback
   hidden    Boolean @default(false) // hidden by default — parent shows a reveal handle instead, until the visitor interacts with it
+}
+
+// --- Community content: user-submitted music, separate from the curated
+// Album/Track models above since it isn't tied to a Branch the way every
+// official release is. Uploaded audio reuses the exact same quota-enforced
+// Attachment pipeline as message attachments, which also means it already
+// shows up in Admin → Storage with the same migrate-to-archive.org tool.
+
+model CommunityAlbum {
+  id          Int      @id @default(autoincrement())
+  ownerId     Int
+  owner       User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  slug        String   @unique
+  title       String
+  composer    String
+  coverArtUrl String?
+  description String?  @db.Text
+  createdAt   DateTime @default(now())
+
+  tracks CommunityTrack[]
+}
+
+model CommunityTrack {
+  id              Int            @id @default(autoincrement())
+  albumId         Int
+  album           CommunityAlbum @relation(fields: [albumId], references: [id], onDelete: Cascade)
+  title           String
+  attachmentId    Int?           @unique // set when the user uploaded a file directly
+  attachment      Attachment?    @relation(fields: [attachmentId], references: [id])
+  externalUrl     String? // set instead of attachmentId when linking an already-hosted file
+  format          AudioFormat
+  durationSeconds Int?
+  position        Int            @default(0)
+
+  playlistItems PlaylistItem[]
+}
+
+model Playlist {
+  id          Int      @id @default(autoincrement())
+  ownerId     Int
+  owner       User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  slug        String   @unique
+  title       String
+  description String?  @db.Text
+  createdAt   DateTime @default(now())
+
+  items PlaylistItem[]
+}
+
+// Exactly one of trackId (an official release) / communityTrackId (a
+// user-submitted one) is set per row — a playlist can freely mix both.
+model PlaylistItem {
+  id               Int             @id @default(autoincrement())
+  playlistId       Int
+  playlist         Playlist        @relation(fields: [playlistId], references: [id], onDelete: Cascade)
+  trackId          Int?
+  track            Track?          @relation(fields: [trackId], references: [id], onDelete: Cascade)
+  communityTrackId Int?
+  communityTrack   CommunityTrack? @relation(fields: [communityTrackId], references: [id], onDelete: Cascade)
+  position         Int             @default(0)
 }

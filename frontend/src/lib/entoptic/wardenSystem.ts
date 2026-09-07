@@ -253,7 +253,8 @@ export class WardenSystem {
   resize(cssWidth: number, cssHeight: number) {
     this.cssWidth = cssWidth;
     this.cssHeight = cssHeight;
-    const layerScale = Math.min(Math.min(window.devicePixelRatio || 1, 1.4), 0.75);
+    const isMobile = cssWidth < 768;
+    const layerScale = Math.min(Math.min(window.devicePixelRatio || 1, isMobile ? 1 : 1.4), isMobile ? 0.5 : 0.75);
     this.canvas.width = Math.max(1, (cssWidth * layerScale) | 0);
     this.canvas.height = Math.max(1, (cssHeight * layerScale) | 0);
     this.canvas.style.width = `${cssWidth}px`;

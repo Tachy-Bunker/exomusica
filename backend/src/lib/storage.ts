@@ -202,6 +202,53 @@ export async function saveSoundFile(filename: string, mimeType: string, buffer: 
   return { url: `/uploads/sounds/${diskName}` };
 }
 
+const ALLOWED_AUDIO_TYPES: Record<string, string> = {
+  "audio/mpeg": ".mp3",
+  "audio/mp3": ".mp3",
+  "audio/wav": ".wav",
+  "audio/x-wav": ".wav",
+  "audio/flac": ".flac",
+  "audio/ogg": ".ogg",
+  "audio/aac": ".aac",
+  "audio/mp4": ".m4a",
+};
+
+/** Saves a user-uploaded track audio file, enforcing the same 65MB quota
+ *  as message attachments (reusing the exact same Attachment row + quota
+ *  accounting) — this is what makes it show up in Admin → Storage with the
+ *  same migrate-to-archive.org tool already built for message uploads. The
+ *  Attachment isn't linked to a message; the caller links it to a
+ *  CommunityTrack via attachmentId once the track row exists. */
+export async function saveCommunityTrackAudio(uploaderId: number, filename: string, mimeType: string, buffer: Buffer) {
+  const ext = ALLOWED_AUDIO_TYPES[mimeType] ?? null;
+  if (!ext) throw new Error(`unsupported audio type "${mimeType}"`);
+
+  const user = await prisma.user.findUniqueOrThrow({ where: { id: uploaderId } });
+  const newTotal = user.storageUsedBytes + BigInt(buffer.length);
+  if (newTotal > user.storageLimitBytes) {
+    throw new Error(`this file would push you over your ${Number(user.storageLimitBytes) / 1024 / 1024}MB storage limit`);
+  }
+
+  const dir = path.join(UPLOADS_DIR, "community-tracks");
+  await mkdir(dir, { recursive: true });
+  const diskName = `${randomUUID()}${ext}`;
+  await writeFile(path.join(dir, diskName), buffer);
+
+  const [attachment] = await prisma.$transaction([
+    prisma.attachment.create({
+      data: {
+        uploaderId,
+        filename: path.basename(filename),
+        mimeType,
+        sizeBytes: buffer.length,
+        storagePath: `/uploads/community-tracks/${diskName}`,
+      },
+    }),
+    prisma.user.update({ where: { id: uploaderId }, data: { storageUsedBytes: newTotal } }),
+  ]);
+  return attachment;
+}
+
 export { UPLOADS_DIR };
 
 const ALLOWED_GALLERY_VIDEO_TYPES: Record<string, string> = {
