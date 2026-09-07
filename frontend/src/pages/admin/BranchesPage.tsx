@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { api, ApiError } from "../../lib/api";
 import type { Branch } from "../../lib/types";
+import { SeoFieldsEditor } from "../../components/SeoFieldsEditor";
 
 interface Font {
   id: number;
@@ -23,6 +24,9 @@ export function BranchesPage() {
     voiceoverText: "",
     discordChannelId: "",
     discordWebhookUrl: "",
+    ogTitle: "",
+    ogDescription: "",
+    ogImageUrl: "",
   });
   const [guideAssets, setGuideAssets] = useState<{ id: number; name: string }[]>([]);
   const voiceoverInputRef = useRef<HTMLInputElement>(null);
@@ -67,6 +71,9 @@ export function BranchesPage() {
       voiceoverText: b.voiceoverText ?? "",
       discordChannelId: b.channel?.discordChannelId ?? "",
       discordWebhookUrl: b.channel?.discordWebhookUrl ?? "",
+      ogTitle: b.ogTitle ?? "",
+      ogDescription: b.ogDescription ?? "",
+      ogImageUrl: b.ogImageUrl ?? "",
     });
   }
 
@@ -81,6 +88,9 @@ export function BranchesPage() {
         isAnchor: editForm.isAnchor,
         guideAssetId: editForm.guideAssetId ? Number(editForm.guideAssetId) : null,
         voiceoverText: editForm.voiceoverText,
+        ogTitle: editForm.ogTitle || null,
+        ogDescription: editForm.ogDescription || null,
+        ogImageUrl: editForm.ogImageUrl || null,
       }),
     });
     if (channelId) {
@@ -251,6 +261,10 @@ export function BranchesPage() {
                     value={editForm.voiceoverText}
                     onChange={(e) => setEditForm((f) => ({ ...f, voiceoverText: e.target.value }))}
                     style={{ marginTop: "0.3rem" }}
+                  />
+                  <SeoFieldsEditor
+                    value={{ ogTitle: editForm.ogTitle, ogDescription: editForm.ogDescription, ogImageUrl: editForm.ogImageUrl }}
+                    onChange={(patch) => setEditForm((f) => ({ ...f, ...Object.fromEntries(Object.entries(patch).map(([k, v]) => [k, v ?? ""])) }))}
                   />
                   <input
                     placeholder="Discord channel ID (bridge)"

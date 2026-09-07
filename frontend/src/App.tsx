@@ -78,7 +78,7 @@ export default function App() {
             <Route path="branch/:slug" element={<BranchPage />} />
             <Route path="album/:slug" element={<AlbumPage />} />
             <Route path="community-album/:slug" element={<CommunityAlbumPage />} />
-            <Route path="community" element={<CommunityPage />} />
+            <Route path="cult" element={<CommunityPage />} />
             <Route path="my-music" element={<MyMusicPage />} />
             <Route path="sample-bank" element={<SampleBankPage />} />
             <Route path="challenges" element={<ChallengesPage />} />

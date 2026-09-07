@@ -31,6 +31,9 @@ export async function channelRoutes(app: FastifyInstance): Promise<void> {
       fontId: number | null;
       discordChannelId: string | null;
       discordWebhookUrl: string | null;
+      ogTitle: string | null;
+      ogDescription: string | null;
+      ogImageUrl: string | null;
     }>;
   }>("/api/admin/channels/:id", { preHandler: requireAdmin }, async (req) => {
     return prisma.forumChannel.update({ where: { id: Number(req.params.id) }, data: req.body ?? {} });

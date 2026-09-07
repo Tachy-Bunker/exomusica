@@ -88,7 +88,7 @@ export async function albumRoutes(app: FastifyInstance): Promise<void> {
     return reply.code(201).send(album);
   });
 
-  app.patch<{ Params: { id: string }; Body: Partial<{ title: string; composer: string; description: string; contentMarkdown: string }> }>(
+  app.patch<{ Params: { id: string }; Body: Partial<{ title: string; composer: string; description: string; contentMarkdown: string; ogTitle: string | null; ogDescription: string | null; ogImageUrl: string | null }> }>(
     "/api/admin/albums/:id",
     { preHandler: requireAdmin },
     async (req) => {

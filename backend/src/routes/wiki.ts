@@ -31,7 +31,7 @@ export async function wikiRoutes(app: FastifyInstance): Promise<void> {
     },
   );
 
-  app.patch<{ Params: { id: string }; Body: Partial<{ title: string; contentMarkdown: string; parentId: number; fontId: number | null }> }>(
+  app.patch<{ Params: { id: string }; Body: Partial<{ title: string; contentMarkdown: string; parentId: number; fontId: number | null; ogTitle: string | null; ogDescription: string | null; ogImageUrl: string | null }> }>(
     "/api/admin/wiki/:id",
     { preHandler: requireAdmin },
     async (req) => {

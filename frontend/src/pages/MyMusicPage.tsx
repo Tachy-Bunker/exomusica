@@ -260,7 +260,7 @@ export function MyMusicPage() {
       <h1>My Music</h1>
       <p style={{ color: "var(--text-dim)" }}>
         Upload your own tracks, organize them into albums, and build playlists mixing your uploads with anything from
-        Exomusica's own catalog. Your playlists show up for everyone in <Link to="/community">Cult Activities</Link>.
+        Exomusica's own catalog. Your playlists show up for everyone in <Link to="/cult">Cult Activities</Link>.
       </p>
 
       <h2 style={{ fontSize: "1.1rem", marginTop: "1.5rem" }}>My Albums</h2>

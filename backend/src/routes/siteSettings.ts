@@ -66,6 +66,12 @@ export async function siteSettingsRoutes(app: FastifyInstance): Promise<void> {
         ogForumDefaultTitle: true,
         ogForumDefaultDescription: true,
         ogForumDefaultImageUrl: true,
+        ogCollaboratorDefaultTitle: true,
+        ogCollaboratorDefaultDescription: true,
+        ogCollaboratorDefaultImageUrl: true,
+        ogForumsIndexTitle: true,
+        ogForumsIndexDescription: true,
+        ogForumsIndexImageUrl: true,
         forumMapInitialX: true,
         forumMapInitialY: true,
         forumMapInitialZoom: true,
@@ -130,6 +136,12 @@ export async function siteSettingsRoutes(app: FastifyInstance): Promise<void> {
         ogForumDefaultTitle: null,
         ogForumDefaultDescription: null,
         ogForumDefaultImageUrl: null,
+        ogCollaboratorDefaultTitle: null,
+        ogCollaboratorDefaultDescription: null,
+        ogCollaboratorDefaultImageUrl: null,
+        ogForumsIndexTitle: null,
+        ogForumsIndexDescription: null,
+        ogForumsIndexImageUrl: null,
         forumMapInitialX: 0,
         forumMapInitialY: 0,
         forumMapInitialZoom: 1,
@@ -231,6 +243,12 @@ export async function siteSettingsRoutes(app: FastifyInstance): Promise<void> {
       ogNewsDefaultTitle: string | null;
       ogNewsDefaultDescription: string | null;
       ogForumDefaultTitle: string | null;
+      ogCollaboratorDefaultTitle: string | null;
+      ogCollaboratorDefaultDescription: string | null;
+      ogCollaboratorDefaultImageUrl: string | null;
+      ogForumsIndexTitle: string | null;
+      ogForumsIndexDescription: string | null;
+      ogForumsIndexImageUrl: string | null;
       ogForumDefaultDescription: string | null;
       forumMapInitialX: number;
       forumMapInitialY: number;
@@ -353,6 +371,12 @@ export async function siteSettingsRoutes(app: FastifyInstance): Promise<void> {
     "ogWikiDefaultImageUrl",
     "ogNewsDefaultImageUrl",
     "ogForumDefaultImageUrl",
+    "ogCollaboratorDefaultTitle",
+    "ogCollaboratorDefaultDescription",
+    "ogCollaboratorDefaultImageUrl",
+    "ogForumsIndexTitle",
+    "ogForumsIndexDescription",
+    "ogForumsIndexImageUrl",
   ] as const;
 
   app.post<{ Params: { field: string } }>("/api/admin/site-settings/og-image/:field", { preHandler: requireAdmin }, async (req, reply) => {

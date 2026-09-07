@@ -392,6 +392,9 @@ model Collaborator {
   slug         String? @unique
   name         String
   role         String
+  ogTitle       String?
+  ogDescription String?
+  ogImageUrl    String?
   position     Int     @default(0) // admin-controlled order for the all-collaborators wiki index
   bio          String? @db.Text
   pictureUrl   String?
@@ -664,6 +667,12 @@ model SiteSettings {
   ogForumDefaultTitle       String?
   ogForumDefaultDescription String?
   ogForumDefaultImageUrl    String?
+  ogCollaboratorDefaultTitle       String?
+  ogCollaboratorDefaultDescription String?
+  ogCollaboratorDefaultImageUrl    String?
+  ogForumsIndexTitle       String? // shared by both /discussion (list) and /discussion/map — one embed for the whole Forums section
+  ogForumsIndexDescription String?
+  ogForumsIndexImageUrl    String?
 }
 
 model FxSettings {

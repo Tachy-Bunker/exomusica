@@ -33,7 +33,7 @@ export function MobileAccountHook(props: LoggedInProps | LoggedOutProps) {
           {props.loggedIn ? (
             <>
               <span className="mobile-hook-online">{onlineCount} online</span>
-              <Link to="/community" onClick={() => setOpen(false)}>
+              <Link to="/cult" onClick={() => setOpen(false)}>
                 Cult Activities
               </Link>
               {props.isAdmin && (
@@ -53,7 +53,7 @@ export function MobileAccountHook(props: LoggedInProps | LoggedOutProps) {
             </>
           ) : (
             <>
-              <Link to="/community" onClick={() => setOpen(false)}>
+              <Link to="/cult" onClick={() => setOpen(false)}>
                 Cult Activities
               </Link>
               <Link to="/login" onClick={() => setOpen(false)}>

@@ -96,7 +96,7 @@ export async function collaboratorRoutes(app: FastifyInstance): Promise<void> {
     return { status: "ok" };
   });
 
-  app.patch<{ Params: { id: string }; Body: Partial<{ name: string; role: string; bio: string }> }>(
+  app.patch<{ Params: { id: string }; Body: Partial<{ name: string; role: string; bio: string; ogTitle: string | null; ogDescription: string | null; ogImageUrl: string | null }> }>(
     "/api/admin/collaborators/:id",
     { preHandler: requireAdmin },
     async (req) => {

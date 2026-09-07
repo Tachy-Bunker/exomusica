@@ -80,7 +80,7 @@ export function Layout() {
           navigate("/discussion/map");
           break;
         case "KeyY":
-          navigate("/community");
+          navigate("/cult");
           break;
         case "KeyE":
           if (suppressGlobalEShortcut) break; // a page with its own E-key handling (e.g. the forum map's crosshair reveal/enter) owns this keypress instead
@@ -293,7 +293,7 @@ export function Layout() {
           <Link to="/wiki">{isDesktop ? underlineLetter("Wiki", "k") : "Wiki"}</Link>
           <Link to="/news">{isDesktop ? underlineLetter("News", "n") : "News"}</Link>
           <Link to="/discussion/map">{isDesktop ? underlineLetter("Forums", "m") : "Forums"}</Link>
-          {isDesktop && <Link to="/community">{underlineLetter("Cult Activities", "y")}</Link>}
+          {isDesktop && <Link to="/cult">{underlineLetter("Cult Activities", "y")}</Link>}
         </nav>
         <div className="spacer" />
         {user && isDesktop && <OnlineOrbs />}

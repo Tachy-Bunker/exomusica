@@ -111,7 +111,7 @@ export async function blogRoutes(app: FastifyInstance): Promise<void> {
 
   app.patch<{
     Params: { id: string };
-    Body: Partial<{ title: string; contentMarkdown: string; coverImageUrl: string; publish: boolean; fontId: number | null }>;
+    Body: Partial<{ title: string; contentMarkdown: string; coverImageUrl: string; publish: boolean; fontId: number | null; ogTitle: string | null; ogDescription: string | null; ogImageUrl: string | null }>;
   }>("/api/admin/blog/:id", { preHandler: requireAdmin }, async (req) => {
     const { publish, ...rest } = req.body ?? {};
     return prisma.blogPost.update({

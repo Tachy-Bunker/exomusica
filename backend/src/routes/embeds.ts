@@ -183,15 +183,37 @@ export async function embedRoutes(app: FastifyInstance): Promise<void> {
     );
   });
 
-  app.get("/embed/forums", async (_req, reply) => {
+  const forumsEmbedHandler = async (_req: unknown, reply: import("fastify").FastifyReply) => {
     const s = await prisma.siteSettings.findUnique({ where: { id: 1 } });
     reply.type("text/html").send(
       renderEmbedHtml({
-        title: s?.ogForumDefaultTitle ?? "Exomusica Forums",
-        description: s?.ogForumDefaultDescription ?? "Discussion topics on Exomusica.",
-        imageUrl: s?.ogForumDefaultImageUrl ?? null,
+        title: s?.ogForumsIndexTitle ?? "Exomusica Forums",
+        description: s?.ogForumsIndexDescription ?? "Discussion topics on Exomusica.",
+        imageUrl: s?.ogForumsIndexImageUrl ?? null,
         faviconUrl: s?.faviconUrl ?? null,
-        url: `${baseUrl}/forums`,
+        url: `${baseUrl}/discussion`,
+      }),
+    );
+  };
+  app.get("/embed/discussion", forumsEmbedHandler);
+  app.get("/embed/discussion/map", forumsEmbedHandler);
+
+  app.get<{ Params: { slug: string } }>("/embed/collaborator/:slug", async (req, reply) => {
+    const [collaborator, s] = await Promise.all([
+      prisma.collaborator.findUnique({ where: { slug: req.params.slug } }),
+      prisma.siteSettings.findUnique({ where: { id: 1 } }),
+    ]);
+    if (!collaborator) return reply.code(404).send("Not found");
+    const data = { title: collaborator.name, description: collaborator.bio ?? "" };
+    const titleTemplate = collaborator.ogTitle ?? s?.ogCollaboratorDefaultTitle ?? "{title}";
+    const descTemplate = collaborator.ogDescription ?? s?.ogCollaboratorDefaultDescription ?? "{description}";
+    reply.type("text/html").send(
+      renderEmbedHtml({
+        title: substitute(titleTemplate, data) || collaborator.name,
+        description: substitute(descTemplate, data) || `${collaborator.role} on Exomusica.`,
+        imageUrl: collaborator.ogImageUrl ?? collaborator.pictureUrl ?? s?.ogCollaboratorDefaultImageUrl ?? null,
+        faviconUrl: s?.faviconUrl ?? null,
+        url: `${baseUrl}/collaborator/${collaborator.slug}`,
       }),
     );
   });
