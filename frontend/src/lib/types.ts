@@ -9,7 +9,7 @@ export interface PlayableTrackDTO {
   albumSlug: string;
   coverArtUrl: string | null;
   composer: string;
-  branchSlug: string;
+  branchSlug: string | null;
   bookmarks: { label: string; timestampSeconds: number }[];
 }
 

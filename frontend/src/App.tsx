@@ -14,6 +14,14 @@ import { ForumMapPage } from "./pages/ForumMapPage";
 import { TopicPage } from "./pages/TopicPage";
 import { BranchPage } from "./pages/BranchPage";
 import { AlbumPage } from "./pages/AlbumPage";
+import { CommunityAlbumPage } from "./pages/CommunityAlbumPage";
+import { CommunityPage } from "./pages/CommunityPage";
+import { MyMusicPage } from "./pages/MyMusicPage";
+import { SampleBankPage } from "./pages/SampleBankPage";
+import { ChallengesPage } from "./pages/ChallengesPage";
+import { PlaylistPage } from "./pages/PlaylistPage";
+import { PlaylistSpaceMapPage } from "./pages/PlaylistSpaceMapPage";
+import { PlaylistFxSettingsPage } from "./pages/PlaylistFxSettingsPage";
 import { CollaboratorPage } from "./pages/CollaboratorPage";
 import { CollaboratorSpacemapPage } from "./pages/CollaboratorSpacemapPage";
 import { ProfilePage } from "./pages/ProfilePage";
@@ -43,6 +51,7 @@ import { IconLibraryAdminPage } from "./pages/admin/IconLibraryAdminPage";
 import { ForumMapAdminPage } from "./pages/admin/ForumMapAdminPage";
 import { NotificationsAdminPage } from "./pages/admin/NotificationsAdminPage";
 import { GuideAssetsAdminPage } from "./pages/admin/GuideAssetsAdminPage";
+import { CommunitySpotlightAdminPage } from "./pages/admin/CommunitySpotlightAdminPage";
 import { useIsDesktop } from "./lib/useIsDesktop";
 
 export default function App() {
@@ -69,6 +78,14 @@ export default function App() {
             <Route path="discussion/map" element={<ForumMapPage />} />
             <Route path="branch/:slug" element={<BranchPage />} />
             <Route path="album/:slug" element={<AlbumPage />} />
+            <Route path="community-album/:slug" element={<CommunityAlbumPage />} />
+            <Route path="community" element={<CommunityPage />} />
+            <Route path="my-music" element={<MyMusicPage />} />
+            <Route path="sample-bank" element={<SampleBankPage />} />
+            <Route path="challenges" element={<ChallengesPage />} />
+            <Route path="playlist/:slug" element={<PlaylistPage />} />
+            <Route path="playlist/:slug/map" element={<PlaylistSpaceMapPage />} />
+            <Route path="playlist/:slug/fx" element={<PlaylistFxSettingsPage />} />
             <Route path="collaborator/:slug" element={<CollaboratorPage />} />
             <Route path="collaborator/:slug/spacemap" element={<CollaboratorSpacemapPage />} />
             <Route path="topic/:slug" element={<TopicPage />} />
@@ -103,6 +120,7 @@ export default function App() {
                 <Route path="forum-map" element={<ForumMapAdminPage />} />
                 <Route path="notifications" element={<NotificationsAdminPage />} />
                 <Route path="guide-assets" element={<GuideAssetsAdminPage />} />
+                <Route path="community-spotlight" element={<CommunitySpotlightAdminPage />} />
               </Route>
             </Route>
           </Route>

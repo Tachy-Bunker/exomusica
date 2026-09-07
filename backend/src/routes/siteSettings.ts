@@ -70,6 +70,7 @@ export async function siteSettingsRoutes(app: FastifyInstance): Promise<void> {
         forumMapInitialY: true,
         forumMapInitialZoom: true,
         forumMapNavSpeed: true,
+        spotlightCommunityTrackId: true,
       },
     });
     return (
@@ -132,6 +133,7 @@ export async function siteSettingsRoutes(app: FastifyInstance): Promise<void> {
         forumMapInitialY: 0,
         forumMapInitialZoom: 1,
         forumMapNavSpeed: 1,
+        spotlightCommunityTrackId: null,
       }
     );
   });
@@ -232,6 +234,7 @@ export async function siteSettingsRoutes(app: FastifyInstance): Promise<void> {
       forumMapInitialY: number;
       forumMapInitialZoom: number;
       forumMapNavSpeed: number;
+      spotlightCommunityTrackId: number | null;
     }>;
   }>("/api/admin/site-settings", { preHandler: requireAdmin }, async (req) => {
     const data: Record<string, unknown> = {};
@@ -279,6 +282,7 @@ export async function siteSettingsRoutes(app: FastifyInstance): Promise<void> {
       "forumMapInitialY",
       "forumMapInitialZoom",
       "forumMapNavSpeed",
+      "spotlightCommunityTrackId",
     ] as const) {
       if (key in body) data[key] = body[key];
     }

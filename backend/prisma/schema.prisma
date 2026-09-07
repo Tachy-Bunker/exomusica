@@ -85,6 +85,10 @@ model User {
   attachments      Attachment[]
   communityAlbums  CommunityAlbum[]
   playlists        Playlist[]
+  communityTrackLikes CommunityTrackLike[]
+  playlistCollaborations PlaylistCollaborator[]
+  sampleBankItems SampleBankItem[]
+  challengeSubmissions ChallengeSubmission[]
   bookmarks        Bookmark[]
   emojisUploaded   CustomEmoji[]
   sentPMs          PrivateMessage[] @relation("PMSender")
@@ -265,6 +269,7 @@ model Attachment {
   storagePath      String
   createdAt        DateTime        @default(now())
   communityTrack   CommunityTrack?
+  sampleBankItem   SampleBankItem?
 }
 
 model Album {
@@ -595,6 +600,7 @@ model SiteSettings {
   forumMapInitialY    Float @default(0)
   forumMapInitialZoom Float @default(1)
   forumMapNavSpeed    Float @default(1) // multiplier on WASD/joystick acceleration — independent of zoom level
+  spotlightCommunityTrackId Int? // admin-curated "featured this week" pick, shown at the top of /community
   ambienceUrl    String? // idle-landing ambient loop, plays when nothing else is
   scanSfxUrl     String? // spacemap text-reveal loop (branch lock-on + F/E/T hint)
   defaultWikiPageId Int?
@@ -727,6 +733,58 @@ model ForumMapNode {
   hidden    Boolean @default(false) // hidden by default — parent shows a reveal handle instead, until the visitor interacts with it
 }
 
+// --- Sample/patch bank: raw material separate from finished tracks —
+// field recordings, synth presets, alterant scripts, one-shots. A flat,
+// tagged library rather than albums, since there's no natural "release"
+// structure for this kind of material.
+
+enum SampleKind {
+  AUDIO
+  PATCH
+  SCRIPT
+  OTHER
+}
+
+model SampleBankItem {
+  id           Int        @id @default(autoincrement())
+  ownerId      Int
+  owner        User       @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  title        String
+  description  String?    @db.Text
+  tags         String[] // freeform, e.g. ["field-recording", "water", "granular"]
+  kind         SampleKind
+  attachmentId Int        @unique
+  attachment   Attachment @relation(fields: [attachmentId], references: [id])
+  createdAt    DateTime   @default(now())
+}
+
+// --- Prompt-based challenges: a recurring constraint with a submission
+// thread. Admin-created; any user can submit one of their own community
+// tracks against an open challenge.
+
+model Challenge {
+  id          Int      @id @default(autoincrement())
+  title       String
+  prompt      String   @db.Text
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+
+  submissions ChallengeSubmission[]
+}
+
+model ChallengeSubmission {
+  id          Int            @id @default(autoincrement())
+  challengeId Int
+  challenge   Challenge      @relation(fields: [challengeId], references: [id], onDelete: Cascade)
+  trackId     Int
+  track       CommunityTrack @relation(fields: [trackId], references: [id], onDelete: Cascade)
+  userId      Int
+  user        User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt   DateTime       @default(now())
+
+  @@unique([challengeId, trackId])
+}
+
 // --- Community content: user-submitted music, separate from the curated
 // Album/Track models above since it isn't tied to a Branch the way every
 // official release is. Uploaded audio reuses the exact same quota-enforced
@@ -747,6 +805,12 @@ model CommunityAlbum {
   tracks CommunityTrack[]
 }
 
+enum TrackPermission {
+  LISTEN_ONLY
+  CREDIT_REQUIRED
+  FREE_REMIX
+}
+
 model CommunityTrack {
   id              Int            @id @default(autoincrement())
   albumId         Int
@@ -758,8 +822,27 @@ model CommunityTrack {
   format          AudioFormat
   durationSeconds Int?
   position        Int            @default(0)
+  permission      TrackPermission @default(LISTEN_ONLY) // creator-set: how others may use this track
 
   playlistItems PlaylistItem[]
+  likes         CommunityTrackLike[]
+  remixOfId     Int?
+  remixOf       CommunityTrack?  @relation("Remixes", fields: [remixOfId], references: [id], onDelete: SetNull)
+  remixes       CommunityTrack[] @relation("Remixes")
+  challengeSubmissions ChallengeSubmission[]
+}
+
+// A lightweight "resonate" signal — deliberately simpler than the full
+// emoji-reaction system chat uses, just a single toggle per user per track.
+model CommunityTrackLike {
+  id        Int            @id @default(autoincrement())
+  trackId   Int
+  track     CommunityTrack @relation(fields: [trackId], references: [id], onDelete: Cascade)
+  userId    Int
+  user      User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime       @default(now())
+
+  @@unique([trackId, userId])
 }
 
 model Playlist {
@@ -769,9 +852,25 @@ model Playlist {
   slug        String   @unique
   title       String
   description String?  @db.Text
+  fxSettingsJson Json? // owner-customizable visual controls for this playlist's spacemap view — null means "use the same defaults as the main spacemap"
   createdAt   DateTime @default(now())
 
   items PlaylistItem[]
+  collaborators PlaylistCollaborator[]
+}
+
+// Anyone the owner adds here can add/remove tracks too — a genuinely
+// shared, multi-person playlist rather than a solo one. The owner alone
+// can add/remove collaborators or delete the playlist itself.
+model PlaylistCollaborator {
+  id         Int      @id @default(autoincrement())
+  playlistId Int
+  playlist   Playlist @relation(fields: [playlistId], references: [id], onDelete: Cascade)
+  userId     Int
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  addedAt    DateTime @default(now())
+
+  @@unique([playlistId, userId])
 }
 
 // Exactly one of trackId (an official release) / communityTrackId (a

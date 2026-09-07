@@ -89,6 +89,9 @@ export function AdminLayout() {
         <NavLink to="/admin/guide-assets" className={({ isActive }) => (isActive ? "active" : "")}>
           Guide assets
         </NavLink>
+        <NavLink to="/admin/community-spotlight" className={({ isActive }) => (isActive ? "active" : "")}>
+          Community Spotlight
+        </NavLink>
       </nav>
       <div>
         <Outlet />

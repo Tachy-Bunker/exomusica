@@ -249,6 +249,38 @@ export async function saveCommunityTrackAudio(uploaderId: number, filename: stri
   return attachment;
 }
 
+/** Saves a sample bank upload — deliberately permissive on file type
+ *  (audio, synth patches, DSP scripts are all fair game here, unlike the
+ *  audio-only whitelist for finished tracks) but still enforces the same
+ *  65MB quota via the same Attachment accounting. */
+export async function saveSampleBankFile(uploaderId: number, filename: string, mimeType: string, buffer: Buffer) {
+  const user = await prisma.user.findUniqueOrThrow({ where: { id: uploaderId } });
+  const newTotal = user.storageUsedBytes + BigInt(buffer.length);
+  if (newTotal > user.storageLimitBytes) {
+    throw new Error(`this file would push you over your ${Number(user.storageLimitBytes) / 1024 / 1024}MB storage limit`);
+  }
+
+  const dir = path.join(UPLOADS_DIR, "sample-bank");
+  await mkdir(dir, { recursive: true });
+  const ext = path.extname(filename) || "";
+  const diskName = `${randomUUID()}${ext}`;
+  await writeFile(path.join(dir, diskName), buffer);
+
+  const [attachment] = await prisma.$transaction([
+    prisma.attachment.create({
+      data: {
+        uploaderId,
+        filename: path.basename(filename),
+        mimeType,
+        sizeBytes: buffer.length,
+        storagePath: `/uploads/sample-bank/${diskName}`,
+      },
+    }),
+    prisma.user.update({ where: { id: uploaderId }, data: { storageUsedBytes: newTotal } }),
+  ]);
+  return attachment;
+}
+
 export { UPLOADS_DIR };
 
 const ALLOWED_GALLERY_VIDEO_TYPES: Record<string, string> = {
