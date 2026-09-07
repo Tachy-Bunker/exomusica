@@ -122,8 +122,6 @@ export function PlaylistSpaceMapPage() {
     return () => cancelAnimationFrame(frameId);
   }, [albumNodes]);
 
-  if (!playlist) return <p>Loading…</p>;
-
   return (
     <div
       ref={containerRef}
@@ -141,6 +139,10 @@ export function PlaylistSpaceMapPage() {
         <canvas ref={wardenCanvasRef} />
       </div>
 
+      {!playlist ? (
+        <p style={{ position: "absolute", top: "50%", left: "50%", transform: "translate(-50%, -50%)", zIndex: 5 }}>Loading…</p>
+      ) : (
+        <>
       <button className="btn" style={{ position: "absolute", top: 12, left: 12, zIndex: 5 }} onClick={() => navigate(`/playlist/${playlist.slug}`)}>
         View as list
       </button>
@@ -177,6 +179,8 @@ export function PlaylistSpaceMapPage() {
           <div style={{ fontSize: "0.7rem", marginTop: "0.2rem", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{a.title}</div>
         </Link>
       ))}
+        </>
+      )}
     </div>
   );
 }

@@ -833,6 +833,7 @@ model CommunityTrack {
   albumId         Int
   album           CommunityAlbum @relation(fields: [albumId], references: [id], onDelete: Cascade)
   title           String
+  composer        String? // per-track override; falls back to the album's composer when unset
   attachmentId    Int?           @unique // set when the user uploaded a file directly
   attachment      Attachment?    @relation(fields: [attachmentId], references: [id])
   externalUrl     String? // set instead of attachmentId when linking an already-hosted file

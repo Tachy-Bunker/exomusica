@@ -28,6 +28,17 @@ export function CommunityAlbumPage() {
   const [album, setAlbum] = useState<CommunityAlbumDetail | null>(null);
   const play = useAudioStore((s) => s.play);
   const addToQueue = useAudioStore((s) => s.addToQueue);
+  const clearQueue = useAudioStore((s) => s.clearQueue);
+
+  function playTrack(track: CommunityTrackPlayable) {
+    if (!album) return;
+    const index = album.tracks.findIndex((t) => t.id === track.id);
+    if (index === -1) return;
+    const [first, ...rest] = album.tracks.slice(index);
+    play(first);
+    clearQueue();
+    addToQueue(rest);
+  }
 
   useEffect(() => {
     if (!slug) return;
@@ -104,7 +115,7 @@ export function CommunityAlbumPage() {
               key={t.id}
               style={{ display: "flex", alignItems: "center", gap: "0.6rem", padding: "0.4rem 0.6rem", border: "1px solid var(--border)", borderRadius: "var(--radius)" }}
             >
-              <button className="btn" onClick={() => play(t)}>
+              <button className="btn" onClick={() => playTrack(t)}>
                 ▶
               </button>
               <button className="btn" onClick={() => addToQueue([t])} title="Add to queue">

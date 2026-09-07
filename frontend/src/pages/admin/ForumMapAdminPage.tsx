@@ -3,7 +3,7 @@ import { api } from "../../lib/api";
 
 interface MapNode {
   id: number;
-  type: "TOPIC" | "ACTIVE_BRANCHES" | "GROWING_SEEDS";
+  type: "TOPIC" | "ACTIVE_BRANCHES" | "GROWING_SEEDS" | "PLAYLIST" | "SAMPLE_BANK_ITEM" | "CHALLENGE";
   parentId: number | null;
   x: number;
   y: number;
@@ -11,6 +11,9 @@ interface MapNode {
   size: number | null;
   hidden: boolean;
   channel: { slug: string; name: string } | null;
+  playlist: { slug: string; title: string; owner: { username: string } } | null;
+  sampleBankItem: { id: number; title: string; owner: { username: string } } | null;
+  challenge: { id: number; title: string } | null;
 }
 
 interface ChannelOption {
@@ -19,8 +22,15 @@ interface ChannelOption {
   id: number;
   branchId: number | null;
 }
+interface RefOption {
+  id: number;
+  label: string;
+}
 
 function nodeLabel(n: MapNode): string {
+  if (n.type === "PLAYLIST" && n.playlist) return `[Playlist] ${n.playlist.title} — ${n.playlist.owner.username}`;
+  if (n.type === "SAMPLE_BANK_ITEM" && n.sampleBankItem) return `[Sample] ${n.sampleBankItem.title} — ${n.sampleBankItem.owner.username}`;
+  if (n.type === "CHALLENGE" && n.challenge) return `[Challenge] ${n.challenge.title}`;
   const name = n.channel?.name ?? "";
   if (n.type === "ACTIVE_BRANCHES") return `[Active] ${name}`;
   if (n.type === "GROWING_SEEDS") return `[Growing] ${name}`;
@@ -30,8 +40,11 @@ function nodeLabel(n: MapNode): string {
 export function ForumMapAdminPage() {
   const [nodes, setNodes] = useState<MapNode[]>([]);
   const [channels, setChannels] = useState<ChannelOption[]>([]);
-  const [newType, setNewType] = useState<"TOPIC" | "ACTIVE_BRANCHES" | "GROWING_SEEDS">("TOPIC");
-  const [newChannelId, setNewChannelId] = useState<number | "">("");
+  const [newType, setNewType] = useState<"TOPIC" | "ACTIVE_BRANCHES" | "GROWING_SEEDS" | "PLAYLIST" | "SAMPLE_BANK_ITEM" | "CHALLENGE">("TOPIC");
+  const [playlistOptions, setPlaylistOptions] = useState<RefOption[]>([]);
+  const [sampleOptions, setSampleOptions] = useState<RefOption[]>([]);
+  const [challengeOptions, setChallengeOptions] = useState<RefOption[]>([]);
+  const [newRefId, setNewRefId] = useState<number | "">("");
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [zoom, setZoom] = useState(1);
   const [navSpeed, setNavSpeed] = useState(1);
@@ -48,6 +61,15 @@ export function ForumMapAdminPage() {
     api<ChannelOption[]>("/api/channels").then(setChannels);
   }, []);
   useEffect(() => {
+    api<{ id: number; title: string; owner: string }[]>("/api/playlists").then((list) =>
+      setPlaylistOptions(list.map((p) => ({ id: p.id, label: `${p.title} — ${p.owner}` }))),
+    );
+    api<{ id: number; title: string; owner: string }[]>("/api/sample-bank").then((list) =>
+      setSampleOptions(list.map((s) => ({ id: s.id, label: `${s.title} — ${s.owner}` }))),
+    );
+    api<{ id: number; title: string }[]>("/api/challenges").then((list) => setChallengeOptions(list.map((c) => ({ id: c.id, label: c.title }))));
+  }, []);
+  useEffect(() => {
     api<{ forumMapInitialX: number; forumMapInitialY: number; forumMapInitialZoom: number; forumMapNavSpeed: number }>("/api/site-settings").then((s) => {
       setPan({ x: s.forumMapInitialX ?? 0, y: s.forumMapInitialY ?? 0 });
       setZoom(s.forumMapInitialZoom ?? 1);
@@ -59,12 +81,14 @@ export function ForumMapAdminPage() {
   const availableChannels = channels.filter((c) => !usedChannelIds.has(c.slug));
 
   async function addNode() {
-    if (!newChannelId) return;
+    if (!newRefId) return;
+    const refField =
+      newType === "PLAYLIST" ? "playlistId" : newType === "SAMPLE_BANK_ITEM" ? "sampleBankItemId" : newType === "CHALLENGE" ? "challengeId" : "channelId";
     await api("/api/admin/forum-map/nodes", {
       method: "POST",
-      body: JSON.stringify({ type: newType, channelId: newChannelId, x: -pan.x, y: -pan.y }),
+      body: JSON.stringify({ type: newType, [refField]: newRefId, x: -pan.x, y: -pan.y }),
     });
-    setNewChannelId("");
+    setNewRefId("");
     load();
   }
 
@@ -153,23 +177,46 @@ export function ForumMapAdminPage() {
       <div style={{ display: "flex", gap: "0.5rem", alignItems: "flex-end", marginBottom: "1rem", flexWrap: "wrap" }}>
         <div>
           <label>Node type</label>
-          <select value={newType} onChange={(e) => setNewType(e.target.value as typeof newType)}>
+          <select
+            value={newType}
+            onChange={(e) => {
+              setNewType(e.target.value as typeof newType);
+              setNewRefId("");
+            }}
+          >
             <option value="TOPIC">Topic</option>
             <option value="ACTIVE_BRANCHES">Active Branch (styled)</option>
             <option value="GROWING_SEEDS">Growing Seed (styled)</option>
+            <option value="PLAYLIST">Playlist</option>
+            <option value="SAMPLE_BANK_ITEM">Sample Bank item</option>
+            <option value="CHALLENGE">Challenge</option>
           </select>
         </div>
-        <div>
-          <label>Channel</label>
-          <select value={newChannelId} onChange={(e) => setNewChannelId(e.target.value ? Number(e.target.value) : "")}>
-            <option value="">— select —</option>
-            {availableChannels.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.branchId ? `[Branch] ${c.name}` : c.name}
-              </option>
-            ))}
-          </select>
-        </div>
+        {newType === "PLAYLIST" || newType === "SAMPLE_BANK_ITEM" || newType === "CHALLENGE" ? (
+          <div>
+            <label>{newType === "PLAYLIST" ? "Playlist" : newType === "SAMPLE_BANK_ITEM" ? "Sample" : "Challenge"}</label>
+            <select value={newRefId} onChange={(e) => setNewRefId(e.target.value ? Number(e.target.value) : "")}>
+              <option value="">— select —</option>
+              {(newType === "PLAYLIST" ? playlistOptions : newType === "SAMPLE_BANK_ITEM" ? sampleOptions : challengeOptions).map((o) => (
+                <option key={o.id} value={o.id}>
+                  {o.label}
+                </option>
+              ))}
+            </select>
+          </div>
+        ) : (
+          <div>
+            <label>Channel</label>
+            <select value={newRefId} onChange={(e) => setNewRefId(e.target.value ? Number(e.target.value) : "")}>
+              <option value="">— select —</option>
+              {availableChannels.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.branchId ? `[Branch] ${c.name}` : c.name}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
         <button className="btn btn-primary" onClick={addNode}>
           Add node
         </button>

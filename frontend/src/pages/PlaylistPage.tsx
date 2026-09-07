@@ -16,6 +16,7 @@ interface PlaylistItem {
   albumTitle: string;
   albumSlug: string;
   coverArtUrl: string | null;
+  composer: string | null;
   branchSlug: string | null;
 }
 interface PlaylistDetail {
@@ -36,6 +37,7 @@ export function PlaylistPage() {
   const { user } = useAuth();
   const play = useAudioStore((s) => s.play);
   const addToQueue = useAudioStore((s) => s.addToQueue);
+  const clearQueue = useAudioStore((s) => s.clearQueue);
 
   function reload() {
     if (!slug) return;
@@ -75,10 +77,22 @@ export function PlaylistPage() {
     albumTitle: item.albumTitle,
     albumSlug: item.albumSlug,
     coverArtUrl: item.coverArtUrl,
-    composer: playlist.owner,
+    composer: item.composer ?? playlist.owner,
     branchSlug: item.branchSlug,
     bookmarks: [],
   });
+
+  const allPlayable = playlist.items.map(toPlayable);
+
+  function playTrack(item: PlaylistItem) {
+    if (!playlist) return;
+    const index = playlist.items.findIndex((i) => i.id === item.id);
+    if (index === -1) return;
+    const [first, ...rest] = allPlayable.slice(index);
+    play(first);
+    clearQueue();
+    addToQueue(rest);
+  }
 
   const albumGroups = new Map<string, { title: string; coverArtUrl: string | null; source: "official" | "community"; slug: string; items: PlaylistItem[] }>();
   for (const item of playlist.items) {
@@ -155,7 +169,7 @@ export function PlaylistPage() {
             {album.source === "community" && <span style={{ fontSize: "0.7rem", color: "var(--text-dim)", marginLeft: "0.4rem" }}>(community)</span>}
             {album.items.map((item) => (
               <div key={item.id} style={{ display: "flex", alignItems: "center", gap: "0.5rem", fontSize: "0.9rem", padding: "0.15rem 0" }}>
-                <button className="btn" style={{ padding: "0.1rem 0.4rem" }} onClick={() => play(toPlayable(item))} title="Play">
+                <button className="btn" style={{ padding: "0.1rem 0.4rem" }} onClick={() => playTrack(item)} title="Play">
                   ▶
                 </button>
                 <span style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{item.title}</span>

@@ -16,6 +16,7 @@ interface AlbumDetailTrack {
   title: string;
   fileUrl: string;
   durationSeconds: number | null;
+  composer: string | null;
 }
 interface MyPlaylist {
   id: number;
@@ -140,6 +141,45 @@ export function MyMusicPage() {
     if (album) openAlbumManage(album);
   }
 
+  const [editingTrackId, setEditingTrackId] = useState<number | null>(null);
+  const [editTitle, setEditTitle] = useState("");
+  const [editComposer, setEditComposer] = useState("");
+
+  function startEditTrack(t: AlbumDetailTrack) {
+    setEditingTrackId(t.id);
+    setEditTitle(t.title);
+    setEditComposer(t.composer ?? "");
+  }
+
+  async function saveTrackEdit(albumId: number) {
+    if (!editingTrackId) return;
+    await api(`/api/community-tracks/${editingTrackId}`, {
+      method: "PATCH",
+      body: JSON.stringify({ title: editTitle.trim(), composer: editComposer.trim() || null }),
+    });
+    setEditingTrackId(null);
+    const album = albums.find((a) => a.id === albumId);
+    if (album) openAlbumManage(album);
+  }
+
+  const coverInputRef = useRef<HTMLInputElement>(null);
+  const [coverUploadingAlbumId, setCoverUploadingAlbumId] = useState<number | null>(null);
+
+  async function uploadCover(albumId: number) {
+    const file = coverInputRef.current?.files?.[0];
+    if (!file) return;
+    const formData = new FormData();
+    formData.append("file", file);
+    setCoverUploadingAlbumId(albumId);
+    try {
+      await api(`/api/community-albums/${albumId}/cover`, { method: "POST", body: formData });
+      if (coverInputRef.current) coverInputRef.current.value = "";
+      loadAlbums();
+    } finally {
+      setCoverUploadingAlbumId(null);
+    }
+  }
+
   async function createPlaylist(e: React.FormEvent) {
     e.preventDefault();
     if (!playlistTitle.trim()) return;
@@ -236,7 +276,11 @@ export function MyMusicPage() {
         <div key={a.id} style={{ border: "1px solid var(--border)", borderRadius: "var(--radius)", padding: "0.6rem", marginBottom: "0.6rem" }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
             <Link to={`/community-album/${a.slug}`}>{a.title}</Link>
-            <div style={{ display: "flex", gap: "0.4rem" }}>
+            <div style={{ display: "flex", gap: "0.4rem", alignItems: "center" }}>
+              <input ref={coverInputRef} type="file" accept="image/*" style={{ fontSize: "0.7rem", width: 90 }} />
+              <button className="btn" onClick={() => uploadCover(a.id)} disabled={coverUploadingAlbumId === a.id}>
+                {coverUploadingAlbumId === a.id ? "Uploading…" : "Set cover"}
+              </button>
               <button className="btn" onClick={() => openAlbumManage(a)}>
                 Manage tracks
               </button>
@@ -249,11 +293,34 @@ export function MyMusicPage() {
           {managingAlbumId === a.id && (
             <div style={{ marginTop: "0.6rem", paddingTop: "0.6rem", borderTop: "1px solid var(--border)" }}>
               {albumTracks.map((t) => (
-                <div key={t.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: "0.9rem", marginBottom: "0.3rem" }}>
-                  <span>{t.title}</span>
-                  <button className="btn btn-danger" style={{ fontSize: "0.75rem" }} onClick={() => deleteTrack(t.id, a.id)}>
-                    remove
-                  </button>
+                <div key={t.id} style={{ fontSize: "0.9rem", marginBottom: "0.3rem" }}>
+                  {editingTrackId === t.id ? (
+                    <div style={{ display: "flex", gap: "0.3rem", alignItems: "center", flexWrap: "wrap" }}>
+                      <input value={editTitle} onChange={(e) => setEditTitle(e.target.value)} placeholder="Title" style={{ fontSize: "0.85rem" }} />
+                      <input value={editComposer} onChange={(e) => setEditComposer(e.target.value)} placeholder="Composer (optional)" style={{ fontSize: "0.85rem" }} />
+                      <button className="btn btn-primary" style={{ fontSize: "0.75rem" }} onClick={() => saveTrackEdit(a.id)}>
+                        save
+                      </button>
+                      <button className="btn" style={{ fontSize: "0.75rem" }} onClick={() => setEditingTrackId(null)}>
+                        cancel
+                      </button>
+                    </div>
+                  ) : (
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                      <span>
+                        {t.title}
+                        {t.composer && <span style={{ color: "var(--text-dim)" }}> — {t.composer}</span>}
+                      </span>
+                      <div style={{ display: "flex", gap: "0.4rem" }}>
+                        <button className="btn" style={{ fontSize: "0.75rem" }} onClick={() => startEditTrack(t)}>
+                          edit
+                        </button>
+                        <button className="btn btn-danger" style={{ fontSize: "0.75rem" }} onClick={() => deleteTrack(t.id, a.id)}>
+                          remove
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               ))}
               <div style={{ marginTop: "0.5rem", display: "flex", flexDirection: "column", gap: "0.4rem" }}>

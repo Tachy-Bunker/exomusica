@@ -1,3 +1,4 @@
+import { getRMS } from "../audioAnalyser";
 // Ported from the Entoptic Cemetery prototype's warden generation and
 // drawing code. Deliberately keeps the prototype's random makeWardens()
 // for now — step 2 of the migration plan replaces this with deterministic
@@ -439,7 +440,8 @@ export class WardenSystem {
     }
 
     const isPlaying = o.branchId !== null && o.branchId === this.playingBranchId;
-    const playingPulse = isPlaying ? 0.75 + 0.25 * Math.sin(nowSec * 3) : 0;
+    const rms = isPlaying ? getRMS() : 0;
+    const playingPulse = isPlaying ? 0.35 + 0.15 * Math.sin(nowSec * 3) + rms * 2.2 : 0;
     const effectiveGlowB = Math.min(1, state.glowB + playingPulse);
 
     const [trailDx, trailDy] = this.stripeOffsetFor(y0, nowSec);

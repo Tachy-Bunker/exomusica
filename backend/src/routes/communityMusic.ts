@@ -2,7 +2,7 @@ import type { FastifyInstance } from "fastify";
 import type { Prisma } from "@prisma/client";
 import { prisma } from "../lib/prisma.js";
 import { requireAuth, requireAdmin, verifyToken } from "../lib/auth.js";
-import { saveCommunityTrackAudio } from "../lib/storage.js";
+import { saveCommunityTrackAudio, saveSiteImage } from "../lib/storage.js";
 import { probeAudioDuration } from "../lib/audioProbe.js";
 
 async function uniqueCommunityAlbumSlug(title: string): Promise<string> {
@@ -138,7 +138,7 @@ export async function communityMusicRoutes(app: FastifyInstance): Promise<void> 
         albumTitle: album.title,
         albumSlug: album.slug,
         coverArtUrl: album.coverArtUrl,
-        composer: album.composer,
+        composer: t.composer ?? album.composer,
         branchSlug: null,
         bookmarks: [],
         permission: t.permission,
@@ -188,6 +188,22 @@ export async function communityMusicRoutes(app: FastifyInstance): Promise<void> 
       return prisma.communityAlbum.update({ where: { id: album.id }, data: req.body ?? {} });
     },
   );
+
+  app.post<{ Params: { id: string } }>("/api/community-albums/:id/cover", { preHandler: requireAuth }, async (req, reply) => {
+    const album = await prisma.communityAlbum.findUnique({ where: { id: Number(req.params.id) } });
+    if (!album) return reply.code(404).send({ error: "no such album" });
+    if (album.ownerId !== req.user!.id) return reply.code(403).send({ error: "not your album" });
+    const file = await req.file();
+    if (!file) return reply.code(400).send({ error: "no file uploaded" });
+    const buffer = await file.toBuffer();
+    try {
+      const { url } = await saveSiteImage(file.filename, file.mimetype, buffer, "community-albums");
+      const updated = await prisma.communityAlbum.update({ where: { id: album.id }, data: { coverArtUrl: url } });
+      return updated;
+    } catch (err) {
+      return reply.code(400).send({ error: err instanceof Error ? err.message : "upload failed" });
+    }
+  });
 
   app.delete<{ Params: { id: string } }>("/api/community-albums/:id", { preHandler: requireAuth }, async (req, reply) => {
     const album = await prisma.communityAlbum.findUnique({ where: { id: Number(req.params.id) } });
@@ -265,6 +281,17 @@ export async function communityMusicRoutes(app: FastifyInstance): Promise<void> 
     return reply.code(201).send(track);
   });
 
+  app.patch<{ Params: { id: string }; Body: Partial<{ title: string; composer: string | null }> }>(
+    "/api/community-tracks/:id",
+    { preHandler: requireAuth },
+    async (req, reply) => {
+      const track = await prisma.communityTrack.findUnique({ where: { id: Number(req.params.id) }, include: { album: true } });
+      if (!track) return reply.code(404).send({ error: "no such track" });
+      if (track.album.ownerId !== req.user!.id) return reply.code(403).send({ error: "not your track" });
+      return prisma.communityTrack.update({ where: { id: track.id }, data: req.body ?? {} });
+    },
+  );
+
   app.delete<{ Params: { id: string } }>("/api/community-tracks/:id", { preHandler: requireAuth }, async (req, reply) => {
     const track = await prisma.communityTrack.findUnique({ where: { id: Number(req.params.id) }, include: { album: true } });
     if (!track) return reply.code(404).send({ error: "no such track" });
@@ -286,6 +313,7 @@ export async function communityMusicRoutes(app: FastifyInstance): Promise<void> 
     }
     const playlists = await prisma.playlist.findMany({
       select: {
+        id: true,
         slug: true,
         title: true,
         description: true,
@@ -303,6 +331,7 @@ export async function communityMusicRoutes(app: FastifyInstance): Promise<void> 
     return playlists.map((p) => {
       const albumKeys = new Set(p.items.map((i) => (i.track ? `o:${i.track.albumId}` : `c:${i.communityTrack!.albumId}`)));
       return {
+        id: p.id,
         slug: p.slug,
         title: p.title,
         description: p.description,
@@ -323,8 +352,8 @@ export async function communityMusicRoutes(app: FastifyInstance): Promise<void> 
         items: {
           orderBy: { position: "asc" },
           include: {
-            track: { include: { album: { select: { slug: true, title: true, coverArtUrl: true, branch: { select: { slug: true } } } } } },
-            communityTrack: { include: { album: { select: { slug: true, title: true, coverArtUrl: true } }, attachment: { select: { storagePath: true } } } },
+            track: { include: { album: { select: { slug: true, title: true, coverArtUrl: true, composer: true, branch: { select: { slug: true } } } } } },
+            communityTrack: { include: { album: { select: { slug: true, title: true, coverArtUrl: true, composer: true } }, attachment: { select: { storagePath: true } } } },
           },
         },
       },
@@ -342,6 +371,7 @@ export async function communityMusicRoutes(app: FastifyInstance): Promise<void> 
           albumTitle: item.track.album.title,
           albumSlug: item.track.album.slug,
           coverArtUrl: item.track.album.coverArtUrl,
+          composer: item.track.album.composer,
           branchSlug: item.track.album.branch?.slug ?? null,
         };
       }
@@ -356,6 +386,7 @@ export async function communityMusicRoutes(app: FastifyInstance): Promise<void> 
         albumTitle: ct.album.title,
         albumSlug: ct.album.slug,
         coverArtUrl: ct.album.coverArtUrl,
+        composer: ct.composer ?? ct.album.composer,
         branchSlug: null,
       };
     });

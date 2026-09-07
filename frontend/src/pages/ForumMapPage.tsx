@@ -180,6 +180,12 @@ export function ForumMapPage() {
     api<PreviewMessage[]>(`/api/channels/${activeNode.channel.slug}/messages?limit=4`).then(setPreview);
   }, [activeNode]);
 
+  const previewScrollRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const el = previewScrollRef.current;
+    if (el) el.scrollTop = el.scrollHeight;
+  }, [preview]);
+
   function goToNode(n: MapNode) {
     if (!n.channel) return;
     if (isDesktop && !n.channel.contentMarkdown) {
@@ -620,7 +626,16 @@ export function ForumMapPage() {
                 style={{ "--pulse-r-min": `${radius}px`, "--pulse-r-max": `${radius * 1.15}px`, animation: "forumMapPulse 4s ease-in-out infinite" } as React.CSSProperties}
               />
               <circle r={radius * 0.4} fill="var(--text)" opacity={0.9} />
-              <text y={radius + 16} textAnchor="middle" fill="var(--text-dim)" fontSize={Math.max(9, radius * 0.85)} fontFamily="var(--font-display)">
+              <text
+                y={radius + 16}
+                textAnchor="middle"
+                fill="var(--text-dim)"
+                stroke="var(--bg-inset)"
+                strokeWidth={3}
+                paintOrder="stroke"
+                fontSize={Math.max(9, radius * 0.85)}
+                fontFamily="var(--font-display)"
+              >
                 {n.channel?.name ?? ""}
               </text>
             </g>
@@ -654,7 +669,7 @@ export function ForumMapPage() {
                     }}
                   >
                     <div style={{ fontWeight: "bold", marginBottom: "0.1rem" }}>{activeNode.channel?.name}</div>
-                    <div style={{ overflowY: "auto", flex: 1, minHeight: 0 }}>
+                    <div ref={previewScrollRef} style={{ overflowY: "auto", flex: 1, minHeight: 0 }}>
                       {preview.length === 0 ? (
                         <div style={{ color: "var(--text-dim)" }}>No messages yet.</div>
                       ) : (
