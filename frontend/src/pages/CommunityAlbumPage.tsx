@@ -3,6 +3,7 @@ import { useParams, Link } from "react-router-dom";
 import { api } from "../lib/api";
 import { useAudioStore } from "../lib/audioStore";
 import { useDocumentTitle } from "../lib/useDocumentTitle";
+import { AddToPlaylistControl } from "../components/AddToPlaylistControl";
 import type { PlayableTrackDTO } from "../lib/types";
 
 interface CommunityTrackPlayable extends PlayableTrackDTO {
@@ -136,6 +137,7 @@ export function CommunityAlbumPage() {
                   )}
                 </span>
               </span>
+              <AddToPlaylistControl communityTrackId={t.id} />
               <button
                 className="btn"
                 onClick={() => toggleLike(t.id)}

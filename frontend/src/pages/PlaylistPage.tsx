@@ -114,11 +114,6 @@ export function PlaylistPage() {
           <Link className="btn" to={`/playlist/${playlist.slug}/map`}>
             View as spacemap
           </Link>
-          {user?.id === playlist.ownerId && (
-            <Link className="btn" to={`/playlist/${playlist.slug}/fx`}>
-              Visual settings
-            </Link>
-          )}
         </div>
       </div>
 

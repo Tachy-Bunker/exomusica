@@ -5,6 +5,22 @@ import { prisma } from "./prisma.js";
 
 const UPLOADS_DIR = path.join(process.cwd(), "uploads");
 
+/** Keeps the human-readable filename shown to users (and offered as a
+ *  download name) unique across the whole site. The actual file on disk
+ *  is always saved under a random UUID name and never collides — this is
+ *  purely about avoiding confusion when, say, two different users both
+ *  upload something called "cover.jpg": the second becomes "cover-2.jpg". */
+async function uniqueAttachmentFilename(desired: string): Promise<string> {
+  const ext = path.extname(desired);
+  const base = desired.slice(0, desired.length - ext.length);
+  let candidate = desired;
+  let n = 1;
+  while (await prisma.attachment.findFirst({ where: { filename: candidate } })) {
+    candidate = `${base}-${++n}${ext}`;
+  }
+  return candidate;
+}
+
 const ALLOWED_EMOJI_TYPES: Record<string, string> = {
   "image/png": ".png",
   "image/bmp": ".bmp",
@@ -69,12 +85,13 @@ export async function saveMessageAttachment(
   const ext = path.extname(filename) || "";
   const diskName = `${randomUUID()}${ext}`;
   await writeFile(path.join(dir, diskName), buffer);
+  const uniqueFilename = await uniqueAttachmentFilename(path.basename(filename));
 
   const [attachment] = await prisma.$transaction([
     prisma.attachment.create({
       data: {
         uploaderId,
-        filename: path.basename(filename),
+        filename: uniqueFilename,
         mimeType,
         sizeBytes: buffer.length,
         storagePath: `/uploads/messages/${diskName}`,
@@ -242,12 +259,13 @@ export async function saveCommunityTrackAudio(uploaderId: number, filename: stri
   await mkdir(dir, { recursive: true });
   const diskName = `${randomUUID()}${ext}`;
   await writeFile(path.join(dir, diskName), buffer);
+  const uniqueFilename = await uniqueAttachmentFilename(path.basename(filename));
 
   const [attachment] = await prisma.$transaction([
     prisma.attachment.create({
       data: {
         uploaderId,
-        filename: path.basename(filename),
+        filename: uniqueFilename,
         mimeType,
         sizeBytes: buffer.length,
         storagePath: `/uploads/community-tracks/${diskName}`,
@@ -274,12 +292,13 @@ export async function saveSampleBankFile(uploaderId: number, filename: string, m
   const ext = path.extname(filename) || "";
   const diskName = `${randomUUID()}${ext}`;
   await writeFile(path.join(dir, diskName), buffer);
+  const uniqueFilename = await uniqueAttachmentFilename(path.basename(filename));
 
   const [attachment] = await prisma.$transaction([
     prisma.attachment.create({
       data: {
         uploaderId,
-        filename: path.basename(filename),
+        filename: uniqueFilename,
         mimeType,
         sizeBytes: buffer.length,
         storagePath: `/uploads/sample-bank/${diskName}`,

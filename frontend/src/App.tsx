@@ -21,7 +21,6 @@ import { SampleBankPage } from "./pages/SampleBankPage";
 import { ChallengesPage } from "./pages/ChallengesPage";
 import { PlaylistPage } from "./pages/PlaylistPage";
 import { PlaylistSpaceMapPage } from "./pages/PlaylistSpaceMapPage";
-import { PlaylistFxSettingsPage } from "./pages/PlaylistFxSettingsPage";
 import { CollaboratorPage } from "./pages/CollaboratorPage";
 import { CollaboratorSpacemapPage } from "./pages/CollaboratorSpacemapPage";
 import { ProfilePage } from "./pages/ProfilePage";
@@ -85,7 +84,6 @@ export default function App() {
             <Route path="challenges" element={<ChallengesPage />} />
             <Route path="playlist/:slug" element={<PlaylistPage />} />
             <Route path="playlist/:slug/map" element={<PlaylistSpaceMapPage />} />
-            <Route path="playlist/:slug/fx" element={<PlaylistFxSettingsPage />} />
             <Route path="collaborator/:slug" element={<CollaboratorPage />} />
             <Route path="collaborator/:slug/spacemap" element={<CollaboratorSpacemapPage />} />
             <Route path="topic/:slug" element={<TopicPage />} />

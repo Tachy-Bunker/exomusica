@@ -8,6 +8,7 @@ import { GalleryLightbox, useLightbox } from "../components/GalleryLightbox";
 import { useIsDesktop } from "../lib/useIsDesktop";
 import { isTypingTarget } from "../lib/isTypingTarget";
 import type { PlayableTrackDTO } from "../lib/types";
+import { AddToPlaylistControl } from "../components/AddToPlaylistControl";
 
 interface TrackWithComposers extends PlayableTrackDTO {
   composers: { id: number; name: string; slug: string | null }[];
@@ -200,6 +201,7 @@ export function AlbumPage() {
             {t.bookmarks.length > 0 && (
               <span style={{ fontSize: "0.75rem", color: "var(--text-dim)" }}>{t.bookmarks.length} bookmarks</span>
             )}
+            <AddToPlaylistControl trackId={t.id} />
           </div>
         ))}
       </div>

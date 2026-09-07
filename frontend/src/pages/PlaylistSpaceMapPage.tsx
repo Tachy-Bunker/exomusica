@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import { api } from "../lib/api";
-import { useSpacemapField, wardenBridge, FX_DEFAULTS, type FxSettings } from "../lib/entoptic/useSpacemapField";
+import { useAuth } from "../lib/auth";
 import { isTypingTarget } from "../lib/isTypingTarget";
 
 interface PlaylistAlbum {
@@ -11,9 +11,11 @@ interface PlaylistAlbum {
   source: "official" | "community";
 }
 interface PlaylistDetail {
+  id: number;
   slug: string;
   title: string;
-  fxSettings: Partial<FxSettings> | null;
+  ownerId: number;
+  fxSettings: { coverSize?: number } | null;
   albums: PlaylistAlbum[];
 }
 
@@ -31,9 +33,12 @@ function hashOf(s: string): number {
   return h;
 }
 
+const DEFAULT_COVER_SIZE = 56;
+
 export function PlaylistSpaceMapPage() {
   const { slug } = useParams<{ slug: string }>();
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [playlist, setPlaylist] = useState<PlaylistDetail | null>(null);
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const panRef = useRef(pan);
@@ -41,18 +46,26 @@ export function PlaylistSpaceMapPage() {
   const keysRef = useRef<Set<string>>(new Set());
   const velRef = useRef({ vx: 0, vy: 0 });
   const containerRef = useRef<HTMLDivElement>(null);
+  const [coverSize, setCoverSize] = useState(DEFAULT_COVER_SIZE);
 
-  useEffect(() => {
+  function reload() {
     if (!slug) return;
-    api<PlaylistDetail>(`/api/playlists/${slug}`).then(setPlaylist);
-  }, [slug]);
+    api<PlaylistDetail>(`/api/playlists/${slug}`).then((p) => {
+      setPlaylist(p);
+      setCoverSize(p.fxSettings?.coverSize ?? DEFAULT_COVER_SIZE);
+    });
+  }
+  useEffect(reload, [slug]);
 
-  const fxSettings: FxSettings = useMemo(() => ({ ...FX_DEFAULTS, ...(playlist?.fxSettings ?? {}) }), [playlist]);
-  const { containerRef: fieldContainerRef, fieldCanvasRef, wardenCanvasRef } = useSpacemapField(fxSettings);
+  async function saveCoverSize(size: number) {
+    setCoverSize(size);
+    if (!playlist) return;
+    await api(`/api/playlists/${playlist.id}/fx-settings`, { method: "PATCH", body: JSON.stringify({ coverSize: size }) });
+  }
 
   // Deterministic world position + a synthetic numeric id (combining
   // source+slug, since official and community album ids can collide) for
-  // each album — the direct equivalent of a branch's own {id, slug}.
+  // each album.
   const albumNodes = useMemo(() => {
     if (!playlist) return [];
     return playlist.albums.map((a) => {
@@ -63,10 +76,6 @@ export function PlaylistSpaceMapPage() {
       return { ...a, id: seed % 1000000, worldX: Math.cos(angle) * radius, worldY: Math.sin(angle) * radius };
     });
   }, [playlist]);
-
-  useEffect(() => {
-    wardenBridge.bindToBranches(albumNodes.map((a) => ({ id: a.id, slug: a.slug })));
-  }, [albumNodes]);
 
   // WASD panning — same feel as the forum map, no crosshair lock-on here
   // given the smaller scope of this view.
@@ -107,20 +116,11 @@ export function PlaylistSpaceMapPage() {
         panRef.current = next;
         setPan(next);
       }
-
-      const el = containerRef.current;
-      if (el) {
-        const w = el.clientWidth;
-        const h = el.clientHeight;
-        for (const a of albumNodes) {
-          wardenBridge.setScreenPosition(a.id, w / 2 + panRef.current.x + a.worldX, h / 2 + panRef.current.y + a.worldY);
-        }
-      }
       frameId = requestAnimationFrame(frame);
     }
     frameId = requestAnimationFrame(frame);
     return () => cancelAnimationFrame(frameId);
-  }, [albumNodes]);
+  }, []);
 
   return (
     <div
@@ -134,51 +134,67 @@ export function PlaylistSpaceMapPage() {
         background: "var(--bg-inset)",
       }}
     >
-      <div ref={fieldContainerRef} className="space-map-entoptic-field">
-        <canvas ref={fieldCanvasRef} />
-        <canvas ref={wardenCanvasRef} />
-      </div>
-
       {!playlist ? (
         <p style={{ position: "absolute", top: "50%", left: "50%", transform: "translate(-50%, -50%)", zIndex: 5 }}>Loading…</p>
       ) : (
         <>
-      <button className="btn" style={{ position: "absolute", top: 12, left: 12, zIndex: 5 }} onClick={() => navigate(`/playlist/${playlist.slug}`)}>
-        View as list
-      </button>
-      <p style={{ position: "absolute", bottom: 12, left: "50%", transform: "translateX(-50%)", zIndex: 5, fontSize: "0.75rem", color: "var(--text-dim)" }}>
-        WASD to navigate
-      </p>
+          <button className="btn" style={{ position: "absolute", top: 12, left: 12, zIndex: 5 }} onClick={() => navigate(`/playlist/${playlist.slug}`)}>
+            View as list
+          </button>
+          <p style={{ position: "absolute", bottom: 12, left: "50%", transform: "translateX(-50%)", zIndex: 5, fontSize: "0.75rem", color: "var(--text-dim)" }}>
+            WASD to navigate
+          </p>
+          {user?.id === playlist.ownerId && (
+            <div
+              style={{
+                position: "absolute",
+                top: 12,
+                right: 12,
+                zIndex: 5,
+                display: "flex",
+                alignItems: "center",
+                gap: "0.4rem",
+                background: "var(--bg-elevated)",
+                padding: "0.3rem 0.6rem",
+                borderRadius: "var(--radius)",
+              }}
+            >
+              <label style={{ fontSize: "0.75rem" }}>Cover size</label>
+              <input type="range" min={32} max={140} value={coverSize} onChange={(e) => saveCoverSize(Number(e.target.value))} />
+            </div>
+          )}
 
-      {albumNodes.map((a) => (
-        <Link
-          key={a.id}
-          to={a.source === "official" ? `/album/${a.slug}` : `/community-album/${a.slug}`}
-          style={{
-            position: "absolute",
-            left: `calc(50% + ${pan.x + a.worldX}px)`,
-            top: `calc(50% + ${pan.y + a.worldY}px)`,
-            transform: "translate(-50%, -50%)",
-            zIndex: 3,
-            textAlign: "center",
-            textDecoration: "none",
-            color: "var(--text)",
-            width: 80,
-          }}
-        >
-          <div
-            style={{
-              width: 56,
-              height: 56,
-              margin: "0 auto",
-              borderRadius: "var(--radius)",
-              border: "1px solid var(--border)",
-              background: a.coverArtUrl ? `url(${a.coverArtUrl}) center/cover` : "var(--bg-elevated)",
-            }}
-          />
-          <div style={{ fontSize: "0.7rem", marginTop: "0.2rem", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{a.title}</div>
-        </Link>
-      ))}
+          {albumNodes.map((a) => (
+            <Link
+              key={a.id}
+              to={a.source === "official" ? `/album/${a.slug}` : `/community-album/${a.slug}`}
+              style={{
+                position: "absolute",
+                left: `calc(50% + ${pan.x + a.worldX}px)`,
+                top: `calc(50% + ${pan.y + a.worldY}px)`,
+                transform: "translate(-50%, -50%)",
+                zIndex: 3,
+                textAlign: "center",
+                textDecoration: "none",
+                color: "var(--text)",
+                width: coverSize * 1.4,
+              }}
+            >
+              <div
+                style={{
+                  width: coverSize,
+                  height: coverSize,
+                  margin: "0 auto",
+                  borderRadius: "var(--radius)",
+                  border: "1px solid var(--border)",
+                  background: a.coverArtUrl ? `url(${a.coverArtUrl}) center/cover` : "var(--bg-elevated)",
+                }}
+              />
+              <div style={{ fontSize: Math.max(9, coverSize * 0.125), marginTop: "0.2rem", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                {a.title}
+              </div>
+            </Link>
+          ))}
         </>
       )}
     </div>

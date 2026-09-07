@@ -457,9 +457,6 @@ export function MyMusicPage() {
                 <Link className="btn" to={`/playlist/${managingPlaylistSlug}/map`}>
                   View as spacemap
                 </Link>
-                <Link className="btn" to={`/playlist/${managingPlaylistSlug}/fx`}>
-                  Visual settings
-                </Link>
               </div>
             </div>
           )}
