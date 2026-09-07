@@ -1,4 +1,5 @@
 import type { FastifyInstance } from "fastify";
+import type { Prisma } from "@prisma/client";
 import { prisma } from "../lib/prisma.js";
 import { requireAuth, requireAdmin, verifyToken } from "../lib/auth.js";
 import { saveCommunityTrackAudio } from "../lib/storage.js";
@@ -387,7 +388,7 @@ export async function communityMusicRoutes(app: FastifyInstance): Promise<void> 
       const playlist = await prisma.playlist.findUnique({ where: { id: Number(req.params.id) } });
       if (!playlist) return reply.code(404).send({ error: "no such playlist" });
       if (playlist.ownerId !== req.user!.id) return reply.code(403).send({ error: "not your playlist" });
-      const updated = await prisma.playlist.update({ where: { id: playlist.id }, data: { fxSettingsJson: req.body ?? {} } });
+      const updated = await prisma.playlist.update({ where: { id: playlist.id }, data: { fxSettingsJson: (req.body ?? {}) as Prisma.InputJsonValue } });
       return { fxSettings: updated.fxSettingsJson };
     },
   );
