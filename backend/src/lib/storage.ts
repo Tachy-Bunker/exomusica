@@ -207,10 +207,19 @@ const ALLOWED_AUDIO_TYPES: Record<string, string> = {
   "audio/mp3": ".mp3",
   "audio/wav": ".wav",
   "audio/x-wav": ".wav",
+  "audio/wave": ".wav",
+  "audio/vnd.wave": ".wav",
   "audio/flac": ".flac",
+  "audio/x-flac": ".flac",
   "audio/ogg": ".ogg",
+  "application/ogg": ".ogg",
   "audio/aac": ".aac",
+  "audio/x-aac": ".aac",
   "audio/mp4": ".m4a",
+  "audio/x-m4a": ".m4a",
+  "audio/m4a": ".m4a",
+  "audio/opus": ".opus",
+  "audio/webm": ".webm",
 };
 
 /** Saves a user-uploaded track audio file, enforcing the same 65MB quota

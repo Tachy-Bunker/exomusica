@@ -95,6 +95,7 @@ export function ForumMapPage() {
   const isDesktop = useIsDesktop();
   const navigate = useNavigate();
   const openChat = useChatDockStore((s) => s.openChat);
+  const setSuppressGlobalEShortcut = useChatDockStore((s) => s.setSuppressGlobalEShortcut);
   const keysRef = useRef<Set<string>>(new Set());
   const cameraVelRef = useRef({ vx: 0, vy: 0 });
   const crosshairOffsetRef = useRef({ x: 0, y: 0 });
@@ -199,6 +200,11 @@ export function ForumMapPage() {
     }
     setActiveNodeId((id) => (id === n.id ? null : n.id));
   }
+  useEffect(() => {
+    setSuppressGlobalEShortcut(true);
+    return () => setSuppressGlobalEShortcut(false);
+  }, [setSuppressGlobalEShortcut]);
+
   const onNodeInteractRef = useRef(onNodeInteract);
   onNodeInteractRef.current = onNodeInteract;
 

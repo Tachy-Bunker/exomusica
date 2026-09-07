@@ -59,6 +59,7 @@ export function Layout() {
   const dockPageChannel = useChatDockStore((s) => s.pageChannel);
   const dockOpenChat = useChatDockStore((s) => s.openChat);
   const dockToggleCollapse = useChatDockStore((s) => s.toggleCollapse);
+  const suppressGlobalEShortcut = useChatDockStore((s) => s.suppressGlobalEShortcut);
 
   useEffect(() => {
     if (!isDesktop) return;
@@ -82,6 +83,7 @@ export function Layout() {
           navigate("/community");
           break;
         case "KeyE":
+          if (suppressGlobalEShortcut) break; // a page with its own E-key handling (e.g. the forum map's crosshair reveal/enter) owns this keypress instead
           if (dockPageChannel && dockOpenChannelSlug !== dockPageChannel.slug) {
             dockOpenChat(dockPageChannel.slug, dockPageChannel.name, dockPageChannel.branchSlug);
           } else if (dockOpenChannelSlug) {
@@ -92,7 +94,7 @@ export function Layout() {
     }
     window.addEventListener("keydown", handleShortcut);
     return () => window.removeEventListener("keydown", handleShortcut);
-  }, [isDesktop, navigate, dockPageChannel, dockOpenChannelSlug, dockOpenChat, dockToggleCollapse]);
+  }, [isDesktop, navigate, dockPageChannel, dockOpenChannelSlug, dockOpenChat, dockToggleCollapse, suppressGlobalEShortcut]);
   const dockOpen = useChatDockStore((s) => !!s.openChannelSlug);
   const dockCollapsed = useChatDockStore((s) => s.collapsed);
   const dockWidth = useChatDockStore((s) => s.width);
@@ -291,7 +293,7 @@ export function Layout() {
           <Link to="/wiki">{isDesktop ? underlineLetter("Wiki", "k") : "Wiki"}</Link>
           <Link to="/news">{isDesktop ? underlineLetter("News", "n") : "News"}</Link>
           <Link to="/discussion/map">{isDesktop ? underlineLetter("Forums", "m") : "Forums"}</Link>
-          {isDesktop && <Link to="/community">{underlineLetter("Community", "y")}</Link>}
+          {isDesktop && <Link to="/community">{underlineLetter("Cult Activities", "y")}</Link>}
         </nav>
         <div className="spacer" />
         {user && isDesktop && <OnlineOrbs />}

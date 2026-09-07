@@ -89,6 +89,7 @@ model User {
   playlistCollaborations PlaylistCollaborator[]
   sampleBankItems SampleBankItem[]
   challengeSubmissions ChallengeSubmission[]
+  questionsAsked ForumChannel[]
   bookmarks        Bookmark[]
   emojisUploaded   CustomEmoji[]
   sentPMs          PrivateMessage[] @relation("PMSender")
@@ -170,6 +171,9 @@ model ForumChannel {
   kind        ChannelKind
   branchId    Int?        @unique // null for Discussion topics (not tied to a branch)
   branch      Branch?     @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  isUserQuestion Boolean  @default(false) // true for a "Your Questions" thread a user created themselves
+  askedById   Int?
+  askedBy     User?       @relation(fields: [askedById], references: [id], onDelete: SetNull)
   fontId      Int?
   font        CustomFont? @relation(fields: [fontId], references: [id])
   createdAt   DateTime    @default(now())
@@ -602,6 +606,7 @@ model SiteSettings {
   forumMapInitialZoom Float @default(1)
   forumMapNavSpeed    Float @default(1) // multiplier on WASD/joystick acceleration — independent of zoom level
   spotlightCommunityTrackId Int? // admin-curated "featured this week" pick, shown at the top of /community
+  cultActivitiesChannelId Int? // the general chat channel shown on the Cult Activities page
   ambienceUrl    String? // idle-landing ambient loop, plays when nothing else is
   scanSfxUrl     String? // spacemap text-reveal loop (branch lock-on + F/E/T hint)
   defaultWikiPageId Int?
@@ -717,6 +722,9 @@ enum ForumMapNodeType {
   TOPIC
   ACTIVE_BRANCHES
   GROWING_SEEDS
+  PLAYLIST
+  SAMPLE_BANK_ITEM
+  CHALLENGE
 }
 
 model ForumMapNode {
@@ -724,6 +732,12 @@ model ForumMapNode {
   type      ForumMapNodeType @default(TOPIC)
   channelId Int?             @unique
   channel   ForumChannel?    @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  playlistId Int?            @unique
+  playlist   Playlist?       @relation(fields: [playlistId], references: [id], onDelete: Cascade)
+  sampleBankItemId Int?      @unique
+  sampleBankItem   SampleBankItem? @relation(fields: [sampleBankItemId], references: [id], onDelete: Cascade)
+  challengeId Int?           @unique
+  challenge   Challenge?     @relation(fields: [challengeId], references: [id], onDelete: Cascade)
   parentId  Int?
   parent    ForumMapNode?    @relation("MapTree", fields: [parentId], references: [id], onDelete: SetNull)
   children  ForumMapNode[]   @relation("MapTree")
@@ -757,6 +771,7 @@ model SampleBankItem {
   attachmentId Int        @unique
   attachment   Attachment @relation(fields: [attachmentId], references: [id])
   createdAt    DateTime   @default(now())
+  mapNode      ForumMapNode?
 }
 
 // --- Prompt-based challenges: a recurring constraint with a submission
@@ -771,6 +786,7 @@ model Challenge {
   createdAt   DateTime @default(now())
 
   submissions ChallengeSubmission[]
+  mapNode ForumMapNode?
 }
 
 model ChallengeSubmission {
@@ -858,6 +874,7 @@ model Playlist {
 
   items PlaylistItem[]
   collaborators PlaylistCollaborator[]
+  mapNode ForumMapNode?
 }
 
 // Anyone the owner adds here can add/remove tracks too — a genuinely

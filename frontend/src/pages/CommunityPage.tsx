@@ -22,7 +22,7 @@ interface SpotlightTrack {
 }
 
 export function CommunityPage() {
-  useDocumentTitle("Community");
+  useDocumentTitle("Cult Activities");
   const [playlists, setPlaylists] = useState<PlaylistSummary[]>([]);
   const [spotlight, setSpotlight] = useState<SpotlightTrack | null>(null);
 
@@ -39,7 +39,7 @@ export function CommunityPage() {
 
   return (
     <div>
-      <h1>Community</h1>
+      <h1>Cult Activities</h1>
       <p style={{ color: "var(--text-dim)", maxWidth: 640 }}>
         Playlists made by the community — mixing their own uploaded tracks with anything from Exomusica's own albums.
       </p>

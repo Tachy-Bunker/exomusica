@@ -24,11 +24,13 @@ async function uniquePlaylistSlug(title: string): Promise<string> {
   return slug;
 }
 
-function formatFromMime(mimeType: string): "MP3" | "WAV" | "FLAC" | "OGG" | "AAC" {
+function formatFromMime(mimeType: string): "MP3" | "WAV" | "FLAC" | "OGG" | "AAC" | "M4A" | "OPUS" {
   if (mimeType.includes("wav")) return "WAV";
   if (mimeType.includes("flac")) return "FLAC";
   if (mimeType.includes("ogg")) return "OGG";
-  if (mimeType.includes("aac") || mimeType.includes("mp4")) return "AAC";
+  if (mimeType.includes("m4a") || mimeType.includes("mp4")) return "M4A";
+  if (mimeType.includes("opus") || mimeType.includes("webm")) return "OPUS";
+  if (mimeType.includes("aac")) return "AAC";
   return "MP3";
 }
 
