@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { api } from "../../lib/api";
+import { SeoFieldsEditor } from "../../components/SeoFieldsEditor";
 
 interface CollaboratorSummary {
   id: number;
@@ -8,6 +9,9 @@ interface CollaboratorSummary {
   role: string;
   bio: string | null;
   pictureUrl: string | null;
+  ogTitle?: string | null;
+  ogDescription?: string | null;
+  ogImageUrl?: string | null;
 }
 
 interface CollaboratorDetail extends CollaboratorSummary {
@@ -22,7 +26,7 @@ export function CollaboratorsAdminPage() {
   const [role, setRole] = useState("");
   const [editingId, setEditingId] = useState<number | null>(null);
   const [detail, setDetail] = useState<CollaboratorDetail | null>(null);
-  const [editForm, setEditForm] = useState({ name: "", role: "", bio: "" });
+  const [editForm, setEditForm] = useState({ name: "", role: "", bio: "", ogTitle: "", ogDescription: "", ogImageUrl: "" });
   const [linkUsername, setLinkUsername] = useState("");
   const [newLinkLabel, setNewLinkLabel] = useState("");
   const [newLinkUrl, setNewLinkUrl] = useState("");
@@ -66,7 +70,7 @@ export function CollaboratorsAdminPage() {
       d = await api<CollaboratorDetail>(`/api/collaborators/${slug}`);
     }
     setDetail({ ...d, id });
-    setEditForm({ name: d.name, role: d.role, bio: d.bio ?? "" });
+    setEditForm({ name: d.name, role: d.role, bio: d.bio ?? "", ogTitle: d.ogTitle ?? "", ogDescription: d.ogDescription ?? "", ogImageUrl: d.ogImageUrl ?? "" });
     setEditingId(id);
     load();
   }
@@ -189,6 +193,11 @@ export function CollaboratorsAdminPage() {
               <label>Bio</label>
               <textarea rows={4} style={{ width: "100%" }} value={editForm.bio} onChange={(e) => setEditForm((f) => ({ ...f, bio: e.target.value }))} />
             </div>
+            <SeoFieldsEditor
+              value={{ ogTitle: editForm.ogTitle, ogDescription: editForm.ogDescription, ogImageUrl: editForm.ogImageUrl }}
+              onChange={(patch) => setEditForm((f) => ({ ...f, ...Object.fromEntries(Object.entries(patch).map(([k, v]) => [k, v ?? ""])) }))}
+              defaultNote="Leave blank to use this collaborator's own name, bio, and picture as the embed."
+            />
             <button className="btn btn-primary" onClick={saveDetail} style={{ marginBottom: "1rem" }}>
               Save
             </button>

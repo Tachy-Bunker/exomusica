@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type FormEvent, type ChangeEvent } from "r
 import { api, ApiError } from "../../lib/api";
 import type { Branch } from "../../lib/types";
 import { snippetFor } from "../../lib/markdownSnippet";
+import { SeoFieldsEditor } from "../../components/SeoFieldsEditor";
 
 interface AlbumSummary {
   id: number;
@@ -24,6 +25,9 @@ interface AlbumDetail {
   description: string | null;
   contentMarkdown: string | null;
   coverArtUrl: string | null;
+  ogTitle?: string | null;
+  ogDescription?: string | null;
+  ogImageUrl?: string | null;
   links: { id: number; label: string; url: string; iconUrl: string | null; linkIconId: number | null; linkIcon: { id: number; name: string; url: string } | null }[];
   gallery: { id: number; url: string }[];
   collaborators: { id: number; name: string }[];
@@ -52,7 +56,7 @@ export function AlbumsAdminPage() {
   const [editingTrackId, setEditingTrackId] = useState<number | null>(null);
   const [trackEditForm, setTrackEditForm] = useState({ title: "", fileUrl: "", format: "MP3" });
   const [editingAlbumInfo, setEditingAlbumInfo] = useState(false);
-  const [albumEditForm, setAlbumEditForm] = useState({ title: "", composer: "", description: "", contentMarkdown: "" });
+  const [albumEditForm, setAlbumEditForm] = useState({ title: "", composer: "", description: "", contentMarkdown: "", ogTitle: "", ogDescription: "", ogImageUrl: "" });
   const contentTextareaRef = useRef<HTMLTextAreaElement>(null);
 
   async function handleContentMediaUpload(e: ChangeEvent<HTMLInputElement>) {
@@ -108,7 +112,15 @@ export function AlbumsAdminPage() {
 
   function startEditAlbumInfo() {
     if (!detail) return;
-    setAlbumEditForm({ title: detail.title, composer: detail.composer, description: detail.description ?? "", contentMarkdown: detail.contentMarkdown ?? "" });
+    setAlbumEditForm({
+      title: detail.title,
+      composer: detail.composer,
+      description: detail.description ?? "",
+      contentMarkdown: detail.contentMarkdown ?? "",
+      ogTitle: detail.ogTitle ?? "",
+      ogDescription: detail.ogDescription ?? "",
+      ogImageUrl: detail.ogImageUrl ?? "",
+    });
     setEditingAlbumInfo(true);
   }
 
@@ -358,6 +370,10 @@ export function AlbumsAdminPage() {
                 />
                 <input type="file" accept="image/*,audio/*,video/*" onChange={handleContentMediaUpload} style={{ fontSize: "0.75rem" }} />
               </div>
+              <SeoFieldsEditor
+                value={{ ogTitle: albumEditForm.ogTitle, ogDescription: albumEditForm.ogDescription, ogImageUrl: albumEditForm.ogImageUrl }}
+                onChange={(patch) => setAlbumEditForm((f) => ({ ...f, ...Object.fromEntries(Object.entries(patch).map(([k, v]) => [k, v ?? ""])) }))}
+              />
               <button className="btn btn-primary" onClick={saveAlbumInfo}>
                 Save
               </button>{" "}

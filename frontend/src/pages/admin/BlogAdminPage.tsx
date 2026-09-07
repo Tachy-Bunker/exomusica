@@ -1,5 +1,6 @@
-import { useEffect, useRef, useState, type ChangeEvent, type FormEvent } from "react";
+import { useEffect, useRef, useState, Fragment, type ChangeEvent, type FormEvent } from "react";
 import { api, ApiError } from "../../lib/api";
+import { SeoFieldsEditor } from "../../components/SeoFieldsEditor";
 
 function snippetFor(mimeType: string, url: string, filename: string): string {
   if (mimeType.startsWith("image/")) return `![${filename}](${url})`;
@@ -14,6 +15,9 @@ interface PostSummary {
   title: string;
   publishedAt: string | null;
   fontId: number | null;
+  ogTitle?: string | null;
+  ogDescription?: string | null;
+  ogImageUrl?: string | null;
 }
 
 interface Font {
@@ -25,6 +29,8 @@ export function BlogAdminPage() {
   const [posts, setPosts] = useState<PostSummary[]>([]);
   const [fonts, setFonts] = useState<Font[]>([]);
   const [form, setForm] = useState({ slug: "", title: "", contentMarkdown: "", publish: true });
+  const [editingSeoId, setEditingSeoId] = useState<number | null>(null);
+  const [seoForm, setSeoForm] = useState({ ogTitle: "", ogDescription: "", ogImageUrl: "" });
   const [error, setError] = useState<string | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -59,6 +65,28 @@ export function BlogAdminPage() {
       method: "PATCH",
       body: JSON.stringify({ fontId: fontIdStr ? Number(fontIdStr) : null }),
     });
+    load();
+  }
+
+  function toggleSeoEdit(post: PostSummary) {
+    if (editingSeoId === post.id) {
+      setEditingSeoId(null);
+      return;
+    }
+    setEditingSeoId(post.id);
+    setSeoForm({ ogTitle: post.ogTitle ?? "", ogDescription: post.ogDescription ?? "", ogImageUrl: post.ogImageUrl ?? "" });
+  }
+
+  async function saveSeo(post: PostSummary) {
+    await api(`/api/admin/blog/${post.id}`, {
+      method: "PATCH",
+      body: JSON.stringify({
+        ogTitle: seoForm.ogTitle || null,
+        ogDescription: seoForm.ogDescription || null,
+        ogImageUrl: seoForm.ogImageUrl || null,
+      }),
+    });
+    setEditingSeoId(null);
     load();
   }
 
@@ -130,28 +158,46 @@ export function BlogAdminPage() {
         </thead>
         <tbody>
           {posts.map((p) => (
-            <tr key={p.id}>
-              <td>{p.title}</td>
-              <td>{p.publishedAt ? "Published" : "Draft"}</td>
-              <td>
-                <button className="btn" onClick={() => togglePublish(p)}>
-                  {p.publishedAt ? "Unpublish" : "Publish"}
-                </button>{" "}
-                {p.publishedAt && (
-                  <button className="btn" onClick={() => notifySubscribers(p)}>
-                    Notify subscribers
+            <Fragment key={p.id}>
+              <tr>
+                <td>{p.title}</td>
+                <td>{p.publishedAt ? "Published" : "Draft"}</td>
+                <td>
+                  <button className="btn" onClick={() => togglePublish(p)}>
+                    {p.publishedAt ? "Unpublish" : "Publish"}
+                  </button>{" "}
+                  {p.publishedAt && (
+                    <button className="btn" onClick={() => notifySubscribers(p)}>
+                      Notify subscribers
+                    </button>
+                  )}{" "}
+                  <select value={p.fontId ?? ""} onChange={(e) => changeFont(p, e.target.value)} style={{ fontSize: "0.8rem" }}>
+                    <option value="">— default font —</option>
+                    {fonts.map((f) => (
+                      <option key={f.id} value={f.id}>
+                        {f.name}
+                      </option>
+                    ))}
+                  </select>{" "}
+                  <button className="btn" style={{ fontSize: "0.75rem" }} onClick={() => toggleSeoEdit(p)}>
+                    {editingSeoId === p.id ? "Close" : "Edit SEO"}
                   </button>
-                )}{" "}
-                <select value={p.fontId ?? ""} onChange={(e) => changeFont(p, e.target.value)} style={{ fontSize: "0.8rem" }}>
-                  <option value="">— default font —</option>
-                  {fonts.map((f) => (
-                    <option key={f.id} value={f.id}>
-                      {f.name}
-                    </option>
-                  ))}
-                </select>
-              </td>
-            </tr>
+                </td>
+              </tr>
+              {editingSeoId === p.id && (
+                <tr>
+                  <td colSpan={3}>
+                    <SeoFieldsEditor
+                      value={seoForm}
+                      onChange={(patch) => setSeoForm((f) => ({ ...f, ...Object.fromEntries(Object.entries(patch).map(([k, v]) => [k, v ?? ""])) }))}
+                    />
+                    <button className="btn btn-primary" style={{ marginTop: "0.4rem" }} onClick={() => saveSeo(p)}>
+                      Save SEO
+                    </button>
+                  </td>
+                </tr>
+              )}
+            </Fragment>
           ))}
         </tbody>
       </table>

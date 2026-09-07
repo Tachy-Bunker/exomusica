@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type ChangeEvent, type FormEvent } from "react";
 import { Link } from "react-router-dom";
 import { api, ApiError } from "../../lib/api";
+import { SeoFieldsEditor } from "../../components/SeoFieldsEditor";
 
 function snippetFor(mimeType: string, url: string, filename: string): string {
   if (mimeType.startsWith("image/")) return `![${filename}](${url})`;
@@ -19,6 +20,9 @@ interface WikiSummary {
 interface WikiFull extends WikiSummary {
   contentMarkdown: string;
   fontId: number | null;
+  ogTitle?: string | null;
+  ogDescription?: string | null;
+  ogImageUrl?: string | null;
 }
 
 interface Font {
@@ -26,7 +30,7 @@ interface Font {
   name: string;
 }
 
-const EMPTY_FORM = { slug: "", title: "", contentMarkdown: "", parentId: "", fontId: "" };
+const EMPTY_FORM = { slug: "", title: "", contentMarkdown: "", parentId: "", fontId: "", ogTitle: "", ogDescription: "", ogImageUrl: "" };
 
 export function WikiAdminPage() {
   const [pages, setPages] = useState<WikiSummary[]>([]);
@@ -80,6 +84,9 @@ export function WikiAdminPage() {
       contentMarkdown: full.contentMarkdown,
       parentId: full.parentId ? String(full.parentId) : "",
       fontId: full.fontId ? String(full.fontId) : "",
+      ogTitle: full.ogTitle ?? "",
+      ogDescription: full.ogDescription ?? "",
+      ogImageUrl: full.ogImageUrl ?? "",
     });
   }
 
@@ -97,7 +104,7 @@ export function WikiAdminPage() {
       if (editingId) {
         await api(`/api/admin/wiki/${editingId}`, {
           method: "PATCH",
-          body: JSON.stringify({ title: form.title, contentMarkdown: form.contentMarkdown, parentId, fontId }),
+          body: JSON.stringify({ title: form.title, contentMarkdown: form.contentMarkdown, parentId, fontId, ogTitle: form.ogTitle || null, ogDescription: form.ogDescription || null, ogImageUrl: form.ogImageUrl || null }),
         });
       } else {
         await api("/api/admin/wiki", {
@@ -186,6 +193,10 @@ export function WikiAdminPage() {
             required
             value={form.contentMarkdown}
             onChange={(e) => setForm((f) => ({ ...f, contentMarkdown: e.target.value }))}
+          />
+          <SeoFieldsEditor
+            value={{ ogTitle: form.ogTitle, ogDescription: form.ogDescription, ogImageUrl: form.ogImageUrl }}
+            onChange={(patch) => setForm((f) => ({ ...f, ...Object.fromEntries(Object.entries(patch).map(([k, v]) => [k, v ?? ""])) }))}
           />
         </div>
         {error && <p style={{ color: "var(--accent-danger)" }}>{error}</p>}

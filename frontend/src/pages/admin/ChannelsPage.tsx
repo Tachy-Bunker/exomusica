@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type FormEvent, type ChangeEvent } from "r
 import { Link } from "react-router-dom";
 import { api, ApiError } from "../../lib/api";
 import { snippetFor } from "../../lib/markdownSnippet";
+import { SeoFieldsEditor } from "../../components/SeoFieldsEditor";
 
 interface ChannelSummary {
   id: number;
@@ -14,6 +15,9 @@ interface ChannelSummary {
   fontId: number | null;
   discordChannelId: string | null;
   discordWebhookUrl: string | null;
+  ogTitle?: string | null;
+  ogDescription?: string | null;
+  ogImageUrl?: string | null;
 }
 
 interface Font {
@@ -54,6 +58,9 @@ export function ChannelsPage() {
     position: "",
     discordChannelId: "",
     discordWebhookUrl: "",
+    ogTitle: "",
+    ogDescription: "",
+    ogImageUrl: "",
   });
   const contentTextareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -119,6 +126,9 @@ export function ChannelsPage() {
       position: String(t.position),
       discordChannelId: t.discordChannelId ?? "",
       discordWebhookUrl: t.discordWebhookUrl ?? "",
+      ogTitle: t.ogTitle ?? "",
+      ogDescription: t.ogDescription ?? "",
+      ogImageUrl: t.ogImageUrl ?? "",
     });
   }
 
@@ -133,6 +143,9 @@ export function ChannelsPage() {
         position: Number(editForm.position) || 0,
         discordChannelId: editForm.discordChannelId || null,
         discordWebhookUrl: editForm.discordWebhookUrl || null,
+        ogTitle: editForm.ogTitle || null,
+        ogDescription: editForm.ogDescription || null,
+        ogImageUrl: editForm.ogImageUrl || null,
       }),
     });
     setEditingId(null);
@@ -246,6 +259,10 @@ export function ChannelsPage() {
                     value={editForm.category}
                     onChange={(e) => setEditForm((f) => ({ ...f, category: e.target.value }))}
                     style={{ marginBottom: "0.2rem" }}
+                  />
+                  <SeoFieldsEditor
+                    value={{ ogTitle: editForm.ogTitle, ogDescription: editForm.ogDescription, ogImageUrl: editForm.ogImageUrl }}
+                    onChange={(patch) => setEditForm((f) => ({ ...f, ...Object.fromEntries(Object.entries(patch).map(([k, v]) => [k, v ?? ""])) }))}
                   />
                   <input
                     placeholder="Discord channel ID (bridge)"
