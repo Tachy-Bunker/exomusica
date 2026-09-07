@@ -314,6 +314,7 @@ export function Layout() {
             </>
           ) : (
             <>
+              <NotificationWidget inline offsetRight={dockOffset} />
               <Link to="/login">Log in</Link>
               <button className="btn" onClick={openDonate}>
                 💛 Donate
@@ -326,7 +327,10 @@ export function Layout() {
             <MobileAccountHook loggedIn avatarUrl={avatarUrl} hasUnreadPms={hasUnreadPms} username={user.username} isAdmin={user.isAdmin} />
           </>
         ) : (
-          <MobileAccountHook loggedIn={false} />
+          <>
+            <NotificationWidget inline />
+            <MobileAccountHook loggedIn={false} />
+          </>
         )}
       </header>
 

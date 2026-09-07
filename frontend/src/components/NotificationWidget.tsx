@@ -73,11 +73,17 @@ export function NotificationWidget({ offsetRight = 0, inline = false }: { offset
   }, [user]);
 
   useEffect(() => {
-    if (!user) return;
-    const username = user.username;
     let cancelled = false;
 
     async function poll() {
+      if (!user) {
+        // Logged out: only the public recent-activity feed applies — no
+        // personal notifications, no per-user sound preferences to honor.
+        const recentList = await api<RecentMessage[]>("/api/recent-messages?limit=3");
+        if (!cancelled) setRecent(recentList);
+        return;
+      }
+      const username = user.username;
       const [notifList, recentList] = await Promise.all([
         api<Notification[]>("/api/notifications"),
         api<RecentMessage[]>("/api/recent-messages?limit=3"),
@@ -118,8 +124,6 @@ export function NotificationWidget({ offsetRight = 0, inline = false }: { offset
       clearInterval(interval);
     };
   }, [user]);
-
-  if (!user) return null;
 
   const unread = notifications.filter((n) => !n.read).length;
 
@@ -217,8 +221,9 @@ export function NotificationWidget({ offsetRight = 0, inline = false }: { offset
           <div style={{ padding: "0.5rem 0.7rem", borderBottom: "1px solid var(--border)" }}>
             <strong style={{ fontSize: "0.85rem" }}>Notifications</strong>
           </div>
-          {notifications.length === 0 && <p style={{ padding: "0.7rem 0.7rem 0.3rem", fontSize: "0.8rem", color: "var(--text-dim)" }}>Nothing yet.</p>}
-          {(() => {
+          {user && notifications.length === 0 && <p style={{ padding: "0.7rem 0.7rem 0.3rem", fontSize: "0.8rem", color: "var(--text-dim)" }}>Nothing yet.</p>}
+          {user &&
+            (() => {
             const priorityKeys = new Set(["mention", "message_followed_topic"]);
             const priority = notifications.filter((n) => priorityKeys.has(n.eventKey));
             const other = notifications.filter((n) => !priorityKeys.has(n.eventKey));
@@ -256,7 +261,7 @@ export function NotificationWidget({ offsetRight = 0, inline = false }: { offset
           })()}
 
           <div style={{ padding: "0.4rem 0.7rem", fontSize: "0.7rem", textTransform: "uppercase", color: "var(--text-dim)", borderTop: "1px solid var(--border)" }}>
-            Recent activity — any topic
+            Recent activity - any topic
           </div>
           {recent.map((m) => (
             <div

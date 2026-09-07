@@ -30,12 +30,12 @@ export function MobileAccountHook(props: LoggedInProps | LoggedOutProps) {
       </button>
       {open && (
         <div className="mobile-hook-panel">
-          <Link to="/community" onClick={() => setOpen(false)}>
-            Community
-          </Link>
           {props.loggedIn ? (
             <>
               <span className="mobile-hook-online">{onlineCount} online</span>
+              <Link to="/community" onClick={() => setOpen(false)}>
+                Community
+              </Link>
               {props.isAdmin && (
                 <Link to="/admin" onClick={() => setOpen(false)}>
                   Admin
@@ -53,6 +53,9 @@ export function MobileAccountHook(props: LoggedInProps | LoggedOutProps) {
             </>
           ) : (
             <>
+              <Link to="/community" onClick={() => setOpen(false)}>
+                Community
+              </Link>
               <Link to="/login" onClick={() => setOpen(false)}>
                 Log in
               </Link>

@@ -109,6 +109,7 @@ export function ForumMapPage() {
   const [revealedIds, setRevealedIds] = useState<Set<number>>(new Set());
   const nodesRef = useRef<MapNode[]>([]);
   nodesRef.current = nodes;
+  const lockableIdsRef = useRef<Set<number>>(new Set());
 
   useEffect(() => {
     api<MapNode[]>("/api/forum-map").then(setNodes);
@@ -144,6 +145,10 @@ export function ForumMapPage() {
     }
     return { visibleIds: visible, handleIds: handles };
   }, [nodes, revealedIds]);
+
+  useEffect(() => {
+    lockableIdsRef.current = new Set([...visibleIds, ...handleIds]);
+  }, [visibleIds, handleIds]);
 
   function revealCluster(rootId: number) {
     setRevealedIds((prev) => {
@@ -273,6 +278,7 @@ export function ForumMapPage() {
         let nearest: MapNode | null = null;
         let nearestDist = LOCK_RADIUS_PX;
         for (const n of nodesRef.current) {
+          if (!lockableIdsRef.current.has(n.id)) continue;
           const screenX = (n.x + panRef.current.x) * pxPerUnit;
           const screenY = (n.y + panRef.current.y) * pxPerUnit;
           const d = Math.hypot(screenX, screenY);
@@ -480,7 +486,7 @@ export function ForumMapPage() {
         <div style={{ position: "absolute", bottom: 16, left: "50%", transform: "translateX(-50%)", zIndex: 5, fontSize: lockedNodeId !== null ? "0.85rem" : "0.75rem", color: lockedNodeId !== null ? "var(--text)" : "var(--text-dim)", textAlign: "center" }}>
           {lockedNodeId !== null ? (
             <>
-              Press <strong style={{ color: "var(--accent-forum)" }}>E</strong> to enter
+              Press <strong style={{ color: "var(--accent-forum)" }}>E</strong> to {handleIds.has(lockedNodeId) ? "reveal" : "enter"}
             </>
           ) : (
             "WASD to navigate"
@@ -604,8 +610,21 @@ export function ForumMapPage() {
               <text y={radius + 16} textAnchor="middle" fill="var(--text-dim)" fontSize={Math.max(9, radius * 0.85)} fontFamily="var(--font-display)">
                 {n.channel?.name ?? ""}
               </text>
+            </g>
+            </g>
+          );
+        })}
 
-              {activeNodeId === n.id && (
+        {/* Rendered last, outside the per-node loop, so it always paints
+            on top of every node regardless of array order — previously a
+            node later in the list could visually cover an earlier node's
+            open preview. */}
+        {activeNode && (
+          <g transform={`translate(${activeNode.x}, ${activeNode.y})`}>
+            {(() => {
+              const fallback = NODE_STYLE[activeNode.type];
+              const radius = activeNode.size ?? fallback.radius;
+              return (
                 <foreignObject x={radius + 12} y={-radius * 2.5} width={Math.max(160, radius * 12)} height={Math.max(140, radius * 11)} style={{ pointerEvents: isDesktop ? "none" : "auto" }}>
                   <div
                     style={{
@@ -621,7 +640,7 @@ export function ForumMapPage() {
                       gap: "0.3rem",
                     }}
                   >
-                    <div style={{ fontWeight: "bold", marginBottom: "0.1rem" }}>{n.channel?.name}</div>
+                    <div style={{ fontWeight: "bold", marginBottom: "0.1rem" }}>{activeNode.channel?.name}</div>
                     <div style={{ overflowY: "auto", flex: 1, minHeight: 0 }}>
                       {preview.length === 0 ? (
                         <div style={{ color: "var(--text-dim)" }}>No messages yet.</div>
@@ -639,7 +658,7 @@ export function ForumMapPage() {
                         style={{ fontSize: "0.75rem", alignSelf: "flex-start" }}
                         onClick={(e) => {
                           e.stopPropagation();
-                          goToNode(n);
+                          goToNode(activeNode);
                         }}
                       >
                         Go →
@@ -647,11 +666,10 @@ export function ForumMapPage() {
                     )}
                   </div>
                 </foreignObject>
-              )}
-            </g>
-            </g>
-          );
-        })}
+              );
+            })()}
+          </g>
+        )}
       </svg>
     </div>
   );
