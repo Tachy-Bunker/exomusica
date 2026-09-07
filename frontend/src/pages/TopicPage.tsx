@@ -34,7 +34,7 @@ export function TopicPage() {
     if (!isDesktop) return;
     function handleKeyDown(e: KeyboardEvent) {
       if (isTypingTarget(e.target)) return;
-      if (e.code === "KeyR") navigate("/discussion");
+      if (e.code === "KeyR") navigate("/discussion/map");
     }
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
@@ -61,7 +61,7 @@ export function TopicPage() {
     return (
       <div>
         <p style={{ marginBottom: "0.5rem" }}>
-          <Link to="/discussion">← Return to {underlineLetter("Forums", "r")}</Link>{" "}
+          <Link to="/discussion/map">← Return to {underlineLetter("Forums", "r")}</Link>{" "}
           <span style={{ fontSize: "0.85rem", color: "var(--text-dim)" }}>(R)</span>
         </p>
         <h1>
@@ -76,7 +76,7 @@ export function TopicPage() {
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "calc(100dvh - var(--nav-height, 3.6rem) - 3rem - var(--player-height, 0px))" }}>
       <p style={{ marginBottom: "0.4rem", flexShrink: 0 }}>
-        <Link to="/discussion">← Return to Forums</Link>
+        <Link to="/discussion/map">← Return to Forums</Link>
       </p>
       <div style={{ flex: 1, minHeight: 0 }}>
         <ChannelPage channelSlug={channel.slug} parentControlsHeight />

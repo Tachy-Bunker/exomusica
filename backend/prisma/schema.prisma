@@ -720,4 +720,5 @@ model ForumMapNode {
   y         Float            @default(0)
   color     String? // admin override — falls back to a type-based default when unset
   size      Float?  // admin override for the node's radius — same fallback
+  hidden    Boolean @default(false) // hidden by default — parent shows a reveal handle instead, until the visitor interacts with it
 }

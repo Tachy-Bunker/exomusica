@@ -23,7 +23,7 @@ export async function forumMapRoutes(app: FastifyInstance): Promise<void> {
     },
   );
 
-  app.patch<{ Params: { id: string }; Body: Partial<{ parentId: number | null; x: number; y: number; color: string | null; size: number | null }> }>(
+  app.patch<{ Params: { id: string }; Body: Partial<{ parentId: number | null; x: number; y: number; color: string | null; size: number | null; hidden: boolean }> }>(
     "/api/admin/forum-map/nodes/:id",
     { preHandler: requireAdmin },
     async (req) => {

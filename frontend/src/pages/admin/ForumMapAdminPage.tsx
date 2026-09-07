@@ -9,6 +9,7 @@ interface MapNode {
   y: number;
   color: string | null;
   size: number | null;
+  hidden: boolean;
   channel: { slug: string; name: string } | null;
 }
 
@@ -79,6 +80,11 @@ export function ForumMapAdminPage() {
 
   async function setNodeStyle(id: number, patch: { color?: string | null; size?: number | null }) {
     await api(`/api/admin/forum-map/nodes/${id}`, { method: "PATCH", body: JSON.stringify(patch) });
+    load();
+  }
+
+  async function toggleHidden(id: number, hidden: boolean) {
+    await api(`/api/admin/forum-map/nodes/${id}`, { method: "PATCH", body: JSON.stringify({ hidden }) });
     load();
   }
 
@@ -226,6 +232,7 @@ export function ForumMapAdminPage() {
             <th style={{ textAlign: "left" }}>Parent</th>
             <th style={{ textAlign: "left" }}>Color</th>
             <th style={{ textAlign: "left" }}>Size</th>
+            <th style={{ textAlign: "left" }}>Hidden</th>
             <th />
           </tr>
         </thead>
@@ -267,6 +274,9 @@ export function ForumMapAdminPage() {
                   onChange={(e) => setNodeStyle(n.id, { size: Number(e.target.value) })}
                   style={{ width: 55 }}
                 />
+              </td>
+              <td>
+                <input type="checkbox" checked={n.hidden} onChange={(e) => toggleHidden(n.id, e.target.checked)} title="Hide by default — parent shows a reveal handle instead" />
               </td>
               <td>
                 <button className="btn btn-danger" style={{ fontSize: "0.75rem" }} onClick={() => removeNode(n.id)}>

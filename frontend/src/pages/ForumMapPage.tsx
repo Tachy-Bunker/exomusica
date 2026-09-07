@@ -3,7 +3,6 @@ import { useNavigate } from "react-router-dom";
 import { api } from "../lib/api";
 import { useIsDesktop } from "../lib/useIsDesktop";
 import { useChatDockStore } from "../lib/chatDockStore";
-import { Joystick } from "../components/Joystick";
 import { isTypingTarget } from "../lib/isTypingTarget";
 import { getRMS } from "../lib/audioAnalyser";
 
@@ -15,6 +14,7 @@ interface MapNode {
   y: number;
   color: string | null;
   size: number | null;
+  hidden: boolean;
   channel: { slug: string; name: string; contentMarkdown: string | null } | null;
 }
 
@@ -96,7 +96,6 @@ export function ForumMapPage() {
   const navigate = useNavigate();
   const openChat = useChatDockStore((s) => s.openChat);
   const keysRef = useRef<Set<string>>(new Set());
-  const joystickVectorRef = useRef({ x: 0, y: 0 });
   const cameraVelRef = useRef({ vx: 0, vy: 0 });
   const crosshairOffsetRef = useRef({ x: 0, y: 0 });
   const panRef = useRef(pan);
@@ -107,6 +106,7 @@ export function ForumMapPage() {
   navSpeedRef.current = navSpeed;
   const [lockedNodeId, setLockedNodeId] = useState<number | null>(null);
   const lockedNodeIdRef = useRef<number | null>(null);
+  const [revealedIds, setRevealedIds] = useState<Set<number>>(new Set());
   const nodesRef = useRef<MapNode[]>([]);
   nodesRef.current = nodes;
 
@@ -120,6 +120,46 @@ export function ForumMapPage() {
   }, []);
 
   const activeNode = useMemo(() => nodes.find((n) => n.id === activeNodeId) ?? null, [nodes, activeNodeId]);
+
+  const { visibleIds, handleIds } = useMemo(() => {
+    const byId = new Map(nodes.map((n) => [n.id, n]));
+    const visible = new Set<number>();
+    const handles = new Set<number>();
+    function isVisible(n: MapNode): boolean {
+      if (!n.hidden) {
+        const parent = n.parentId !== null ? byId.get(n.parentId) : null;
+        return !parent || isVisible(parent);
+      }
+      return revealedIds.has(n.id);
+    }
+    for (const n of nodes) {
+      if (isVisible(n)) {
+        visible.add(n.id);
+      } else if (n.hidden) {
+        // A handle is the topmost hidden node in its cluster whose parent
+        // IS visible — that's the single point of entry into that cluster.
+        const parent = n.parentId !== null ? byId.get(n.parentId) : null;
+        if (!parent || isVisible(parent)) handles.add(n.id);
+      }
+    }
+    return { visibleIds: visible, handleIds: handles };
+  }, [nodes, revealedIds]);
+
+  function revealCluster(rootId: number) {
+    setRevealedIds((prev) => {
+      const next = new Set(prev);
+      const byId = new Map(nodesRef.current.map((n) => [n.id, n]));
+      // Reveal the whole ensemble at once — the handle's node plus every
+      // descendant beneath it, not just the single node clicked.
+      const stack = [rootId];
+      while (stack.length) {
+        const id = stack.pop()!;
+        next.add(id);
+        for (const n of nodesRef.current) if (n.parentId === id) stack.push(n.id);
+      }
+      return next;
+    });
+  }
 
   useEffect(() => {
     if (!activeNode?.channel) {
@@ -139,6 +179,10 @@ export function ForumMapPage() {
   }
 
   function onNodeInteract(n: MapNode) {
+    if (handleIds.has(n.id)) {
+      revealCluster(n.id);
+      return;
+    }
     if (isDesktop) {
       goToNode(n); // hover already shows the preview, so a click/E-lock just acts
       return;
@@ -177,15 +221,12 @@ export function ForumMapPage() {
       lastTime = now;
 
       const keys = keysRef.current;
-      const joy = joystickVectorRef.current;
       let ax = 0;
       let ay = 0;
       if (keys.has("KeyA")) ax += CAMERA_ACCEL;
       if (keys.has("KeyD")) ax -= CAMERA_ACCEL;
       if (keys.has("KeyW")) ay += CAMERA_ACCEL;
       if (keys.has("KeyS")) ay -= CAMERA_ACCEL;
-      ax -= joy.x * CAMERA_ACCEL;
-      ay -= joy.y * CAMERA_ACCEL;
       ax *= navSpeedRef.current;
       ay *= navSpeedRef.current;
 
@@ -206,7 +247,7 @@ export function ForumMapPage() {
           const vbSize = 1600 / zoomRef.current;
           const pxToUnit = el ? vbSize / el.clientWidth : 1;
           const p = panRef.current;
-          const next = { x: p.x - cam.vx * dt * pxToUnit, y: p.y - cam.vy * dt * pxToUnit };
+          const next = { x: p.x + cam.vx * dt * pxToUnit, y: p.y + cam.vy * dt * pxToUnit };
           panRef.current = next;
           setPan(next);
         }
@@ -267,13 +308,6 @@ export function ForumMapPage() {
     }, 120);
     return () => clearInterval(interval);
   }, []);
-
-  function handleJoystickMove(dx: number, dy: number) {
-    joystickVectorRef.current = { x: dx, y: dy };
-  }
-  function handleJoystickRelease() {
-    joystickVectorRef.current = { x: 0, y: 0 };
-  }
 
   // Screen-pixel deltas converted through the container's actual rendered
   // size against the viewBox size, not just divided by zoom — the earlier
@@ -402,6 +436,14 @@ export function ForumMapPage() {
           6% { transform: rotate(calc(2deg * var(--rms, 0.35))); }
           8%, 100% { transform: rotate(0deg); }
         }
+        @keyframes forumMapHandleSpin {
+          from { transform: rotate(0deg); }
+          to { transform: rotate(360deg); }
+        }
+        @keyframes forumMapReveal {
+          from { opacity: 0; transform: scale(0.4); }
+          to { opacity: 1; transform: scale(1); }
+        }
       `}</style>
 
       <button className="btn" style={{ position: "absolute", top: 12, left: 12, zIndex: 5 }} onClick={() => navigate("/discussion")}>
@@ -445,11 +487,6 @@ export function ForumMapPage() {
           )}
         </div>
       )}
-      {!isDesktop && (
-        <div style={{ position: "absolute", bottom: 16, left: 16, zIndex: 5 }}>
-          <Joystick onMove={handleJoystickMove} onRelease={handleJoystickRelease} />
-        </div>
-      )}
 
       <svg
         viewBox={`${-vbSize / 2 - pan.x} ${-vbSize / 2 - pan.y} ${vbSize} ${vbSize}`}
@@ -468,7 +505,7 @@ export function ForumMapPage() {
         {/* Thick, jagged synapse-like connections between nodes — Phazon
             crack aesthetic rather than a smooth clean curve. */}
         {nodes
-          .filter((n) => n.parentId !== null)
+          .filter((n) => n.parentId !== null && (visibleIds.has(n.id) || handleIds.has(n.id)))
           .map((n) => {
             const parent = byId.get(n.parentId!);
             if (!parent) return null;
@@ -489,11 +526,33 @@ export function ForumMapPage() {
             );
           })}
 
-        {nodes.map((n) => {
+        {nodes
+          .filter((n) => visibleIds.has(n.id) || handleIds.has(n.id))
+          .map((n) => {
+          const isHandle = handleIds.has(n.id);
           const fallback = NODE_STYLE[n.type];
           const radius = n.size ?? fallback.radius;
           const color = n.color ?? fallback.color;
           const branches = dendrites(n.id, radius);
+
+          if (isHandle) {
+            return (
+              <g
+                key={n.id}
+                data-node-id={n.id}
+                transform={`translate(${n.x}, ${n.y})`}
+                style={{ cursor: "pointer" }}
+              >
+                <circle r={radius * 1.6} fill="none" stroke="var(--text-dim)" strokeDasharray="4 4" opacity={0.6} style={{ animation: "forumMapHandleSpin 12s linear infinite", transformOrigin: "0px 0px" }} />
+                <circle r={radius} fill="var(--bg-elevated)" stroke={color} strokeWidth={2} style={{ animation: "forumMapTwinkle 2s ease-in-out infinite" }} />
+                <text y={5} textAnchor="middle" fontSize={radius} fill={color}>+</text>
+                <text y={radius + 16} textAnchor="middle" fill="var(--text-dim)" fontSize={Math.max(9, radius * 0.7)} fontFamily="var(--font-display)">
+                  ??? — reveal
+                </text>
+              </g>
+            );
+          }
+
           return (
             <g
               key={n.id}
@@ -503,6 +562,7 @@ export function ForumMapPage() {
               onMouseEnter={() => isDesktop && setActiveNodeId(n.id)}
               onMouseLeave={() => isDesktop && setActiveNodeId((id) => (id === n.id ? null : id))}
             >
+            <g style={{ animation: "forumMapReveal 0.4s ease-out", transformOrigin: "0px 0px" }}>
               {/* Neural dendrites — forked branches with a small glowing
                   terminal at each fork, like a synapse. */}
               {branches.map((b, i) => (
@@ -541,21 +601,21 @@ export function ForumMapPage() {
                 style={{ "--pulse-r-min": `${radius}px`, "--pulse-r-max": `${radius * 1.15}px`, animation: "forumMapPulse 4s ease-in-out infinite" } as React.CSSProperties}
               />
               <circle r={radius * 0.4} fill="var(--text)" opacity={0.9} />
-              <text y={radius + 16} textAnchor="middle" fill="var(--text-dim)" fontSize={12} fontFamily="var(--font-display)">
+              <text y={radius + 16} textAnchor="middle" fill="var(--text-dim)" fontSize={Math.max(9, radius * 0.85)} fontFamily="var(--font-display)">
                 {n.channel?.name ?? ""}
               </text>
 
               {activeNodeId === n.id && (
-                <foreignObject x={radius + 12} y={-50} width={220} height={220} style={{ pointerEvents: isDesktop ? "none" : "auto" }}>
+                <foreignObject x={radius + 12} y={-radius * 2.5} width={Math.max(160, radius * 12)} height={Math.max(140, radius * 11)} style={{ pointerEvents: isDesktop ? "none" : "auto" }}>
                   <div
                     style={{
                       background: "var(--bg-elevated)",
                       border: "1px solid var(--border)",
                       borderRadius: 8,
                       padding: "0.6rem",
-                      fontSize: "0.75rem",
+                      fontSize: `${Math.max(0.65, Math.min(1.1, radius / 16))}rem`,
                       color: "var(--text)",
-                      maxHeight: 190,
+                      maxHeight: Math.max(140, radius * 11) - 20,
                       display: "flex",
                       flexDirection: "column",
                       gap: "0.3rem",
@@ -588,6 +648,7 @@ export function ForumMapPage() {
                   </div>
                 </foreignObject>
               )}
+            </g>
             </g>
           );
         })}
