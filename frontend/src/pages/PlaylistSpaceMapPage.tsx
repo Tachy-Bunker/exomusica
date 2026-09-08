@@ -33,7 +33,7 @@ interface PlaylistDetail {
   slug: string;
   title: string;
   ownerId: number;
-  fxSettings: (Partial<FxSettings> & { coverSize?: number }) | null;
+  fxSettings: (Partial<FxSettings> & { coverSize?: number; spacing?: number; roamSpeed?: number }) | null;
   albums: PlaylistAlbum[];
   items: PlaylistItem[];
 }
@@ -85,7 +85,7 @@ export function PlaylistSpaceMapPage() {
   const clearQueue = useAudioStore((s) => s.clearQueue);
   const setCurrentPlaylist = useAudioStore((s) => s.setCurrentPlaylist);
   const [playlist, setPlaylist] = useState<PlaylistDetail | null>(null);
-  const [controls, setControls] = useState({ coverSize: DEFAULT_COVER_SIZE, bgBright: 0.5, bgSat: 0.5, bgContrast: 0.5, rmsBrightnessAmount: 0.3 });
+  const [controls, setControls] = useState({ coverSize: DEFAULT_COVER_SIZE, bgBright: 0.5, bgSat: 0.5, bgContrast: 0.5, rmsBrightnessAmount: 0.3, spacing: 1, roamSpeed: 1 });
   const [, forceRender] = useState(0);
   const [lockedId, setLockedId] = useState<number | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -102,6 +102,8 @@ export function PlaylistSpaceMapPage() {
   const playlistRef = useRef<PlaylistDetail | null>(null);
   playlistRef.current = playlist;
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const controlsRef = useRef(controls);
+  controlsRef.current = controls;
 
   function reload() {
     if (!slug) return;
@@ -113,6 +115,8 @@ export function PlaylistSpaceMapPage() {
         bgSat: p.fxSettings?.bgSat ?? 0.5,
         bgContrast: p.fxSettings?.bgContrast ?? 0.5,
         rmsBrightnessAmount: p.fxSettings?.rmsBrightnessAmount ?? 0.3,
+        spacing: p.fxSettings?.spacing ?? 1,
+        roamSpeed: p.fxSettings?.roamSpeed ?? 1,
       });
     });
   }
@@ -294,8 +298,9 @@ export function PlaylistSpaceMapPage() {
       }
 
       // --- album covers: wander around home + repel each other ---
-      const t = now / 1000;
+      const t = (now / 1000) * controlsRef.current.roamSpeed;
       const nodes = nodesRef.current;
+      const repelRadius = REPEL_RADIUS * controlsRef.current.spacing;
       for (const n of nodes) {
         const wanderX = Math.sin(t * 0.3 + n.wanderSeed) * 18;
         const wanderY = Math.cos(t * 0.25 + n.wanderSeed) * 18;
@@ -308,8 +313,8 @@ export function PlaylistSpaceMapPage() {
           const dx = n.x - other.x;
           const dy = n.y - other.y;
           const dist = Math.sqrt(dx * dx + dy * dy) || 0.001;
-          if (dist < REPEL_RADIUS) {
-            const push = ((REPEL_RADIUS - dist) / REPEL_RADIUS) * REPEL_STRENGTH;
+          if (dist < repelRadius) {
+            const push = ((repelRadius - dist) / repelRadius) * REPEL_STRENGTH;
             fx += (dx / dist) * push;
             fy += (dy / dist) * push;
           }
@@ -363,7 +368,7 @@ export function PlaylistSpaceMapPage() {
         <p style={{ position: "absolute", top: "50%", left: "50%", transform: "translate(-50%, -50%)", zIndex: 5 }}>Loading…</p>
       ) : (
         <>
-          <button className="btn" style={{ position: "absolute", top: 12, left: 12, zIndex: 5 }} onClick={() => navigate(`/playlist/${playlist.slug}`)}>
+          <button className="btn" style={{ position: "absolute", top: 12, left: 12, zIndex: 5 }} onClick={() => navigate(`/playlist/${playlist.slug}/list`)}>
             View as list
           </button>
           {isDesktop && (
@@ -416,6 +421,14 @@ export function PlaylistSpaceMapPage() {
                       value={controls.rmsBrightnessAmount}
                       onChange={(e) => updateControl({ rmsBrightnessAmount: Number(e.target.value) })}
                     />
+                  </div>
+                  <div className="field">
+                    <label style={{ fontSize: "0.75rem" }}>Cover spacing</label>
+                    <input type="range" min={0.3} max={2.5} step={0.05} value={controls.spacing} onChange={(e) => updateControl({ spacing: Number(e.target.value) })} />
+                  </div>
+                  <div className="field">
+                    <label style={{ fontSize: "0.75rem" }}>Roaming speed</label>
+                    <input type="range" min={0} max={2.5} step={0.05} value={controls.roamSpeed} onChange={(e) => updateControl({ roamSpeed: Number(e.target.value) })} />
                   </div>
                 </div>
               )}

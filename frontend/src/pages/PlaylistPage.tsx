@@ -113,7 +113,7 @@ export function PlaylistPage() {
           <p style={{ color: "var(--text-dim)", marginTop: 0 }}>by {playlist.owner}</p>
         </div>
         <div style={{ display: "flex", gap: "0.5rem" }}>
-          <Link className="btn" to={`/playlist/${playlist.slug}/map`}>
+          <Link className="btn" to={`/playlist/${playlist.slug}`}>
             View as spacemap
           </Link>
         </div>

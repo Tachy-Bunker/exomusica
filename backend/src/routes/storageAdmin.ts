@@ -44,6 +44,7 @@ export async function storageAdminRoutes(app: FastifyInstance): Promise<void> {
         uploader: { select: { username: true } },
         message: { select: { channel: { select: { slug: true, name: true } } } },
         communityTrack: { select: { title: true, album: { select: { title: true, slug: true } } } },
+        communityAlbumCover: { select: { title: true, slug: true } },
       },
       orderBy: { createdAt: "desc" },
     });
@@ -57,6 +58,7 @@ export async function storageAdminRoutes(app: FastifyInstance): Promise<void> {
       uploader: a.uploader.username,
       channel: a.message?.channel ? `${a.message.channel.name} (${a.message.channel.slug})` : null,
       communityTrack: a.communityTrack ? `${a.communityTrack.title} — ${a.communityTrack.album.title}` : null,
+      communityAlbumCover: a.communityAlbumCover ? `Cover for ${a.communityAlbumCover.title}` : null,
       createdAt: a.createdAt,
     }));
   });

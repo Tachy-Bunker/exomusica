@@ -10,6 +10,7 @@ interface StorageAttachment {
   uploader: string;
   channel: string | null;
   communityTrack: string | null;
+  communityAlbumCover: string | null;
   createdAt: string;
 }
 
@@ -137,7 +138,7 @@ export function StorageAdminPage() {
               <td>{a.filename}</td>
               <td className="mono">{formatSize(a.sizeBytes)}</td>
               <td>{a.uploader}</td>
-              <td>{a.channel ?? a.communityTrack ?? "—"}</td>
+              <td>{a.channel ?? a.communityTrack ?? a.communityAlbumCover ?? "—"}</td>
               <td style={{ display: "flex", gap: "0.4rem" }}>
                 <a className="btn" href={a.url} download={a.filename}>
                   Download

@@ -275,6 +275,7 @@ model Attachment {
   createdAt        DateTime        @default(now())
   communityTrack   CommunityTrack?
   sampleBankItem   SampleBankItem?
+  communityAlbumCover CommunityAlbum?
 }
 
 model Album {
@@ -825,6 +826,8 @@ model CommunityAlbum {
   title       String
   composer    String
   coverArtUrl String?
+  coverAttachmentId Int? @unique
+  coverAttachment   Attachment? @relation(fields: [coverAttachmentId], references: [id])
   description String?  @db.Text
   createdAt   DateTime @default(now())
 

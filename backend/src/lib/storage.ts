@@ -136,6 +136,38 @@ export async function saveSiteImage(
   return { url: `/uploads/${subfolder}/${diskName}` };
 }
 
+/** Saves a community album cover — unlike saveSiteImage (admin-only site
+ *  assets, no quota), this is a regular user's own upload: it enforces
+ *  the same quota as their tracks, and creates a real Attachment row so
+ *  it shows up in Admin → Storage with the same migrate-to-archive.org
+ *  tool, which saveSiteImage's plain file-write never gave it access to. */
+export async function saveCommunityAlbumCover(uploaderId: number, filename: string, mimeType: string, buffer: Buffer) {
+  const user = await prisma.user.findUniqueOrThrow({ where: { id: uploaderId } });
+  const newTotal = user.storageUsedBytes + BigInt(buffer.length);
+  if (newTotal > user.storageLimitBytes) {
+    throw new Error(`this cover would push you over your ${Number(user.storageLimitBytes) / 1024 / 1024}MB storage limit`);
+  }
+
+  const ext =
+    ALLOWED_IMAGE_TYPES[mimeType] ??
+    ([".png", ".jpg", ".jpeg", ".webp", ".gif", ".bmp"].includes(path.extname(filename).toLowerCase()) ? path.extname(filename).toLowerCase() : null);
+  if (!ext) throw new Error(`unsupported image type "${mimeType}" — PNG, JPEG, WebP, or GIF only`);
+
+  const dir = path.join(UPLOADS_DIR, "community-albums");
+  await mkdir(dir, { recursive: true });
+  const diskName = `${randomUUID()}${ext}`;
+  await writeFile(path.join(dir, diskName), buffer);
+  const uniqueFilename = await uniqueAttachmentFilename(path.basename(filename));
+
+  const [attachment] = await prisma.$transaction([
+    prisma.attachment.create({
+      data: { uploaderId, filename: uniqueFilename, mimeType, sizeBytes: buffer.length, storagePath: `/uploads/community-albums/${diskName}` },
+    }),
+    prisma.user.update({ where: { id: uploaderId }, data: { storageUsedBytes: newTotal } }),
+  ]);
+  return attachment;
+}
+
 const ALLOWED_MEDIA_TYPES: Record<string, string> = {
   "image/png": ".png",
   "image/jpeg": ".jpg",

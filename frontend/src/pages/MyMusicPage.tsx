@@ -471,7 +471,7 @@ export function MyMusicPage() {
               </div>
 
               <div style={{ marginTop: "0.8rem", display: "flex", gap: "0.5rem" }}>
-                <Link className="btn" to={`/playlist/${managingPlaylistSlug}/map`}>
+                <Link className="btn" to={`/playlist/${managingPlaylistSlug}`}>
                   View as spacemap
                 </Link>
               </div>

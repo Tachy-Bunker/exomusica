@@ -82,8 +82,8 @@ export default function App() {
             <Route path="my-music" element={<MyMusicPage />} />
             <Route path="sample-bank" element={<SampleBankPage />} />
             <Route path="challenges" element={<ChallengesPage />} />
-            <Route path="playlist/:slug" element={<PlaylistPage />} />
-            <Route path="playlist/:slug/map" element={<PlaylistSpaceMapPage />} />
+            <Route path="playlist/:slug" element={<PlaylistSpaceMapPage />} />
+            <Route path="playlist/:slug/list" element={<PlaylistPage />} />
             <Route path="collaborator/:slug" element={<CollaboratorPage />} />
             <Route path="collaborator/:slug/spacemap" element={<CollaboratorSpacemapPage />} />
             <Route path="topic/:slug" element={<TopicPage />} />

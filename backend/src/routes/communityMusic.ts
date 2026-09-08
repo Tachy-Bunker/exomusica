@@ -2,7 +2,7 @@ import type { FastifyInstance } from "fastify";
 import type { Prisma } from "@prisma/client";
 import { prisma } from "../lib/prisma.js";
 import { requireAuth, requireAdmin, verifyToken } from "../lib/auth.js";
-import { saveCommunityTrackAudio, saveSiteImage } from "../lib/storage.js";
+import { saveCommunityTrackAudio, saveCommunityAlbumCover } from "../lib/storage.js";
 import { probeAudioDuration } from "../lib/audioProbe.js";
 
 async function uniqueCommunityAlbumSlug(title: string): Promise<string> {
@@ -197,8 +197,11 @@ export async function communityMusicRoutes(app: FastifyInstance): Promise<void> 
     if (!file) return reply.code(400).send({ error: "no file uploaded" });
     const buffer = await file.toBuffer();
     try {
-      const { url } = await saveSiteImage(file.filename, file.mimetype, buffer, "community-albums");
-      const updated = await prisma.communityAlbum.update({ where: { id: album.id }, data: { coverArtUrl: url } });
+      const attachment = await saveCommunityAlbumCover(req.user!.id, file.filename, file.mimetype, buffer);
+      const updated = await prisma.communityAlbum.update({
+        where: { id: album.id },
+        data: { coverArtUrl: attachment.storagePath, coverAttachmentId: attachment.id },
+      });
       return updated;
     } catch (err) {
       return reply.code(400).send({ error: err instanceof Error ? err.message : "upload failed" });
