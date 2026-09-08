@@ -8,7 +8,7 @@ import { getRMS } from "../lib/audioAnalyser";
 
 interface MapNode {
   id: number;
-  type: "TOPIC" | "ACTIVE_BRANCHES" | "GROWING_SEEDS";
+  type: "TOPIC" | "ACTIVE_BRANCHES" | "GROWING_SEEDS" | "PLAYLIST" | "SAMPLE_BANK_ITEM" | "CHALLENGE";
   parentId: number | null;
   x: number;
   y: number;
@@ -16,6 +16,9 @@ interface MapNode {
   size: number | null;
   hidden: boolean;
   channel: { slug: string; name: string; contentMarkdown: string | null } | null;
+  playlist: { slug: string; title: string; owner: { username: string } } | null;
+  sampleBankItem: { id: number; title: string; owner: { username: string } } | null;
+  challenge: { id: number; title: string } | null;
 }
 
 interface PreviewMessage {
@@ -26,10 +29,20 @@ interface PreviewMessage {
 
 // Site's own accent colors, not arbitrary ones — forum's established
 // identity is the accretion-disk orange-red, audio's is the pulsar blue.
+function nodeLabel(n: MapNode): string {
+  if (n.type === "PLAYLIST") return n.playlist?.title ?? "";
+  if (n.type === "SAMPLE_BANK_ITEM") return n.sampleBankItem?.title ?? "";
+  if (n.type === "CHALLENGE") return n.challenge?.title ?? "";
+  return n.channel?.name ?? "";
+}
+
 const NODE_STYLE: Record<MapNode["type"], { radius: number; color: string }> = {
   TOPIC: { radius: 14, color: "#e2703f" },
   ACTIVE_BRANCHES: { radius: 19, color: "#f0a06a" },
   GROWING_SEEDS: { radius: 19, color: "#4fa8e0" },
+  PLAYLIST: { radius: 16, color: "#8a6fd8" },
+  SAMPLE_BANK_ITEM: { radius: 14, color: "#5fbf8f" },
+  CHALLENGE: { radius: 16, color: "#d4b13f" },
 };
 
 // Matches the spacemap's own camera feel exactly, just adapted to
@@ -187,6 +200,18 @@ export function ForumMapPage() {
   }, [preview]);
 
   function goToNode(n: MapNode) {
+    if (n.type === "PLAYLIST" && n.playlist) {
+      navigate(`/playlist/${n.playlist.slug}`);
+      return;
+    }
+    if (n.type === "SAMPLE_BANK_ITEM") {
+      navigate(`/sample-bank`);
+      return;
+    }
+    if (n.type === "CHALLENGE") {
+      navigate(`/challenges`);
+      return;
+    }
     if (!n.channel) return;
     if (isDesktop && !n.channel.contentMarkdown) {
       openChat(n.channel.slug, n.channel.name);
@@ -200,8 +225,10 @@ export function ForumMapPage() {
       revealCluster(n.id);
       return;
     }
-    if (isDesktop) {
-      goToNode(n); // hover already shows the preview, so a click/E-lock just acts
+    // The new node types (playlist/sample/challenge) have no chat preview
+    // to show, so both desktop and mobile just navigate straight there.
+    if (isDesktop || n.type === "PLAYLIST" || n.type === "SAMPLE_BANK_ITEM" || n.type === "CHALLENGE") {
+      goToNode(n);
       return;
     }
     setActiveNodeId((id) => (id === n.id ? null : n.id));
@@ -636,7 +663,7 @@ export function ForumMapPage() {
                 fontSize={Math.max(9, radius * 0.85)}
                 fontFamily="var(--font-display)"
               >
-                {n.channel?.name ?? ""}
+                {nodeLabel(n)}
               </text>
             </g>
             </g>
@@ -668,7 +695,7 @@ export function ForumMapPage() {
                       gap: "0.3rem",
                     }}
                   >
-                    <div style={{ fontWeight: "bold", marginBottom: "0.1rem" }}>{activeNode.channel?.name}</div>
+                    <div style={{ fontWeight: "bold", marginBottom: "0.1rem" }}>{nodeLabel(activeNode)}</div>
                     <div ref={previewScrollRef} style={{ overflowY: "auto", flex: 1, minHeight: 0 }}>
                       {preview.length === 0 ? (
                         <div style={{ color: "var(--text-dim)" }}>No messages yet.</div>
