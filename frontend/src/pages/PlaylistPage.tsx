@@ -18,6 +18,7 @@ interface PlaylistItem {
   coverArtUrl: string | null;
   composer: string | null;
   branchSlug: string | null;
+  replayGainDb: number | null;
 }
 interface PlaylistDetail {
   id: number;
@@ -81,6 +82,8 @@ export function PlaylistPage() {
     composer: item.composer ?? playlist.owner,
     branchSlug: item.branchSlug,
     bookmarks: [],
+    replayGainDb: item.replayGainDb,
+    source: item.source,
   });
 
   const allPlayable = playlist.items.map(toPlayable);

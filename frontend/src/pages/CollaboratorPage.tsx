@@ -68,6 +68,8 @@ export function CollaboratorPage() {
         composer: collaborator.name,
         branchSlug: album.branchSlug,
         bookmarks: [],
+        replayGainDb: null,
+        source: "official" as const,
       })),
   );
 
@@ -180,6 +182,8 @@ export function CollaboratorPage() {
                           composer: collaborator!.name,
                           branchSlug: album.branchSlug,
                           bookmarks: [],
+                          replayGainDb: null,
+                          source: "official" as const,
                         },
                       ])
                     }

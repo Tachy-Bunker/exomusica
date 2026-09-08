@@ -15,6 +15,8 @@ export interface PlayableTrackDTO {
   composer: string;
   branchSlug: string;
   bookmarks: { label: string; timestampSeconds: number }[];
+  replayGainDb: number | null;
+  source: "official" | "community";
 }
 
 export interface MessageDTO {

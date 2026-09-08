@@ -9,6 +9,7 @@ let ctx: AudioContext | null = null;
 let analyser: AnalyserNode | null = null;
 let dataArray: Uint8Array | null = null;
 let boundEl: HTMLAudioElement | null = null;
+let gainNode: GainNode | null = null;
 
 // Guards against calling createMediaElementSource twice on the same
 // element, which throws — the WeakSet survives across bindAudioElement
@@ -23,14 +24,18 @@ export function initAnalyser(el: HTMLAudioElement): void {
   try {
     if (!ctx) ctx = new AudioContext();
     const source = ctx.createMediaElementSource(el);
+    const gain = ctx.createGain();
+    gain.gain.value = 1; // neutral until a track's ReplayGain value is applied
     const node = ctx.createAnalyser();
     node.fftSize = 256;
-    // Critical: connect through to the destination, or the element's
-    // audio output gets rerouted into this graph and never reaches
-    // speakers — this line is what keeps playback audible.
-    source.connect(node);
+    // Critical: connect all the way through to the destination, or the
+    // element's audio output gets rerouted into this graph and never
+    // reaches speakers — this chain is what keeps playback audible.
+    source.connect(gain);
+    gain.connect(node);
     node.connect(ctx.destination);
     analyser = node;
+    gainNode = gain;
     dataArray = new Uint8Array(node.fftSize);
     sourcedElements.add(el);
     boundEl = el;
@@ -38,6 +43,20 @@ export function initAnalyser(el: HTMLAudioElement): void {
     // Any failure here (e.g. a stricter browser policy) just means no
     // reactive visuals — never touch playback itself in this catch.
     console.error("Audio analyser setup failed (visuals only, playback unaffected):", err);
+  }
+}
+
+/** Sets the ReplayGain adjustment for the currently playing track, in dB
+ *  (converted to a linear multiplier). Safe to call even if the gain
+ *  node was never set up (e.g. analyser setup failed) — playback is
+ *  never affected either way, it just won't be volume-normalized. */
+export function setReplayGainDb(db: number | null): void {
+  if (!gainNode || !ctx) return;
+  try {
+    const linear = db === null ? 1 : Math.pow(10, db / 20);
+    gainNode.gain.setTargetAtTime(linear, ctx.currentTime, 0.05); // short ramp avoids an audible click on track change
+  } catch {
+    // Never let a gain-setting failure affect playback.
   }
 }
 

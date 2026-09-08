@@ -1,7 +1,8 @@
 import { create } from "zustand";
 import type { PlayableTrackDTO } from "./types";
 import { useAmbienceStore } from "./ambienceStore";
-import { resumeAnalyserContextIfNeeded } from "./audioAnalyser";
+import { resumeAnalyserContextIfNeeded, setReplayGainDb } from "./audioAnalyser";
+import { analyzeAndSubmitReplayGain } from "./replayGain";
 
 type RepeatMode = "off" | "all" | "one";
 
@@ -46,7 +47,7 @@ export function setMusicVolume(v: number): void {
   if (audioEl) audioEl.volume = v;
 }
 
-function shuffleArray<T>(arr: T[]): T[] {
+export function shuffleArray<T>(arr: T[]): T[] {
   const result = [...arr];
   for (let i = result.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
@@ -76,6 +77,8 @@ export const useAudioStore = create<AudioState>((set, get) => ({
     if (!isSameTrack) {
       set({ currentTrack: track, currentTime: 0, duration: 0 });
       if (el) el.src = track.fileUrl;
+      setReplayGainDb(track.replayGainDb);
+      if (track.replayGainDb === null) analyzeAndSubmitReplayGain({ id: track.id, fileUrl: track.fileUrl, source: track.source });
     }
     set({ isPlaying: true });
     el?.play().catch((err) => {

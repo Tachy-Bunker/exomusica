@@ -57,6 +57,8 @@ export function CollaboratorSpacemapPage() {
       composer: collaborator.name,
       branchSlug: album.branchSlug,
       bookmarks: [],
+      replayGainDb: null,
+      source: "official" as const,
     })),
   );
 

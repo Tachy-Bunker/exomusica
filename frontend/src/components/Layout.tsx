@@ -66,23 +66,28 @@ export function Layout() {
     function handleShortcut(e: KeyboardEvent) {
       if (isTypingTarget(e.target)) return;
       if (e.ctrlKey || e.metaKey || e.altKey) return;
-      switch (e.code) {
-        case "KeyC":
+      // These are letter shortcuts, matched to the actual character
+      // produced (e.key), not the physical key position (e.code) — on
+      // AZERTY and other non-QWERTY layouts, the key at the QWERTY "M"
+      // position doesn't produce "m" at all, so e.code would silently
+      // never fire for anyone not on QWERTY.
+      switch (e.key.toLowerCase()) {
+        case "c":
           navigate("/");
           break;
-        case "KeyK":
+        case "k":
           navigate("/wiki");
           break;
-        case "KeyN":
+        case "n":
           navigate("/news");
           break;
-        case "KeyM":
+        case "m":
           navigate("/discussion/map");
           break;
-        case "KeyU":
+        case "u":
           navigate("/cult");
           break;
-        case "KeyE":
+        case "e":
           if (suppressGlobalEShortcut) break; // a page with its own E-key handling (e.g. the forum map's crosshair reveal/enter) owns this keypress instead
           if (dockPageChannel && dockOpenChannelSlug !== dockPageChannel.slug) {
             dockOpenChat(dockPageChannel.slug, dockPageChannel.name, dockPageChannel.branchSlug);

@@ -338,6 +338,7 @@ model Track {
   format          AudioFormat
   durationSeconds Int?
   position        Int         @default(0)
+  replayGainDb    Float? // sitewide loudness normalization — null means not yet analyzed
 
   bookmarks    AudioBookmark[]
   collaborators TrackCollaborator[] // per-track composer/credit override, checkbox-selected from the album's collaborators
@@ -853,6 +854,7 @@ model CommunityTrack {
   durationSeconds Int?
   position        Int            @default(0)
   permission      TrackPermission @default(LISTEN_ONLY) // creator-set: how others may use this track
+  replayGainDb    Float? // sitewide loudness normalization — null means not yet analyzed
 
   playlistItems PlaylistItem[]
   likes         CommunityTrackLike[]

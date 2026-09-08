@@ -80,6 +80,17 @@ export async function communityMusicRoutes(app: FastifyInstance): Promise<void> 
     return tracks.map((t) => ({ id: t.id, title: t.title, albumTitle: t.album.title }));
   });
 
+  app.post<{ Params: { id: string }; Body: { gainDb: number } }>("/api/community-tracks/:id/replay-gain", async (req, reply) => {
+    const gainDb = req.body?.gainDb;
+    if (typeof gainDb !== "number" || !Number.isFinite(gainDb)) return reply.code(400).send({ error: "gainDb is required" });
+    const clamped = Math.max(-24, Math.min(24, gainDb));
+    const track = await prisma.communityTrack.findUnique({ where: { id: Number(req.params.id) }, select: { replayGainDb: true } });
+    if (!track) return reply.code(404).send({ error: "no such track" });
+    if (track.replayGainDb !== null) return { status: "already-set" };
+    await prisma.communityTrack.update({ where: { id: Number(req.params.id) }, data: { replayGainDb: clamped } });
+    return { status: "ok" };
+  });
+
   // --- Search for adding official tracks to a playlist ---------------------
 
   app.get<{ Querystring: { q?: string } }>("/api/tracks/search", async (req) => {
@@ -141,6 +152,8 @@ export async function communityMusicRoutes(app: FastifyInstance): Promise<void> 
         composer: t.composer ?? album.composer,
         branchSlug: null,
         bookmarks: [],
+        replayGainDb: t.replayGainDb,
+        source: "community" as const,
         permission: t.permission,
         likeCount: t._count.likes,
         likedByMe: myLikes.has(t.id),
@@ -376,6 +389,7 @@ export async function communityMusicRoutes(app: FastifyInstance): Promise<void> 
           coverArtUrl: item.track.album.coverArtUrl,
           composer: item.track.album.composer,
           branchSlug: item.track.album.branch?.slug ?? null,
+          replayGainDb: item.track.replayGainDb,
         };
       }
       const ct = item.communityTrack!;
@@ -391,6 +405,7 @@ export async function communityMusicRoutes(app: FastifyInstance): Promise<void> 
         coverArtUrl: ct.album.coverArtUrl,
         composer: ct.composer ?? ct.album.composer,
         branchSlug: null,
+        replayGainDb: ct.replayGainDb,
       };
     });
     // Distinct albums referenced by this playlist's tracks — the

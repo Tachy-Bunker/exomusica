@@ -77,6 +77,17 @@ export async function albumRoutes(app: FastifyInstance): Promise<void> {
     };
   });
 
+  app.post<{ Params: { id: string }; Body: { gainDb: number } }>("/api/tracks/:id/replay-gain", async (req, reply) => {
+    const gainDb = req.body?.gainDb;
+    if (typeof gainDb !== "number" || !Number.isFinite(gainDb)) return reply.code(400).send({ error: "gainDb is required" });
+    const clamped = Math.max(-24, Math.min(24, gainDb));
+    const track = await prisma.track.findUnique({ where: { id: Number(req.params.id) }, select: { replayGainDb: true } });
+    if (!track) return reply.code(404).send({ error: "no such track" });
+    if (track.replayGainDb !== null) return { status: "already-set" }; // first analysis wins, avoids concurrent-listener races
+    await prisma.track.update({ where: { id: Number(req.params.id) }, data: { replayGainDb: clamped } });
+    return { status: "ok" };
+  });
+
   app.post<{
     Body: { branchId: number; slug: string; title: string; composer: string; description?: string };
   }>("/api/admin/albums", { preHandler: requireAdmin }, async (req, reply) => {

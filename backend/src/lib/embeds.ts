@@ -25,6 +25,8 @@ export function trackToDTO(t: TrackWithRelations): PlayableTrackDTO {
     composer: perTrackComposers.length > 0 ? perTrackComposers.join(", ") : t.album.composer,
     branchSlug: t.album.branch.slug,
     bookmarks: t.bookmarks.map((b) => ({ label: b.label, timestampSeconds: b.timestampSeconds })),
+    replayGainDb: t.replayGainDb,
+    source: "official",
   };
 }
 

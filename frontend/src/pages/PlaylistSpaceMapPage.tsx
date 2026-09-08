@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import { api } from "../lib/api";
 import { useAuth } from "../lib/auth";
-import { useAudioStore } from "../lib/audioStore";
+import { useAudioStore, shuffleArray } from "../lib/audioStore";
 import { useIsDesktop } from "../lib/useIsDesktop";
 import { isTypingTarget } from "../lib/isTypingTarget";
 import { useSpacemapField, FX_DEFAULTS, type FxSettings } from "../lib/entoptic/useSpacemapField";
@@ -27,6 +27,7 @@ interface PlaylistItem {
   coverArtUrl: string | null;
   composer: string | null;
   branchSlug: string | null;
+  replayGainDb: number | null;
 }
 interface PlaylistDetail {
   id: number;
@@ -58,6 +59,25 @@ function hashOf(s: string): number {
   let h = 0;
   for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0;
   return h;
+}
+
+function playlistItemToPlayable(item: PlaylistItem): PlayableTrackDTO {
+  return {
+    id: item.trackId,
+    title: item.title,
+    fileUrl: item.fileUrl,
+    format: "MP3",
+    durationSeconds: item.durationSeconds,
+    position: 0,
+    albumTitle: item.albumTitle,
+    albumSlug: item.albumSlug,
+    coverArtUrl: item.coverArtUrl,
+    composer: item.composer ?? "",
+    branchSlug: item.branchSlug,
+    bookmarks: [],
+    replayGainDb: item.replayGainDb,
+    source: item.source,
+  };
 }
 
 const DEFAULT_COVER_SIZE = 56;
@@ -143,18 +163,27 @@ export function PlaylistSpaceMapPage() {
 
   // Scattered home positions, deterministic per album so revisits land the
   // same place — actual x/y then wander around that point each frame.
+  // Cartesian random points (rather than polar angle+radius, which tends
+  // to look like uniform rings) pushed out to a guaranteed minimum
+  // distance from the center Play-all button, both scaled by the
+  // spacing control.
   useEffect(() => {
     if (!playlist) return;
+    const minDist = 170 * controls.spacing;
+    const spread = 420 * controls.spacing;
     nodesRef.current = playlist.albums.map((a) => {
       const seed = hashOf(`${a.source}:${a.slug}`);
       const rand = seededRand(seed);
-      const angle = rand() * Math.PI * 2;
-      const radius = 120 + rand() * 260;
-      const homeX = Math.cos(angle) * radius;
-      const homeY = Math.sin(angle) * radius;
+      let homeX = (rand() - 0.5) * 2 * spread;
+      let homeY = (rand() - 0.5) * 2 * spread;
+      const dist = Math.hypot(homeX, homeY) || 0.001;
+      if (dist < minDist) {
+        homeX = (homeX / dist) * minDist;
+        homeY = (homeY / dist) * minDist;
+      }
       return { ...a, id: seed % 1000000, homeX, homeY, x: homeX, y: homeY, wanderSeed: rand() * 1000 };
     });
-  }, [playlist]);
+  }, [playlist, controls.spacing]);
 
   async function playAlbum(node: AlbumNode) {
     const tracks =
@@ -162,32 +191,27 @@ export function PlaylistSpaceMapPage() {
         ? (await api<{ tracks: PlayableTrackDTO[] }>(`/api/albums/${node.slug}`)).tracks
         : (await api<{ tracks: PlayableTrackDTO[] }>(`/api/community-albums/${node.slug}`)).tracks;
     if (tracks.length === 0) return;
-    const [first, ...rest] = tracks;
+    const [first, ...restOfAlbum] = tracks;
     play(first);
     clearQueue();
-    addToQueue(rest);
+    addToQueue(restOfAlbum);
+
     const p = playlistRef.current;
-    if (p) setCurrentPlaylist({ slug: p.slug, title: p.title });
+    if (p) {
+      setCurrentPlaylist({ slug: p.slug, title: p.title });
+      // Smart contextualization: once this album finishes, keep playing
+      // through the rest of the playlist rather than just stopping —
+      // shuffled, and with this album's own tracks excluded so nothing
+      // repeats right after it just played.
+      const restOfPlaylist = p.items.filter((item) => !(item.source === node.source && item.albumSlug === node.slug)).map(playlistItemToPlayable);
+      addToQueue(shuffleArray(restOfPlaylist));
+    }
   }
 
   function playAllPlaylist() {
     const p = playlistRef.current;
     if (!p || p.items.length === 0) return;
-    const toPlayable = (item: PlaylistItem): PlayableTrackDTO => ({
-      id: item.trackId,
-      title: item.title,
-      fileUrl: item.fileUrl,
-      format: "MP3",
-      durationSeconds: item.durationSeconds,
-      position: 0,
-      albumTitle: item.albumTitle,
-      albumSlug: item.albumSlug,
-      coverArtUrl: item.coverArtUrl,
-      composer: item.composer ?? "",
-      branchSlug: item.branchSlug,
-      bookmarks: [],
-    });
-    const all = p.items.map(toPlayable);
+    const all = p.items.map(playlistItemToPlayable);
     const [first, ...rest] = all;
     play(first);
     clearQueue();
@@ -424,7 +448,7 @@ export function PlaylistSpaceMapPage() {
                   </div>
                   <div className="field">
                     <label style={{ fontSize: "0.75rem" }}>Cover spacing</label>
-                    <input type="range" min={0.3} max={2.5} step={0.05} value={controls.spacing} onChange={(e) => updateControl({ spacing: Number(e.target.value) })} />
+                    <input type="range" min={0.3} max={6} step={0.05} value={controls.spacing} onChange={(e) => updateControl({ spacing: Number(e.target.value) })} />
                   </div>
                   <div className="field">
                     <label style={{ fontSize: "0.75rem" }}>Roaming speed</label>
