@@ -112,6 +112,8 @@ export function PlaylistSpaceMapPage() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const mapQuality = useMapQualityStore((s) => s.quality);
   const setMapQuality = useMapQualityStore((s) => s.setQuality);
+  const softwareRendererName = useMapQualityStore((s) => s.softwareRendererName);
+  const [dismissedSwNotice, setDismissedSwNotice] = useState(false);
 
   const containerRef = useRef<HTMLDivElement>(null);
   const cameraRef = useRef({ x: 0, y: 0, vx: 0, vy: 0 });
@@ -403,12 +405,40 @@ export function PlaylistSpaceMapPage() {
               Quality
             </label>
             <select value={mapQuality} onChange={(e) => setMapQuality(Number(e.target.value))} style={{ fontSize: "0.7rem", padding: "0.1rem" }}>
+              <option value={0.2}>Potato</option>
               <option value={0.4}>Low</option>
               <option value={0.6}>Medium</option>
               <option value={1}>High</option>
               <option value={1.5}>Ultra</option>
             </select>
           </div>
+          {softwareRendererName && !dismissedSwNotice && (
+            <div
+              style={{
+                position: "absolute",
+                top: 52,
+                left: 12,
+                zIndex: 5,
+                maxWidth: 280,
+                background: "var(--bg-elevated)",
+                border: "1px solid var(--accent-forum)",
+                borderRadius: "var(--radius)",
+                padding: "0.5rem 0.6rem",
+                fontSize: "0.72rem",
+                color: "var(--text-dim)",
+              }}
+            >
+              <button
+                onClick={() => setDismissedSwNotice(true)}
+                style={{ float: "right", background: "none", border: "none", color: "var(--text-dim)", cursor: "pointer", fontSize: "0.8rem", lineHeight: 1 }}
+                title="Dismiss"
+              >
+                ×
+              </button>
+              Your browser is rendering this without hardware acceleration, which is slow — quality's been dropped
+              automatically. This is a browser/GPU setting, not something this site controls.
+            </div>
+          )}
           {isDesktop && (
             <p style={{ position: "absolute", bottom: 12, left: "50%", transform: "translateX(-50%)", zIndex: 5, fontSize: "0.75rem", color: "var(--text-dim)" }}>
               WASD to navigate

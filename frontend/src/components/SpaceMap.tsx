@@ -176,6 +176,8 @@ export function SpaceMap({
   const currentTrack = useAudioStore((s) => s.currentTrack);
   const mapQuality = useMapQualityStore((s) => s.quality);
   const setMapQuality = useMapQualityStore((s) => s.setQuality);
+  const softwareRendererName = useMapQualityStore((s) => s.softwareRendererName);
+  const [dismissedSwNotice, setDismissedSwNotice] = useState(false);
 
   useEffect(() => {
     const branch = currentTrack ? branches.find((b) => b.slug === currentTrack.branchSlug) : null;
@@ -641,12 +643,41 @@ export function SpaceMap({
             onChange={(e) => setMapQuality(Number(e.target.value))}
             style={{ fontSize: "0.7rem", padding: "0.1rem" }}
           >
+            <option value={0.2}>Potato</option>
             <option value={0.4}>Low</option>
             <option value={0.6}>Medium</option>
             <option value={1}>High</option>
             <option value={1.5}>Ultra</option>
           </select>
         </div>
+        {softwareRendererName && !dismissedSwNotice && (
+          <div
+            style={{
+              position: "absolute",
+              top: 52,
+              right: 12,
+              zIndex: 5,
+              maxWidth: 280,
+              background: "var(--bg-elevated)",
+              border: "1px solid var(--accent-forum)",
+              borderRadius: "var(--radius)",
+              padding: "0.5rem 0.6rem",
+              fontSize: "0.72rem",
+              color: "var(--text-dim)",
+            }}
+          >
+            <button
+              onClick={() => setDismissedSwNotice(true)}
+              style={{ float: "right", background: "none", border: "none", color: "var(--text-dim)", cursor: "pointer", fontSize: "0.8rem", lineHeight: 1 }}
+              title="Dismiss"
+            >
+              ×
+            </button>
+            Your browser is rendering this without hardware acceleration, which is slow — quality's been dropped
+            automatically. This is a browser/GPU setting, not something this site controls; check your browser's
+            hardware acceleration setting if you'd like it faster.
+          </div>
+        )}
         <div ref={fieldContainerRef} className="space-map-entoptic-field">
           <canvas ref={fieldCanvasRef} />
           <canvas ref={wardenCanvasRef} />

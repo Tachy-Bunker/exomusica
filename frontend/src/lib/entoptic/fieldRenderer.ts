@@ -102,6 +102,7 @@ export class FieldRenderer {
           console.warn(
             `Spacemap: WebGL is running on a software renderer ("${renderer}") instead of the GPU — this will be slow. Check that hardware acceleration is enabled for this browser specifically.`,
           );
+          useMapQualityStore.getState().setSoftwareRendererName(renderer);
         }
       }
     } catch {
