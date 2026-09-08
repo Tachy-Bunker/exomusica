@@ -86,6 +86,28 @@ export class FieldRenderer {
     if (!this.gl) return;
     const gl = this.gl;
 
+    // Diagnostic only — never affects rendering. If the GPU is
+    // blacklisted or hardware acceleration is off, WebGL can silently
+    // fall back to a software rasterizer (SwiftShader/llvmpipe/etc)
+    // rather than failing outright, which would fully explain identical
+    // code performing very differently across browsers that share the
+    // same rendering engine, since acceleration is configured per-browser
+    // even within the same engine family.
+    try {
+      const debugInfo = gl.getExtension("WEBGL_debug_renderer_info");
+      if (debugInfo) {
+        const renderer = gl.getParameter(debugInfo.UNMASKED_RENDERER_WEBGL) as string;
+        const isSoftware = /swiftshader|llvmpipe|software|microsoft basic render/i.test(renderer);
+        if (isSoftware) {
+          console.warn(
+            `Spacemap: WebGL is running on a software renderer ("${renderer}") instead of the GPU — this will be slow. Check that hardware acceleration is enabled for this browser specifically.`,
+          );
+        }
+      }
+    } catch {
+      // Diagnostic-only, never let this affect actual rendering setup.
+    }
+
     this.program = gl.createProgram()!;
     gl.attachShader(this.program, compile(gl, gl.VERTEX_SHADER, vertexSrc));
     gl.attachShader(this.program, compile(gl, gl.FRAGMENT_SHADER, fieldFragmentSrc));
