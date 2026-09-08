@@ -85,9 +85,10 @@ export function PlaylistSpaceMapPage() {
   const clearQueue = useAudioStore((s) => s.clearQueue);
   const setCurrentPlaylist = useAudioStore((s) => s.setCurrentPlaylist);
   const [playlist, setPlaylist] = useState<PlaylistDetail | null>(null);
-  const [coverSize, setCoverSize] = useState(DEFAULT_COVER_SIZE);
+  const [controls, setControls] = useState({ coverSize: DEFAULT_COVER_SIZE, bgBright: 0.5, bgSat: 0.5, bgContrast: 0.5, rmsBrightnessAmount: 0.3 });
   const [, forceRender] = useState(0);
   const [lockedId, setLockedId] = useState<number | null>(null);
+  const [settingsOpen, setSettingsOpen] = useState(false);
 
   const containerRef = useRef<HTMLDivElement>(null);
   const cameraRef = useRef({ x: 0, y: 0, vx: 0, vy: 0 });
@@ -100,23 +101,40 @@ export function PlaylistSpaceMapPage() {
   const lockProgressRef = useRef(0);
   const playlistRef = useRef<PlaylistDetail | null>(null);
   playlistRef.current = playlist;
+  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   function reload() {
     if (!slug) return;
     api<PlaylistDetail>(`/api/playlists/${slug}`).then((p) => {
       setPlaylist(p);
-      setCoverSize(p.fxSettings?.coverSize ?? DEFAULT_COVER_SIZE);
+      setControls({
+        coverSize: p.fxSettings?.coverSize ?? DEFAULT_COVER_SIZE,
+        bgBright: p.fxSettings?.bgBright ?? 0.5,
+        bgSat: p.fxSettings?.bgSat ?? 0.5,
+        bgContrast: p.fxSettings?.bgContrast ?? 0.5,
+        rmsBrightnessAmount: p.fxSettings?.rmsBrightnessAmount ?? 0.3,
+      });
     });
   }
   useEffect(reload, [slug]);
 
-  async function saveCoverSize(size: number) {
-    setCoverSize(size);
-    if (!playlist) return;
-    await api(`/api/playlists/${playlist.id}/fx-settings`, { method: "PATCH", body: JSON.stringify({ coverSize: size }) });
+  // Updates the visible slider immediately, but debounces the actual save
+  // — five sliders each firing a request per drag tick would otherwise
+  // spam the API, unlike the single cover-size slider this replaced.
+  function updateControl(patch: Partial<typeof controls>) {
+    setControls((c) => ({ ...c, ...patch }));
+    if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    saveTimerRef.current = setTimeout(() => {
+      const p = playlistRef.current;
+      if (!p) return;
+      api(`/api/playlists/${p.id}/fx-settings`, { method: "PATCH", body: JSON.stringify({ ...controls, ...patch }) }).catch(() => {});
+    }, 400);
   }
 
-  const fxSettings: FxSettings = useMemo(() => ({ ...FX_DEFAULTS, ...(playlist?.fxSettings ?? {}) }), [playlist]);
+  const fxSettings: FxSettings = useMemo(
+    () => ({ ...FX_DEFAULTS, bgBright: controls.bgBright, bgSat: controls.bgSat, bgContrast: controls.bgContrast, rmsBrightnessAmount: controls.rmsBrightnessAmount }),
+    [controls],
+  );
   const { containerRef: fieldContainerRef, fieldCanvasRef, wardenCanvasRef } = useSpacemapField(fxSettings);
 
   // Scattered home positions, deterministic per album so revisits land the
@@ -354,22 +372,53 @@ export function PlaylistSpaceMapPage() {
             </p>
           )}
           {user?.id === playlist.ownerId && (
-            <div
-              style={{
-                position: "absolute",
-                top: 12,
-                right: 12,
-                zIndex: 5,
-                display: "flex",
-                alignItems: "center",
-                gap: "0.4rem",
-                background: "var(--bg-elevated)",
-                padding: "0.3rem 0.6rem",
-                borderRadius: "var(--radius)",
-              }}
-            >
-              <label style={{ fontSize: "0.75rem" }}>Cover size</label>
-              <input type="range" min={32} max={140} value={coverSize} onChange={(e) => saveCoverSize(Number(e.target.value))} />
+            <div style={{ position: "absolute", top: 12, right: 12, zIndex: 5 }}>
+              <button className="btn" onClick={() => setSettingsOpen((v) => !v)}>
+                ⚙ {settingsOpen ? "Close" : "Settings"}
+              </button>
+              {settingsOpen && (
+                <div
+                  style={{
+                    marginTop: "0.4rem",
+                    background: "var(--bg-elevated)",
+                    border: "1px solid var(--border)",
+                    padding: "0.6rem",
+                    borderRadius: "var(--radius)",
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: "0.4rem",
+                    minWidth: 200,
+                  }}
+                >
+                  <div className="field">
+                    <label style={{ fontSize: "0.75rem" }}>Cover size — {controls.coverSize}</label>
+                    <input type="range" min={32} max={140} value={controls.coverSize} onChange={(e) => updateControl({ coverSize: Number(e.target.value) })} />
+                  </div>
+                  <div className="field">
+                    <label style={{ fontSize: "0.75rem" }}>Background brightness</label>
+                    <input type="range" min={0} max={1} step={0.01} value={controls.bgBright} onChange={(e) => updateControl({ bgBright: Number(e.target.value) })} />
+                  </div>
+                  <div className="field">
+                    <label style={{ fontSize: "0.75rem" }}>Background saturation</label>
+                    <input type="range" min={0} max={1} step={0.01} value={controls.bgSat} onChange={(e) => updateControl({ bgSat: Number(e.target.value) })} />
+                  </div>
+                  <div className="field">
+                    <label style={{ fontSize: "0.75rem" }}>Background contrast</label>
+                    <input type="range" min={0} max={1} step={0.01} value={controls.bgContrast} onChange={(e) => updateControl({ bgContrast: Number(e.target.value) })} />
+                  </div>
+                  <div className="field">
+                    <label style={{ fontSize: "0.75rem" }}>Reacts to audio (RMS)</label>
+                    <input
+                      type="range"
+                      min={0}
+                      max={1}
+                      step={0.01}
+                      value={controls.rmsBrightnessAmount}
+                      onChange={(e) => updateControl({ rmsBrightnessAmount: Number(e.target.value) })}
+                    />
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
@@ -386,20 +435,20 @@ export function PlaylistSpaceMapPage() {
                 textAlign: "center",
                 textDecoration: "none",
                 color: "var(--text)",
-                width: coverSize * 1.4,
+                width: controls.coverSize * 1.4,
               }}
             >
               <div
                 style={{
-                  width: coverSize,
-                  height: coverSize,
+                  width: controls.coverSize,
+                  height: controls.coverSize,
                   margin: "0 auto",
                   borderRadius: "var(--radius)",
                   border: "1px solid var(--border)",
                   background: a.coverArtUrl ? `url(${a.coverArtUrl}) center/cover` : "var(--bg-elevated)",
                 }}
               />
-              <div style={{ fontSize: Math.max(9, coverSize * 0.125), marginTop: "0.2rem", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+              <div style={{ fontSize: Math.max(9, controls.coverSize * 0.125), marginTop: "0.2rem", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                 {a.title}
               </div>
             </Link>
@@ -442,20 +491,20 @@ export function PlaylistSpaceMapPage() {
           >
             <div
               style={{
-                width: coverSize * 0.9,
-                height: coverSize * 0.9,
+                width: controls.coverSize * 0.9,
+                height: controls.coverSize * 0.9,
                 borderRadius: "50%",
                 border: "2px solid var(--accent-audio)",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
                 background: "var(--bg-elevated)",
-                fontSize: coverSize * 0.35,
+                fontSize: controls.coverSize * 0.35,
               }}
             >
               ▶
             </div>
-            <div style={{ fontSize: Math.max(9, coverSize * 0.11), marginTop: "0.15rem" }}>Play all</div>
+            <div style={{ fontSize: Math.max(9, controls.coverSize * 0.11), marginTop: "0.15rem" }}>Play all</div>
           </div>
 
           <div className="space-reticle" ref={reticleRef}>
