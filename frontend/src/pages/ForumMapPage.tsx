@@ -595,6 +595,7 @@ export function ForumMapPage() {
                 transform={`translate(${n.x}, ${n.y})`}
                 style={{ cursor: "pointer" }}
               >
+                <circle r={radius * 1.5} fill="transparent" />
                 <circle r={radius * 1.6} fill="none" stroke="var(--text-dim)" strokeDasharray="4 4" opacity={0.6} style={{ animation: "forumMapHandleSpin 12s linear infinite", transformOrigin: "0px 0px" }} />
                 <circle r={radius} fill="var(--bg-elevated)" stroke={color} strokeWidth={2} style={{ animation: "forumMapTwinkle 2s ease-in-out infinite" }} />
                 <text y={5} textAnchor="middle" fontSize={radius} fill={color}>+</text>
@@ -614,6 +615,7 @@ export function ForumMapPage() {
               onMouseEnter={() => isDesktop && setActiveNodeId(n.id)}
               onMouseLeave={() => isDesktop && setActiveNodeId((id) => (id === n.id ? null : id))}
             >
+            <circle r={radius * 1.5} fill="transparent" />
             <g style={{ animation: "forumMapReveal 0.4s ease-out", transformOrigin: "0px 0px" }}>
               {/* Neural dendrites — forked branches with a small glowing
                   terminal at each fork, like a synapse. */}

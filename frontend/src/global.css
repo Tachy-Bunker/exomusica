@@ -141,12 +141,17 @@ button {
   font-family: var(--font-display);
   font-size: 1.25rem;
   letter-spacing: 0.02em;
+  text-decoration: none;
 }
 
 .top-nav nav {
   display: flex;
   gap: clamp(0.5rem, 3vw, 1.1rem);
   font-size: 0.9rem;
+}
+
+.top-nav nav a {
+  text-decoration: none;
 }
 
 @media (max-width: 420px) {

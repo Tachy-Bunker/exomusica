@@ -79,7 +79,7 @@ export function Layout() {
         case "KeyM":
           navigate("/discussion/map");
           break;
-        case "KeyY":
+        case "KeyU":
           navigate("/cult");
           break;
         case "KeyE":
@@ -293,7 +293,7 @@ export function Layout() {
           <Link to="/wiki">{isDesktop ? underlineLetter("Wiki", "k") : "Wiki"}</Link>
           <Link to="/news">{isDesktop ? underlineLetter("News", "n") : "News"}</Link>
           <Link to="/discussion/map">{isDesktop ? underlineLetter("Forums", "m") : "Forums"}</Link>
-          {isDesktop && <Link to="/cult">{underlineLetter("Cult Activities", "y")}</Link>}
+          {isDesktop && <Link to="/cult">{underlineLetter("Cult Activities", "u")}</Link>}
         </nav>
         <div className="spacer" />
         {user && isDesktop && <OnlineOrbs />}

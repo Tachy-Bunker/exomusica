@@ -107,6 +107,31 @@ export function ForumMapAdminPage() {
     load();
   }
 
+  const [copiedColor, setCopiedColor] = useState<string | null>(null);
+  const [selectedNodeIds, setSelectedNodeIds] = useState<Set<number>>(new Set());
+
+  function toggleNodeSelected(id: number) {
+    setSelectedNodeIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function copyColor(hex: string) {
+    setCopiedColor(hex);
+    navigator.clipboard?.writeText(hex).catch(() => {});
+  }
+
+  async function pasteColorToSelected() {
+    if (!copiedColor || selectedNodeIds.size === 0) return;
+    await Promise.all(
+      [...selectedNodeIds].map((id) => api(`/api/admin/forum-map/nodes/${id}`, { method: "PATCH", body: JSON.stringify({ color: copiedColor }) })),
+    );
+    load();
+  }
+
   async function toggleHidden(id: number, hidden: boolean) {
     await api(`/api/admin/forum-map/nodes/${id}`, { method: "PATCH", body: JSON.stringify({ hidden }) });
     load();
@@ -272,9 +297,28 @@ export function ForumMapAdminPage() {
         ))}
       </svg>
 
+      <div style={{ display: "flex", alignItems: "center", gap: "0.6rem", margin: "0.6rem 0" }}>
+        {copiedColor && (
+          <span style={{ display: "flex", alignItems: "center", gap: "0.3rem", fontSize: "0.8rem" }}>
+            Copied:
+            <span style={{ display: "inline-block", width: 16, height: 16, borderRadius: 3, background: copiedColor, border: "1px solid var(--border)" }} />
+            {copiedColor}
+          </span>
+        )}
+        <button className="btn btn-primary" onClick={pasteColorToSelected} disabled={!copiedColor || selectedNodeIds.size === 0}>
+          Paste color to selected ({selectedNodeIds.size})
+        </button>
+        {selectedNodeIds.size > 0 && (
+          <button className="btn" onClick={() => setSelectedNodeIds(new Set())}>
+            Clear selection
+          </button>
+        )}
+      </div>
+
       <table style={{ width: "100%", marginTop: "1rem", fontSize: "0.85rem" }}>
         <thead>
           <tr>
+            <th />
             <th style={{ textAlign: "left" }}>Node</th>
             <th style={{ textAlign: "left" }}>Parent</th>
             <th style={{ textAlign: "left" }}>Color</th>
@@ -286,6 +330,9 @@ export function ForumMapAdminPage() {
         <tbody>
           {nodes.map((n) => (
             <tr key={n.id}>
+              <td>
+                <input type="checkbox" checked={selectedNodeIds.has(n.id)} onChange={() => toggleNodeSelected(n.id)} />
+              </td>
               <td>{nodeLabel(n)}</td>
               <td>
                 <select value={n.parentId ?? ""} onChange={(e) => setParent(n.id, e.target.value ? Number(e.target.value) : null)}>
@@ -306,6 +353,14 @@ export function ForumMapAdminPage() {
                   onChange={(e) => setNodeStyle(n.id, { color: e.target.value })}
                   style={{ width: 32, height: 24, padding: 0 }}
                 />
+                <button
+                  className="btn"
+                  style={{ fontSize: "0.65rem", marginLeft: "0.2rem", padding: "0.1rem 0.3rem" }}
+                  onClick={() => copyColor(n.color ?? (n.type === "TOPIC" ? "#e2703f" : n.type === "ACTIVE_BRANCHES" ? "#f0a06a" : "#4fa8e0"))}
+                  title="Copy this hex color"
+                >
+                  copy
+                </button>
                 {n.color && (
                   <button className="btn" style={{ fontSize: "0.65rem", marginLeft: "0.2rem", padding: "0.1rem 0.3rem" }} onClick={() => setNodeStyle(n.id, { color: null })} title="Reset to default color">
                     reset
