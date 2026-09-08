@@ -1,4 +1,5 @@
 import { vertexSrc, fieldFragmentSrc } from "./shaders";
+import { useMapQualityStore } from "../mapQualityStore";
 
 export interface FieldSource {
   x: number;
@@ -129,10 +130,11 @@ export class FieldRenderer {
     this.cssWidth = cssWidth;
     this.cssHeight = cssHeight;
     const isMobile = cssWidth < 768;
-    const dpr = Math.min(window.devicePixelRatio || 1, isMobile ? 1 : 1.4);
-    const maxPixels = isMobile ? 220000 : 480000;
+    const quality = useMapQualityStore.getState().quality;
+    const dpr = Math.min(window.devicePixelRatio || 1, (isMobile ? 1 : 1.4) * quality);
+    const maxPixels = (isMobile ? 220000 : 480000) * quality;
     const fit = Math.sqrt(maxPixels / (cssWidth * cssHeight));
-    const bgScale = Math.max(0.28, Math.min(isMobile ? 0.45 : 0.62, dpr, fit));
+    const bgScale = Math.max(0.2, Math.min((isMobile ? 0.45 : 0.62) * quality, dpr, fit));
     this.canvas.width = Math.max(1, (cssWidth * bgScale) | 0);
     this.canvas.height = Math.max(1, (cssHeight * bgScale) | 0);
     if (this.gl) this.gl.viewport(0, 0, this.canvas.width, this.canvas.height);

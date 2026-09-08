@@ -219,6 +219,7 @@ export async function messageRoutes(app: FastifyInstance): Promise<void> {
 
       const mentioned = await resolveMentions(prisma, contentRaw, req.user!.id);
       for (const m of mentioned) {
+        if (m.isGhost) continue;
         void createNotification(
           m.id,
           "mention",

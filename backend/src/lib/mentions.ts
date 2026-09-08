@@ -16,28 +16,33 @@ export async function resolveMentions(
   prisma: PrismaClient,
   content: string,
   authorId: number,
-): Promise<{ id: number; username: string; discordUserId: string | null; discordUsername: string | null }[]> {
+): Promise<{ id: number; username: string; discordUserId: string | null; discordUsername: string | null; isGhost: boolean }[]> {
   const usernames = extractMentionedUsernames(content);
   if (usernames.length === 0) return [];
   const users = await prisma.user.findMany({
-    where: { username: { in: usernames, mode: "insensitive" }, isGhost: false, id: { not: authorId } },
+    where: { username: { in: usernames, mode: "insensitive" }, id: { not: authorId } },
     select: {
       id: true,
       username: true,
       discordUserId: true,
       discordUsername: true,
+      discordId: true, // a ghost's own snowflake, or a real account's if one was ever captured directly
+      isGhost: true,
       linkedGhosts: { select: { discordId: true }, where: { discordId: { not: null } }, take: 1 },
     },
   });
-  // A user's own discordUserId is only set if they separately opted into
-  // DM features — but anyone who's ever been bridged from Discord has a
-  // ghost linked to them with their real snowflake, which is the more
-  // complete and reliable source for a plain @mention translation.
+  // Resolution order: a user's own opt-in discordUserId (set for DM
+  // features) first, then their own discordId if they have one directly
+  // (this is how a ghost — a Discord-only person with no website
+  // account — resolves, since that's the only place their id lives),
+  // then finally a linked ghost's discordId for a real account that's
+  // never set either of its own fields but has been bridged before.
   return users.map((u) => ({
     id: u.id,
     username: u.username,
-    discordUserId: u.discordUserId ?? u.linkedGhosts[0]?.discordId ?? null,
+    discordUserId: u.discordUserId ?? u.discordId ?? u.linkedGhosts[0]?.discordId ?? null,
     discordUsername: u.discordUsername,
+    isGhost: u.isGhost,
   }));
 }
 

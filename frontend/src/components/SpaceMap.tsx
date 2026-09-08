@@ -14,6 +14,7 @@ import { useAudioStore } from "../lib/audioStore";
 import { api } from "../lib/api";
 import type { PlayableTrackDTO } from "../lib/types";
 import { useGlitchText } from "../lib/useGlitchText";
+import { useMapQualityStore } from "../lib/mapQualityStore";
 
 interface MapNode {
   id: number;
@@ -173,6 +174,8 @@ export function SpaceMap({
   const addToQueue = useAudioStore((s) => s.addToQueue);
   const clearQueue = useAudioStore((s) => s.clearQueue);
   const currentTrack = useAudioStore((s) => s.currentTrack);
+  const mapQuality = useMapQualityStore((s) => s.quality);
+  const setMapQuality = useMapQualityStore((s) => s.setQuality);
 
   useEffect(() => {
     const branch = currentTrack ? branches.find((b) => b.slug === currentTrack.branchSlug) : null;
@@ -629,6 +632,21 @@ export function SpaceMap({
         <button className="btn space-map-fullscreen" onClick={toggleFullscreen} title={isFullscreen ? "Exit fullscreen" : "Fullscreen"}>
           {isFullscreen ? "⤡" : "⤢"}
         </button>
+        <div style={{ position: "absolute", top: 12, right: 56, zIndex: 5, display: "flex", alignItems: "center", gap: "0.3rem", background: "var(--bg-elevated)", padding: "0.2rem 0.5rem", borderRadius: "var(--radius)" }}>
+          <label style={{ fontSize: "0.7rem", color: "var(--text-dim)" }} title="Lower this if the map feels laggy">
+            Quality
+          </label>
+          <select
+            value={mapQuality}
+            onChange={(e) => setMapQuality(Number(e.target.value))}
+            style={{ fontSize: "0.7rem", padding: "0.1rem" }}
+          >
+            <option value={0.4}>Low</option>
+            <option value={0.6}>Medium</option>
+            <option value={1}>High</option>
+            <option value={1.5}>Ultra</option>
+          </select>
+        </div>
         <div ref={fieldContainerRef} className="space-map-entoptic-field">
           <canvas ref={fieldCanvasRef} />
           <canvas ref={wardenCanvasRef} />

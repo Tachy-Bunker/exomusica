@@ -6,6 +6,7 @@ import { useAudioStore, shuffleArray } from "../lib/audioStore";
 import { useIsDesktop } from "../lib/useIsDesktop";
 import { isTypingTarget } from "../lib/isTypingTarget";
 import { useSpacemapField, FX_DEFAULTS, type FxSettings } from "../lib/entoptic/useSpacemapField";
+import { useMapQualityStore } from "../lib/mapQualityStore";
 import { Joystick } from "../components/Joystick";
 import type { PlayableTrackDTO } from "../lib/types";
 
@@ -109,6 +110,8 @@ export function PlaylistSpaceMapPage() {
   const [, forceRender] = useState(0);
   const [lockedId, setLockedId] = useState<number | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const mapQuality = useMapQualityStore((s) => s.quality);
+  const setMapQuality = useMapQualityStore((s) => s.setQuality);
 
   const containerRef = useRef<HTMLDivElement>(null);
   const cameraRef = useRef({ x: 0, y: 0, vx: 0, vy: 0 });
@@ -395,6 +398,17 @@ export function PlaylistSpaceMapPage() {
           <button className="btn" style={{ position: "absolute", top: 12, left: 12, zIndex: 5 }} onClick={() => navigate(`/playlist/${playlist.slug}/list`)}>
             View as list
           </button>
+          <div style={{ position: "absolute", top: 12, left: 130, zIndex: 5, display: "flex", alignItems: "center", gap: "0.3rem", background: "var(--bg-elevated)", padding: "0.2rem 0.5rem", borderRadius: "var(--radius)" }}>
+            <label style={{ fontSize: "0.7rem", color: "var(--text-dim)" }} title="Lower this if the map feels laggy">
+              Quality
+            </label>
+            <select value={mapQuality} onChange={(e) => setMapQuality(Number(e.target.value))} style={{ fontSize: "0.7rem", padding: "0.1rem" }}>
+              <option value={0.4}>Low</option>
+              <option value={0.6}>Medium</option>
+              <option value={1}>High</option>
+              <option value={1.5}>Ultra</option>
+            </select>
+          </div>
           {isDesktop && (
             <p style={{ position: "absolute", bottom: 12, left: "50%", transform: "translateX(-50%)", zIndex: 5, fontSize: "0.75rem", color: "var(--text-dim)" }}>
               WASD to navigate

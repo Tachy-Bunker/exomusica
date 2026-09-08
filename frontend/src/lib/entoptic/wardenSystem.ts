@@ -1,4 +1,5 @@
 import { getRMS } from "../audioAnalyser";
+import { useMapQualityStore } from "../mapQualityStore";
 // Ported from the Entoptic Cemetery prototype's warden generation and
 // drawing code. Deliberately keeps the prototype's random makeWardens()
 // for now — step 2 of the migration plan replaces this with deterministic
@@ -255,7 +256,8 @@ export class WardenSystem {
     this.cssWidth = cssWidth;
     this.cssHeight = cssHeight;
     const isMobile = cssWidth < 768;
-    const layerScale = Math.min(Math.min(window.devicePixelRatio || 1, isMobile ? 1 : 1.4), isMobile ? 0.5 : 0.75);
+    const quality = useMapQualityStore.getState().quality;
+    const layerScale = Math.min(Math.min(window.devicePixelRatio || 1, (isMobile ? 1 : 1.4) * quality), (isMobile ? 0.5 : 0.75) * quality);
     this.canvas.width = Math.max(1, (cssWidth * layerScale) | 0);
     this.canvas.height = Math.max(1, (cssHeight * layerScale) | 0);
     this.canvas.style.width = `${cssWidth}px`;

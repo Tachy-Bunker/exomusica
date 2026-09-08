@@ -119,6 +119,7 @@ async function handleIncomingDiscordMessage(message: {
 
   const mentioned = await resolveMentions(prisma, translatedContent, author.id);
   for (const m of mentioned) {
+    if (m.isGhost) continue;
     void createNotification(
       m.id,
       "mention",

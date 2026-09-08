@@ -2,6 +2,7 @@ import { useEffect, useRef } from "react";
 import { FieldRenderer } from "./fieldRenderer";
 import { WardenSystem } from "./wardenSystem";
 import { getRMS } from "../audioAnalyser";
+import { useMapQualityStore } from "../mapQualityStore";
 
 // Matches the prototype's <div class="hud"> default slider values exactly.
 export const FX_DEFAULTS = {
@@ -93,6 +94,7 @@ export function useSpacemapField(settings: FxSettings = FX_DEFAULTS) {
     const resizeObserver = new ResizeObserver(resize);
     resizeObserver.observe(container);
     document.addEventListener("fullscreenchange", resize);
+    const unsubscribeQuality = useMapQualityStore.subscribe(resize);
 
     let rafId: number;
     let last = performance.now();
@@ -161,6 +163,7 @@ export function useSpacemapField(settings: FxSettings = FX_DEFAULTS) {
       cancelAnimationFrame(rafId);
       resizeObserver.disconnect();
       document.removeEventListener("fullscreenchange", resize);
+      unsubscribeQuality();
       document.removeEventListener("visibilitychange", handleVisibility);
       wardenBridge.bindToBranches = () => {};
       wardenBridge.setScreenPosition = () => {};
