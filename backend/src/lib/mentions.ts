@@ -21,9 +21,24 @@ export async function resolveMentions(
   if (usernames.length === 0) return [];
   const users = await prisma.user.findMany({
     where: { username: { in: usernames, mode: "insensitive" }, isGhost: false, id: { not: authorId } },
-    select: { id: true, username: true, discordUserId: true, discordUsername: true },
+    select: {
+      id: true,
+      username: true,
+      discordUserId: true,
+      discordUsername: true,
+      linkedGhosts: { select: { discordId: true }, where: { discordId: { not: null } }, take: 1 },
+    },
   });
-  return users;
+  // A user's own discordUserId is only set if they separately opted into
+  // DM features — but anyone who's ever been bridged from Discord has a
+  // ghost linked to them with their real snowflake, which is the more
+  // complete and reliable source for a plain @mention translation.
+  return users.map((u) => ({
+    id: u.id,
+    username: u.username,
+    discordUserId: u.discordUserId ?? u.linkedGhosts[0]?.discordId ?? null,
+    discordUsername: u.discordUsername,
+  }));
 }
 
 /** Converts @username mentions to Discord's <@snowflakeId> mention syntax
