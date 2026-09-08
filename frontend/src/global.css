@@ -608,6 +608,36 @@ th {
   color: var(--text);
 }
 
+/* When the "from: {playlist}" line is showing on desktop, the row grows
+   an extra line of text — scale the cover and play button up to match so
+   they don't look small relative to the taller bar. */
+.player-bar-row--tall {
+  padding-top: 0.7rem;
+  padding-bottom: 0.7rem;
+}
+.player-bar-row--tall .player-cover {
+  width: 3.4rem;
+  height: 3.4rem;
+}
+.player-bar-row--tall .player-transport button.play-toggle {
+  width: 2.6rem;
+  height: 2.6rem;
+}
+
+.player-queue-indicator {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--accent-audio);
+}
+
+.player-queue-row {
+  transition: filter 0.15s ease;
+}
+.player-queue-row:hover {
+  filter: brightness(2.4);
+}
+
 .player-expand-btn {
   flex-shrink: 0;
   padding: 0.3rem 0.5rem;
@@ -661,6 +691,12 @@ th {
 .player-expanded-content .seek-row input[type="range"] {
   flex: 1;
   accent-color: var(--accent-audio);
+}
+
+.player-expanded-content .seek-row .player-seek-strip--expanded {
+  flex: 1;
+  height: 16px;
+  margin-bottom: 0;
 }
 
 .player-expanded-content .bookmarks {

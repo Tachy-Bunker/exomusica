@@ -7,12 +7,26 @@ import { useIsDesktop } from "../lib/useIsDesktop";
 import { isTypingTarget } from "../lib/isTypingTarget";
 import { useSpacemapField, FX_DEFAULTS, type FxSettings } from "../lib/entoptic/useSpacemapField";
 import { Joystick } from "../components/Joystick";
+import type { PlayableTrackDTO } from "../lib/types";
 
 interface PlaylistAlbum {
   slug: string;
   title: string;
   coverArtUrl: string | null;
   source: "official" | "community";
+}
+interface PlaylistItem {
+  id: number;
+  source: "official" | "community";
+  trackId: number;
+  title: string;
+  fileUrl: string;
+  durationSeconds: number | null;
+  albumTitle: string;
+  albumSlug: string;
+  coverArtUrl: string | null;
+  composer: string | null;
+  branchSlug: string | null;
 }
 interface PlaylistDetail {
   id: number;
@@ -21,6 +35,7 @@ interface PlaylistDetail {
   ownerId: number;
   fxSettings: (Partial<FxSettings> & { coverSize?: number }) | null;
   albums: PlaylistAlbum[];
+  items: PlaylistItem[];
 }
 
 interface AlbumNode extends PlaylistAlbum {
@@ -56,6 +71,8 @@ const CAMERA_MAX_SPEED = 900;
 const CROSSHAIR_LOOKAHEAD = 0.16;
 const CROSSHAIR_MAX_OFFSET = 65;
 const CROSSHAIR_CATCHUP_RATE = 2.2;
+const LOCK_RADIUS = 58;
+const LOCK_TIME = 0.9;
 
 export function PlaylistSpaceMapPage() {
   const { slug } = useParams<{ slug: string }>();
@@ -63,9 +80,14 @@ export function PlaylistSpaceMapPage() {
   const { user } = useAuth();
   const isDesktop = useIsDesktop();
   const currentTrack = useAudioStore((s) => s.currentTrack);
+  const play = useAudioStore((s) => s.play);
+  const addToQueue = useAudioStore((s) => s.addToQueue);
+  const clearQueue = useAudioStore((s) => s.clearQueue);
+  const setCurrentPlaylist = useAudioStore((s) => s.setCurrentPlaylist);
   const [playlist, setPlaylist] = useState<PlaylistDetail | null>(null);
   const [coverSize, setCoverSize] = useState(DEFAULT_COVER_SIZE);
   const [, forceRender] = useState(0);
+  const [lockedId, setLockedId] = useState<number | null>(null);
 
   const containerRef = useRef<HTMLDivElement>(null);
   const cameraRef = useRef({ x: 0, y: 0, vx: 0, vy: 0 });
@@ -74,6 +96,10 @@ export function PlaylistSpaceMapPage() {
   const crosshairOffsetRef = useRef({ x: 0, y: 0 });
   const reticleRef = useRef<HTMLDivElement>(null);
   const nodesRef = useRef<AlbumNode[]>([]);
+  const lockedIdRef = useRef<number | null>(null);
+  const lockProgressRef = useRef(0);
+  const playlistRef = useRef<PlaylistDetail | null>(null);
+  playlistRef.current = playlist;
 
   function reload() {
     if (!slug) return;
@@ -108,10 +134,61 @@ export function PlaylistSpaceMapPage() {
     });
   }, [playlist]);
 
+  async function playAlbum(node: AlbumNode) {
+    const tracks =
+      node.source === "official"
+        ? (await api<{ tracks: PlayableTrackDTO[] }>(`/api/albums/${node.slug}`)).tracks
+        : (await api<{ tracks: PlayableTrackDTO[] }>(`/api/community-albums/${node.slug}`)).tracks;
+    if (tracks.length === 0) return;
+    const [first, ...rest] = tracks;
+    play(first);
+    clearQueue();
+    addToQueue(rest);
+    const p = playlistRef.current;
+    if (p) setCurrentPlaylist({ slug: p.slug, title: p.title });
+  }
+
+  function playAllPlaylist() {
+    const p = playlistRef.current;
+    if (!p || p.items.length === 0) return;
+    const toPlayable = (item: PlaylistItem): PlayableTrackDTO => ({
+      id: item.trackId,
+      title: item.title,
+      fileUrl: item.fileUrl,
+      format: "MP3",
+      durationSeconds: item.durationSeconds,
+      position: 0,
+      albumTitle: item.albumTitle,
+      albumSlug: item.albumSlug,
+      coverArtUrl: item.coverArtUrl,
+      composer: item.composer ?? "",
+      branchSlug: item.branchSlug,
+      bookmarks: [],
+    });
+    const all = p.items.map(toPlayable);
+    const [first, ...rest] = all;
+    play(first);
+    clearQueue();
+    addToQueue(rest);
+    setCurrentPlaylist({ slug: p.slug, title: p.title });
+  }
+
+  function playLocked() {
+    const id = lockedIdRef.current;
+    if (id === null) return;
+    if (id === -1) {
+      playAllPlaylist();
+      return;
+    }
+    const node = nodesRef.current.find((n) => n.id === id);
+    if (node) void playAlbum(node);
+  }
+
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
       if (isTypingTarget(e.target)) return;
       if (["KeyW", "KeyA", "KeyS", "KeyD"].includes(e.code)) keysRef.current.add(e.code);
+      if (e.code === "KeyF") playLocked();
     }
     function onKeyUp(e: KeyboardEvent) {
       keysRef.current.delete(e.code);
@@ -169,6 +246,33 @@ export function PlaylistSpaceMapPage() {
         co.x += (targetX - co.x) * Math.min(CROSSHAIR_CATCHUP_RATE * dt, 1);
         co.y += (targetY - co.y) * Math.min(CROSSHAIR_CATCHUP_RATE * dt, 1);
         if (reticleRef.current) reticleRef.current.style.transform = `translate(-50%, -50%) translate(${co.x}px, ${co.y}px)`;
+      }
+
+      // --- crosshair lock-on: nearest node to screen center, including
+      // the always-present center "Play all" pseudo-target (id -1) ---
+      {
+        let nearestId: number | null = null;
+        let nearestDist = LOCK_RADIUS;
+        const centerDist = Math.hypot(cam.x, cam.y);
+        if (centerDist < nearestDist) {
+          nearestId = -1;
+          nearestDist = centerDist;
+        }
+        for (const n of nodesRef.current) {
+          const dist = Math.hypot(cam.x + n.x, cam.y + n.y);
+          if (dist < nearestDist) {
+            nearestId = n.id;
+            nearestDist = dist;
+          }
+        }
+        if (nearestId !== lockedIdRef.current) {
+          lockedIdRef.current = nearestId;
+          lockProgressRef.current = 0;
+          setLockedId(null);
+        } else if (nearestId !== null && lockProgressRef.current < 1) {
+          lockProgressRef.current = Math.min(1, lockProgressRef.current + dt / LOCK_TIME);
+          if (lockProgressRef.current >= 1) setLockedId(nearestId);
+        }
       }
 
       // --- album covers: wander around home + repel each other ---
@@ -321,10 +425,65 @@ export function PlaylistSpaceMapPage() {
             </div>
           ))}
 
+          {/* Always-visible center "Play all" marker, anchored in world space at the origin like any album node */}
+          <div
+            style={{
+              position: "absolute",
+              left: `calc(50% + ${cameraRef.current.x}px)`,
+              top: `calc(50% + ${cameraRef.current.y}px)`,
+              transform: "translate(-50%, -50%)",
+              zIndex: 2,
+              textAlign: "center",
+              pointerEvents: "auto",
+              cursor: "pointer",
+              color: "var(--text)",
+            }}
+            onClick={playAllPlaylist}
+          >
+            <div
+              style={{
+                width: coverSize * 0.9,
+                height: coverSize * 0.9,
+                borderRadius: "50%",
+                border: "2px solid var(--accent-audio)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                background: "var(--bg-elevated)",
+                fontSize: coverSize * 0.35,
+              }}
+            >
+              ▶
+            </div>
+            <div style={{ fontSize: Math.max(9, coverSize * 0.11), marginTop: "0.15rem" }}>Play all</div>
+          </div>
+
           <div className="space-reticle" ref={reticleRef}>
-            <div className="space-reticle-ring" />
+            <div
+              className="space-reticle-ring"
+              style={{ background: `conic-gradient(var(--accent-audio) ${lockProgressRef.current * 360}deg, transparent 0deg)` }}
+            />
             <div className="space-reticle-cross" />
           </div>
+
+          {lockedId !== null && (
+            <p
+              onClick={!isDesktop ? playLocked : undefined}
+              style={{
+                position: "absolute",
+                bottom: isDesktop ? 40 : 56,
+                left: "50%",
+                transform: "translateX(-50%)",
+                zIndex: 5,
+                fontSize: "0.85rem",
+                color: "var(--accent-audio)",
+                textShadow: "0 0 6px var(--accent-audio)",
+                cursor: !isDesktop ? "pointer" : undefined,
+              }}
+            >
+              {lockedId === -1 ? "Play all" : nodesRef.current.find((n) => n.id === lockedId)?.title} {isDesktop ? "(F)" : "— tap to play"}
+            </p>
+          )}
 
           {!isDesktop && (
             <div className="space-joystick-backdrop">

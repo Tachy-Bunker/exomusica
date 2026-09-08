@@ -41,6 +41,7 @@ export function CollaboratorPage() {
   const lightbox = useLightbox();
   const isDesktop = useIsDesktop();
   const play = useAudioStore((s) => s.play);
+  const setCurrentPlaylist = useAudioStore((s) => s.setCurrentPlaylist);
   const addToQueue = useAudioStore((s) => s.addToQueue);
   const clearQueue = useAudioStore((s) => s.clearQueue);
 
@@ -77,6 +78,7 @@ export function CollaboratorPage() {
     play(first);
     clearQueue();
     addToQueue(rest);
+    setCurrentPlaylist(null);
   }
 
   return (

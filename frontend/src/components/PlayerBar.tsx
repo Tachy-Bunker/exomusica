@@ -5,7 +5,7 @@ import { bindAudioElement, useAudioStore } from "../lib/audioStore";
 import { initAnalyser } from "../lib/audioAnalyser";
 import { useIsDesktop } from "../lib/useIsDesktop";
 import { useFixedPortalRoot } from "../lib/useFixedPortalRoot";
-import { PreviousIcon, NextIcon, LoopIcon, LoopOneIcon, ExpandIcon, CollapseIcon, ShuffleIcon } from "./Icons";
+import { PreviousIcon, NextIcon, LoopIcon, LoopOneIcon, ExpandIcon, CollapseIcon, ShuffleIcon, QueueIcon } from "./Icons";
 
 function formatTime(seconds: number): string {
   if (!Number.isFinite(seconds)) return "0:00";
@@ -53,10 +53,12 @@ export function PlayerBar() {
     currentTime,
     duration,
     expanded,
+    currentPlaylist,
     toggle,
     seek,
     playNext,
     playPrevious,
+    playQueueIndex,
     toggleShuffle,
     cycleRepeat,
     setExpanded,
@@ -232,7 +234,7 @@ export function PlayerBar() {
             </div>
           </div>
           <div
-            className="player-bar-row"
+            className={`player-bar-row${isDesktop && currentPlaylist ? " player-bar-row--tall" : ""}`}
             ref={rowRef}
             onClick={handleRowClick}
             onTouchStart={handleTouchStart}
@@ -254,9 +256,22 @@ export function PlayerBar() {
                   </Link>
                 </div>
               )}
+              {isDesktop && currentPlaylist && (
+                <div className="origin">
+                  from:{" "}
+                  <Link to={`/playlist/${currentPlaylist.slug}`} onClick={(e) => e.stopPropagation()}>
+                    {currentPlaylist.title}
+                  </Link>
+                </div>
+              )}
             </div>
 
             <div className="player-transport">
+              {!isDesktop && currentPlaylist && (
+                <Link to={`/playlist/${currentPlaylist.slug}`} className="btn player-queue-indicator" onClick={(e) => e.stopPropagation()} title={`Playing from: ${currentPlaylist.title}`}>
+                  <QueueIcon size={15} />
+                </Link>
+              )}
               {isDesktop && (
                 <button className={`btn ${shuffle ? "btn-primary" : ""}`} onClick={toggleShuffle} title="Shuffle (P)">
                   <ShuffleIcon size={16} />
@@ -314,25 +329,22 @@ export function PlayerBar() {
                 {currentTrack.albumTitle}
               </Link>
             </p>
+            {currentPlaylist && (
+              <p style={{ color: "var(--text-dim)", marginTop: "-0.4rem" }}>
+                from:{" "}
+                <Link to={`/playlist/${currentPlaylist.slug}`} onClick={() => setExpanded(false)}>
+                  {currentPlaylist.title}
+                </Link>
+              </p>
+            )}
 
             <div className="seek-row">
               <span className="mono">{formatTime(seekPreview ?? currentTime)}</span>
-              <input
-                type="range"
-                min={0}
-                max={effectiveDuration || 0}
-                step={0.1}
-                value={seekPreview ?? currentTime}
-                onChange={(e) => setSeekPreview(Number(e.target.value))}
-                onMouseUp={(e) => {
-                  seek(Number((e.target as HTMLInputElement).value));
-                  setSeekPreview(null);
-                }}
-                onTouchEnd={(e) => {
-                  seek(Number((e.target as HTMLInputElement).value));
-                  setSeekPreview(null);
-                }}
-              />
+              <div className="player-seek-strip player-seek-strip--expanded" onClick={handleSeekStripClick}>
+                <div className="player-seek-track">
+                  <div className="player-seek-fill" style={{ width: `${progressPct}%` }} />
+                </div>
+              </div>
               <span className="mono">{formatTime(effectiveDuration)}</span>
             </div>
 
@@ -371,7 +383,12 @@ export function PlayerBar() {
                 </div>
                 <div style={{ maxHeight: "30vh", overflowY: "auto" }}>
                   {queue.map((t, i) => (
-                    <div key={`${t.id}-${i}`} style={{ fontSize: "0.85rem", padding: "0.3rem 0", borderBottom: "1px solid var(--border)" }}>
+                    <div
+                      key={`${t.id}-${i}`}
+                      className="player-queue-row"
+                      onClick={() => playQueueIndex(i)}
+                      style={{ fontSize: "0.85rem", padding: "0.3rem 0", borderBottom: "1px solid var(--border)", cursor: "pointer" }}
+                    >
                       {t.title} <span style={{ color: "var(--text-dim)" }}>— {t.albumTitle}</span>
                     </div>
                   ))}

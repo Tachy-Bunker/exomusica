@@ -38,6 +38,7 @@ export function PlaylistPage() {
   const play = useAudioStore((s) => s.play);
   const addToQueue = useAudioStore((s) => s.addToQueue);
   const clearQueue = useAudioStore((s) => s.clearQueue);
+  const setCurrentPlaylist = useAudioStore((s) => s.setCurrentPlaylist);
 
   function reload() {
     if (!slug) return;
@@ -92,6 +93,7 @@ export function PlaylistPage() {
     play(first);
     clearQueue();
     addToQueue(rest);
+    setCurrentPlaylist({ slug: playlist.slug, title: playlist.title });
   }
 
   const albumGroups = new Map<string, { title: string; coverArtUrl: string | null; source: "official" | "community"; slug: string; items: PlaylistItem[] }>();
@@ -139,7 +141,17 @@ export function PlaylistPage() {
       )}
 
       {playlist.items.length > 0 && (
-        <button className="btn btn-primary" style={{ marginTop: "1rem" }} onClick={() => addToQueue(playlist.items.map(toPlayable))}>
+        <button
+          className="btn btn-primary"
+          style={{ marginTop: "1rem" }}
+          onClick={() => {
+            const [first, ...rest] = allPlayable;
+            play(first);
+            clearQueue();
+            addToQueue(rest);
+            setCurrentPlaylist({ slug: playlist.slug, title: playlist.title });
+          }}
+        >
           Play all
         </button>
       )}

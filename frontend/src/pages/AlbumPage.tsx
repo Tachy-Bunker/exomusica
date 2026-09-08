@@ -37,6 +37,7 @@ export function AlbumPage() {
   const [album, setAlbum] = useState<AlbumDetail | null>(null);
   const play = useAudioStore((s) => s.play);
   const addToQueue = useAudioStore((s) => s.addToQueue);
+  const setCurrentPlaylist = useAudioStore((s) => s.setCurrentPlaylist);
 
   useEffect(() => {
     if (!slug) return;
@@ -174,7 +175,7 @@ export function AlbumPage() {
               borderRadius: "var(--radius)",
             }}
           >
-            <button className="btn" onClick={() => play(t)}>
+            <button className="btn" onClick={() => { play(t); setCurrentPlaylist(null); }}>
               ▶
             </button>
             <button className="btn" onClick={() => addToQueue([t])} title="Add to queue">

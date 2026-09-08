@@ -30,6 +30,7 @@ export function CommunityAlbumPage() {
   const play = useAudioStore((s) => s.play);
   const addToQueue = useAudioStore((s) => s.addToQueue);
   const clearQueue = useAudioStore((s) => s.clearQueue);
+  const setCurrentPlaylist = useAudioStore((s) => s.setCurrentPlaylist);
 
   function playTrack(track: CommunityTrackPlayable) {
     if (!album) return;
@@ -39,6 +40,7 @@ export function CommunityAlbumPage() {
     play(first);
     clearQueue();
     addToQueue(rest);
+    setCurrentPlaylist(null);
   }
 
   useEffect(() => {

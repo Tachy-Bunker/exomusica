@@ -15,8 +15,11 @@ interface AudioState {
   currentTime: number;
   duration: number;
   expanded: boolean;
+  currentPlaylist: { slug: string; title: string } | null; // which playlist the currently playing track was launched from, if any
 
   play: (track: PlayableTrackDTO) => void;
+  playQueueIndex: (index: number) => void;
+  setCurrentPlaylist: (playlist: { slug: string; title: string } | null) => void;
   addToQueue: (tracks: PlayableTrackDTO[]) => void;
   clearQueue: () => void;
   playNext: () => void;
@@ -62,6 +65,9 @@ export const useAudioStore = create<AudioState>((set, get) => ({
   currentTime: 0,
   duration: 0,
   expanded: false,
+  currentPlaylist: null,
+
+  setCurrentPlaylist: (playlist) => set({ currentPlaylist: playlist }),
 
   play: (track) => {
     resumeAnalyserContextIfNeeded();
@@ -77,6 +83,19 @@ export const useAudioStore = create<AudioState>((set, get) => ({
       set({ isPlaying: false });
     });
     useAmbienceStore.getState().setEnabled(false);
+  },
+
+  playQueueIndex: (index) => {
+    const { queue, currentTrack, history } = get();
+    if (index < 0 || index >= queue.length) return;
+    const target = queue[index];
+    const passedOver = queue.slice(0, index);
+    const rest = queue.slice(index + 1);
+    set({
+      history: currentTrack ? [...history, ...passedOver, currentTrack] : [...history, ...passedOver],
+      queue: rest,
+    });
+    get().play(target);
   },
 
   addToQueue: (tracks) => set((s) => ({ queue: [...s.queue, ...(s.shuffle ? shuffleArray(tracks) : tracks)] })),

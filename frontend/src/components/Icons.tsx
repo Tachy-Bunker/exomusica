@@ -111,3 +111,11 @@ export function CollapseIcon({ size = 20, className }: IconProps) {
     </svg>
   );
 }
+
+export function QueueIcon({ size = 20, className }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" className={className}>
+      <path d="M3 5h13v2H3V5zm0 4h13v2H3V9zm0 4h9v2H3v-2zm12.5-1v6l5-3-5-3z" />
+    </svg>
+  );
+}
