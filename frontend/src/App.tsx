@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { ChromaticAberrationLayer } from "./components/ChromaticAberrationLayer";
 import { MoireLayer } from "./components/MoireLayer";
+import { useSiteEffectsStore } from "./lib/siteEffectsStore";
 import { AuthProvider } from "./lib/auth";
 import { Layout } from "./components/Layout";
 import { RequireAdmin } from "./components/RequireAdmin";
@@ -55,11 +56,13 @@ import { useIsDesktop } from "./lib/useIsDesktop";
 
 export default function App() {
   const isDesktop = useIsDesktop();
+  const userCaEnabled = useSiteEffectsStore((s) => s.userCaEnabled);
+  const applyCaFilter = isDesktop && userCaEnabled;
   return (
     <>
       {isDesktop && <ChromaticAberrationLayer />}
       <div id="fixed-portal-root" />
-      <div style={isDesktop ? { filter: "url(#caFilter)", minHeight: "100%" } : { minHeight: "100%" }}>
+      <div style={applyCaFilter ? { filter: "url(#caFilter)", minHeight: "100%" } : { minHeight: "100%" }}>
         {isDesktop && <MoireLayer />}
         <BrowserRouter>
           <AuthProvider>

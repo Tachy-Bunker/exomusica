@@ -20,6 +20,17 @@ export function MoireLayer() {
     }
     document.addEventListener("visibilitychange", handleVisibility);
 
+    // Stops scheduling frames entirely while disabled — this subscription
+    // restarts the loop if the user re-enables the effect later via
+    // account settings, since nothing else would notice that change once
+    // the loop itself has stopped polling for it.
+    const unsubscribe = useSiteEffectsStore.subscribe((state, prevState) => {
+      if (state.userMoireEnabled && !prevState.userMoireEnabled && !paused) {
+        cancelAnimationFrame(rafId);
+        rafId = requestAnimationFrame(tick);
+      }
+    });
+
     const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
     function tick(now: number) {
@@ -33,8 +44,7 @@ export function MoireLayer() {
         if (!s.userMoireEnabled) {
           base.style.opacity = "0";
           dupe.style.opacity = "0";
-          rafId = requestAnimationFrame(tick);
-          return;
+          return; // don't reschedule — the subscription above restarts this if re-enabled
         }
 
         const bgImage = s.moireImageUrl ? `url(${s.moireImageUrl})` : "none";
@@ -65,6 +75,7 @@ export function MoireLayer() {
     return () => {
       cancelAnimationFrame(rafId);
       document.removeEventListener("visibilitychange", handleVisibility);
+      unsubscribe();
     };
   }, []);
 

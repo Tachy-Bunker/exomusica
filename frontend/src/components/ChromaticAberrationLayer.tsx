@@ -35,19 +35,35 @@ export function ChromaticAberrationLayer() {
     }
     document.addEventListener("visibilitychange", handleVisibility);
 
+    // The loop stops scheduling itself entirely while disabled (see the
+    // early-return in tick() below) — this subscription is what restarts
+    // it if the user re-enables the effect later via account settings,
+    // without needing the loop to keep polling on its own to notice.
+    const unsubscribe = useSiteEffectsStore.subscribe((state, prevState) => {
+      if (state.userCaEnabled && !prevState.userCaEnabled && !paused) {
+        cancelAnimationFrame(rafId);
+        rafId = requestAnimationFrame(tick);
+      }
+    });
+
     const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    let lastUpdate = 0;
+    const FRAME_INTERVAL = 1000 / 20; // ~20fps — this is a subtle, slow-moving effect; 60fps was wasted compositing work
 
     function tick(now: number) {
       if (paused) return;
       const { caInitial, caBurst, userCaEnabled } = useSiteEffectsStore.getState();
       if (!userCaEnabled) {
-        offRRef.current?.setAttribute("dx", "0");
-        offRRef.current?.setAttribute("dy", "0");
-        offBRef.current?.setAttribute("dx", "0");
-        offBRef.current?.setAttribute("dy", "0");
+        // Nothing to animate — the CSS filter itself is removed from the
+        // DOM entirely when disabled (see App.tsx), so there's no need
+        // to keep scheduling frames here at all.
+        return;
+      }
+      if (now - lastUpdate < FRAME_INTERVAL) {
         rafId = requestAnimationFrame(tick);
         return;
       }
+      lastUpdate = now;
       const initialAmt = caInitial * 12; // was *2.6 — capped at a sub-pixel 2.6px even at max, genuinely invisible
       const burstAmt = caBurst * 22;
       if (!reduceMotion) {
@@ -94,6 +110,7 @@ export function ChromaticAberrationLayer() {
     return () => {
       cancelAnimationFrame(rafId);
       document.removeEventListener("visibilitychange", handleVisibility);
+      unsubscribe();
     };
   }, []);
 
