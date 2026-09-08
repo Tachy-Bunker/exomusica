@@ -36,6 +36,9 @@ interface AlbumDetail {
 
 export function AlbumsAdminPage() {
   const [branches, setBranches] = useState<Branch[]>([]);
+  const [communityAlbums, setCommunityAlbums] = useState<{ id: number; title: string; owner: string }[]>([]);
+  const [duplicateSourceId, setDuplicateSourceId] = useState<number | "">("");
+  const [duplicating, setDuplicating] = useState(false);
   const [selectedBranchId, setSelectedBranchId] = useState<number | null>(null);
   const [albums, setAlbums] = useState<AlbumSummary[]>([]);
   const [collaborators, setCollaborators] = useState<CollaboratorSummary[]>([]);
@@ -91,7 +94,25 @@ export function AlbumsAdminPage() {
       if (b[0]) setSelectedBranchId(b[0].id);
     });
     loadCollaborators();
+    api<{ id: number; title: string; owner: { username: string } }[]>("/api/community-albums").then((list) =>
+      setCommunityAlbums(list.map((a) => ({ id: a.id, title: a.title, owner: a.owner.username }))),
+    );
   }, []);
+
+  async function duplicateToBranch() {
+    if (!duplicateSourceId || !selectedBranchId) return;
+    setDuplicating(true);
+    try {
+      await api(`/api/admin/community-albums/${duplicateSourceId}/duplicate-to-branch`, {
+        method: "POST",
+        body: JSON.stringify({ branchId: selectedBranchId }),
+      });
+      setDuplicateSourceId("");
+      loadAlbums();
+    } finally {
+      setDuplicating(false);
+    }
+  }
 
   function loadAlbums() {
     const branch = branches.find((b) => b.id === selectedBranchId);
@@ -291,6 +312,27 @@ export function AlbumsAdminPage() {
             </option>
           ))}
         </select>
+      </div>
+
+      <div style={{ border: "1px dashed var(--border)", borderRadius: "var(--radius)", padding: "0.6rem", marginBottom: "1.5rem", maxWidth: 480 }}>
+        <h3 style={{ fontSize: "0.9rem", marginTop: 0 }}>Duplicate a community album to this branch</h3>
+        <p style={{ fontSize: "0.75rem", color: "var(--text-dim)" }}>
+          Copies the album's title, composer, description, cover, and every track into a new official album on the
+          currently selected branch above. Add collaborators, links, etc. afterward via the normal edit form.
+        </p>
+        <div style={{ display: "flex", gap: "0.5rem" }}>
+          <select value={duplicateSourceId} onChange={(e) => setDuplicateSourceId(e.target.value ? Number(e.target.value) : "")} style={{ flex: 1 }}>
+            <option value="">— select a community album —</option>
+            {communityAlbums.map((a) => (
+              <option key={a.id} value={a.id}>
+                {a.title} — {a.owner}
+              </option>
+            ))}
+          </select>
+          <button className="btn btn-primary" onClick={duplicateToBranch} disabled={!duplicateSourceId || duplicating}>
+            {duplicating ? "Duplicating…" : "Duplicate"}
+          </button>
+        </div>
       </div>
 
       <form onSubmit={handleCreateAlbum} style={{ maxWidth: 380, marginBottom: "1.5rem" }}>

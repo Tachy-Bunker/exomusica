@@ -27,6 +27,29 @@
 
 * {
   box-sizing: border-box;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) var(--bg-inset);
+}
+
+/* WebKit (Chrome/Safari/Edge) needs its own pseudo-elements — the
+   scrollbar-color property above only covers Firefox. Applying to * so
+   this is genuinely sitewide (chat, forum topics, news, wiki, Cult
+   Activities, admin panel) without needing a rule per scrollable
+   container. */
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+*::-webkit-scrollbar-track {
+  background: var(--bg-inset);
+}
+*::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 6px;
+  border: 2px solid var(--bg-inset);
+}
+*::-webkit-scrollbar-thumb:hover {
+  background: var(--accent-audio-dim);
 }
 
 html,
@@ -686,11 +709,6 @@ th {
   width: 100%;
   max-width: 480px;
   margin-top: 1rem;
-}
-
-.player-expanded-content .seek-row input[type="range"] {
-  flex: 1;
-  accent-color: var(--accent-audio);
 }
 
 .player-expanded-content .seek-row .player-seek-strip--expanded {

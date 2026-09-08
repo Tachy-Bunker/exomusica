@@ -165,8 +165,8 @@ export function MyMusicPage() {
   const coverInputRef = useRef<HTMLInputElement>(null);
   const [coverUploadingAlbumId, setCoverUploadingAlbumId] = useState<number | null>(null);
 
-  async function uploadCover(albumId: number) {
-    const file = coverInputRef.current?.files?.[0];
+  async function uploadCover(albumId: number, fileOverride?: File) {
+    const file = fileOverride ?? coverInputRef.current?.files?.[0];
     if (!file) return;
     const formData = new FormData();
     formData.append("file", file);
@@ -178,6 +178,15 @@ export function MyMusicPage() {
     } finally {
       setCoverUploadingAlbumId(null);
     }
+  }
+
+  function handleCoverPaste(e: React.ClipboardEvent, albumId: number) {
+    const item = [...e.clipboardData.items].find((i) => i.type.startsWith("image/"));
+    if (!item) return;
+    const file = item.getAsFile();
+    if (!file) return;
+    e.preventDefault();
+    uploadCover(albumId, file);
   }
 
   async function createPlaylist(e: React.FormEvent) {
@@ -276,11 +285,19 @@ export function MyMusicPage() {
         <div key={a.id} style={{ border: "1px solid var(--border)", borderRadius: "var(--radius)", padding: "0.6rem", marginBottom: "0.6rem" }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
             <Link to={`/community-album/${a.slug}`}>{a.title}</Link>
-            <div style={{ display: "flex", gap: "0.4rem", alignItems: "center" }}>
+            <div
+              tabIndex={0}
+              onPaste={(e) => handleCoverPaste(e, a.id)}
+              title="Click here, then Ctrl+V / Cmd+V to paste an image directly"
+              style={{ display: "flex", gap: "0.4rem", alignItems: "center", outline: "none", border: "1px dashed var(--border)", borderRadius: "var(--radius)", padding: "0.2rem 0.4rem" }}
+            >
               <input ref={coverInputRef} type="file" accept="image/*" style={{ fontSize: "0.7rem", width: 90 }} />
               <button className="btn" onClick={() => uploadCover(a.id)} disabled={coverUploadingAlbumId === a.id}>
                 {coverUploadingAlbumId === a.id ? "Uploading…" : "Set cover"}
               </button>
+              <span style={{ fontSize: "0.65rem", color: "var(--text-dim)" }}>or click here + paste</span>
+            </div>
+            <div style={{ display: "flex", gap: "0.4rem", alignItems: "center", marginTop: "0.3rem" }}>
               <button className="btn" onClick={() => openAlbumManage(a)}>
                 Manage tracks
               </button>

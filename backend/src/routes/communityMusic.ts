@@ -105,7 +105,7 @@ export async function communityMusicRoutes(app: FastifyInstance): Promise<void> 
       return prisma.communityAlbum.findMany({ where: { ownerId: userId }, orderBy: { createdAt: "desc" } });
     }
     return prisma.communityAlbum.findMany({
-      select: { slug: true, title: true, composer: true, coverArtUrl: true, createdAt: true, owner: { select: { username: true } } },
+      select: { id: true, slug: true, title: true, composer: true, coverArtUrl: true, createdAt: true, owner: { select: { username: true } } },
       orderBy: { createdAt: "desc" },
     });
   });

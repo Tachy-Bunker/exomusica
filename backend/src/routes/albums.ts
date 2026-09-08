@@ -88,6 +88,60 @@ export async function albumRoutes(app: FastifyInstance): Promise<void> {
     return reply.code(201).send(album);
   });
 
+  app.post<{ Params: { id: string }; Body: { branchId: number } }>(
+    "/api/admin/community-albums/:id/duplicate-to-branch",
+    { preHandler: requireAdmin },
+    async (req, reply) => {
+      const { branchId } = req.body ?? {};
+      if (!branchId) return reply.code(400).send({ error: "branchId is required" });
+
+      const source = await prisma.communityAlbum.findUnique({
+        where: { id: Number(req.params.id) },
+        include: { tracks: { orderBy: { position: "asc" }, include: { attachment: true } } },
+      });
+      if (!source) return reply.code(404).send({ error: "no such community album" });
+
+      const branch = await prisma.branch.findUnique({ where: { id: branchId } });
+      if (!branch) return reply.code(404).send({ error: "no such branch" });
+
+      // Auto-generate a unique slug — unlike the manual create endpoint
+      // above, this is a duplication action, not something the admin
+      // types a slug in for.
+      const base = source.title.toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") || "album";
+      let slug = base;
+      let n = 1;
+      while (await prisma.album.findUnique({ where: { slug } })) {
+        slug = `${base}-${++n}`;
+      }
+
+      const album = await prisma.album.create({
+        data: {
+          branchId,
+          slug,
+          title: source.title,
+          composer: source.composer,
+          description: source.description,
+          coverArtUrl: source.coverArtUrl,
+        },
+      });
+
+      for (const t of source.tracks) {
+        await prisma.track.create({
+          data: {
+            albumId: album.id,
+            title: t.title,
+            fileUrl: t.attachment?.storagePath ?? t.externalUrl ?? "",
+            format: t.format,
+            durationSeconds: t.durationSeconds,
+            position: t.position,
+          },
+        });
+      }
+
+      return reply.code(201).send(album);
+    },
+  );
+
   app.patch<{ Params: { id: string }; Body: Partial<{ title: string; composer: string; description: string; contentMarkdown: string; ogTitle: string | null; ogDescription: string | null; ogImageUrl: string | null }> }>(
     "/api/admin/albums/:id",
     { preHandler: requireAdmin },
