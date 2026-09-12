@@ -58,7 +58,7 @@ export function MiniChat({ slug, channelName }: { slug: string; channelName: str
       <div ref={listRef} style={{ flex: 1, overflowY: "auto", padding: "0.5rem 0.7rem" }}>
         {messages.map((m) => (
           <div key={m.id} style={{ marginBottom: "0.5rem", fontSize: "0.85rem" }}>
-            <strong>{m.authorUsername}</strong>{" "}
+            <strong style={{ color: "var(--text-dim)" }}>{m.authorUsername}</strong>{" "}
             <span className="mono" style={{ fontSize: "0.7rem", color: "var(--text-dim)" }}>
               {new Date(m.unixTimestamp * 1000).toLocaleTimeString()}
             </span>

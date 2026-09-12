@@ -6,6 +6,7 @@ import { AuthProvider } from "./lib/auth";
 import { Layout } from "./components/Layout";
 import { RequireAdmin } from "./components/RequireAdmin";
 import { HomePage } from "./pages/HomePage";
+import { MiniChatWindowPage } from "./pages/MiniChatWindowPage";
 import { LoginPage } from "./pages/LoginPage";
 import { JoinPage } from "./pages/JoinPage";
 import { WikiPage } from "./pages/WikiPage";
@@ -67,6 +68,7 @@ export default function App() {
         <BrowserRouter>
           <AuthProvider>
             <Routes>
+              <Route path="chat-window" element={<MiniChatWindowPage />} />
               <Route element={<Layout />}>
                 <Route index element={<HomePage />} />
                 <Route path="login" element={<LoginPage />} />

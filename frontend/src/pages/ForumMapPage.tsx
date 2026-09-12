@@ -19,6 +19,7 @@ interface MapNode {
   playlist: { slug: string; title: string; owner: { username: string } } | null;
   sampleBankItem: { id: number; title: string; owner: { username: string } } | null;
   challenge: { id: number; title: string } | null;
+  speakerCount: number;
 }
 
 interface PreviewMessage {
@@ -64,30 +65,40 @@ function seededRand(seed: number): () => number {
     return s / 233280;
   };
 }
-// Neural-dendrite-style branches per node: each one forks partway, like
-// the synapse reference images, rather than a single straight strand out
-// to a satellite orb.
-function dendrites(nodeId: number, baseRadius: number) {
+// Fireflies roaming around a node — count is driven by that channel's
+// actual unique-speaker history (see speakerCount from /api/forum-map),
+// not a fixed random range like the old dendrites. Ring-based placement
+// guarantees no two fireflies ever overlap: each ring holds only as many
+// as fit with real spacing between them, and rings themselves are spaced
+// far enough apart radially that adjacent rings can't collide either.
+function fireflies(nodeId: number, baseRadius: number, count: number) {
   const rand = seededRand(nodeId * 7919);
-  const count = 4 + Math.floor(rand() * 3); // 4-6
-  return Array.from({ length: count }, (_, i) => {
-    const angle = (i / count) * Math.PI * 2 + rand() * 0.5;
-    const len1 = baseRadius + 14 + rand() * 16;
-    const len2 = len1 + 10 + rand() * 14;
-    const forkAngle = angle + (rand() - 0.5) * 0.9;
-    const mid = { x: Math.cos(angle) * len1, y: Math.sin(angle) * len1 };
-    const tip = { x: mid.x + Math.cos(angle) * (len2 - len1), y: mid.y + Math.sin(angle) * (len2 - len1) };
-    const forkTip = { x: mid.x + Math.cos(forkAngle) * (len2 - len1) * 0.8, y: mid.y + Math.sin(forkAngle) * (len2 - len1) * 0.8 };
-    return {
-      mid,
-      tip,
-      forkTip,
-      glowSize: 1.5 + rand() * 2,
-      delay: rand() * 3,
-      pluckDuration: 6 + rand() * 8, // 6-14s idle cycle, most of it still
-      pluckDelay: rand() * 12,
-    };
-  });
+  const capped = Math.min(count, 24); // sane upper bound so one very active channel doesn't render hundreds of fireflies
+  const result: { orbitRadius: number; startAngle: number; direction: 1 | -1; duration: number; size: number; twinkleDelay: number }[] = [];
+  let ring = 0;
+  let placed = 0;
+  while (placed < capped) {
+    const ringRadius = baseRadius + 22 + ring * 16;
+    const circumference = 2 * Math.PI * ringRadius;
+    const minGap = 14; // minimum arc distance between fireflies on the same ring
+    const ringCapacity = Math.max(1, Math.floor(circumference / minGap));
+    const onThisRing = Math.min(ringCapacity, capped - placed);
+    const angleOffset = rand() * Math.PI * 2;
+    for (let i = 0; i < onThisRing; i++) {
+      const startAngle = angleOffset + (i / onThisRing) * Math.PI * 2 + (rand() - 0.5) * 0.15;
+      result.push({
+        orbitRadius: ringRadius,
+        startAngle,
+        direction: rand() > 0.5 ? 1 : -1,
+        duration: 14 + rand() * 18, // 14-32s per full orbit — slow, ambient drift
+        size: 1.4 + rand() * 1.3,
+        twinkleDelay: rand() * 4,
+      });
+    }
+    placed += onThisRing;
+    ring++;
+  }
+  return result;
 }
 
 function dist(a: { x: number; y: number }, b: { x: number; y: number }) {
@@ -99,6 +110,8 @@ export function ForumMapPage() {
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [zoom, setZoom] = useState(1);
   const [navSpeed, setNavSpeed] = useState(1);
+  const [fireflySize, setFireflySize] = useState(1);
+  const [fireflySpeed, setFireflySpeed] = useState(1);
   const [activeNodeId, setActiveNodeId] = useState<number | null>(null);
   const [preview, setPreview] = useState<PreviewMessage[]>([]);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -127,10 +140,12 @@ export function ForumMapPage() {
 
   useEffect(() => {
     api<MapNode[]>("/api/forum-map").then(setNodes);
-    api<{ forumMapInitialX: number; forumMapInitialY: number; forumMapInitialZoom: number; forumMapNavSpeed: number }>("/api/site-settings").then((s) => {
+    api<{ forumMapInitialX: number; forumMapInitialY: number; forumMapInitialZoom: number; forumMapNavSpeed: number; forumMapFireflySize: number; forumMapFireflySpeed: number }>("/api/site-settings").then((s) => {
       setPan({ x: s.forumMapInitialX ?? 0, y: s.forumMapInitialY ?? 0 });
       setZoom(s.forumMapInitialZoom ?? 1);
       setNavSpeed(s.forumMapNavSpeed ?? 1);
+      setFireflySize(s.forumMapFireflySize ?? 1);
+      setFireflySpeed(s.forumMapFireflySpeed ?? 1);
     });
   }, []);
 
@@ -481,12 +496,9 @@ export function ForumMapPage() {
           0%, 100% { opacity: 0.55; }
           50% { opacity: 0.9; }
         }
-        @keyframes forumMapPluck {
-          0% { transform: rotate(0deg); }
-          2% { transform: rotate(calc(4deg * var(--rms, 0.35))); }
-          4% { transform: rotate(calc(-3deg * var(--rms, 0.35))); }
-          6% { transform: rotate(calc(2deg * var(--rms, 0.35))); }
-          8%, 100% { transform: rotate(0deg); }
+        @keyframes forumMapHandleSpinReverse {
+          from { transform: rotate(0deg); }
+          to { transform: rotate(-360deg); }
         }
         @keyframes forumMapHandleSpin {
           from { transform: rotate(0deg); }
@@ -552,6 +564,12 @@ export function ForumMapPage() {
               <feMergeNode in="SourceGraphic" />
             </feMerge>
           </filter>
+          <radialGradient id="firefly-glow-gradient">
+            <stop offset="0%" stopColor="#ffffff" stopOpacity="1" />
+            <stop offset="60%" stopColor="#ffffff" stopOpacity="0.6" />
+            <stop offset="100%" stopColor="#ffffff" stopOpacity="0" />
+          </radialGradient>
+          <ellipse id="firefly-glow" rx="4" ry="4" fill="url(#firefly-glow-gradient)" />
         </defs>
 
         {/* Thick, jagged synapse-like connections between nodes — Phazon
@@ -585,7 +603,7 @@ export function ForumMapPage() {
           const fallback = NODE_STYLE[n.type];
           const radius = n.size ?? fallback.radius;
           const color = n.color ?? fallback.color;
-          const branches = dendrites(n.id, radius);
+          const fliesForNode = fireflies(n.id, radius, n.speakerCount);
 
           if (isHandle) {
             return (
@@ -617,33 +635,22 @@ export function ForumMapPage() {
             >
             <circle r={radius * 1.5} fill="transparent" />
             <g style={{ animation: "forumMapReveal 0.4s ease-out", transformOrigin: "0px 0px" }}>
-              {/* Neural dendrites — forked branches with a small glowing
-                  terminal at each fork, like a synapse. */}
-              {branches.map((b, i) => (
+              {/* Fireflies — each one a <use> reference to the single
+                  shared glow defined once in <defs> (see below), not a
+                  duplicated gradient per firefly. Orbits behind the node
+                  and its label, ahead of nothing — rendered first in this
+                  group so the node circle and text below paint over it. */}
+              {fliesForNode.map((f, i) => (
                 <g
                   key={i}
                   style={{
                     transformOrigin: "0px 0px",
-                    animation: `forumMapPluck ${b.pluckDuration}s ease-in-out infinite`,
-                    animationDelay: `${b.pluckDelay}s`,
+                    animation: `forumMapHandleSpin${f.direction > 0 ? "" : "Reverse"} ${f.duration / Math.max(0.05, fireflySpeed)}s linear infinite`,
                   }}
                 >
-                  <path d={`M 0 0 L ${b.mid.x} ${b.mid.y} L ${b.tip.x} ${b.tip.y}`} fill="none" stroke={color} strokeWidth={1.2} opacity={0.5} />
-                  <path d={`M ${b.mid.x} ${b.mid.y} L ${b.forkTip.x} ${b.forkTip.y}`} fill="none" stroke={color} strokeWidth={1} opacity={0.4} />
-                  <circle
-                    cx={b.tip.x}
-                    cy={b.tip.y}
-                    r={b.glowSize}
-                    fill={color}
-                    style={{ animation: `forumMapTwinkle ${2.5 + b.delay}s ease-in-out infinite`, animationDelay: `${b.delay}s` }}
-                  />
-                  <circle
-                    cx={b.forkTip.x}
-                    cy={b.forkTip.y}
-                    r={b.glowSize * 0.7}
-                    fill={color}
-                    style={{ animation: `forumMapTwinkle ${2.5 + b.delay}s ease-in-out infinite`, animationDelay: `${b.delay + 1}s` }}
-                  />
+                  <g transform={`rotate(${(f.startAngle * 180) / Math.PI}) translate(${f.orbitRadius}, 0) scale(${f.size * fireflySize})`}>
+                    <use href="#firefly-glow" style={{ animation: `forumMapTwinkle ${2.5 + f.twinkleDelay}s ease-in-out infinite`, animationDelay: `${f.twinkleDelay}s` }} />
+                  </g>
                 </g>
               ))}
 

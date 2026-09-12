@@ -76,6 +76,8 @@ export async function siteSettingsRoutes(app: FastifyInstance): Promise<void> {
         forumMapInitialY: true,
         forumMapInitialZoom: true,
         forumMapNavSpeed: true,
+        forumMapFireflySize: true,
+        forumMapFireflySpeed: true,
         spotlightCommunityTrackId: true,
         cultActivitiesChannelId: true,
       },
@@ -146,6 +148,8 @@ export async function siteSettingsRoutes(app: FastifyInstance): Promise<void> {
         forumMapInitialY: 0,
         forumMapInitialZoom: 1,
         forumMapNavSpeed: 1,
+        forumMapFireflySize: 1,
+        forumMapFireflySpeed: 1,
         spotlightCommunityTrackId: null,
         cultActivitiesChannelId: null,
       }
@@ -254,6 +258,8 @@ export async function siteSettingsRoutes(app: FastifyInstance): Promise<void> {
       forumMapInitialY: number;
       forumMapInitialZoom: number;
       forumMapNavSpeed: number;
+      forumMapFireflySize: number;
+      forumMapFireflySpeed: number;
       spotlightCommunityTrackId: number | null;
       cultActivitiesChannelId: number | null;
     }>;
@@ -303,6 +309,8 @@ export async function siteSettingsRoutes(app: FastifyInstance): Promise<void> {
       "forumMapInitialY",
       "forumMapInitialZoom",
       "forumMapNavSpeed",
+      "forumMapFireflySize",
+      "forumMapFireflySpeed",
       "spotlightCommunityTrackId",
       "cultActivitiesChannelId",
     ] as const) {

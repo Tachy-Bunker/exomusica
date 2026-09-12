@@ -20,7 +20,6 @@ import { useDocumentTitle } from "../lib/useDocumentTitle";
 import { isTypingTarget } from "../lib/isTypingTarget";
 import { usePresenceStore } from "../lib/presenceStore";
 import { useCustomFont, type FontInfo } from "../lib/useCustomFont";
-import { MiniChat } from "../components/MiniChat";
 import { useSiteEffectsStore } from "../lib/siteEffectsStore";
 import { getCurrentSfxVolume } from "../lib/volumeMixerStore";
 import { playOneShotSfx } from "../lib/oneShotSfx";
@@ -144,7 +143,7 @@ function MessageMenu({
                 onQuote(message);
               }}
             >
-              Quote
+              Reply
             </button>
           )}
           <button
@@ -365,7 +364,6 @@ export function ChannelPage({ channelSlug, fillHeight, parentControlsHeight }: {
   const [replyTarget, setReplyTarget] = useState<ReplyTarget | null>(null);
   const [pendingAttachments, setPendingAttachments] = useState<{ id: number; filename: string }[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [pipWindow, setPipWindow] = useState<Window | null>(null);
   const [pendingScrollTo, setPendingScrollTo] = useState<number | null>(null);
 
   const [exportAttachments, setExportAttachments] = useState<{ filename: string; url: string }[] | null>(null);
@@ -377,37 +375,12 @@ export function ChannelPage({ channelSlug, fillHeight, parentControlsHeight }: {
     setExportAttachments(attachments);
   }
 
-  async function popOutChat() {
-    if (!slug) return;
-    // Document Picture-in-Picture: a real always-on-top window, enforced by
-    // the browser, that stays visible over *any* application — not just
-    // other browser tabs. Chrome/Edge only; Firefox and Safari fall back to
-    // a plain popup, which is still a separate OS window but can't be
-    // forced above other apps (no website can do that, by design).
-    const dpip = (window as unknown as { documentPictureInPicture?: { requestWindow: (opts: { width: number; height: number }) => Promise<Window> } }).documentPictureInPicture;
-    if (dpip) {
-      const pip = await dpip.requestWindow({ width: 340, height: 480 });
-      [...document.styleSheets].forEach((sheet) => {
-        try {
-          const rules = [...sheet.cssRules].map((r) => r.cssText).join("\n");
-          const style = pip.document.createElement("style");
-          style.textContent = rules;
-          pip.document.head.appendChild(style);
-        } catch {
-          if (sheet.href) {
-            const link = pip.document.createElement("link");
-            link.rel = "stylesheet";
-            link.href = sheet.href;
-            pip.document.head.appendChild(link);
-          }
-        }
-      });
-      pip.document.body.style.margin = "0";
-      pip.addEventListener("pagehide", () => setPipWindow(null));
-      setPipWindow(pip);
-    } else {
-      window.open(`/topic/${slug}`, "_blank", "popup=1,width=380,height=560");
-    }
+  function popOutChat() {
+    // A real popup window loading its own page — independent of this
+    // page's lifecycle entirely (no portal, no dependency on this
+    // component staying mounted), and since no target name is reused,
+    // multiple of these can be open simultaneously.
+    window.open("/chat-window", "_blank", "popup=1,width=340,height=520");
   }
   const [searchParams] = useSearchParams();
 
@@ -1049,7 +1022,6 @@ export function ChannelPage({ channelSlug, fillHeight, parentControlsHeight }: {
         </form>
       )}
 
-      {pipWindow && slug && createPortal(<MiniChat slug={slug} channelName={channelName ?? slug} />, pipWindow.document.body)}
     </div>
     </LinkClickContext.Provider>
   );

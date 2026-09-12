@@ -610,6 +610,8 @@ model SiteSettings {
   forumMapInitialY    Float @default(0)
   forumMapInitialZoom Float @default(1)
   forumMapNavSpeed    Float @default(1) // multiplier on WASD/joystick acceleration — independent of zoom level
+  forumMapFireflySize Float @default(1) // multiplier on each firefly's rendered size
+  forumMapFireflySpeed Float @default(1) // multiplier on the fireflies' orbit speed
   spotlightCommunityTrackId Int? // admin-curated "featured this week" pick, shown at the top of /community
   cultActivitiesChannelId Int? // the general chat channel shown on the Cult Activities page
   ambienceUrl    String? // idle-landing ambient loop, plays when nothing else is

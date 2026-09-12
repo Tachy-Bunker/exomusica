@@ -12,7 +12,23 @@ export async function forumMapRoutes(app: FastifyInstance): Promise<void> {
         challenge: { select: { id: true, title: true } },
       },
     });
-    return nodes;
+
+    // Unique speaker count per channel (ghosts included — Message.authorId
+    // counts any author regardless of isGhost) — this is what drives the
+    // firefly count on each node. One grouped query rather than one per
+    // node.
+    const speakerCounts = await prisma.$queryRaw<{ channelId: number; count: bigint }[]>`
+      SELECT "channelId", COUNT(DISTINCT "authorId") as count
+      FROM "Message"
+      WHERE "isDeleted" = false
+      GROUP BY "channelId"
+    `;
+    const speakerCountByChannelId = new Map(speakerCounts.map((r) => [r.channelId, Number(r.count)]));
+
+    return nodes.map((n) => ({
+      ...n,
+      speakerCount: n.channel ? (speakerCountByChannelId.get(n.channelId!) ?? 0) : 0,
+    }));
   });
 
   app.post<{

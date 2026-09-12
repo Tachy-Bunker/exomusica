@@ -235,6 +235,21 @@ export async function forwardMessageToDiscord(
     const attachments = options?.attachments ?? [];
     const replyTo = options?.replyTo ?? null;
 
+    // Webhooks only exist on a parent text channel — posting into a
+    // thread or a forum post (which Discord implements as a thread under
+    // the hood) requires this explicit thread_id, or the message lands
+    // in the parent channel instead, silently. The bot-send path below
+    // doesn't need this since ThreadChannel.send() already handles it.
+    let threadIdParam = "";
+    if (channel.discordWebhookUrl) {
+      try {
+        const targetChannel = await client.channels.fetch(channel.discordChannelId);
+        if (targetChannel?.isThread()) threadIdParam = `&thread_id=${targetChannel.id}`;
+      } catch (err) {
+        console.error("Failed to check whether the target Discord channel is a thread:", err);
+      }
+    }
+
     if (channel.discordWebhookUrl) {
       const avatarUrl = authorDiscordIdentity ? await findDiscordAvatarUrl(authorDiscordIdentity) : null;
       // Webhooks can't use Discord's native reply feature (no shared
@@ -258,9 +273,9 @@ export async function forwardMessageToDiscord(
           const blob = await fileRes.blob();
           form.append(`files[${i}]`, blob, a.filename);
         }
-        res = await fetch(`${channel.discordWebhookUrl}?wait=true`, { method: "POST", body: form });
+        res = await fetch(`${channel.discordWebhookUrl}?wait=true${threadIdParam}`, { method: "POST", body: form });
       } else {
-        res = await fetch(`${channel.discordWebhookUrl}?wait=true`, {
+        res = await fetch(`${channel.discordWebhookUrl}?wait=true${threadIdParam}`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ username: `${authorUsername} | Exo-API`, content: quotedContent, ...(avatarUrl ? { avatar_url: avatarUrl } : {}) }),
