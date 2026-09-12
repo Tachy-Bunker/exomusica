@@ -25,6 +25,7 @@ import { getCurrentSfxVolume } from "../lib/volumeMixerStore";
 import { playOneShotSfx } from "../lib/oneShotSfx";
 import { useChatHudReveal } from "../lib/useChatHudReveal";
 import { useFixedPortalRoot } from "../lib/useFixedPortalRoot";
+import { openPopoutChat } from "../lib/chatPipStore";
 
 type ViewMode = "live" | "day" | "search";
 type DisplayMode = "standard" | "grouped";
@@ -376,11 +377,7 @@ export function ChannelPage({ channelSlug, fillHeight, parentControlsHeight }: {
   }
 
   function popOutChat() {
-    // A real popup window loading its own page — independent of this
-    // page's lifecycle entirely (no portal, no dependency on this
-    // component staying mounted), and since no target name is reused,
-    // multiple of these can be open simultaneously.
-    window.open("/chat-window", "_blank", "popup=1,width=340,height=520");
+    void openPopoutChat(slug, channelName);
   }
   const [searchParams] = useSearchParams();
 

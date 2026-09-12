@@ -35,6 +35,9 @@ import { useEmojiStore } from "../lib/emojiStore";
 import { useGlobalPlayerShortcuts } from "../lib/useGlobalPlayerShortcuts";
 import { useChatDockStore } from "../lib/chatDockStore";
 import { usePresenceStore } from "../lib/presenceStore";
+import { useChatPipStore } from "../lib/chatPipStore";
+import { PopoutChatContent } from "./PopoutChatContent";
+import { createPortal } from "react-dom";
 import { useIsDesktop } from "../lib/useIsDesktop";
 import { ChatDock } from "./ChatDock";
 import { NotificationWidget } from "./NotificationWidget";
@@ -47,6 +50,7 @@ export function Layout() {
   const { user } = useAuth();
   const loadEmojis = useEmojiStore((s) => s.load);
   useGlobalPlayerShortcuts();
+  const pipWindow = useChatPipStore((s) => s.pipWindow);
 
   const isDesktop = useIsDesktop();
   const navigate = useNavigate();
@@ -350,6 +354,7 @@ export function Layout() {
       <PlayerBar />
       <ChatDock />
       <div className="crt-overlay" />
+      {pipWindow && createPortal(<PopoutChatContent />, pipWindow.document.body)}
     </div>
   );
 }
