@@ -1,0 +1,3 @@
+-- AlterTable
+ALTER TABLE "SiteSettings" ADD COLUMN     "forumMapFireflySize" DOUBLE PRECISION NOT NULL DEFAULT 1,
+ADD COLUMN     "forumMapFireflySpeed" DOUBLE PRECISION NOT NULL DEFAULT 1;
