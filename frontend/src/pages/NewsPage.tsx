@@ -5,6 +5,7 @@ import { renderMarkdown } from "../lib/markdown";
 import { useCustomFont, type FontInfo } from "../lib/useCustomFont";
 import { useIsDesktop } from "../lib/useIsDesktop";
 import { useContentScaleStore } from "../lib/contentScaleStore";
+import { isTypingTarget } from "../lib/isTypingTarget";
 
 interface PostSummary {
   id: number;
@@ -67,6 +68,26 @@ export function NewsPage() {
     api<PostFull>(`/api/blog/${slug}`).then(setCurrent);
   }, [slug]);
 
+  const [selectedIndex, setSelectedIndex] = useState(0);
+  useEffect(() => {
+    if (!isDesktop || slug) return; // only on the list view
+    function onKeyDown(e: KeyboardEvent) {
+      if (isTypingTarget(e.target)) return;
+      if (e.code === "ArrowLeft") {
+        e.preventDefault();
+        setSelectedIndex((i) => Math.max(0, i - 1));
+      } else if (e.code === "ArrowRight") {
+        e.preventDefault();
+        setSelectedIndex((i) => Math.min(posts.length - 1, i + 1));
+      } else if (e.code === "Enter" || e.key.toLowerCase() === "t") {
+        const target = posts[selectedIndex];
+        if (target) navigate(`/news/${target.slug}`);
+      }
+    }
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [isDesktop, slug, posts, selectedIndex, navigate]);
+
   if (slug) {
     return (
       <div style={{ maxWidth: 640, fontFamily, fontSize: `${scale}rem` }}>
@@ -89,12 +110,18 @@ export function NewsPage() {
 
   return (
     <div style={{ fontSize: `${scale}rem` }}>
-      <h1>News</h1>
+      <h1>
+        News{isDesktop && <span style={{ opacity: 0.4, fontWeight: "normal", fontSize: "0.6em" }}> (use ←→)</span>}
+      </h1>
       <NewsletterForm />
       <div style={{ marginTop: "1.5rem", display: "flex", flexDirection: "column", gap: "1rem", maxWidth: 640 }}>
         {posts.length === 0 && <p style={{ color: "var(--text-dim)" }}>Nothing published yet.</p>}
-        {posts.map((p) => (
-          <Link key={p.id} to={`/news/${p.slug}`} style={{ textDecoration: "none", color: "inherit" }}>
+        {posts.map((p, i) => (
+          <Link
+            key={p.id}
+            to={`/news/${p.slug}`}
+            style={{ textDecoration: "none", color: "inherit", ...(i === selectedIndex ? { outline: "1px dashed var(--accent-forum)", padding: "0.3rem", margin: "-0.3rem" } : {}) }}
+          >
             <h2 style={{ fontSize: `${1.1 * scale}rem`, marginBottom: "0.1rem" }}>{p.title}</h2>
             <p className="mono" style={{ fontSize: `${0.8 * scale}rem`, color: "var(--text-dim)" }}>
               {new Date(p.publishedAt).toLocaleDateString()}

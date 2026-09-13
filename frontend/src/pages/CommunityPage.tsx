@@ -1,7 +1,9 @@
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { api } from "../lib/api";
 import { useDocumentTitle } from "../lib/useDocumentTitle";
+import { useIsDesktop } from "../lib/useIsDesktop";
+import { isTypingTarget } from "../lib/isTypingTarget";
 
 interface PlaylistSummary {
   slug: string;
@@ -23,6 +25,8 @@ interface SpotlightTrack {
 
 export function CommunityPage() {
   useDocumentTitle("Cult Activities");
+  const isDesktop = useIsDesktop();
+  const navigate = useNavigate();
   const [playlists, setPlaylists] = useState<PlaylistSummary[]>([]);
   const [spotlight, setSpotlight] = useState<SpotlightTrack | null>(null);
 
@@ -37,9 +41,35 @@ export function CommunityPage() {
     byOwner.get(p.owner)!.push(p);
   }
 
+  // Flat keyboard-navigation order matching the visual grouping: each
+  // owner's playlists in the same order they're rendered below.
+  const flatOrder = [...byOwner.values()].flat();
+  const [selectedIndex, setSelectedIndex] = useState(0);
+
+  useEffect(() => {
+    if (!isDesktop) return;
+    function onKeyDown(e: KeyboardEvent) {
+      if (isTypingTarget(e.target)) return;
+      if (e.code === "ArrowUp") {
+        e.preventDefault();
+        setSelectedIndex((i) => Math.max(0, i - 1));
+      } else if (e.code === "ArrowDown") {
+        e.preventDefault();
+        setSelectedIndex((i) => Math.min(flatOrder.length - 1, i + 1));
+      } else if (e.code === "Enter" || e.key.toLowerCase() === "t") {
+        const target = flatOrder[selectedIndex];
+        if (target) navigate(`/playlist/${target.slug}`);
+      }
+    }
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [isDesktop, flatOrder, selectedIndex, navigate]);
+
   return (
     <div>
-      <h1>Cult Activities</h1>
+      <h1>
+        Cult Activities{isDesktop && <span style={{ opacity: 0.4, fontWeight: "normal", fontSize: "0.6em" }}> (use ↑↓)</span>}
+      </h1>
       <p style={{ color: "var(--text-dim)", maxWidth: 640 }}>
         Playlists made by the community — mixing their own uploaded tracks with anything from Exomusica's own albums.
       </p>
@@ -107,6 +137,7 @@ export function CommunityPage() {
                     borderRadius: "var(--radius)",
                     textDecoration: "none",
                     color: "inherit",
+                    ...(flatOrder[selectedIndex]?.slug === p.slug ? { outline: "1px dashed var(--accent-forum)" } : {}),
                   }}
                 >
                   <div style={{ fontFamily: "var(--font-display)" }}>{p.title}</div>

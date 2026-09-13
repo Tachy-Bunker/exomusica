@@ -7,6 +7,7 @@ import { useIsDesktop } from "../lib/useIsDesktop";
 import { useContentScaleStore } from "../lib/contentScaleStore";
 import { BranchIndexList } from "../components/BranchIndexList";
 import { CollaboratorIndexList } from "../components/CollaboratorIndexList";
+import { isTypingTarget } from "../lib/isTypingTarget";
 
 interface WikiSummary {
   id: number;
@@ -48,21 +49,59 @@ export function WikiPage() {
     api<WikiFull>(`/api/wiki/${slug}`).then(setCurrent);
   }, [slug]);
 
+  // Flat keyboard-navigation order matching the visual list: each parent
+  // immediately followed by its own children.
+  const flatOrder: WikiSummary[] = [];
+  for (const p of pages.filter((p) => !p.parentId)) {
+    flatOrder.push(p);
+    for (const c of pages.filter((c) => c.parentId === p.id)) flatOrder.push(c);
+  }
+  const [selectedIndex, setSelectedIndex] = useState(0);
+  useEffect(() => {
+    const i = flatOrder.findIndex((p) => p.slug === slug);
+    if (i !== -1) setSelectedIndex(i);
+  }, [slug, pages.length]);
+
+  useEffect(() => {
+    if (!isDesktop) return;
+    function onKeyDown(e: KeyboardEvent) {
+      if (isTypingTarget(e.target)) return;
+      if (e.code === "ArrowUp") {
+        e.preventDefault();
+        setSelectedIndex((i) => Math.max(0, i - 1));
+      } else if (e.code === "ArrowDown") {
+        e.preventDefault();
+        setSelectedIndex((i) => Math.min(flatOrder.length - 1, i + 1));
+      } else if (e.code === "Enter" || e.key.toLowerCase() === "t") {
+        const target = flatOrder[selectedIndex];
+        if (target) navigate(`/wiki/${target.slug}`);
+      }
+    }
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [isDesktop, flatOrder, selectedIndex, navigate]);
+
   const pagesNav = (
     <nav>
-      <h3 style={{ fontSize: `${0.9 * scale}rem` }}>Pages</h3>
+      <h3 style={{ fontSize: `${0.9 * scale}rem` }}>
+        Pages{isDesktop && <span style={{ opacity: 0.4, fontWeight: "normal", fontSize: "0.8em" }}> (use ↑↓)</span>}
+      </h3>
       <ul style={{ listStyle: "none", padding: 0 }}>
         {pages
           .filter((p) => !p.parentId)
           .map((p) => (
             <li key={p.id} style={{ marginBottom: "0.3rem" }}>
-              <Link to={`/wiki/${p.slug}`}>{p.title}</Link>
+              <Link to={`/wiki/${p.slug}`} style={flatOrder[selectedIndex]?.id === p.id ? { outline: "1px dashed var(--accent-forum)", padding: "0 0.2rem" } : undefined}>
+                {p.title}
+              </Link>
               <ul style={{ listStyle: "none", paddingLeft: "0.8rem" }}>
                 {pages
                   .filter((c) => c.parentId === p.id)
                   .map((c) => (
                     <li key={c.id}>
-                      <Link to={`/wiki/${c.slug}`}>{c.title}</Link>
+                      <Link to={`/wiki/${c.slug}`} style={flatOrder[selectedIndex]?.id === c.id ? { outline: "1px dashed var(--accent-forum)", padding: "0 0.2rem" } : undefined}>
+                        {c.title}
+                      </Link>
                     </li>
                   ))}
               </ul>

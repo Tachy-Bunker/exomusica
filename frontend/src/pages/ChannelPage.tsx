@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useCallback, useContext, createContext, type ChangeEvent, type ClipboardEvent, type FormEvent } from "react";
+import { useEffect, useRef, useState, useCallback, useContext, createContext, type ChangeEvent, type ClipboardEvent, type DragEvent, type FormEvent } from "react";
 import { Link, useParams, useSearchParams, useNavigate } from "react-router-dom";
 import { api } from "../lib/api";
 import { exportChatHistory } from "../lib/exportChat";
@@ -364,6 +364,7 @@ export function ChannelPage({ channelSlug, fillHeight, parentControlsHeight }: {
   const fontFamily = useCustomFont(channelFont);
   const [replyTarget, setReplyTarget] = useState<ReplyTarget | null>(null);
   const [pendingAttachments, setPendingAttachments] = useState<{ id: number; filename: string }[]>([]);
+  const [isDraggingFile, setIsDraggingFile] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [pendingScrollTo, setPendingScrollTo] = useState<number | null>(null);
 
@@ -663,17 +664,16 @@ export function ChannelPage({ channelSlug, fillHeight, parentControlsHeight }: {
     setFollowing(true); // posting auto-follows server-side; keep the button in sync without a refetch
   }
 
-  async function handleFileSelect(e: ChangeEvent<HTMLInputElement>) {
-    const files = e.target.files;
-    if (!files || files.length === 0) return;
+  async function uploadFiles(fileList: FileList | File[]) {
+    const files = [...fileList];
+    if (files.length === 0) return;
     const MAX_ATTACHMENTS_PER_MESSAGE = 10;
     const remaining = MAX_ATTACHMENTS_PER_MESSAGE - pendingAttachments.length;
     if (remaining <= 0) {
       alert(`You can attach up to ${MAX_ATTACHMENTS_PER_MESSAGE} files per message.`);
-      if (fileInputRef.current) fileInputRef.current.value = "";
       return;
     }
-    const selected = [...files].slice(0, remaining);
+    const selected = files.slice(0, remaining);
     if (files.length > remaining) {
       alert(`Only the first ${remaining} file${remaining !== 1 ? "s" : ""} were added — up to ${MAX_ATTACHMENTS_PER_MESSAGE} attachments are allowed per message.`);
     }
@@ -684,8 +684,21 @@ export function ChannelPage({ channelSlug, fillHeight, parentControlsHeight }: {
       body: formData,
     });
     setPendingAttachments((prev) => [...prev, ...result.created]);
+  }
+
+  async function handleFileSelect(e: ChangeEvent<HTMLInputElement>) {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+    await uploadFiles(files);
     if (fileInputRef.current) fileInputRef.current.value = "";
   }
+
+  function handleComposerDrop(e: DragEvent) {
+    e.preventDefault();
+    setIsDraggingFile(false);
+    if (e.dataTransfer?.files && e.dataTransfer.files.length > 0) void uploadFiles(e.dataTransfer.files);
+  }
+
 
   function removePendingAttachment(id: number) {
     setPendingAttachments((prev) => prev.filter((a) => a.id !== id));
@@ -729,6 +742,14 @@ export function ChannelPage({ channelSlug, fillHeight, parentControlsHeight }: {
   }
 
   function handlePaste(e: ClipboardEvent<HTMLTextAreaElement>) {
+    // Screenshot tools (Win+Shift+S, etc) put the image on the clipboard
+    // as a file-like item, not literal text — clipboardData.files covers
+    // that directly, especially useful for screenshotting on Windows.
+    if (e.clipboardData.files.length > 0) {
+      e.preventDefault();
+      void uploadFiles(e.clipboardData.files);
+      return;
+    }
     const el = textareaRef.current;
     if (!el) return;
     const pasted = e.clipboardData.getData("text").trim();
@@ -927,6 +948,16 @@ export function ChannelPage({ channelSlug, fillHeight, parentControlsHeight }: {
       {user && mode === "live" && (
         <form
           onSubmit={handleSend}
+          onDragOver={(e) => {
+            e.preventDefault();
+            if (e.dataTransfer.types.includes("Files")) setIsDraggingFile(true);
+          }}
+          onDragLeave={(e) => {
+            // Only clear when leaving the form itself, not when moving
+            // between its children (which also fires dragleave).
+            if (e.currentTarget === e.target) setIsDraggingFile(false);
+          }}
+          onDrop={handleComposerDrop}
           style={{
             marginTop: effectiveFillHeight ? 0 : "1rem",
             paddingTop: effectiveFillHeight ? "1rem" : 0,
@@ -937,8 +968,30 @@ export function ChannelPage({ channelSlug, fillHeight, parentControlsHeight }: {
             gap: "0.4rem",
             maxWidth: effectiveFillHeight ? undefined : 720,
             position: "relative",
+            outline: isDraggingFile ? "2px dashed var(--accent-forum)" : "none",
+            outlineOffset: "-2px",
           }}
         >
+          {isDraggingFile && (
+            <div
+              style={{
+                position: "absolute",
+                inset: 0,
+                zIndex: 10,
+                background: "var(--bg-elevated)",
+                opacity: 0.92,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                fontSize: "0.9rem",
+                color: "var(--text-dim)",
+                pointerEvents: "none",
+                borderRadius: "var(--radius)",
+              }}
+            >
+              Drop files to attach
+            </div>
+          )}
           {typingLabel && (
             <div style={{ fontSize: "0.75rem", color: "var(--text-dim)", fontStyle: "italic" }}>{typingLabel}</div>
           )}

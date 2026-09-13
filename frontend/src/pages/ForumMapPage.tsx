@@ -705,6 +705,22 @@ export function ForumMapPage() {
                     }}
                   >
                     <div style={{ fontWeight: "bold", marginBottom: "0.1rem" }}>{nodeLabel(activeNode)}</div>
+                    {activeNode.channel && (
+                      <div style={{ display: "flex", alignItems: "center", gap: "0.35rem", fontSize: "0.85em", color: "var(--text-dim)", marginTop: "-0.15rem", marginBottom: "0.1rem" }}>
+                        <span
+                          style={{
+                            width: 7,
+                            height: 7,
+                            borderRadius: "50%",
+                            background: "#4ade80",
+                            boxShadow: "0 0 6px 1px #4ade80",
+                            animation: "forumMapTwinkle 1.6s ease-in-out infinite",
+                            flexShrink: 0,
+                          }}
+                        />
+                        {activeNode.speakerCount} user{activeNode.speakerCount !== 1 ? "s" : ""}
+                      </div>
+                    )}
                     <div ref={previewScrollRef} style={{ overflowY: "auto", flex: 1, minHeight: 0 }}>
                       {preview.length === 0 ? (
                         <div style={{ color: "var(--text-dim)" }}>No messages yet.</div>
