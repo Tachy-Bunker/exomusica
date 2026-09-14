@@ -6,7 +6,7 @@ import { createNotification } from "../lib/notify.js";
 import { saveSiteImage } from "../lib/storage.js";
 
 export async function accountRoutes(app: FastifyInstance): Promise<void> {
-  // Self view — includes email and notification prefs, unlike the public
+  // Self view - includes email and notification prefs, unlike the public
   // /api/users/:username lookup which deliberately hides email.
   app.get("/api/account/followed-channels", { preHandler: requireAuth }, async (req) => {
     const follows = await prisma.channelFollow.findMany({
@@ -16,7 +16,7 @@ export async function accountRoutes(app: FastifyInstance): Promise<void> {
     return follows.map((f) => f.channel.slug);
   });
 
-  // Deliberately tighter than the site's general 10MB body limit — an
+  // Deliberately tighter than the site's general 10MB body limit - an
   // avatar has no reason to be that large, and a small explicit cap here
   // keeps profile pictures fast to load everywhere they're shown (header,
   // messages, profile).
@@ -168,7 +168,7 @@ export async function accountRoutes(app: FastifyInstance): Promise<void> {
     },
   );
 
-  // Public profile — everything except email (spec: accounts can see each
+  // Public profile - everything except email (spec: accounts can see each
   // other's info except email).
   app.get<{ Params: { id: string } }>("/api/admin/users/:id", { preHandler: requireAdmin }, async (req, reply) => {
     const user = await prisma.user.findUnique({
@@ -233,7 +233,7 @@ export async function accountRoutes(app: FastifyInstance): Promise<void> {
         },
         orderBy: { username: "asc" },
       });
-      // Active, then linked ghosts, then unlinked ghosts — alphabetical
+      // Active, then linked ghosts, then unlinked ghosts - alphabetical
       // within each group. Whether a ghost is linked isn't a plain scalar
       // column Prisma can sort on directly, so rank it here instead.
       const rank = (u: (typeof users)[number]) => (!u.isGhost ? 0 : u.linkedUserId ? 1 : 2);
@@ -258,13 +258,13 @@ export async function accountRoutes(app: FastifyInstance): Promise<void> {
       const target = await prisma.user.findUnique({ where: { id: targetUserId } });
       if (!target) return reply.code(404).send({ error: "target account not found" });
 
-      // Deliberately NOT reassigning message.authorId — this is a
+      // Deliberately NOT reassigning message.authorId - this is a
       // persistent link, resolved at read time (message display, export,
       // mentions) rather than a one-time backfill. That's what makes it
       // safe to relink/unlink later, and what makes a future Discord bot
       // bridge work: new messages can keep arriving tagged with this
       // discordId's ghost, and every reader resolves through the link to
-      // the real account automatically — no per-message reassignment
+      // the real account automatically - no per-message reassignment
       // needed going forward.
       await prisma.user.update({ where: { id: ghostId }, data: { linkedUserId: targetUserId } });
       if (ghost.discordId && !target.discordUserId) {
@@ -286,7 +286,7 @@ export async function accountRoutes(app: FastifyInstance): Promise<void> {
   // Discord snowflake (<@123456789>) rather than a username. Resolves
   // through the ghost link when one is set, so a mention that says
   // "@<ghost's discord id>" in old message text shows the linked real
-  // account's current username — without ever rewriting the message.
+  // account's current username - without ever rewriting the message.
   app.get<{ Querystring: { ids?: string } }>("/api/users/discord-lookup", async (req) => {
     const ids = (req.query.ids ?? "").split(",").map((s) => s.trim()).filter(Boolean);
     if (ids.length === 0) return [];

@@ -60,7 +60,7 @@ export function SampleBankPage() {
     <div style={{ maxWidth: 720 }}>
       <h1>Sample Bank</h1>
       <p style={{ color: "var(--text-dim)" }}>
-        Raw material, not finished tracks — field recordings, synth presets, alterant scripts, one-shots. Anything
+        Raw material, not finished tracks - field recordings, synth presets, alterant scripts, one-shots. Anything
         others might build with.
       </p>
 

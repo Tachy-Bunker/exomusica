@@ -127,7 +127,7 @@ export function AccountSettingsPage() {
     if (file.size > MAX_BYTES) {
       file = await compressImageToMaxSize(file, MAX_BYTES);
       if (file.size > MAX_BYTES) {
-        setAvatarError("Image must be 1MB or smaller — couldn't compress it enough automatically.");
+        setAvatarError("Image must be 1MB or smaller - couldn't compress it enough automatically.");
         return;
       }
     }
@@ -227,7 +227,7 @@ export function AccountSettingsPage() {
         </p>
       )}
       <p style={{ color: "var(--text-dim)", fontSize: "0.9rem" }}>
-        {me.username} — {me.email}
+        {me.username} - {me.email}
       </p>
 
       <div style={{ display: "flex", alignItems: "center", gap: "0.8rem", marginBottom: "1rem" }}>
@@ -291,7 +291,7 @@ export function AccountSettingsPage() {
         the idle ambience loop).
       </p>
       <div className="field">
-        <label>Notifications — {Math.round(mixer.notifications * 100)}%</label>
+        <label>Notifications - {Math.round(mixer.notifications * 100)}%</label>
         <input
           type="range"
           min={0}
@@ -302,11 +302,11 @@ export function AccountSettingsPage() {
         />
       </div>
       <div className="field">
-        <label>Sound effects (when nothing's playing) — {Math.round(mixer.sfxIdle * 100)}%</label>
+        <label>Sound effects (when nothing's playing) - {Math.round(mixer.sfxIdle * 100)}%</label>
         <input type="range" min={0} max={1} step={0.05} value={mixer.sfxIdle} onChange={(e) => mixer.setVolume("sfxIdle", Number(e.target.value))} />
       </div>
       <div className="field">
-        <label>Sound effects (while music plays) — {Math.round(mixer.sfxPlaying * 100)}%</label>
+        <label>Sound effects (while music plays) - {Math.round(mixer.sfxPlaying * 100)}%</label>
         <input
           type="range"
           min={0}
@@ -317,7 +317,7 @@ export function AccountSettingsPage() {
         />
       </div>
       <div className="field">
-        <label>Music — {Math.round(mixer.music * 100)}%</label>
+        <label>Music - {Math.round(mixer.music * 100)}%</label>
         <input
           type="range"
           min={0}
@@ -359,7 +359,7 @@ export function AccountSettingsPage() {
 
       <h2 style={{ fontSize: "1rem" }}>Discord notifications</h2>
       <div className="field">
-        <label>Your Discord user ID (preferred — more reliable)</label>
+        <label>Your Discord user ID (preferred - more reliable)</label>
         <input
           placeholder="e.g. 259653581316161536"
           value={me.discordUserId ?? ""}
@@ -388,7 +388,7 @@ export function AccountSettingsPage() {
         />
         {discordFeedback.saved && <span style={{ fontSize: "0.8rem", color: "var(--accent-audio)" }}>Saved ✓</span>}
         <p style={{ fontSize: "0.75rem", color: "var(--text-dim)", marginTop: "0.2rem" }}>
-          Only used if no ID is set above — requires being in a Discord server the bot is also in.
+          Only used if no ID is set above - requires being in a Discord server the bot is also in.
         </p>
       </div>
       {checkbox("notifyDiscordWeeklySummary", "Weekly activity summary")}
@@ -396,7 +396,7 @@ export function AccountSettingsPage() {
       {checkbox("notifyDiscordFollowedReplies", "Replies on topics I follow")}
       {checkbox("notifyDiscordPrivateMessage", "New private messages")}
       <p style={{ fontSize: "0.8rem", color: "var(--text-dim)" }}>
-        These toggles save correctly. Whether email actually arrives depends on SMTP being configured and working —
+        These toggles save correctly. Whether email actually arrives depends on SMTP being configured and working -
         ask an admin if you're not receiving anything you expect to.
       </p>
 

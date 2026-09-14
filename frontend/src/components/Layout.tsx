@@ -72,7 +72,7 @@ export function Layout() {
       if (isTypingTarget(e.target)) return;
       if (e.ctrlKey || e.metaKey || e.altKey) return;
       // These are letter shortcuts, matched to the actual character
-      // produced (e.key), not the physical key position (e.code) — on
+      // produced (e.key), not the physical key position (e.code) - on
       // AZERTY and other non-QWERTY layouts, the key at the QWERTY "M"
       // position doesn't produce "m" at all, so e.code would silently
       // never fire for anyone not on QWERTY.
@@ -109,7 +109,7 @@ export function Layout() {
   const dockCollapsed = useChatDockStore((s) => s.collapsed);
   const dockWidth = useChatDockStore((s) => s.width);
   // The player bar and notification widget "nudge" out of the dock's way
-  // automatically — nobody has to manually rearrange anything.
+  // automatically - nobody has to manually rearrange anything.
   const dockOffset = isDesktop && dockOpen && !dockCollapsed ? dockWidth : 0;
 
   useEffect(() => {
@@ -276,7 +276,7 @@ export function Layout() {
   }, [currentTrack, setAmbienceHasMainTrack]);
   useEffect(() => {
     // Deliberately using siteFont.familyName directly here, not
-    // siteFontFamily below — that value's own fallback chain ends in
+    // siteFontFamily below - that value's own fallback chain ends in
     // var(--font-body), which is exactly the property being set. Assigning
     // that in would make --font-body reference itself: an invalid CSS
     // custom property that silently falls back to the browser default

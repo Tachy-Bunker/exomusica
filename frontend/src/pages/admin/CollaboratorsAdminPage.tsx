@@ -167,7 +167,7 @@ export function CollaboratorsAdminPage() {
           {collaborators.map((c, i) => (
             <li key={c.id} style={{ marginBottom: "0.3rem", display: "flex", alignItems: "center", gap: "0.3rem" }}>
               <button className={`btn ${editingId === c.id ? "btn-primary" : ""}`} onClick={() => openDetail(c.id)} style={{ flex: 1, textAlign: "left" }}>
-                {c.name} — {c.role}
+                {c.name} - {c.role}
               </button>
               <button className="btn" disabled={i === 0} onClick={() => moveCollaborator(i, -1)} title="Move up" style={{ padding: "0.1rem 0.4rem" }}>
                 ↑
@@ -245,7 +245,7 @@ export function CollaboratorsAdminPage() {
                 <div key={l.id} style={{ display: "flex", gap: "0.5rem", alignItems: "center", marginBottom: "0.3rem" }}>
                   {(l.linkIcon?.url) && <img src={l.linkIcon.url} alt="" style={{ width: 18, height: 18, objectFit: "contain" }} />}
                   <span style={{ fontSize: "0.85rem" }}>
-                    {l.label} — <span style={{ color: "var(--text-dim)" }}>{l.url}</span>
+                    {l.label} - <span style={{ color: "var(--text-dim)" }}>{l.url}</span>
                   </span>
                   <select
                     value={l.linkIconId ?? ""}

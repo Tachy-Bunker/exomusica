@@ -4,7 +4,7 @@ import Fastify from "fastify";
 // Without this, an uncaught error in any fire-and-forget background task
 // (a background email, a notification insert, anything not directly
 // awaited in a request handler) crashes the entire process by Node's
-// default behavior — taking down every other in-flight request with it.
+// default behavior - taking down every other in-flight request with it.
 // Individual background calls should still have their own .catch(), but
 // this is the safety net for anything that doesn't.
 process.on("unhandledRejection", (reason) => {
@@ -59,7 +59,7 @@ import { sampleBankAndChallengesRoutes } from "./routes/sampleBankAndChallenges.
 import { questionsRoutes } from "./routes/questions.js";
 
 // Fastify's own default body limit is 1MB, applied before multipart even
-// parses anything — this was the real ceiling blocking larger uploads
+// parses anything - this was the real ceiling blocking larger uploads
 // (cover art, gallery images, message attachments), not anything in
 // multipart's own config. Raised for the whole app, not just admin routes,
 // since Fastify's bodyLimit isn't naturally scoped per-route by auth.

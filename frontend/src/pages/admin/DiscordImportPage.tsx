@@ -53,7 +53,7 @@ export function DiscordImportPage() {
       <p style={{ color: "var(--text-dim)", fontSize: "0.9rem" }}>
         Import a DiscordChatExporter CSV into a channel as if the conversation happened here. Authors without a
         matching account become "ghost" users (attributed but unable to log in) until they claim their account.
-        Dragging in a newer export of the same channel later is safe — messages already imported are skipped
+        Dragging in a newer export of the same channel later is safe - messages already imported are skipped
         automatically, so only new ones get added.
       </p>
       <p style={{ color: "var(--text-dim)", fontSize: "0.85rem" }}>
@@ -64,7 +64,7 @@ export function DiscordImportPage() {
       <div className="field">
         <label htmlFor="channel">Target channel</label>
         <select id="channel" value={channelSlug} onChange={(e) => setChannelSlug(e.target.value)}>
-          <option value="">— choose a channel —</option>
+          <option value="">- choose a channel -</option>
           {channels.map((c) => (
             <option key={c.slug} value={c.slug}>
               {c.name} ({c.slug})
@@ -87,7 +87,7 @@ export function DiscordImportPage() {
           onChange={(e) => setArchiveOrgPrefix(e.target.value)}
         />
         <p style={{ fontSize: "0.75rem", color: "var(--text-dim)", marginTop: "0.2rem" }}>
-          Only works if you uploaded every attachment to that archive.org item preserving its original filename —
+          Only works if you uploaded every attachment to that archive.org item preserving its original filename -
           the tool matches each CSV attachment by filename and appends it to this prefix. Leave blank to skip
           attachments entirely for this import.
         </p>

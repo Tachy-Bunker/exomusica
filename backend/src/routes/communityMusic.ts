@@ -110,7 +110,7 @@ export async function communityMusicRoutes(app: FastifyInstance): Promise<void> 
     const mine = req.query.mine === "true";
     if (mine) {
       // requireAuth isn't on this route since it's also the public browse
-      // endpoint — but "mine" obviously needs a logged-in user.
+      // endpoint - but "mine" obviously needs a logged-in user.
       const userId = optionalUserId(req);
       if (!userId) return [];
       return prisma.communityAlbum.findMany({ where: { ownerId: userId }, orderBy: { createdAt: "desc" } });
@@ -232,7 +232,7 @@ export async function communityMusicRoutes(app: FastifyInstance): Promise<void> 
   // --- Community tracks ----------------------------------------------------
 
   // Multipart: either a "file" field (uploaded audio) OR a "url" field
-  // (linking an already-hosted file) — exactly one, not both.
+  // (linking an already-hosted file) - exactly one, not both.
   app.post<{ Params: { id: string } }>("/api/community-albums/:id/tracks", { preHandler: requireAuth }, async (req, reply) => {
     const album = await prisma.communityAlbum.findUnique({ where: { id: Number(req.params.id) } });
     if (!album) return reply.code(404).send({ error: "no such album" });
@@ -408,7 +408,7 @@ export async function communityMusicRoutes(app: FastifyInstance): Promise<void> 
         replayGainDb: ct.replayGainDb,
       };
     });
-    // Distinct albums referenced by this playlist's tracks — the
+    // Distinct albums referenced by this playlist's tracks - the
     // node-equivalent for the spacemap view (an album here plays the same
     // role a branch plays on the main map).
     const albumsBySlug = new Map<string, { slug: string; title: string; coverArtUrl: string | null; source: "official" | "community" }>();

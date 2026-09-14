@@ -35,7 +35,7 @@ export function CommunitySpotlightAdminPage() {
       {current ? (
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1rem" }}>
           <span>
-            Currently: <strong>{current.title}</strong> — {current.albumTitle}
+            Currently: <strong>{current.title}</strong> - {current.albumTitle}
           </span>
           <button className="btn btn-danger" onClick={() => setSpotlight(null)}>
             Clear
@@ -54,7 +54,7 @@ export function CommunitySpotlightAdminPage() {
       {results.map((t) => (
         <div key={t.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "0.4rem" }}>
           <span>
-            {t.title} — {t.albumTitle}
+            {t.title} - {t.albumTitle}
           </span>
           <button className="btn btn-primary" onClick={() => setSpotlight(t.id)}>
             Set as spotlight

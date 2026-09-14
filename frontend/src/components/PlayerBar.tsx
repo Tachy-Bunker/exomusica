@@ -24,7 +24,7 @@ export function PlayerBar() {
       if (!el || !window.visualViewport) return;
       const vv = window.visualViewport;
       // How much of the layout viewport's bottom is currently hidden below
-      // what's actually visible (e.g. a partially-collapsed address bar) —
+      // what's actually visible (e.g. a partially-collapsed address bar) -
       // position:fixed;bottom:0 alone anchors to the layout viewport on
       // some mobile browsers, not the visual one, which is what put the
       // player off-screen below the real visible area.
@@ -74,13 +74,13 @@ export function PlayerBar() {
 
   // The audio element's own .duration sometimes never resolves for some
   // sources (observed with archive.org-hosted files) even though playback
-  // itself works fine — falling back to the track's own stored duration
+  // itself works fine - falling back to the track's own stored duration
   // means the seek bar still gets a real max instead of 0, which is what
   // was making any seek attempt silently resolve to seeking to position 0
   // (looking exactly like the track restarting).
   const effectiveDuration = duration || currentTrack?.durationSeconds || 0;
 
-  // Real measured height, not a guess — every layout consumer (main content
+  // Real measured height, not a guess - every layout consumer (main content
   // padding, the homepage's height calc) reads this instead of assuming a
   // fixed player height, so nothing ever sits hidden behind it regardless
   // of collapsed/expanded state or queue length. The expanded overlay is a
@@ -133,7 +133,7 @@ export function PlayerBar() {
       setDragOffset((current) => {
         const overlayHeight = overlayRef.current?.getBoundingClientRect().height ?? 600;
         if (current > overlayHeight * 0.3) {
-          // Dragged far enough — animate the rest of the way down, then
+          // Dragged far enough - animate the rest of the way down, then
           // actually collapse once that animation would be done.
           setTimeout(() => setExpanded(false), 200);
           return overlayHeight;
@@ -190,7 +190,7 @@ export function PlayerBar() {
   const content = (
     <div className="player-bar-wrapper" ref={wrapperRef} style={{ display: currentTrack ? "block" : "none" }}>
       {/* This element is created once and never unmounts across route
-          changes — that's the entire mechanism behind "playback survives
+          changes - that's the entire mechanism behind "playback survives
           navigation". No special persistence logic needed beyond living
           here, in Layout, outside the router's <Outlet />. */}
       <audio
@@ -250,7 +250,7 @@ export function PlayerBar() {
               <div className="title">{currentTrack.title}</div>
               {isDesktop && (
                 <div className="origin">
-                  {currentTrack.composer} —{" "}
+                  {currentTrack.composer} -{" "}
                   <Link to={`/album/${currentTrack.albumSlug}`} onClick={(e) => e.stopPropagation()}>
                     {currentTrack.albumTitle}
                   </Link>
@@ -325,7 +325,7 @@ export function PlayerBar() {
             />
             <h2 style={{ marginBottom: "0.2rem" }}>{currentTrack.title}</h2>
             <p style={{ color: "var(--text-dim)" }}>
-              {currentTrack.composer} —{" "}
+              {currentTrack.composer} -{" "}
               <Link to={`/album/${currentTrack.albumSlug}`} onClick={() => setExpanded(false)}>
                 {currentTrack.albumTitle}
               </Link>
@@ -390,7 +390,7 @@ export function PlayerBar() {
                       onClick={() => playQueueIndex(i)}
                       style={{ fontSize: "0.85rem", padding: "0.3rem 0", borderBottom: "1px solid var(--border)", cursor: "pointer" }}
                     >
-                      {t.title} <span style={{ color: "var(--text-dim)" }}>— {t.albumTitle}</span>
+                      {t.title} <span style={{ color: "var(--text-dim)" }}>- {t.albumTitle}</span>
                     </div>
                   ))}
                 </div>
@@ -402,7 +402,7 @@ export function PlayerBar() {
     </div>
   );
 
-  // Portal escapes the app-root's chromatic-aberration filter wrapper —
+  // Portal escapes the app-root's chromatic-aberration filter wrapper -
   // CSS filter on an ancestor changes the containing block for
   // position:fixed descendants, which was making this bar/overlay
   // position and size relative to that wrapper instead of the true

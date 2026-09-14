@@ -61,7 +61,7 @@ export async function aboutRoutes(app: FastifyInstance): Promise<void> {
     },
   );
 
-  // Swaps two features' positions — the admin UI moves one item up/down at
+  // Swaps two features' positions - the admin UI moves one item up/down at
   // a time rather than sending a full reordered list, so a simple swap is
   // all this needs.
   app.post<{ Body: { idA: number; idB: number } }>(

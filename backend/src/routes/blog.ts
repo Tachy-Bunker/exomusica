@@ -22,7 +22,7 @@ export async function blogRoutes(app: FastifyInstance): Promise<void> {
     return [
       ...formSubs.map((s) => ({ id: `form:${s.id}`, email: s.email, subscribed: s.subscribed, source: "form" as const, createdAt: s.createdAt })),
       // Skip account-based entries whose email already appears as a form
-      // signup — same person, don't list them twice.
+      // signup - same person, don't list them twice.
       ...accountSubsWithEmail
         .filter((u) => !formEmails.has(u.email.toLowerCase()))
         .map((u) => ({ id: `account:${u.id}`, email: u.email, subscribed: true, source: "account" as const, createdAt: u.createdAt, username: u.username })),
@@ -47,12 +47,12 @@ export async function blogRoutes(app: FastifyInstance): Promise<void> {
 
   app.delete<{ Params: { id: string } }>("/api/admin/newsletter-subscriptions/:id", { preHandler: requireAdmin }, async (req, reply) => {
     const [kind, rawId] = req.params.id.split(":");
-    if (kind !== "form") return reply.code(400).send({ error: "account-based subscribers can only be unsubscribed, not deleted here — that's their account preference" });
+    if (kind !== "form") return reply.code(400).send({ error: "account-based subscribers can only be unsubscribed, not deleted here - that's their account preference" });
     await prisma.newsletterSubscription.delete({ where: { id: Number(rawId) } });
     return { status: "ok" };
   });
 
-  // Bulk-add from a pasted/uploaded list — one email per line. Skips
+  // Bulk-add from a pasted/uploaded list - one email per line. Skips
   // anything already in the table (by email) rather than erroring, and
   // ignores blank lines and anything that doesn't look like an email.
   app.post<{ Body: { emails: string[] } }>("/api/admin/newsletter-subscriptions/bulk-import", { preHandler: requireAdmin }, async (req, reply) => {
@@ -125,11 +125,11 @@ export async function blogRoutes(app: FastifyInstance): Promise<void> {
     return reply.code(204).send();
   });
 
-  // Separate, admin-triggered step from publishing — you might publish a
+  // Separate, admin-triggered step from publishing - you might publish a
   // post and only email the list once, later, or never. There's no
   // confirmation/double-opt-in flow on subscription (see the note at
   // /api/newsletter/subscribe below), so this sends to every row in
-  // NewsletterSubscription regardless of `confirmed` — that field exists
+  // NewsletterSubscription regardless of `confirmed` - that field exists
   // for a future opt-in flow but nothing sets it true yet.
   app.post<{ Params: { id: string } }>(
     "/api/admin/blog/:id/notify-subscribers",
@@ -163,12 +163,12 @@ export async function blogRoutes(app: FastifyInstance): Promise<void> {
         );
         notified++;
       }
-      void sendDiscordAnnouncement("news_published", `New Exomusica News: "${post.title}" — ${excerpt.slice(0, 200)}`);
+      void sendDiscordAnnouncement("news_published", `New Exomusica News: "${post.title}" - ${excerpt.slice(0, 200)}`);
       return { notified };
     },
   );
 
-  // Captures the subscription only — sending happens separately, via the
+  // Captures the subscription only - sending happens separately, via the
   // admin's "notify subscribers" action on a published post (above). There's
   // no confirmation/double-opt-in email; every subscriber gets emailed on
   // that action regardless of `confirmed`.

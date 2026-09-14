@@ -28,8 +28,8 @@ interface RefOption {
 }
 
 function nodeLabel(n: MapNode): string {
-  if (n.type === "PLAYLIST" && n.playlist) return `[Playlist] ${n.playlist.title} — ${n.playlist.owner.username}`;
-  if (n.type === "SAMPLE_BANK_ITEM" && n.sampleBankItem) return `[Sample] ${n.sampleBankItem.title} — ${n.sampleBankItem.owner.username}`;
+  if (n.type === "PLAYLIST" && n.playlist) return `[Playlist] ${n.playlist.title} - ${n.playlist.owner.username}`;
+  if (n.type === "SAMPLE_BANK_ITEM" && n.sampleBankItem) return `[Sample] ${n.sampleBankItem.title} - ${n.sampleBankItem.owner.username}`;
   if (n.type === "CHALLENGE" && n.challenge) return `[Challenge] ${n.challenge.title}`;
   const name = n.channel?.name ?? "";
   if (n.type === "ACTIVE_BRANCHES") return `[Active] ${name}`;
@@ -64,10 +64,10 @@ export function ForumMapAdminPage() {
   }, []);
   useEffect(() => {
     api<{ id: number; title: string; owner: string }[]>("/api/playlists").then((list) =>
-      setPlaylistOptions(list.map((p) => ({ id: p.id, label: `${p.title} — ${p.owner}` }))),
+      setPlaylistOptions(list.map((p) => ({ id: p.id, label: `${p.title} - ${p.owner}` }))),
     );
     api<{ id: number; title: string; owner: string }[]>("/api/sample-bank").then((list) =>
-      setSampleOptions(list.map((s) => ({ id: s.id, label: `${s.title} — ${s.owner}` }))),
+      setSampleOptions(list.map((s) => ({ id: s.id, label: `${s.title} - ${s.owner}` }))),
     );
     api<{ id: number; title: string }[]>("/api/challenges").then((list) => setChallengeOptions(list.map((c) => ({ id: c.id, label: c.title }))));
   }, []);
@@ -232,7 +232,7 @@ export function ForumMapAdminPage() {
           <div>
             <label>{newType === "PLAYLIST" ? "Playlist" : newType === "SAMPLE_BANK_ITEM" ? "Sample" : "Challenge"}</label>
             <select value={newRefId} onChange={(e) => setNewRefId(e.target.value ? Number(e.target.value) : "")}>
-              <option value="">— select —</option>
+              <option value="">- select -</option>
               {(newType === "PLAYLIST" ? playlistOptions : newType === "SAMPLE_BANK_ITEM" ? sampleOptions : challengeOptions).map((o) => (
                 <option key={o.id} value={o.id}>
                   {o.label}
@@ -244,7 +244,7 @@ export function ForumMapAdminPage() {
           <div>
             <label>Channel</label>
             <select value={newRefId} onChange={(e) => setNewRefId(e.target.value ? Number(e.target.value) : "")}>
-              <option value="">— select —</option>
+              <option value="">- select -</option>
               {availableChannels.map((c) => (
                 <option key={c.id} value={c.id}>
                   {c.branchId ? `[Branch] ${c.name}` : c.name}
@@ -355,7 +355,7 @@ export function ForumMapAdminPage() {
               <td>{nodeLabel(n)}</td>
               <td>
                 <select value={n.parentId ?? ""} onChange={(e) => setParent(n.id, e.target.value ? Number(e.target.value) : null)}>
-                  <option value="">— none (root) —</option>
+                  <option value="">- none (root) -</option>
                   {nodes
                     .filter((c) => c.id !== n.id)
                     .map((c) => (
@@ -397,7 +397,7 @@ export function ForumMapAdminPage() {
                 />
               </td>
               <td>
-                <input type="checkbox" checked={n.hidden} onChange={(e) => toggleHidden(n.id, e.target.checked)} title="Hide by default — parent shows a reveal handle instead" />
+                <input type="checkbox" checked={n.hidden} onChange={(e) => toggleHidden(n.id, e.target.checked)} title="Hide by default - parent shows a reveal handle instead" />
               </td>
               <td>
                 <button className="btn btn-danger" style={{ fontSize: "0.75rem" }} onClick={() => removeNode(n.id)}>

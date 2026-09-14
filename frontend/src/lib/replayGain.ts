@@ -1,19 +1,19 @@
 import { api } from "./api";
 
-// -18 dBFS RMS is a common, moderate reference level — loud enough that
+// -18 dBFS RMS is a common, moderate reference level - loud enough that
 // quiet tracks get a real boost, conservative enough that already-loud
 // masters don't get pushed toward clipping-adjacent territory.
 const TARGET_RMS_DB = -18;
 const MAX_GAIN_DB = 24;
 
 // Guards against kicking off two analyses of the same track in one
-// session (e.g. rapid track-skipping back and forth) — this is purely a
+// session (e.g. rapid track-skipping back and forth) - this is purely a
 // same-tab in-flight guard, not a durable cache; the real cache is the
 // server-side replayGainDb field once this submits successfully.
 const inFlight = new Set<string>();
 
 /** Decodes the full track and computes its RMS loudness, converted to a
- *  gain adjustment in dB toward TARGET_RMS_DB. Never throws outward —
+ *  gain adjustment in dB toward TARGET_RMS_DB. Never throws outward -
  *  any failure (network, decode, unsupported format) just means this
  *  track stays unanalyzed and plays at its original volume. */
 async function computeGainDb(fileUrl: string): Promise<number | null> {
@@ -21,7 +21,7 @@ async function computeGainDb(fileUrl: string): Promise<number | null> {
     const res = await fetch(fileUrl);
     if (!res.ok) return null;
     const arrayBuffer = await res.arrayBuffer();
-    // A throwaway context purely for decodeAudioData — nothing here ever
+    // A throwaway context purely for decodeAudioData - nothing here ever
     // connects to speakers, so it can't affect actual playback.
     const decodeCtx = new (window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext)();
     let audioBuffer: AudioBuffer;
@@ -55,7 +55,7 @@ async function computeGainDb(fileUrl: string): Promise<number | null> {
 }
 
 /** Kicks off background analysis for a track that has no cached gain yet
- *  — fire-and-forget, never awaited by playback. If this tab computes a
+ *  - fire-and-forget, never awaited by playback. If this tab computes a
  *  value, it's submitted to be cached for every future listener. */
 export function analyzeAndSubmitReplayGain(track: { id: number; fileUrl: string; source?: "official" | "community" }): void {
   const key = `${track.source ?? "official"}:${track.id}`;

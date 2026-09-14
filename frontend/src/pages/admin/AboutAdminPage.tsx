@@ -147,14 +147,14 @@ export function AboutAdminPage() {
               </option>
               {collaborators.map((c) => (
                 <option key={c.id} value={c.id}>
-                  {c.name} — {c.role}
+                  {c.name} - {c.role}
                 </option>
               ))}
             </select>
           </div>
           <div className="field">
             <textarea
-              placeholder="About-page description (optional — falls back to their bio)"
+              placeholder="About-page description (optional - falls back to their bio)"
               rows={3}
               value={collabForm.description}
               onChange={(e) => setCollabForm((f) => ({ ...f, description: e.target.value }))}

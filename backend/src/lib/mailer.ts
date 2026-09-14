@@ -49,12 +49,12 @@ function buildTransport(config: SmtpConfig) {
 }
 
 /** Sends an email if SMTP is configured; otherwise logs and no-ops. Never
- *  throws — a mail failure should never take down the request that
+ *  throws - a mail failure should never take down the request that
  *  triggered it (a PM send, a reaction, a publish). */
 export async function sendMail(to: string, subject: string, text: string, html?: string): Promise<void> {
   const config = await resolveSmtpConfig();
   if (!config) {
-    console.warn(`[mailer] SMTP not configured — would have sent "${subject}" to ${to}`);
+    console.warn(`[mailer] SMTP not configured - would have sent "${subject}" to ${to}`);
     return;
   }
   try {
@@ -64,7 +64,7 @@ export async function sendMail(to: string, subject: string, text: string, html?:
   }
 }
 
-/** Admin "check if it's working" button — verifies the connection without
+/** Admin "check if it's working" button - verifies the connection without
  *  actually sending anything. Throws on failure so the route can report why. */
 export async function verifySmtpConnection(): Promise<void> {
   const config = await resolveSmtpConfig();

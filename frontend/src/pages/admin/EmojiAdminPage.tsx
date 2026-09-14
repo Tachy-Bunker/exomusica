@@ -49,7 +49,7 @@ export function EmojiAdminPage() {
     <div>
       <h1>Emoji</h1>
       <p style={{ color: "var(--text-dim)", fontSize: "0.9rem" }}>
-        Upload PNG or BMP files — select several at once for a full palette import. The filename (minus extension)
+        Upload PNG or BMP files - select several at once for a full palette import. The filename (minus extension)
         becomes the emoji's <code>:name:</code>, deduplicated automatically if it's already taken.
       </p>
       <div style={{ display: "flex", gap: "0.6rem", marginBottom: "1.5rem" }}>

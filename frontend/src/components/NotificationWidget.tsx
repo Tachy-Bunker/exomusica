@@ -38,7 +38,7 @@ interface SoundPref {
 
 const POLL_MS = 20000;
 
-// Shared by the widget's own click-to-jump and by ChannelPage's — a message
+// Shared by the widget's own click-to-jump and by ChannelPage's - a message
 // still on today's UTC date is still in the live feed, not yet archived,
 // so jumping to it should land in live mode, not force a day-archive view.
 function jumpUrl(channelSlug: string, unixTimestamp: number, messageId: number): string {
@@ -77,7 +77,7 @@ export function NotificationWidget({ offsetRight = 0, inline = false }: { offset
 
     async function poll() {
       if (!user) {
-        // Logged out: only the public recent-activity feed applies — no
+        // Logged out: only the public recent-activity feed applies - no
         // personal notifications, no per-user sound preferences to honor.
         const recentList = await api<RecentMessage[]>("/api/recent-messages?limit=3");
         if (!cancelled) setRecent(recentList);
@@ -98,7 +98,7 @@ export function NotificationWidget({ offsetRight = 0, inline = false }: { offset
         seenNotificationIds.current.add(n.id);
       }
 
-      // Unfollowed-topic attention ping — site-wide, not tied to whichever
+      // Unfollowed-topic attention ping - site-wide, not tied to whichever
       // page you're currently on, since the whole point is to get your
       // attention when you're looking at something else entirely.
       for (const m of recentList) {

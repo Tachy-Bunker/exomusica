@@ -36,7 +36,7 @@ export async function siteSettingsRoutes(app: FastifyInstance): Promise<void> {
         smtpPort: true,
         smtpUser: true,
         smtpFrom: true,
-        // smtpPassword and discordBotToken deliberately excluded — this is a
+        // smtpPassword and discordBotToken deliberately excluded - this is a
         // public, unauthenticated endpoint
         chatOpenSfxUrl: true,
         joinNotifyEmail: true,
@@ -156,7 +156,7 @@ export async function siteSettingsRoutes(app: FastifyInstance): Promise<void> {
     );
   });
 
-  // Admin-only view — includes whether a password is set (as a boolean,
+  // Admin-only view - includes whether a password is set (as a boolean,
   // never the value itself) so the form can show "configured" without
   // ever round-tripping the actual secret back to the browser.
   app.get("/api/admin/discord-bridge/status", { preHandler: requireAdmin }, async () => {
@@ -192,7 +192,7 @@ export async function siteSettingsRoutes(app: FastifyInstance): Promise<void> {
       smtpFrom: req.body.smtpFrom,
       smtpFromName: req.body.smtpFromName,
     };
-    // Only overwrite the password if a new one was actually typed — an
+    // Only overwrite the password if a new one was actually typed - an
     // empty field means "leave the existing one alone", not "clear it".
     if (req.body.smtpPassword) data.smtpPassword = req.body.smtpPassword;
     await prisma.siteSettings.upsert({ where: { id: 1 }, create: { id: 1, ...data }, update: data });

@@ -60,7 +60,7 @@ export function StorageAdminPage() {
     }
     if (
       !confirm(
-        `Replace all ${attachments.length} local attachments with archive.org links using this prefix? Files not found under this prefix (mismatched filenames) will silently stay pointed at their old — now possibly missing — local path.`,
+        `Replace all ${attachments.length} local attachments with archive.org links using this prefix? Files not found under this prefix (mismatched filenames) will silently stay pointed at their old - now possibly missing - local path.`,
       )
     )
       return;
@@ -94,7 +94,7 @@ export function StorageAdminPage() {
       <h1>Storage</h1>
       <p style={{ color: "var(--text-dim)" }}>
         {attachments.length} attachments hosted locally, {formatSize(String(totalSize))} total. Attachments already
-        pointed at an external URL (archive.org or otherwise) aren't shown here — there's nothing to migrate.
+        pointed at an external URL (archive.org or otherwise) aren't shown here - there's nothing to migrate.
       </p>
 
       <div className="field" style={{ maxWidth: 480 }}>
@@ -106,7 +106,7 @@ export function StorageAdminPage() {
           onChange={(e) => setArchiveOrgPrefix(e.target.value)}
         />
         <p style={{ fontSize: "0.75rem", color: "var(--text-dim)", marginTop: "0.2rem" }}>
-          Matches each attachment by its exact filename appended to this prefix — only works if you uploaded it to
+          Matches each attachment by its exact filename appended to this prefix - only works if you uploaded it to
           that archive.org item preserving the original filename.
         </p>
       </div>
@@ -138,7 +138,7 @@ export function StorageAdminPage() {
               <td>{a.filename}</td>
               <td className="mono">{formatSize(a.sizeBytes)}</td>
               <td>{a.uploader}</td>
-              <td>{a.channel ?? a.communityTrack ?? a.communityAlbumCover ?? "—"}</td>
+              <td>{a.channel ?? a.communityTrack ?? a.communityAlbumCover ?? "-"}</td>
               <td style={{ display: "flex", gap: "0.4rem" }}>
                 <a className="btn" href={a.url} download={a.filename}>
                   Download

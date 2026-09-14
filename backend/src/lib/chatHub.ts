@@ -10,7 +10,7 @@ export function subscribe(channelSlug: string, socket: WebSocket): void {
 
 /** Push a server-authored event (a new/edited/deleted message) to everyone
  *  watching this channel. Clients never send chat content over the socket
- *  directly — sending goes through the authenticated REST endpoint, which
+ *  directly - sending goes through the authenticated REST endpoint, which
  *  persists first and calls this afterward. That's what makes messages
  *  durable and lets replies/reactions/embeds resolve before broadcast. */
 export function broadcast(channelSlug: string, event: unknown): void {

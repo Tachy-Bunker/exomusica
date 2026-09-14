@@ -50,7 +50,7 @@ export function TopicPage() {
 
   useEffect(() => {
     if (isDesktop && channel) {
-      // No branch slug — this is a standalone forum topic, not tied to a branch.
+      // No branch slug - this is a standalone forum topic, not tied to a branch.
       openChat(channel.slug, channel.name);
     }
   }, [isDesktop, channel, openChat]);

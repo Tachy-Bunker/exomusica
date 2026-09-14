@@ -148,7 +148,7 @@ export function PlaylistSpaceMapPage() {
   useEffect(reload, [slug]);
 
   // Updates the visible slider immediately, but debounces the actual save
-  // — five sliders each firing a request per drag tick would otherwise
+  // - five sliders each firing a request per drag tick would otherwise
   // spam the API, unlike the single cover-size slider this replaced.
   function updateControl(patch: Partial<typeof controls>) {
     setControls((c) => ({ ...c, ...patch }));
@@ -167,7 +167,7 @@ export function PlaylistSpaceMapPage() {
   const { containerRef: fieldContainerRef, fieldCanvasRef, wardenCanvasRef } = useSpacemapField(fxSettings);
 
   // Scattered home positions, deterministic per album so revisits land the
-  // same place — actual x/y then wander around that point each frame.
+  // same place - actual x/y then wander around that point each frame.
   // Cartesian random points (rather than polar angle+radius, which tends
   // to look like uniform rings) pushed out to a guaranteed minimum
   // distance from the center Play-all button, both scaled by the
@@ -205,7 +205,7 @@ export function PlaylistSpaceMapPage() {
     if (p) {
       setCurrentPlaylist({ slug: p.slug, title: p.title });
       // Smart contextualization: once this album finishes, keep playing
-      // through the rest of the playlist rather than just stopping —
+      // through the rest of the playlist rather than just stopping -
       // shuffled, and with this album's own tracks excluded so nothing
       // repeats right after it just played.
       const restOfPlaylist = p.items.filter((item) => !(item.source === node.source && item.albumSlug === node.slug)).map(playlistItemToPlayable);
@@ -359,7 +359,7 @@ export function PlaylistSpaceMapPage() {
     return () => cancelAnimationFrame(frameId);
   }, []);
 
-  // Off-screen compass arrows — same pattern as the main spacemap.
+  // Off-screen compass arrows - same pattern as the main spacemap.
   const container = containerRef.current;
   const compassPoints: { angle: number; label: string; playing: boolean }[] = [];
   if (container) {
@@ -435,7 +435,7 @@ export function PlaylistSpaceMapPage() {
               >
                 ×
               </button>
-              Your browser is rendering this without hardware acceleration, which is slow — quality's been dropped
+              Your browser is rendering this without hardware acceleration, which is slow - quality's been dropped
               automatically. This is a browser/GPU setting, not something this site controls.
             </div>
           )}
@@ -464,7 +464,7 @@ export function PlaylistSpaceMapPage() {
                   }}
                 >
                   <div className="field">
-                    <label style={{ fontSize: "0.75rem" }}>Cover size — {controls.coverSize}</label>
+                    <label style={{ fontSize: "0.75rem" }}>Cover size - {controls.coverSize}</label>
                     <input type="range" min={32} max={140} value={controls.coverSize} onChange={(e) => updateControl({ coverSize: Number(e.target.value) })} />
                   </div>
                   <div className="field">
@@ -611,7 +611,7 @@ export function PlaylistSpaceMapPage() {
                 cursor: !isDesktop ? "pointer" : undefined,
               }}
             >
-              {lockedId === -1 ? "Play all" : nodesRef.current.find((n) => n.id === lockedId)?.title} {isDesktop ? "(F)" : "— tap to play"}
+              {lockedId === -1 ? "Play all" : nodesRef.current.find((n) => n.id === lockedId)?.title} {isDesktop ? "(F)" : "- tap to play"}
             </p>
           )}
 

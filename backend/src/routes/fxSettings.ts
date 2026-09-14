@@ -36,7 +36,7 @@ export async function fxSettingsRoutes(app: FastifyInstance): Promise<void> {
 
   app.put<{ Body: Partial<typeof DEFAULTS> }>("/api/admin/fx-settings", { preHandler: requireAdmin }, async (req) => {
     const data = req.body ?? {};
-    // Clamp debris count server-side too — an admin typo shouldn't be able
+    // Clamp debris count server-side too - an admin typo shouldn't be able
     // to exceed what the prototype's own slider allowed.
     if (data.debrisCount !== undefined) data.debrisCount = Math.max(10, Math.min(1500, data.debrisCount));
     return prisma.fxSettings.upsert({ where: { id: 1 }, create: { id: 1, ...data }, update: data });

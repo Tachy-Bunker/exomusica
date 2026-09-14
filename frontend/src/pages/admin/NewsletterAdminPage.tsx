@@ -28,7 +28,7 @@ export function NewsletterAdminPage() {
   }
 
   async function removeSubscriber(s: Subscription) {
-    if (!confirm(`Permanently remove ${s.email}? This deletes the record entirely — use the checkbox instead if you just want to pause emails.`)) return;
+    if (!confirm(`Permanently remove ${s.email}? This deletes the record entirely - use the checkbox instead if you just want to pause emails.`)) return;
     await api(`/api/admin/newsletter-subscriptions/${s.id}`, { method: "DELETE" });
     setSubs((prev) => prev.filter((x) => x.id !== s.id));
   }

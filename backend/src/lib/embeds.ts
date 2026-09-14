@@ -31,7 +31,7 @@ export function trackToDTO(t: TrackWithRelations): PlayableTrackDTO {
 }
 
 // Matches "track:42", "/t/42", or "/track/42" anywhere in a message.
-// Deliberately independent of the frontend's eventual page-URL scheme —
+// Deliberately independent of the frontend's eventual page-URL scheme -
 // "track:ID" always works even before routing is decided.
 const TRACK_REF = /(?:track:|\/t\/|\/track\/)(\d+)/g;
 

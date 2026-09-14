@@ -20,7 +20,7 @@ export function MoireLayer() {
     }
     document.addEventListener("visibilitychange", handleVisibility);
 
-    // Stops scheduling frames entirely while disabled — this subscription
+    // Stops scheduling frames entirely while disabled - this subscription
     // restarts the loop if the user re-enables the effect later via
     // account settings, since nothing else would notice that change once
     // the loop itself has stopped polling for it.
@@ -44,7 +44,7 @@ export function MoireLayer() {
         if (!s.userMoireEnabled) {
           base.style.opacity = "0";
           dupe.style.opacity = "0";
-          return; // don't reschedule — the subscription above restarts this if re-enabled
+          return; // don't reschedule - the subscription above restarts this if re-enabled
         }
 
         const bgImage = s.moireImageUrl ? `url(${s.moireImageUrl})` : "none";
@@ -61,7 +61,7 @@ export function MoireLayer() {
           const wave = s.moireWaveform === "triangle" ? triangleWave(cyclePhase) : (Math.sin(cyclePhase * Math.PI * 2) + 1) / 2;
           const offset = s.moireOffsetMin + wave * (s.moireOffsetMax - s.moireOffsetMin);
           const rotation = (t * s.moireRotationSpeed * 360) % 360;
-          // Only the duplicate moves — the base stays put, so the two
+          // Only the duplicate moves - the base stays put, so the two
           // overlapping transparent layers interfere with each other as
           // the duplicate drifts and turns, which is the actual moiré.
           dupe.style.backgroundPosition = `${offset}px ${offset}px`;
@@ -80,13 +80,13 @@ export function MoireLayer() {
   }, []);
 
   return (
-    // Outer wrapper is exactly viewport-sized and clips its children —
+    // Outer wrapper is exactly viewport-sized and clips its children -
     // this is what actually fixes the scrollbar/page-size bug: the inner
     // layers are deliberately oversized (200%) so rotation never reveals
     // empty corners, but without this clip that oversized box was
     // affecting layout/scroll regardless of position:fixed, because an
     // ancestor's CSS filter (the chromatic aberration wrapper) changes
-    // fixed-position containment — overflow:hidden here neutralizes that
+    // fixed-position containment - overflow:hidden here neutralizes that
     // side effect entirely rather than depending on it not mattering.
     <div style={{ position: "fixed", inset: 0, overflow: "hidden", zIndex: 9998, pointerEvents: "none" }}>
       <div ref={baseRef} style={{ position: "absolute", inset: "-50%", width: "200%", height: "200%", backgroundRepeat: "repeat", mixBlendMode: "overlay" }} />

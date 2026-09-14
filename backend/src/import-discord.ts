@@ -12,8 +12,8 @@ const prisma = new PrismaClient();
 
 /** Indexes every file under mediaDir by basename, once, so per-row lookups
  *  are O(1) instead of re-walking the tree per attachment. The CSV's own
- *  paths are absolute Windows paths from wherever the export was made —
- *  meaningless here — so only the filename itself is used to relocate it
+ *  paths are absolute Windows paths from wherever the export was made -
+ *  meaningless here - so only the filename itself is used to relocate it
  *  under mediaDir (which is expected to be that whole backup folder,
  *  copied over with its subfolders intact). */
 function indexMediaDir(mediaDir: string): Map<string, string> {
@@ -53,7 +53,7 @@ async function main() {
 
   const channel = await prisma.forumChannel.findUnique({ where: { slug: channelSlug } });
   if (!channel) {
-    console.error(`No channel with slug "${channelSlug}" — create it first (branch or admin discussion topic).`);
+    console.error(`No channel with slug "${channelSlug}" - create it first (branch or admin discussion topic).`);
     process.exit(1);
   }
 

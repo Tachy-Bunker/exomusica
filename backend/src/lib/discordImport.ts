@@ -93,7 +93,7 @@ export async function importDiscordRows(
 
     // Messages forwarded by our own bridge (website -> Discord) are all
     // posted through one webhook, which shares a single Discord author id
-    // across every website user's message — that id is not a useful
+    // across every website user's message - that id is not a useful
     // ghost identity, since it doesn't distinguish between senders.
     // Detect this pattern and attribute the message to the real website
     // account directly instead.
@@ -105,7 +105,7 @@ export async function importDiscordRows(
       if (realUser) {
         author = realUser;
       } else {
-        // Real user not found (renamed, deleted) — fall back to a ghost
+        // Real user not found (renamed, deleted) - fall back to a ghost
         // under this synthetic name rather than dropping the message.
         author = await findOrCreateGhostUser(prisma, `exo-api:${realUsername}`, realUsername);
       }

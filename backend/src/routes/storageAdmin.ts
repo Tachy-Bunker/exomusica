@@ -20,13 +20,13 @@ async function migrateToArchiveOrg(attachmentId: number, urlPrefix: string): Pro
   const oldDiskPath = path.join(UPLOADS_DIR, attachment.storagePath.replace(LOCAL_PREFIX, ""));
 
   await prisma.attachment.update({ where: { id: attachmentId }, data: { storagePath: newUrl } });
-  // Best-effort local cleanup — the swap to the DB pointer above is what
+  // Best-effort local cleanup - the swap to the DB pointer above is what
   // actually matters for the site; a leftover file if this fails just
   // means slightly wasted disk, not a broken attachment.
   try {
     await unlink(oldDiskPath);
   } catch {
-    // already gone, or a permissions issue — either way, not fatal
+    // already gone, or a permissions issue - either way, not fatal
   }
   return { ok: true };
 }
@@ -57,7 +57,7 @@ export async function storageAdminRoutes(app: FastifyInstance): Promise<void> {
       url: a.storagePath,
       uploader: a.uploader.username,
       channel: a.message?.channel ? `${a.message.channel.name} (${a.message.channel.slug})` : null,
-      communityTrack: a.communityTrack ? `${a.communityTrack.title} — ${a.communityTrack.album.title}` : null,
+      communityTrack: a.communityTrack ? `${a.communityTrack.title} - ${a.communityTrack.album.title}` : null,
       communityAlbumCover: a.communityAlbumCover ? `Cover for ${a.communityAlbumCover.title}` : null,
       createdAt: a.createdAt,
     }));

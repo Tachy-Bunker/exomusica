@@ -10,7 +10,7 @@ const injectedFamilies = new Set<string>();
 
 /** Ensures the @font-face rule for this font exists in the document, then
  *  returns the font-family value to apply. Pass null/undefined for "use
- *  the site default" — every call site already does this uniformly. */
+ *  the site default" - every call site already does this uniformly. */
 export function useCustomFont(font: FontInfo | null | undefined): string | undefined {
   useEffect(() => {
     if (!font || injectedFamilies.has(font.familyName)) return;

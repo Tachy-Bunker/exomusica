@@ -98,7 +98,7 @@ export function ChallengesPage() {
   return (
     <div style={{ maxWidth: 720 }}>
       <h1>Challenges</h1>
-      <p style={{ color: "var(--text-dim)" }}>A recurring constraint, a submission thread — see what people make of it.</p>
+      <p style={{ color: "var(--text-dim)" }}>A recurring constraint, a submission thread - see what people make of it.</p>
 
       {user?.isAdmin && (
         <form onSubmit={createChallenge} style={{ border: "1px solid var(--border)", borderRadius: "var(--radius)", padding: "0.6rem", marginBottom: "1.5rem", display: "flex", flexDirection: "column", gap: "0.4rem" }}>
@@ -143,7 +143,7 @@ export function ChallengesPage() {
                   <div key={s.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: "0.85rem", marginBottom: "0.3rem" }}>
                     <span>
                       <Link to={`/community-album/${s.albumSlug}`}>{s.trackTitle}</Link>
-                      <span style={{ color: "var(--text-dim)" }}> — {s.username}</span>
+                      <span style={{ color: "var(--text-dim)" }}> - {s.username}</span>
                     </span>
                     {user?.username === s.username && (
                       <button className="btn btn-danger" style={{ fontSize: "0.7rem" }} onClick={() => withdraw(s.id)}>
@@ -157,7 +157,7 @@ export function ChallengesPage() {
               {user && detail.active && (
                 <div style={{ display: "flex", gap: "0.4rem", marginTop: "0.6rem" }}>
                   <select value={chosenTrack} onChange={(e) => setChosenTrack(e.target.value ? Number(e.target.value) : "")} style={{ flex: 1 }}>
-                    <option value="">— pick one of your tracks —</option>
+                    <option value="">- pick one of your tracks -</option>
                     {myTracks.map((t) => (
                       <option key={t.id} value={t.id}>
                         {t.title}

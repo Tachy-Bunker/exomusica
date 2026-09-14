@@ -1,5 +1,5 @@
 /** Compresses an image file down to fit under maxBytes, entirely in the
- *  browser via canvas re-encoding — first by lowering JPEG quality, then
+ *  browser via canvas re-encoding - first by lowering JPEG quality, then
  *  by downscaling dimensions if quality reduction alone isn't enough
  *  (very large source images can still exceed the target even at low
  *  quality). Non-image files, or anything that fails to decode, are
@@ -13,7 +13,7 @@ export async function compressImageToMaxSize(file: File, maxBytes: number): Prom
   try {
     bitmap = await createImageBitmap(file);
   } catch {
-    return file; // couldn't decode — let the normal upload path handle/reject it
+    return file; // couldn't decode - let the normal upload path handle/reject it
   }
 
   let width = bitmap.width;
@@ -39,7 +39,7 @@ export async function compressImageToMaxSize(file: File, maxBytes: number): Prom
     if (blob.size <= maxBytes) break;
   }
 
-  // Pass 2: quality alone wasn't enough — scale dimensions down too,
+  // Pass 2: quality alone wasn't enough - scale dimensions down too,
   // re-trying a moderate quality at each smaller size.
   while (best && best.size > maxBytes && (width > 128 || height > 128)) {
     width = Math.round(width * 0.75);

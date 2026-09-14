@@ -39,7 +39,7 @@ export async function channelRoutes(app: FastifyInstance): Promise<void> {
     return prisma.forumChannel.update({ where: { id: Number(req.params.id) }, data: req.body ?? {} });
   });
 
-  // Powers the "follow" button — ChannelFollow already existed (it's what
+  // Powers the "follow" button - ChannelFollow already existed (it's what
   // weeklySummary.ts reads from) but nothing ever wrote to it.
   app.post<{ Params: { slug: string } }>(
     "/api/channels/:slug/follow",
@@ -81,7 +81,7 @@ export async function channelRoutes(app: FastifyInstance): Promise<void> {
   );
 
   // Discussion topics (Art You Like, Science, Primal Taste Theory, ...) have
-  // no branch — branch topics come from POST /api/admin/branches instead.
+  // no branch - branch topics come from POST /api/admin/branches instead.
   app.post<{ Body: { slug: string; name: string; description?: string; category?: string } }>(
     "/api/admin/channels",
     { preHandler: requireAdmin },

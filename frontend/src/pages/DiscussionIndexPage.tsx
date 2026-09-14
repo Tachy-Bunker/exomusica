@@ -32,7 +32,7 @@ export function DiscussionIndexPage() {
     api<{ categoryOrder: string[] | null }>("/api/site-settings").then((s) => setCategoryOrder(s.categoryOrder ?? []));
   }, []);
 
-  // Already ordered by position from the API — group by category while
+  // Already ordered by position from the API - group by category while
   // preserving that order, uncategorized topics fall into a plain group.
   const groups = new Map<string, ChannelSummary[]>();
   for (const t of topics) {

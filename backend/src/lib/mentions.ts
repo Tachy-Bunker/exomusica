@@ -9,7 +9,7 @@ export function extractMentionedUsernames(content: string): string[] {
 }
 
 /** Resolves @username mentions in freshly-authored website content to the
- *  actual users being mentioned (active accounts only — mentioning a
+ *  actual users being mentioned (active accounts only - mentioning a
  *  ghost doesn't notify anyone, since ghosts can't log in to see it).
  *  Excludes the author mentioning themselves. */
 export async function resolveMentions(
@@ -33,8 +33,8 @@ export async function resolveMentions(
   });
   // Resolution order: a user's own opt-in discordUserId (set for DM
   // features) first, then their own discordId if they have one directly
-  // (this is how a ghost — a Discord-only person with no website
-  // account — resolves, since that's the only place their id lives),
+  // (this is how a ghost - a Discord-only person with no website
+  // account - resolves, since that's the only place their id lives),
   // then finally a linked ghost's discordId for a real account that's
   // never set either of its own fields but has been bridged before.
   return users.map((u) => ({
@@ -63,7 +63,7 @@ export function translateMentionsForDiscord(
 }
 
 /** Converts Discord's <@snowflakeId> mentions to website @username mentions
- *  before storing an incoming live-bridged Discord message — so a reader
+ *  before storing an incoming live-bridged Discord message - so a reader
  *  on the website sees a real, resolvable @username rather than a raw id,
  *  and so the standard mention-notification logic picks it up. Resolves
  *  through the ghost/linked-user system: a mentioned Discord user with a

@@ -172,7 +172,7 @@ export function BlogAdminPage() {
                     </button>
                   )}{" "}
                   <select value={p.fontId ?? ""} onChange={(e) => changeFont(p, e.target.value)} style={{ fontSize: "0.8rem" }}>
-                    <option value="">— default font —</option>
+                    <option value="">- default font -</option>
                     {fonts.map((f) => (
                       <option key={f.id} value={f.id}>
                         {f.name}

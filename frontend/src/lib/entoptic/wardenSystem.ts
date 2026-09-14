@@ -2,7 +2,7 @@ import { getRMS } from "../audioAnalyser";
 import { useMapQualityStore } from "../mapQualityStore";
 // Ported from the Entoptic Cemetery prototype's warden generation and
 // drawing code. Deliberately keeps the prototype's random makeWardens()
-// for now — step 2 of the migration plan replaces this with deterministic
+// for now - step 2 of the migration plan replaces this with deterministic
 // per-branch seeding, but step 1's job is matching the prototype's visual
 // behavior first.
 
@@ -31,7 +31,7 @@ export interface Warden {
   ty: number;
   speed: number;
   size: number;
-  sizeFrac: number; // 0..1, the raw random draw — lets size be rescaled live if min/max change
+  sizeFrac: number; // 0..1, the raw random draw - lets size be rescaled live if min/max change
   hue: number;
   eyeHue: number;
   spikes: Spike[];
@@ -48,7 +48,7 @@ export interface Warden {
   screenY: number | null;
 }
 
-// FNV-1a — deterministic per-branch seed so a warden's appearance never
+// FNV-1a - deterministic per-branch seed so a warden's appearance never
 // reshuffles when branches reorder, unlike seeding from array index.
 function fnv1a(str: string): number {
   let h = 0x811c9dc5;
@@ -190,7 +190,7 @@ export class WardenSystem {
   private canvas: HTMLCanvasElement;
   private ctx: CanvasRenderingContext2D;
   private wardens: Warden[] = [];
-  private branchWardenCache = new Map<number, Warden>(); // incremental — never regenerate wholesale, or an in-progress hover/interaction breaks
+  private branchWardenCache = new Map<number, Warden>(); // incremental - never regenerate wholesale, or an in-progress hover/interaction breaks
   private sizeMin = 24;
   private sizeMax = 44;
   private playingBranchId: number | null = null;
@@ -213,7 +213,7 @@ export class WardenSystem {
     this.wardens = makeWardens(count, this.seed, this.sizeMin, this.sizeMax);
   }
 
-  /** Rescales every existing warden's size from its stored raw fraction —
+  /** Rescales every existing warden's size from its stored raw fraction -
    *  no regeneration needed, so an in-progress hover/lock-on isn't disrupted
    *  when the admin adjusts the min/max sliders. */
   setSizeRange(min: number, max: number) {
@@ -223,7 +223,7 @@ export class WardenSystem {
     for (const w of this.branchWardenCache.values()) w.size = min + w.sizeFrac * (max - min);
   }
 
-  /** Wardens become the branch objects themselves — one per branch,
+  /** Wardens become the branch objects themselves - one per branch,
    *  deterministically seeded from the branch's own ID, diffed against the
    *  previous set so reordering or one branch changing doesn't regenerate
    *  (and thereby interrupt) every other warden. */
@@ -242,7 +242,7 @@ export class WardenSystem {
   }
 
   /** Called once per frame per branch by the spacemap, reusing the exact
-   *  screen-position math it already computes for hit-testing/lock-on —
+   *  screen-position math it already computes for hit-testing/lock-on -
    *  this is what makes wardens track the camera pan and physics wander. */
   setScreenPosition(branchId: number, screenX: number, screenY: number) {
     const w = this.branchWardenCache.get(branchId);
@@ -468,12 +468,12 @@ export class WardenSystem {
     }
   }
 
-  /** Advances waypoint wandering — call once per logic tick. */
+  /** Advances waypoint wandering - call once per logic tick. */
   tick(dt: number, zoneSpeedFactor: number, driftMul: number) {
     for (const o of this.wardens) {
       if (o.branchId !== null) {
         o.facing += o.spin * dt * zoneSpeedFactor;
-        continue; // position is externally driven — see setScreenPosition
+        continue; // position is externally driven - see setScreenPosition
       }
       const dx = o.tx - o.x;
       const dy = o.ty - o.y;
@@ -519,7 +519,7 @@ export class WardenSystem {
   }
 
   /** Sources fed into the field shader's `sources[]`/`uFlyerLens[]` uniforms
-   *  — wardens act as light sources and lens-distortion points in the field
+   *  - wardens act as light sources and lens-distortion points in the field
    *  itself, matching the prototype's per-frame uniform wiring. */
   private fieldSpacePosition(o: Warden): { x: number; y: number } {
     if (o.screenX !== null && o.screenY !== null) {

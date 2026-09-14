@@ -189,7 +189,7 @@ export function AlbumPage() {
               {t.composers.length > 0 && (
                 <span style={{ color: "var(--text-dim)", fontSize: "0.8rem" }}>
                   {" "}
-                  —{" "}
+                  -{" "}
                   {t.composers.map((c, i) => (
                     <span key={c.id}>
                       {i > 0 && ", "}

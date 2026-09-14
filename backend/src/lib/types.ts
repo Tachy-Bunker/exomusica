@@ -1,6 +1,6 @@
 // This is the one contract the forum backend and the future audio player
-// both depend on. Wherever a track can be handed to the player — a forum
-// message embed today, an album page or search result later — it arrives
+// both depend on. Wherever a track can be handed to the player - a forum
+// message embed today, an album page or search result later - it arrives
 // in this shape. The player store only needs to know this one type.
 export interface PlayableTrackDTO {
   id: number;

@@ -1,22 +1,22 @@
 :root {
-  /* Base — deep pulsar space, not pure black */
+  /* Base - deep pulsar space, not pure black */
   --bg: #0a0e1c;
   --bg-elevated: #131a2e;
   --bg-inset: #060911;
-  --text: #eef1fb; /* cool white — ~16:1 against --bg, well past WCAG AAA */
+  --text: #eef1fb; /* cool white - ~16:1 against --bg, well past WCAG AAA */
   --text-dim: #9aa4c4; /* ~7:1 against --bg, still comfortably AA on small text */
   --border: #263156;
 
-  /* The site has two halves — forum (talk) and music (playback) — so they
+  /* The site has two halves - forum (talk) and music (playback) - so they
      keep two accents instead of one, used consistently as a wayfinding
      device rather than decoration: now the accretion disk's hot orange-red
      for conversation, the pulsar's electric blue for audio. Both checked
-     against --bg: forum ~7.3:1, audio ~6:1 — both clear AA, forum passes AAA. */
+     against --bg: forum ~7.3:1, audio ~6:1 - both clear AA, forum passes AAA. */
   --accent-forum: #e2703f; /* accretion-disk orange-red */
   --accent-forum-dim: #7a3a1f;
   --accent-audio: #4fa8e0; /* pulsar blue */
   --accent-audio-dim: #1f4566;
-  --accent-danger: #d43d56; /* distinct magenta-crimson — never confused with the orange forum accent */
+  --accent-danger: #d43d56; /* distinct magenta-crimson - never confused with the orange forum accent */
 
   --font-display: "Fraunces", Georgia, serif;
   --font-body: "Space Grotesk", system-ui, sans-serif;
@@ -31,7 +31,7 @@
   scrollbar-color: var(--border) var(--bg-inset);
 }
 
-/* WebKit (Chrome/Safari/Edge) needs its own pseudo-elements — the
+/* WebKit (Chrome/Safari/Edge) needs its own pseudo-elements - the
    scrollbar-color property above only covers Firefox. Applying to * so
    this is genuinely sitewide (chat, forum topics, news, wiki, Cult
    Activities, admin panel) without needing a rule per scrollable
@@ -581,7 +581,7 @@ th {
   gap: 0.8rem;
   padding: 0.5rem 1rem;
   cursor: pointer;
-  /* Never lets the docked bar grow wider than its container — the
+  /* Never lets the docked bar grow wider than its container - the
      transport cluster and cover have fixed/shrink-safe sizing so this
      never has to scroll horizontally regardless of title length. */
   max-width: 100%;
@@ -637,7 +637,7 @@ th {
 }
 
 /* When the "from: {playlist}" line is showing on desktop, the row grows
-   an extra line of text — scale the cover and play button up to match so
+   an extra line of text - scale the cover and play button up to match so
    they don't look small relative to the taller bar. */
 .player-bar-row--tall {
   padding-top: 0.7rem;
@@ -857,7 +857,7 @@ th {
   cursor: grab;
   /* Visor silhouette: angled top corners like a helmet visor's opening,
      full-width bottom edge left uncut since the action buttons live
-     there — a cut there would risk clipping them. */
+     there - a cut there would risk clipping them. */
   clip-path: polygon(6% 0%, 94% 0%, 100% 12%, 100% 100%, 0% 100%, 0% 12%);
 }
 
@@ -978,10 +978,9 @@ th {
 
 .space-compass-arrow {
   position: absolute;
-  color: var(--accent-forum-dim);
-  opacity: 0.55;
+  color: var(--accent-forum);
   font-size: 1.1rem;
-  text-shadow: 0 0 6px var(--accent-forum-dim);
+  text-shadow: 0 0 6px var(--accent-forum);
   pointer-events: none;
   z-index: 3;
 }
@@ -1135,7 +1134,7 @@ th {
   z-index: 7;
 }
 
-/* Purely decorative — pointer-events: none throughout so it never blocks
+/* Purely decorative - pointer-events: none throughout so it never blocks
    clicks, drags, or text selection on anything underneath. Deliberately
    static (no flicker/strobe animation) to avoid any photosensitivity risk,
    and kept low-opacity so it doesn't fight with text legibility. */
@@ -1452,7 +1451,7 @@ th {
 }
 
 /* The chat composer's native placeholder is kept in the DOM for screen
-   readers, but hidden visually — the letter-by-letter reveal overlay is
+   readers, but hidden visually - the letter-by-letter reveal overlay is
    the actual visible text. Without this, both render simultaneously and
    overlap into a doubled/garbled look during the reveal. */
 .hud-reveal-textarea::placeholder {
@@ -1476,7 +1475,7 @@ th {
   transform: rotate(-20deg);
 }
 
-/* Forum topic nodes on the spacemap — deliberately angular/crystalline,
+/* Forum topic nodes on the spacemap - deliberately angular/crystalline,
    distinct from the organic warden shapes used for branches. A rough
    nod to Metroid Prime Hunters' Celestial Archives: faceted, geometric,
    glowing from within rather than textured like a creature. */
@@ -1522,7 +1521,7 @@ th {
   }
 }
 
-/* Baby Crystals branch nodes — deliberately open/broken, scattered shard
+/* Baby Crystals branch nodes - deliberately open/broken, scattered shard
    fragments rather than one closed shape, since these are branches in
    progress with no music yet: an unformed, still-coalescing look. */
 .space-node-crystal {
@@ -1574,7 +1573,7 @@ th {
   pointer-events: none;
 }
 
-/* The "breaking apart" hint-text effect for a locked Baby Crystals node —
+/* The "breaking apart" hint-text effect for a locked Baby Crystals node -
    slow, subtle per-letter jitter rather than a fast glitch, matching
    their unfinished, still-forming state. */
 .space-hud-name-crystal span {

@@ -52,7 +52,7 @@ export async function embedRoutes(app: FastifyInstance): Promise<void> {
     reply.type("text/html").send(
       renderEmbedHtml({
         title: s?.ogHomepageTitle ?? "Exomusica",
-        description: s?.ogHomepageDescription ?? "Accessible experimental music — alien sonic worlds.",
+        description: s?.ogHomepageDescription ?? "Accessible experimental music - alien sonic worlds.",
         imageUrl: s?.ogHomepageImageUrl ?? null,
         faviconUrl: s?.faviconUrl ?? null,
         url: baseUrl,

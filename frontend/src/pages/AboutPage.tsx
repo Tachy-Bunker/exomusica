@@ -26,7 +26,7 @@ export function AboutPage() {
     <div>
       <h1>About Exomusica</h1>
       <p style={{ maxWidth: 640, color: "var(--text-dim)" }}>
-        Exomusica is a platform for accessible experimental music — a laboratory where branches of sound each get
+        Exomusica is a platform for accessible experimental music - a laboratory where branches of sound each get
         their own space to talk and to release work.
       </p>
       {!user && (

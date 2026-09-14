@@ -6,7 +6,7 @@ function internalPathOf(url: string): string | null {
     const parsed = new URL(url, window.location.origin);
     if (parsed.origin === window.location.origin) return parsed.pathname + parsed.search + parsed.hash;
   } catch {
-    // malformed URL — treat as external, let the browser's own error handling apply
+    // malformed URL - treat as external, let the browser's own error handling apply
   }
   return null;
 }
@@ -44,7 +44,7 @@ function renderInline(text: string, onLinkClick?: (path: string) => void): React
   return nodes;
 }
 
-// Embeds are block-level — each must be alone on its own line. Images use
+// Embeds are block-level - each must be alone on its own line. Images use
 // standard markdown syntax; audio/video/generic-file have no standard
 // markdown equivalent, so they get simple custom tags instead.
 const IMAGE_LINE = /^!\[(.*?)\]\((\S+)\)$/;

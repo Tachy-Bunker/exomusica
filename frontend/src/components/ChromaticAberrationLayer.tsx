@@ -1,7 +1,7 @@
 import { useEffect, useRef } from "react";
 import { useSiteEffectsStore } from "../lib/siteEffectsStore";
 
-// Deliberately not a mirror of R_DIR — keeps the split asymmetric, matching the prototype.
+// Deliberately not a mirror of R_DIR - keeps the split asymmetric, matching the prototype.
 const CA_R_DIR: [number, number] = [1.0, 0.32];
 const CA_B_DIR: [number, number] = [-0.58, -0.82];
 
@@ -36,7 +36,7 @@ export function ChromaticAberrationLayer() {
     document.addEventListener("visibilitychange", handleVisibility);
 
     // The loop stops scheduling itself entirely while disabled (see the
-    // early-return in tick() below) — this subscription is what restarts
+    // early-return in tick() below) - this subscription is what restarts
     // it if the user re-enables the effect later via account settings,
     // without needing the loop to keep polling on its own to notice.
     const unsubscribe = useSiteEffectsStore.subscribe((state, prevState) => {
@@ -48,13 +48,13 @@ export function ChromaticAberrationLayer() {
 
     const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     let lastUpdate = 0;
-    const FRAME_INTERVAL = 1000 / 20; // ~20fps — this is a subtle, slow-moving effect; 60fps was wasted compositing work
+    const FRAME_INTERVAL = 1000 / 20; // ~20fps - this is a subtle, slow-moving effect; 60fps was wasted compositing work
 
     function tick(now: number) {
       if (paused) return;
       const { caInitial, caBurst, userCaEnabled } = useSiteEffectsStore.getState();
       if (!userCaEnabled) {
-        // Nothing to animate — the CSS filter itself is removed from the
+        // Nothing to animate - the CSS filter itself is removed from the
         // DOM entirely when disabled (see App.tsx), so there's no need
         // to keep scheduling frames here at all.
         return;
@@ -64,7 +64,7 @@ export function ChromaticAberrationLayer() {
         return;
       }
       lastUpdate = now;
-      const initialAmt = caInitial * 12; // was *2.6 — capped at a sub-pixel 2.6px even at max, genuinely invisible
+      const initialAmt = caInitial * 12; // was *2.6 - capped at a sub-pixel 2.6px even at max, genuinely invisible
       const burstAmt = caBurst * 22;
       if (!reduceMotion) {
         if (!burst && now >= nextBurst) {

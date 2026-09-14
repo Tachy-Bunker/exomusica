@@ -35,7 +35,7 @@ async function loadBuffer(url: string): Promise<AudioBuffer> {
 /** Plays a sound effect once via the Web Audio API rather than a plain
  *  <audio> element / new Audio(). On mobile, <audio> playback is commonly
  *  treated as "media" by the OS audio-focus system, which ducks or pauses
- *  other apps' background audio (music, podcasts) — Web Audio API buffer
+ *  other apps' background audio (music, podcasts) - Web Audio API buffer
  *  playback empirically doesn't trigger that (this is the same mechanism
  *  the spacemap scan loop already uses, which was confirmed not to duck). */
 export async function playOneShotSfx(url: string, volume: number): Promise<void> {

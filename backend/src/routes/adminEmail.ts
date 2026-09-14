@@ -56,7 +56,7 @@ export async function adminEmailRoutes(app: FastifyInstance): Promise<void> {
     },
   );
 
-  // Calls for ideas / Calls for artists — free-text broadcasts, unlike NEWS
+  // Calls for ideas / Calls for artists - free-text broadcasts, unlike NEWS
   // which is always tied to a published blog post. Sent to every user with
   // the matching notify flag on.
   app.post<{ Body: { type: "CALL_FOR_IDEAS" | "CALL_FOR_ARTISTS"; subject: string; body: string } }>(

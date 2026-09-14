@@ -133,7 +133,7 @@ export function WikiAdminPage() {
       <div className="field" style={{ maxWidth: 360 }}>
         <label>Default page (opens when visiting "Wiki" with no page selected)</label>
         <select value={defaultWikiSlug ? pages.find((p) => p.slug === defaultWikiSlug)?.id ?? "" : ""} onChange={(e) => setDefaultWikiPage(e.target.value ? Number(e.target.value) : null)}>
-          <option value="">— none, show the page list —</option>
+          <option value="">- none, show the page list -</option>
           {pages.map((p) => (
             <option key={p.id} value={p.id}>
               {p.title}
@@ -158,7 +158,7 @@ export function WikiAdminPage() {
         </div>
         <div className="field">
           <select value={form.parentId} onChange={(e) => setForm((f) => ({ ...f, parentId: e.target.value }))}>
-            <option value="">— top-level page —</option>
+            <option value="">- top-level page -</option>
             {pages
               .filter((p) => p.id !== editingId)
               .map((p) => (
@@ -172,7 +172,7 @@ export function WikiAdminPage() {
           <div className="field">
             <label>Font (only settable once a page exists)</label>
             <select value={form.fontId} onChange={(e) => setForm((f) => ({ ...f, fontId: e.target.value }))}>
-              <option value="">— site default font —</option>
+              <option value="">- site default font -</option>
               {fonts.map((f) => (
                 <option key={f.id} value={f.id}>
                   {f.name}

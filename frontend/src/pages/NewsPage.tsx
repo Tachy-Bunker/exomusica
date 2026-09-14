@@ -34,7 +34,7 @@ function NewsletterForm() {
     }
   }
 
-  if (status === "sent") return <p style={{ color: "var(--text-dim)" }}>Subscribed — you're on the list.</p>;
+  if (status === "sent") return <p style={{ color: "var(--text-dim)" }}>Subscribed - you're on the list.</p>;
 
   return (
     <form onSubmit={handleSubmit} style={{ display: "flex", gap: "0.5rem", maxWidth: 360 }}>

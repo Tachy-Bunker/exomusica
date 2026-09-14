@@ -27,12 +27,12 @@ export const useChatDockStore = create<ChatDockState>()(
       width: Math.round(window.innerWidth * 0.4),
       pageChannel: null,
       suppressGlobalEShortcut: false,
-      // Deliberately a plain replace, not append — the spec is one chatbox
+      // Deliberately a plain replace, not append - the spec is one chatbox
       // at a time, so opening a different branch's chat just swaps the
       // content.
       openChat: (slug, name, branchSlug) =>
         set({ openChannelSlug: slug, openChannelName: name, openBranchSlug: branchSlug ?? null, collapsed: false }),
-      // "Close" now means collapse, not wipe — once a topic has been
+      // "Close" now means collapse, not wipe - once a topic has been
       // opened, it stays remembered (and persists across a full page
       // reload) until the user deliberately opens a different one. This
       // is what E toggles, and what the dock's own close button now does.

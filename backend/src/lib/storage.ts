@@ -7,7 +7,7 @@ const UPLOADS_DIR = path.join(process.cwd(), "uploads");
 
 /** Keeps the human-readable filename shown to users (and offered as a
  *  download name) unique across the whole site. The actual file on disk
- *  is always saved under a random UUID name and never collides — this is
+ *  is always saved under a random UUID name and never collides - this is
  *  purely about avoiding confusion when, say, two different users both
  *  upload something called "cover.jpg": the second becomes "cover-2.jpg". */
 async function uniqueAttachmentFilename(desired: string): Promise<string> {
@@ -36,13 +36,13 @@ export async function saveEmojiFile(
   mimeType: string,
   buffer: Buffer,
 ): Promise<{ url: string; suggestedName: string }> {
-  // Mimetype first, but browsers disagree on what to call a BMP — fall
+  // Mimetype first, but browsers disagree on what to call a BMP - fall
   // back to the file extension rather than reject a legitimate upload.
   const ext =
     ALLOWED_EMOJI_TYPES[mimeType] ??
     (ALLOWED_EXTENSIONS.has(path.extname(filename).toLowerCase()) ? path.extname(filename).toLowerCase() : null);
   if (!ext) {
-    throw new Error(`unsupported image type "${mimeType}" — only PNG and BMP are accepted`);
+    throw new Error(`unsupported image type "${mimeType}" - only PNG and BMP are accepted`);
   }
   const dir = path.join(UPLOADS_DIR, "emojis");
   await mkdir(dir, { recursive: true });
@@ -60,10 +60,10 @@ export async function saveEmojiFile(
 }
 
 /** Saves a forum-message attachment for a user, enforcing their 65MB quota
- *  unless explicitly bypassed (the Discord importer bypasses it — a bulk
+ *  unless explicitly bypassed (the Discord importer bypasses it - a bulk
  *  historical backfill isn't the same thing as live upload behavior, but
  *  storageUsedBytes is still updated for accurate accounting). Returns the
- *  created Attachment row (not yet linked to a message — the caller sets
+ *  created Attachment row (not yet linked to a message - the caller sets
  *  messageId once the message exists). */
 export async function saveMessageAttachment(
   uploaderId: number,
@@ -113,7 +113,7 @@ const ALLOWED_IMAGE_TYPES: Record<string, string> = {
 };
 
 /** Saves a general site image (album cover/gallery, About-page entries).
- *  No user quota applies — these are admin-only site assets, same
+ *  No user quota applies - these are admin-only site assets, same
  *  reasoning as emoji images. `subfolder` just keeps uploads/ organized. */
 export async function saveSiteImage(
   filename: string,
@@ -127,7 +127,7 @@ export async function saveSiteImage(
       ? path.extname(filename).toLowerCase()
       : null);
   if (!ext) {
-    throw new Error(`unsupported image type "${mimeType}" — PNG, JPEG, WebP, or GIF only`);
+    throw new Error(`unsupported image type "${mimeType}" - PNG, JPEG, WebP, or GIF only`);
   }
   const dir = path.join(UPLOADS_DIR, subfolder);
   await mkdir(dir, { recursive: true });
@@ -136,7 +136,7 @@ export async function saveSiteImage(
   return { url: `/uploads/${subfolder}/${diskName}` };
 }
 
-/** Saves a community album cover — unlike saveSiteImage (admin-only site
+/** Saves a community album cover - unlike saveSiteImage (admin-only site
  *  assets, no quota), this is a regular user's own upload: it enforces
  *  the same quota as their tracks, and creates a real Attachment row so
  *  it shows up in Admin → Storage with the same migrate-to-archive.org
@@ -151,7 +151,7 @@ export async function saveCommunityAlbumCover(uploaderId: number, filename: stri
   const ext =
     ALLOWED_IMAGE_TYPES[mimeType] ??
     ([".png", ".jpg", ".jpeg", ".webp", ".gif", ".bmp"].includes(path.extname(filename).toLowerCase()) ? path.extname(filename).toLowerCase() : null);
-  if (!ext) throw new Error(`unsupported image type "${mimeType}" — PNG, JPEG, WebP, or GIF only`);
+  if (!ext) throw new Error(`unsupported image type "${mimeType}" - PNG, JPEG, WebP, or GIF only`);
 
   const dir = path.join(UPLOADS_DIR, "community-albums");
   await mkdir(dir, { recursive: true });
@@ -184,7 +184,7 @@ const ALLOWED_MEDIA_TYPES: Record<string, string> = {
 
 /** General-purpose media upload for embedding in wiki pages, blog posts,
  *  and anywhere else that isn't a forum message attachment or an
- *  album/emoji/about image specifically. No user quota — admin-only. */
+ *  album/emoji/about image specifically. No user quota - admin-only. */
 export async function saveMediaFile(filename: string, mimeType: string, buffer: Buffer): Promise<{ url: string; mimeType: string }> {
   const ext = ALLOWED_MEDIA_TYPES[mimeType] ?? path.extname(filename).toLowerCase();
   if (!ext) {
@@ -216,14 +216,14 @@ const FONT_EXT_FORMAT: Record<string, string> = {
 };
 
 /** Saves an admin-uploaded font file. Returns the public URL and the CSS
- *  @font-face format string it needs (not guessable from mimetype alone —
+ *  @font-face format string it needs (not guessable from mimetype alone -
  *  browsers are inconsistent about what mimetype they send for fonts, so
  *  the file extension is the more reliable signal here). */
 export async function saveFontFile(filename: string, mimeType: string, buffer: Buffer): Promise<{ url: string; format: string }> {
   const ext = path.extname(filename).toLowerCase();
   const format = FONT_EXT_FORMAT[ext] ?? ALLOWED_FONT_TYPES[mimeType];
   if (!format) {
-    throw new Error(`unsupported font type — use OTF, TTF, WOFF, or WOFF2`);
+    throw new Error(`unsupported font type - use OTF, TTF, WOFF, or WOFF2`);
   }
   const dir = path.join(UPLOADS_DIR, "fonts");
   await mkdir(dir, { recursive: true });
@@ -242,7 +242,7 @@ const ALLOWED_SOUND_TYPES: Record<string, string> = {
 export async function saveSoundFile(filename: string, mimeType: string, buffer: Buffer): Promise<{ url: string }> {
   const ext = ALLOWED_SOUND_TYPES[mimeType] ?? path.extname(filename).toLowerCase();
   if (![".mp3", ".wav", ".ogg"].includes(ext)) {
-    throw new Error("unsupported sound type — use MP3, WAV, or OGG");
+    throw new Error("unsupported sound type - use MP3, WAV, or OGG");
   }
   const dir = path.join(UPLOADS_DIR, "sounds");
   await mkdir(dir, { recursive: true });
@@ -273,7 +273,7 @@ const ALLOWED_AUDIO_TYPES: Record<string, string> = {
 
 /** Saves a user-uploaded track audio file, enforcing the same 65MB quota
  *  as message attachments (reusing the exact same Attachment row + quota
- *  accounting) — this is what makes it show up in Admin → Storage with the
+ *  accounting) - this is what makes it show up in Admin → Storage with the
  *  same migrate-to-archive.org tool already built for message uploads. The
  *  Attachment isn't linked to a message; the caller links it to a
  *  CommunityTrack via attachmentId once the track row exists. */
@@ -308,7 +308,7 @@ export async function saveCommunityTrackAudio(uploaderId: number, filename: stri
   return attachment;
 }
 
-/** Saves a sample bank upload — deliberately permissive on file type
+/** Saves a sample bank upload - deliberately permissive on file type
  *  (audio, synth patches, DSP scripts are all fair game here, unlike the
  *  audio-only whitelist for finished tracks) but still enforces the same
  *  65MB quota via the same Attachment accounting. */
@@ -349,7 +349,7 @@ const ALLOWED_GALLERY_VIDEO_TYPES: Record<string, string> = {
 };
 
 /** Album gallery items specifically can be images OR short video clips
- *  (MOV/MP4) — cover art stays image-only via saveSiteImage above. */
+ *  (MOV/MP4) - cover art stays image-only via saveSiteImage above. */
 export async function saveGalleryFile(filename: string, mimeType: string, buffer: Buffer): Promise<{ url: string; kind: "image" | "video" }> {
   const videoExt = ALLOWED_GALLERY_VIDEO_TYPES[mimeType] ?? (path.extname(filename).toLowerCase() === ".mov" || path.extname(filename).toLowerCase() === ".mp4" ? path.extname(filename).toLowerCase() : null);
   if (videoExt) {

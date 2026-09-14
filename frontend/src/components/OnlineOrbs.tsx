@@ -19,7 +19,7 @@ const REPEL_STRENGTH = 420;
 const SPRING = 10;
 const DAMPING = 6;
 
-// Deterministic-looking but organic scatter — procedurally placed per
+// Deterministic-looking but organic scatter - procedurally placed per
 // render, not a fixed lookup table, so the cluster's shape isn't identical
 // every time the count is the same.
 function scatterPositions(n: number): { x: number; y: number }[] {

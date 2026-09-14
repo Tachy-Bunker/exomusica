@@ -29,7 +29,7 @@ export function BranchPage() {
     if (isDesktop && branch?.channel) {
       openChat(branch.channel.slug, branch.name, branch.slug);
     }
-    // Deliberately not closing on unmount — the dock is meant to persist
+    // Deliberately not closing on unmount - the dock is meant to persist
     // across navigation until the user closes it themselves.
   }, [isDesktop, branch?.channel, branch?.name, openChat]);
 
@@ -116,7 +116,7 @@ export function BranchPage() {
         <h2 style={{ fontSize: "1.1rem", color: "var(--accent-audio)" }}>Music</h2>
         {albums.length === 0 ? (
           <p style={{ color: "var(--text-dim)" }}>
-            No releases yet. Full album pages (streaming/download links, collaborator cards) are a Phase 3 build —
+            No releases yet. Full album pages (streaming/download links, collaborator cards) are a Phase 3 build -
             this shows whatever's already in the database.
           </p>
         ) : (

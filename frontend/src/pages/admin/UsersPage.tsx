@@ -55,7 +55,7 @@ export function UsersPage() {
     const { users: matches } = await api<{ users: UserSummary[] }>(`/api/admin/users?q=${encodeURIComponent(targetUsername)}`);
     const target = matches.find((u) => u.username.toLowerCase() === targetUsername.toLowerCase());
     if (!target) {
-      alert(`No account found with username "${targetUsername}" — check the spelling.`);
+      alert(`No account found with username "${targetUsername}" - check the spelling.`);
       return;
     }
     await api(`/api/admin/users/${ghostId}/link-ghost`, { method: "POST", body: JSON.stringify({ targetUserId: target.id }) });
@@ -119,7 +119,7 @@ export function UsersPage() {
       setDetail(null);
       load();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Save failed — that username might already be taken.");
+      setError(err instanceof ApiError ? err.message : "Save failed - that username might already be taken.");
     }
   }
 
@@ -146,15 +146,15 @@ export function UsersPage() {
         <div style={{ marginBottom: "1.5rem", border: "1px solid var(--border)", borderRadius: "var(--radius)", padding: "0.8rem" }}>
           <h2 style={{ fontSize: "1rem", marginTop: 0 }}>Ghost accounts ({ghosts.length})</h2>
           <p style={{ fontSize: "0.8rem", color: "var(--text-dim)" }}>
-            Created by Discord import — can't log in. Linking one to a real account resolves its messages,
-            mentions, and exports as that account from now on — this is a persistent link, not a one-time merge, so
+            Created by Discord import - can't log in. Linking one to a real account resolves its messages,
+            mentions, and exports as that account from now on - this is a persistent link, not a one-time merge, so
             it keeps working for anything a future Discord bot bridge sends under the same author id too.
           </p>
           {ghosts.map((g) => (
             <div key={g.id} style={{ display: "flex", alignItems: "center", gap: "0.5rem", padding: "0.4rem 0", borderBottom: "1px solid var(--border)" }}>
               <span style={{ minWidth: 140 }}>{g.username}</span>
               <span className="mono" style={{ fontSize: "0.7rem", color: "var(--text-dim)", minWidth: 130 }} title="Discord author ID">
-                {g.discordId ?? "—"}
+                {g.discordId ?? "-"}
               </span>
               <span style={{ fontSize: "0.75rem", color: "var(--text-dim)", minWidth: 90 }}>{g._count?.messages ?? 0} messages</span>
               {g.linkedUser ? (

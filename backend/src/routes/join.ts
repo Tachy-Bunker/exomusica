@@ -25,7 +25,7 @@ export async function joinRoutes(app: FastifyInstance): Promise<void> {
     }
     if (!/^[a-zA-Z0-9_.-]{3,32}$/.test(username)) {
       return reply.code(400).send({
-        error: "username must be 3-32 characters: letters, numbers, underscore, hyphen, or period only — no spaces",
+        error: "username must be 3-32 characters: letters, numbers, underscore, hyphen, or period only - no spaces",
       });
     }
     const existing = await prisma.joinRequest.findFirst({
@@ -83,18 +83,18 @@ export async function joinRoutes(app: FastifyInstance): Promise<void> {
       });
       if (existingRealUser) {
         return reply.code(409).send({
-          error: `A real account already exists with the username "${existingRealUser.username}" — this join request can't be approved as-is. Rename or reject it.`,
+          error: `A real account already exists with the username "${existingRealUser.username}" - this join request can't be approved as-is. Rename or reject it.`,
         });
       }
 
-      // A username match with a ghost does NOT mean it's the same person —
+      // A username match with a ghost does NOT mean it's the same person -
       // ghost usernames come from Discord display names, which anyone could
       // coincidentally pick when signing up for real. Never link silently;
       // require the admin to explicitly confirm after seeing who the ghost
       // actually is (its Discord identity), sent back on the first attempt.
       if (existingGhost && !req.body?.confirmClaimGhost) {
         return reply.code(409).send({
-          error: `A ghost account already exists with this exact username, imported from Discord (Discord identity: ${existingGhost.discordUsername ?? existingGhost.discordId ?? "unknown"}, created ${existingGhost.createdAt.toISOString().slice(0, 10)}). A matching username does NOT guarantee it's the same person. If you're confident it is, confirm to link the ghost's imported message history to this new account (same as the manual link-ghost tool in Users — the ghost keeps its own row, nothing is merged). If you're not sure, cancel and reject the request or ask them to pick a different username instead.`,
+          error: `A ghost account already exists with this exact username, imported from Discord (Discord identity: ${existingGhost.discordUsername ?? existingGhost.discordId ?? "unknown"}, created ${existingGhost.createdAt.toISOString().slice(0, 10)}). A matching username does NOT guarantee it's the same person. If you're confident it is, confirm to link the ghost's imported message history to this new account (same as the manual link-ghost tool in Users - the ghost keeps its own row, nothing is merged). If you're not sure, cancel and reject the request or ask them to pick a different username instead.`,
         });
       }
 
@@ -104,7 +104,7 @@ export async function joinRoutes(app: FastifyInstance): Promise<void> {
         // history untouched, just renamed out of the way so its
         // original username is free for the new real account. Readers
         // resolve a linked ghost's messages through to the real account
-        // at display time — nothing here rewrites message.authorId.
+        // at display time - nothing here rewrites message.authorId.
         if (existingGhost) {
           await tx.user.update({
             where: { id: existingGhost.id },

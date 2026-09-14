@@ -11,10 +11,10 @@ export const useChatPipStore = create<ChatPipState>((set) => ({
 }));
 
 /** Opens the single always-on-top pop-out chat window (Document
- *  Picture-in-Picture — Chrome/Edge only; other browsers fall back to a
+ *  Picture-in-Picture - Chrome/Edge only; other browsers fall back to a
  *  regular, non-always-on-top popup, since no website can force real
  *  window-stacking behavior any other way). If one is already open, opens
- *  a second, ordinary popup instead — the browser only ever allows one
+ *  a second, ordinary popup instead - the browser only ever allows one
  *  real PiP window per tab, a hard platform limit, not a choice here. */
 export async function openPopoutChat(initialSlug?: string | null, initialName?: string | null): Promise<void> {
   const dpip = (window as unknown as { documentPictureInPicture?: { requestWindow: (opts: { width: number; height: number }) => Promise<Window> } }).documentPictureInPicture;

@@ -248,7 +248,7 @@ export function ChannelsPage() {
                   <textarea
                     ref={contentTextareaRef}
                     rows={6}
-                    placeholder="Page content (markdown — text, images, embeds)"
+                    placeholder="Page content (markdown - text, images, embeds)"
                     value={editForm.contentMarkdown}
                     onChange={(e) => setEditForm((f) => ({ ...f, contentMarkdown: e.target.value }))}
                     style={{ marginBottom: "0.2rem", width: "100%" }}
@@ -271,7 +271,7 @@ export function ChannelsPage() {
                     style={{ marginBottom: "0.2rem", width: "100%" }}
                   />
                   <input
-                    placeholder="Discord webhook URL (optional — for the {username} | Exo-API format)"
+                    placeholder="Discord webhook URL (optional - for the {username} | Exo-API format)"
                     value={editForm.discordWebhookUrl}
                     onChange={(e) => setEditForm((f) => ({ ...f, discordWebhookUrl: e.target.value }))}
                     style={{ marginBottom: "0.2rem", width: "100%" }}
@@ -291,13 +291,13 @@ export function ChannelsPage() {
                       /{t.slug}
                     </div>
                   </td>
-                  <td>{t.category ?? "—"}</td>
+                  <td>{t.category ?? "-"}</td>
                   <td>{t.position}</td>
                 </>
               )}
               <td>
                 <select value={t.fontId ?? ""} onChange={(e) => changeFont(t, e.target.value)} style={{ fontSize: "0.8rem" }}>
-                  <option value="">— default font —</option>
+                  <option value="">- default font -</option>
                   {fonts.map((f) => (
                     <option key={f.id} value={f.id}>
                       {f.name}

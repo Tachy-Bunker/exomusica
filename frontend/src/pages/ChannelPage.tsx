@@ -45,7 +45,7 @@ function upsertMessage(list: MessageDTO[], msg: MessageDTO): MessageDTO[] {
 }
 
 // Consecutive messages from the same author collapse into one visual group
-// as long as no gap between them exceeds 5 minutes — a new box starts on
+// as long as no gap between them exceeds 5 minutes - a new box starts on
 // author change or on a >5 min silence, matching Discord's convention.
 const GROUP_GAP_SECONDS = 5 * 60;
 
@@ -116,7 +116,7 @@ function MessageMenu({
     setReacting(false);
     setOpen(false);
     await api(`/api/messages/${message.id}/reactions`, { method: "POST", body: JSON.stringify({ emojiId: emoji.id }) });
-    // No local optimistic update needed — the live channel is subscribed to
+    // No local optimistic update needed - the live channel is subscribed to
     // message.update events, which this reaction triggers server-side.
   }
 
@@ -214,7 +214,7 @@ function MessageBody({
         <div className="track-embed" key={track.id} onClick={(e) => e.stopPropagation()}>
           <button onClick={() => play(track)}>▶</button>
           <span>
-            {track.title} — <span style={{ color: "var(--text-dim)" }}>{track.albumTitle}</span>
+            {track.title} - <span style={{ color: "var(--text-dim)" }}>{track.albumTitle}</span>
           </span>
         </div>
       ))}
@@ -309,8 +309,8 @@ export function ChannelPage({ channelSlug, fillHeight, parentControlsHeight }: {
   }, [slug]);
   const { user } = useAuth();
   const isDesktop = useIsDesktop();
-  // Mobile standalone view behaves like fillHeight mode too — internally
-  // scrolling message list, composer always pinned and visible — the dock
+  // Mobile standalone view behaves like fillHeight mode too - internally
+  // scrolling message list, composer always pinned and visible - the dock
   // never renders on mobile, so isDesktop alone correctly identifies this.
   const effectiveFillHeight = fillHeight || !isDesktop;
   const [isChatFullscreen, setIsChatFullscreen] = useState(false);
@@ -437,7 +437,7 @@ export function ChannelPage({ channelSlug, fillHeight, parentControlsHeight }: {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   // Mobile virtual keyboard handling: visualViewport shrinks when the
-  // keyboard opens (a real, standard signal — no guessing based on focus
+  // keyboard opens (a real, standard signal - no guessing based on focus
   // timing). Scroll the composer into view on open; restore the scroll
   // position that was current right before the keyboard opened, rather
   // than an arbitrary "scroll to top", since the user may have been
@@ -456,7 +456,7 @@ export function ChannelPage({ channelSlug, fillHeight, parentControlsHeight }: {
       if (shrunk && !keyboardOpen) {
         keyboardOpen = true;
         composerTriggeredOpen = composerFocused;
-        if (!composerFocused) return; // some other input (Location, search) opened the keyboard — leave the view alone
+        if (!composerFocused) return; // some other input (Location, search) opened the keyboard - leave the view alone
         scrollBeforeKeyboard = messageListRef.current?.scrollTop ?? window.scrollY;
         requestAnimationFrame(() => {
           textareaRef.current?.scrollIntoView({ block: "end", behavior: "smooth" });
@@ -538,7 +538,7 @@ export function ChannelPage({ channelSlug, fillHeight, parentControlsHeight }: {
 
   // Discord-style infinite scroll: scrolling near the top of the live feed
   // loads the next 100 older messages via cursor pagination, prepending
-  // them without visually jerking the viewport — we measure the height
+  // them without visually jerking the viewport - we measure the height
   // added and adjust scrollTop by that same amount in the same paint.
   const loadOlderMessages = useCallback(() => {
     if (!slug || mode !== "live" || loadingOlder || !hasMoreOlder || messages.length === 0) return;
@@ -567,7 +567,7 @@ export function ChannelPage({ channelSlug, fillHeight, parentControlsHeight }: {
     function handleScroll() {
       if (container!.scrollTop < 200) loadOlderMessages();
       const distanceFromBottom = container!.scrollHeight - container!.scrollTop - container!.clientHeight;
-      // ~60px average message height — an approximation, since actual
+      // ~60px average message height - an approximation, since actual
       // height varies with content/attachments, but "roughly 30 messages"
       // doesn't need to be exact to be useful here.
       setShowLiveChatButton(distanceFromBottom > 30 * 60);
@@ -600,7 +600,7 @@ export function ChannelPage({ channelSlug, fillHeight, parentControlsHeight }: {
     return () => reportViewing(null);
   }, [slug, mode, reportViewing]);
 
-  // Only the live view stays subscribed — browsing history or search
+  // Only the live view stays subscribed - browsing history or search
   // shouldn't be interrupted by new messages arriving underneath you.
   useEffect(() => {
     if (!slug || mode !== "live") return;
@@ -627,7 +627,7 @@ export function ChannelPage({ channelSlug, fillHeight, parentControlsHeight }: {
     return () => ws.close();
   }, [slug, mode, user?.username]);
 
-  // Prune anyone who hasn't sent a fresh ping in a while — covers a
+  // Prune anyone who hasn't sent a fresh ping in a while - covers a
   // dropped connection or a closed tab that never got to say "stopped
   // typing", so the indicator doesn't get stuck showing someone forever.
   useEffect(() => {
@@ -675,7 +675,7 @@ export function ChannelPage({ channelSlug, fillHeight, parentControlsHeight }: {
     }
     const selected = files.slice(0, remaining);
     if (files.length > remaining) {
-      alert(`Only the first ${remaining} file${remaining !== 1 ? "s" : ""} were added — up to ${MAX_ATTACHMENTS_PER_MESSAGE} attachments are allowed per message.`);
+      alert(`Only the first ${remaining} file${remaining !== 1 ? "s" : ""} were added - up to ${MAX_ATTACHMENTS_PER_MESSAGE} attachments are allowed per message.`);
     }
     const formData = new FormData();
     for (const f of selected) formData.append("files", f);
@@ -721,7 +721,7 @@ export function ChannelPage({ channelSlug, fillHeight, parentControlsHeight }: {
 
   // Detects an in-progress ":partial" fragment right before the cursor and
   // opens the picker filtered to it. Doesn't try to float at the cursor's
-  // exact pixel position (needs a textarea-mirroring technique) — it just
+  // exact pixel position (needs a textarea-mirroring technique) - it just
   // anchors above the composer, which is a fair simplification here.
   function handleDraftChange(e: ChangeEvent<HTMLTextAreaElement>) {
     const value = e.target.value;
@@ -743,7 +743,7 @@ export function ChannelPage({ channelSlug, fillHeight, parentControlsHeight }: {
 
   function handlePaste(e: ClipboardEvent<HTMLTextAreaElement>) {
     // Screenshot tools (Win+Shift+S, etc) put the image on the clipboard
-    // as a file-like item, not literal text — clipboardData.files covers
+    // as a file-like item, not literal text - clipboardData.files covers
     // that directly, especially useful for screenshotting on Windows.
     if (e.clipboardData.files.length > 0) {
       e.preventDefault();
@@ -883,7 +883,7 @@ export function ChannelPage({ channelSlug, fillHeight, parentControlsHeight }: {
       {exportAttachments && (
         <div style={{ border: "1px solid var(--border)", borderRadius: "var(--radius)", padding: "0.6rem", marginBottom: "0.6rem", maxHeight: 200, overflowY: "auto" }}>
           <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "0.3rem" }}>
-            <strong style={{ fontSize: "0.85rem" }}>Attachments ({exportAttachments.length}) — download individually</strong>
+            <strong style={{ fontSize: "0.85rem" }}>Attachments ({exportAttachments.length}) - download individually</strong>
             <button className="btn" style={{ padding: "0 0.4rem" }} onClick={() => setExportAttachments(null)}>
               ×
             </button>
@@ -1077,7 +1077,7 @@ export function ChannelPage({ channelSlug, fillHeight, parentControlsHeight }: {
   );
 
   // Same fix as the player bar: only actually portal while genuinely in
-  // fullscreen mode (position:fixed, needs the true viewport) — normal
+  // fullscreen mode (position:fixed, needs the true viewport) - normal
   // in-place rendering the rest of the time, so this doesn't change
   // anything about how the dock or standalone page rendering works.
   if (isChatFullscreen && isMobileWindow && portalRoot) return createPortal(content, portalRoot);

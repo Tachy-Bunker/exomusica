@@ -71,7 +71,7 @@ export function CommunityPage() {
         Cult Activities{isDesktop && <span style={{ opacity: 0.4, fontWeight: "normal", fontSize: "0.6em" }}> (use ↑↓)</span>}
       </h1>
       <p style={{ color: "var(--text-dim)", maxWidth: 640 }}>
-        Playlists made by the community — mixing their own uploaded tracks with anything from Exomusica's own albums.
+        Playlists made by the community - mixing their own uploaded tracks with anything from Exomusica's own albums.
       </p>
       <p style={{ display: "flex", gap: "0.5rem" }}>
         <Link to="/my-music" className="btn">
@@ -113,7 +113,7 @@ export function CommunityPage() {
             <div style={{ fontSize: "0.7rem", color: "var(--accent-forum)", textTransform: "uppercase" }}>Spotlight</div>
             <div style={{ fontFamily: "var(--font-display)" }}>{spotlight.title}</div>
             <div style={{ fontSize: "0.8rem", color: "var(--text-dim)" }}>
-              {spotlight.albumTitle} — {spotlight.owner}
+              {spotlight.albumTitle} - {spotlight.owner}
             </div>
           </div>
         </Link>

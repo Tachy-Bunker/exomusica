@@ -8,7 +8,7 @@ interface MapQualityState {
   quality: number;
   setQuality: (quality: number) => void;
   // Set once per session if WebGL is detected running on a software
-  // rasterizer (see fieldRenderer.ts) — surfaced as an on-page notice,
+  // rasterizer (see fieldRenderer.ts) - surfaced as an on-page notice,
   // since a console warning alone goes unseen by almost everyone.
   softwareRendererName: string | null;
   setSoftwareRendererName: (name: string | null) => void;
@@ -25,7 +25,7 @@ export const useMapQualityStore = create<MapQualityState>()(
       setSoftwareRendererName: (name) => {
         set({ softwareRendererName: name });
         // Auto-downgrade once per session, and only if this is the first
-        // time it's been detected — never overrides a choice the user
+        // time it's been detected - never overrides a choice the user
         // makes afterward (e.g. raising it back up themselves).
         if (name && !get().hasAutoDowngraded) {
           set({ quality: Math.min(get().quality, 0.25), hasAutoDowngraded: true });

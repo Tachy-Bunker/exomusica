@@ -13,8 +13,8 @@ export async function forumMapRoutes(app: FastifyInstance): Promise<void> {
       },
     });
 
-    // Unique speaker count per channel (ghosts included — Message.authorId
-    // counts any author regardless of isGhost) — this is what drives the
+    // Unique speaker count per channel (ghosts included - Message.authorId
+    // counts any author regardless of isGhost) - this is what drives the
     // firefly count on each node. One grouped query rather than one per
     // node.
     const speakerCounts = await prisma.$queryRaw<{ channelId: number; count: bigint }[]>`

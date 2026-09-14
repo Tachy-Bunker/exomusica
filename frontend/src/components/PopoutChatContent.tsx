@@ -20,7 +20,7 @@ export function PopoutChatContent({ initialSlug, initialName }: { initialSlug?: 
   const [searchOpen, setSearchOpen] = useState(false);
 
   // Cross-window live-follow: zustand's persist middleware writes to
-  // localStorage but doesn't auto-sync across separate windows/tabs —
+  // localStorage but doesn't auto-sync across separate windows/tabs -
   // the native `storage` event only fires in *other* windows than the
   // one that made the change, which is exactly this window's situation
   // relative to the main one. Re-hydrating on that event is what makes
@@ -42,7 +42,7 @@ export function PopoutChatContent({ initialSlug, initialName }: { initialSlug?: 
   }, [followDock]);
 
   // Show every topic when no search text has been entered yet, not an
-  // empty list — narrows as the user actually types.
+  // empty list - narrows as the user actually types.
   const q = query.trim().toLowerCase();
   const results = (q ? allChannels.filter((c) => c.name.toLowerCase().includes(q)) : allChannels).slice(0, 30);
 

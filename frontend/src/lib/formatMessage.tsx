@@ -23,13 +23,13 @@ function Spoiler({ children }: { children: ReactNode }) {
 const INLINE_PATTERN =
   /\*\*(.+?)\*\*|\*(.+?)\*|__(.+?)__|~~(.+?)~~|`([^`]+?)`|\|(.+?)\||\[(.+?)\]\((https?:\/\/[^\s)]+)\)|<t:(\d+)>|<@&(\d+)>|<@(\d+)>|<#(\d+)>|:([a-z0-9_]+):|(https?:\/\/[^\s<>()]+)/g;
 
-// NOTE: mentions/channel refs render with the raw id for now — resolving
+// NOTE: mentions/channel refs render with the raw id for now - resolving
 // them to real names needs a bulk id->name lookup endpoint that doesn't
 // exist yet (the current /api/users/:username route is keyed the other
 // way). Small, cheap follow-up; not done here.
 // Same-origin URLs get a real in-app path back (no leading domain), so the
 // caller can navigate() there without a full page reload. Anything else
-// returns null, meaning "let the native <a target=_blank> handle it" —
+// returns null, meaning "let the native <a target=_blank> handle it" -
 // no onClick at all, so ctrl/cmd/middle-click still work exactly as a
 // normal link would.
 function internalPathOf(url: string): string | null {
@@ -38,7 +38,7 @@ function internalPathOf(url: string): string | null {
     const parsed = new URL(url, window.location.origin);
     if (parsed.origin === window.location.origin) return parsed.pathname + parsed.search + parsed.hash;
   } catch {
-    // malformed URL — treat as external, let the browser's own error handling apply
+    // malformed URL - treat as external, let the browser's own error handling apply
   }
   return null;
 }
@@ -55,14 +55,14 @@ function renderInline(
 
   function linkClickHandler(url: string) {
     const internalPath = internalPathOf(url);
-    if (!internalPath || !onLinkClick) return undefined; // external — no handler, native new-tab behavior applies
+    if (!internalPath || !onLinkClick) return undefined; // external - no handler, native new-tab behavior applies
     return (e: React.MouseEvent) => {
       e.preventDefault();
       onLinkClick(internalPath);
     };
   }
 
-  // matchAll (not a manual exec loop) deliberately — it doesn't mutate the
+  // matchAll (not a manual exec loop) deliberately - it doesn't mutate the
   // shared regex's lastIndex, so recursive calls for nested formatting
   // (e.g. **bold *italic***) can't corrupt the outer loop's position.
   for (const match of text.matchAll(INLINE_PATTERN)) {

@@ -16,7 +16,7 @@ interface AuthContextValue {
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
-// The backend never sends "who am I" from a bare token — login's response
+// The backend never sends "who am I" from a bare token - login's response
 // is the only place we learn the user object, so we cache it alongside the
 // token rather than re-decoding the JWT client-side.
 const USER_KEY = "exomusica_user";

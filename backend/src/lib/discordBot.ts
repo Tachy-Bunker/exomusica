@@ -20,7 +20,7 @@ export function getDiscordBridgeStatus(): { status: string; lastError: string | 
 
 /** Extracts the numeric webhook id from a Discord webhook URL
  *  (https://discord.com/api/webhooks/{id}/{token}) so incoming messages
- *  posted by our own webhook can be recognized and skipped — this is half
+ *  posted by our own webhook can be recognized and skipped - this is half
  *  of the feedback-loop prevention (the other half is the bot-account
  *  check below). */
 function webhookIdFromUrl(url: string): string | null {
@@ -47,14 +47,14 @@ async function handleIncomingDiscordMessage(message: {
 
   // Feedback-loop prevention, part 2: never re-import anything posted
   // through our own configured webhook (the "{username} | Exo-API" path)
-  // — a webhook message's author isn't flagged as a bot by Discord, so
+  // - a webhook message's author isn't flagged as a bot by Discord, so
   // the check above alone wouldn't catch it.
   if (channel.discordWebhookUrl && message.webhookId) {
     const ourWebhookId = webhookIdFromUrl(channel.discordWebhookUrl);
     if (ourWebhookId && message.webhookId === ourWebhookId) return;
   }
 
-  // No text and no attachments — genuinely nothing to import (e.g. a
+  // No text and no attachments - genuinely nothing to import (e.g. a
   // sticker-only message). Attachment-only messages now DO get imported.
   if (!message.content.trim() && message.attachments.length === 0) return;
 
@@ -67,7 +67,7 @@ async function handleIncomingDiscordMessage(message: {
   const dayKey = toDayKey(createdAt);
   const translatedContent = await translateMentionsFromDiscord(prisma, message.content);
 
-  // Resolve a Discord reply back to a website message — either one that
+  // Resolve a Discord reply back to a website message - either one that
   // originated on Discord itself (via the id embedded in importedFrom)
   // or one that started on the website and was forwarded out (via its
   // stored discordMessageId).
@@ -98,7 +98,7 @@ async function handleIncomingDiscordMessage(message: {
   });
 
   // Download and save each Discord attachment as our own Attachment row,
-  // linked to this message. Best-effort per file — one failure shouldn't
+  // linked to this message. Best-effort per file - one failure shouldn't
   // block the message import or the rest of the batch.
   if (message.attachments.length > 0) {
     for (const a of message.attachments) {
@@ -133,14 +133,14 @@ async function handleIncomingDiscordMessage(message: {
 
 /** Posts a website message out to its linked Discord channel, if any.
  *  Call this after a message is successfully created on the website side
- *  — it's a no-op if the channel isn't bridged. Never throws; a Discord
+ *  - it's a no-op if the channel isn't bridged. Never throws; a Discord
  *  API hiccup shouldn't break sending a message on the website. */
 /** Sends a DM to a user identified by Discord username, by searching every
  *  guild the bot is a member of for a matching member. Usernames aren't
  *  directly resolvable to a DM-able user without either a shared server
- *  (this) or a stored user id — since we only ask users for their
+ *  (this) or a stored user id - since we only ask users for their
  *  username, this is the mechanism. Silently no-ops if the bot isn't
- *  connected, no username is given, or no match is found — notification
+ *  connected, no username is given, or no match is found - notification
  *  delivery failures shouldn't ever break the action that triggered them. */
 interface DiscordIdentity {
   discordUserId?: string | null;
@@ -151,7 +151,7 @@ interface DiscordIdentity {
  *  Prefers a direct fetch by id (reliable, works without a shared guild
  *  or the Server Members intent) over searching guild members by
  *  username (the fallback, since usernames are what we ask most users
- *  for — but that path needs Server Members intent and a shared server). */
+ *  for - but that path needs Server Members intent and a shared server). */
 async function resolveDiscordUser(identity: DiscordIdentity) {
   if (!client) return null;
   if (identity.discordUserId) {
@@ -180,7 +180,7 @@ export async function sendDiscordDM(identity: DiscordIdentity, message: string):
   try {
     const user = await resolveDiscordUser(identity);
     if (!user) {
-      console.warn(`Discord bridge: no user found for`, identity, `— DM not sent.`);
+      console.warn(`Discord bridge: no user found for`, identity, `- DM not sent.`);
       return;
     }
     await user.send(message);
@@ -200,7 +200,7 @@ export async function findDiscordAvatarUrl(identity: DiscordIdentity): Promise<s
 export type AnnouncementEvent = "join_applied" | "join_approved" | "news_published" | "calls_for_artists" | "calls_for_ideas";
 
 /** Posts an admin-selected event announcement to the configured channel,
- *  as the bot itself — a no-op if no channel is set or this event type
+ *  as the bot itself - a no-op if no channel is set or this event type
  *  isn't one the admin enabled. */
 export async function sendDiscordAnnouncement(event: AnnouncementEvent, message: string): Promise<void> {
   if (!client) return;
@@ -218,7 +218,7 @@ export async function sendDiscordAnnouncement(event: AnnouncementEvent, message:
   }
 }
 
-/** Triggers Discord's native typing indicator in the given channel — this
+/** Triggers Discord's native typing indicator in the given channel - this
  *  necessarily shows as the bot typing, not the specific website user,
  *  since Discord's API has no concept of "a webhook-impersonated user is
  *  typing"; sendTyping() only works for the bot's own identity. Lasts
@@ -251,7 +251,7 @@ export async function forwardMessageToDiscord(
     const attachments = options?.attachments ?? [];
     const replyTo = options?.replyTo ?? null;
 
-    // Webhooks only exist on a parent text channel — posting into a
+    // Webhooks only exist on a parent text channel - posting into a
     // thread or a forum post (which Discord implements as a thread under
     // the hood) requires this explicit thread_id, or the message lands
     // in the parent channel instead, silently. The bot-send path below
@@ -276,7 +276,7 @@ export async function forwardMessageToDiscord(
       let res: Response;
       if (attachments.length > 0) {
         // Discord's webhook endpoint needs actual file bytes in a
-        // multipart body for real attachments — a plain JSON payload
+        // multipart body for real attachments - a plain JSON payload
         // can't reference a remote URL as a file the way discord.js's
         // bot-send path can, so each attachment is fetched from our own
         // storage first and re-uploaded as multipart form parts.
@@ -319,7 +319,7 @@ export async function forwardMessageToDiscord(
 }
 
 /** Starts (or restarts, if the token changed) the Discord bot connection.
- *  Safe to call with no token — it's a no-op, and the bridge is simply
+ *  Safe to call with no token - it's a no-op, and the bridge is simply
  *  inactive until one is configured in the admin panel. */
 export async function initDiscordBot(): Promise<void> {
   const settings = await prisma.siteSettings.findUnique({ where: { id: 1 } });
@@ -397,7 +397,7 @@ export async function initDiscordBot(): Promise<void> {
   });
 
   // Blends Discord's own online-member count into the website's presence
-  // count — deliberately never exposed or labeled as Discord-sourced
+  // count - deliberately never exposed or labeled as Discord-sourced
   // anywhere, per an explicit choice not to reveal where any of it came
   // from. presenceUpdate fires very frequently in an active server, so
   // this is debounced rather than recomputing on every single event.
@@ -442,11 +442,11 @@ export async function initDiscordBot(): Promise<void> {
   } catch (err) {
     connectionStatus = "error";
     lastError = err instanceof Error ? err.message : String(err);
-    console.error("Discord bridge failed to connect — check the bot token:", err);
+    console.error("Discord bridge failed to connect - check the bot token:", err);
   }
 }
 
-/** Re-reads the token from SiteSettings and reconnects if it changed —
+/** Re-reads the token from SiteSettings and reconnects if it changed -
  *  call this after the admin saves a new token, rather than requiring a
  *  full server restart. */
 export async function restartDiscordBotIfNeeded(): Promise<void> {

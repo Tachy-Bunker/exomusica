@@ -6,7 +6,7 @@ import { saveSiteImage, saveGalleryFile } from "../lib/storage.js";
 import { probeAudioDuration } from "../lib/audioProbe.js";
 
 export async function albumRoutes(app: FastifyInstance): Promise<void> {
-  // Every track site-wide, shuffled server-side — powers the homepage's
+  // Every track site-wide, shuffled server-side - powers the homepage's
   // "Shuffle play" button. Capped well above any realistic catalog size,
   // just as a sanity limit rather than a real constraint.
   app.get("/api/tracks/shuffle", async () => {
@@ -22,7 +22,7 @@ export async function albumRoutes(app: FastifyInstance): Promise<void> {
     return shuffled.map(trackToDTO);
   });
 
-  // One branch's tracks, shuffled — powers the reticle lock-on "F" action
+  // One branch's tracks, shuffled - powers the reticle lock-on "F" action
   // in the space map (distinct from /api/tracks/shuffle, which is sitewide).
   app.get<{ Params: { slug: string } }>("/api/branches/:slug/tracks/shuffle", async (req, reply) => {
     const branch = await prisma.branch.findUnique({ where: { slug: req.params.slug } });
@@ -115,7 +115,7 @@ export async function albumRoutes(app: FastifyInstance): Promise<void> {
       const branch = await prisma.branch.findUnique({ where: { id: branchId } });
       if (!branch) return reply.code(404).send({ error: "no such branch" });
 
-      // Auto-generate a unique slug — unlike the manual create endpoint
+      // Auto-generate a unique slug - unlike the manual create endpoint
       // above, this is a duplication action, not something the admin
       // types a slug in for.
       const base = source.title.toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") || "album";
@@ -281,7 +281,7 @@ export async function albumRoutes(app: FastifyInstance): Promise<void> {
   }>("/api/admin/tracks/:id", { preHandler: requireAdmin }, async (req) => {
     const data = { ...req.body };
     // If the fileUrl is changing and no explicit duration was given,
-    // re-probe — the old duration would belong to the previous file.
+    // re-probe - the old duration would belong to the previous file.
     if (data.fileUrl && data.durationSeconds === undefined) {
       data.durationSeconds = (await probeAudioDuration(data.fileUrl)) ?? undefined;
     }
@@ -291,7 +291,7 @@ export async function albumRoutes(app: FastifyInstance): Promise<void> {
     });
   });
 
-  // Swaps two tracks' positions — same pattern as About-feature reordering:
+  // Swaps two tracks' positions - same pattern as About-feature reordering:
   // move one item up/down at a time rather than sending a full reordered list.
   app.post<{ Body: { idA: number; idB: number } }>(
     "/api/admin/tracks/swap",
@@ -316,7 +316,7 @@ export async function albumRoutes(app: FastifyInstance): Promise<void> {
     return reply.code(204).send();
   });
 
-  // Full replace, not incremental add/remove — the admin UI sends the
+  // Full replace, not incremental add/remove - the admin UI sends the
   // complete checked set each time, simpler than diffing on both ends.
   app.put<{ Params: { id: string }; Body: { collaboratorIds: number[] } }>(
     "/api/admin/tracks/:id/composers",
@@ -351,7 +351,7 @@ export async function albumRoutes(app: FastifyInstance): Promise<void> {
 
   // --- Collaborators --------------------------------------------------------
   // Collaborator creation/management now lives entirely in collaborators.ts
-  // (it also generates a slug, which this older version never did) — this
+  // (it also generates a slug, which this older version never did) - this
   // duplicate registration at the same path was crashing the server on
   // every boot with FST_ERR_DUPLICATED_ROUTE.
 
@@ -378,7 +378,7 @@ export async function albumRoutes(app: FastifyInstance): Promise<void> {
       const albumId = Number(req.params.id);
       const collaboratorId = Number(req.params.collaboratorId);
       // Clean up per-track composer credits for this collaborator on this
-      // album's tracks too — otherwise a track could still credit someone
+      // album's tracks too - otherwise a track could still credit someone
       // no longer listed as an album collaborator at all.
       await prisma.trackCollaborator.deleteMany({
         where: { collaboratorId, track: { albumId } },

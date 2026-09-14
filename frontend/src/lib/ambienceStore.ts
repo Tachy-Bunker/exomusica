@@ -72,7 +72,7 @@ export const useAmbienceStore = create<AmbienceState>((set) => ({
     set({ hasMainTrack });
     reevaluate();
   },
-  // A deliberate, momentary stop (spacebar / pause button) — distinct from
+  // A deliberate, momentary stop (spacebar / pause button) - distinct from
   // unchecking "Exo-Ambience" outright. Since it doesn't touch `enabled`,
   // it'll fade back in the next time something naturally re-triggers it
   // (e.g. a real track starts and then finishes).

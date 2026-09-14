@@ -30,7 +30,7 @@ interface PreviewMessage {
   contentRaw: string;
 }
 
-// Site's own accent colors, not arbitrary ones — forum's established
+// Site's own accent colors, not arbitrary ones - forum's established
 // identity is the accretion-disk orange-red, audio's is the pulsar blue.
 function nodeLabel(n: MapNode): string {
   if (n.type === "PLAYLIST") return n.playlist?.title ?? "";
@@ -50,7 +50,7 @@ const NODE_STYLE: Record<MapNode["type"], { radius: number; color: string }> = {
 
 // Matches the spacemap's own camera feel exactly, just adapted to
 // screen-pixel-equivalent units (converted to SVG units per frame via
-// pxToSvgUnits) so speed stays consistent regardless of zoom level —
+// pxToSvgUnits) so speed stays consistent regardless of zoom level -
 // the admin's configured multiplier applies on top of this baseline.
 const CAMERA_ACCEL = 900;
 const CAMERA_FRICTION = 5;
@@ -67,7 +67,7 @@ function seededRand(seed: number): () => number {
     return s / 233280;
   };
 }
-// Fireflies roaming around a node — count is driven by that channel's
+// Fireflies roaming around a node - count is driven by that channel's
 // actual unique-speaker history (see speakerCount from /api/forum-map),
 // not a fixed random range like the old dendrites. Ring-based placement
 // guarantees no two fireflies ever overlap: each ring holds only as many
@@ -92,7 +92,7 @@ function fireflies(nodeId: number, baseRadius: number, count: number) {
         orbitRadius: ringRadius,
         startAngle,
         direction: rand() > 0.5 ? 1 : -1,
-        duration: 14 + rand() * 18, // 14-32s per full orbit — slow, ambient drift
+        duration: 14 + rand() * 18, // 14-32s per full orbit - slow, ambient drift
         size: 1.4 + rand() * 1.3,
         twinkleDelay: rand() * 4,
       });
@@ -169,7 +169,7 @@ export function ForumMapPage() {
         visible.add(n.id);
       } else if (n.hidden) {
         // A handle is the topmost hidden node in its cluster whose parent
-        // IS visible — that's the single point of entry into that cluster.
+        // IS visible - that's the single point of entry into that cluster.
         const parent = n.parentId !== null ? byId.get(n.parentId) : null;
         if (!parent || isVisible(parent)) handles.add(n.id);
       }
@@ -177,7 +177,7 @@ export function ForumMapPage() {
     return { visibleIds: visible, handleIds: handles };
   }, [nodes, revealedIds]);
 
-  // Excludes handle nodes — a handle isn't revealed yet, so it should
+  // Excludes handle nodes - a handle isn't revealed yet, so it should
   // never trigger the preview fetch/popup, only the crosshair's hint.
   const activeNode = useMemo(() => {
     const n = nodes.find((n) => n.id === activeNodeId) ?? null;
@@ -192,7 +192,7 @@ export function ForumMapPage() {
     setRevealedIds((prev) => {
       const next = new Set(prev);
       const byId = new Map(nodesRef.current.map((n) => [n.id, n]));
-      // Reveal the whole ensemble at once — the handle's node plus every
+      // Reveal the whole ensemble at once - the handle's node plus every
       // descendant beneath it, not just the single node clicked.
       const stack = [rootId];
       while (stack.length) {
@@ -327,7 +327,7 @@ export function ForumMapPage() {
         }
       }
 
-      // Crosshair inertia — leads the camera's velocity, then eases back
+      // Crosshair inertia - leads the camera's velocity, then eases back
       // to center once it settles, same feel as the spacemap reticle.
       {
         const targetX = Math.max(-CROSSHAIR_MAX_OFFSET, Math.min(CROSSHAIR_MAX_OFFSET, -cam.vx * CROSSHAIR_LOOKAHEAD));
@@ -371,7 +371,7 @@ export function ForumMapPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isDesktop]);
 
-  // RMS-driven pluck intensity — throttled well below animation-frame
+  // RMS-driven pluck intensity - throttled well below animation-frame
   // rate since this only needs to feel responsive, not be perfectly
   // smooth, and updates the CSS variable directly rather than through
   // React state to avoid re-rendering the whole node tree constantly.
@@ -385,7 +385,7 @@ export function ForumMapPage() {
   }, []);
 
   // Screen-pixel deltas converted through the container's actual rendered
-  // size against the viewBox size, not just divided by zoom — the earlier
+  // size against the viewBox size, not just divided by zoom - the earlier
   // version assumed the container was exactly as wide as the base viewBox,
   // which is essentially never true, so panning felt broken/unresponsive.
   function pxToSvgUnits(px: number) {
@@ -411,7 +411,7 @@ export function ForumMapPage() {
     setPan({ x: dragState.current.panX + pxToSvgUnits(rawDx), y: dragState.current.panY + pxToSvgUnits(rawDy) });
   }
   // Clicks are detected here, on pointerup, rather than relying on the
-  // browser's native "click" event — setPointerCapture on the container
+  // browser's native "click" event - setPointerCapture on the container
   // (needed so a fast drag can't slip outside the element mid-gesture)
   // retargets pointerup to the container too, which can prevent a
   // separately-synthesized click from ever reaching the node that was
@@ -580,7 +580,7 @@ export function ForumMapPage() {
           <ellipse id="firefly-glow" rx="4" ry="4" fill="url(#firefly-glow-gradient)" />
         </defs>
 
-        {/* Thick, jagged synapse-like connections between nodes — Phazon
+        {/* Thick, jagged synapse-like connections between nodes - Phazon
             crack aesthetic rather than a smooth clean curve. */}
         {nodes
           .filter((n) => n.parentId !== null && (visibleIds.has(n.id) || handleIds.has(n.id)))
@@ -626,7 +626,7 @@ export function ForumMapPage() {
                 <circle r={radius} fill="var(--bg-elevated)" stroke={color} strokeWidth={2} style={{ animation: "forumMapTwinkle 2s ease-in-out infinite" }} />
                 <text y={5} textAnchor="middle" fontSize={radius} fill={color}>+</text>
                 <text y={radius + 16} textAnchor="middle" fill="var(--text-dim)" fontSize={Math.max(9, radius * 0.7)} fontFamily="var(--font-display)">
-                  ??? — reveal
+                  ??? - reveal
                 </text>
               </g>
             );
@@ -643,10 +643,10 @@ export function ForumMapPage() {
             >
             <circle r={radius * 1.5} fill="transparent" />
             <g style={{ animation: "forumMapReveal 0.4s ease-out", transformOrigin: "0px 0px" }}>
-              {/* Fireflies — each one a <use> reference to the single
+              {/* Fireflies - each one a <use> reference to the single
                   shared glow defined once in <defs> (see below), not a
                   duplicated gradient per firefly. Orbits behind the node
-                  and its label, ahead of nothing — rendered first in this
+                  and its label, ahead of nothing - rendered first in this
                   group so the node circle and text below paint over it. */}
               {fliesForNode.map((f, i) => (
                 <g
@@ -688,7 +688,7 @@ export function ForumMapPage() {
         })}
 
         {/* Rendered last, outside the per-node loop, so it always paints
-            on top of every node regardless of array order — previously a
+            on top of every node regardless of array order - previously a
             node later in the list could visually cover an earlier node's
             open preview. */}
         {activeNode && (

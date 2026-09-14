@@ -329,7 +329,7 @@ export function MyMusicPage() {
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                       <span>
                         {t.title}
-                        {t.composer && <span style={{ color: "var(--text-dim)" }}> — {t.composer}</span>}
+                        {t.composer && <span style={{ color: "var(--text-dim)" }}> - {t.composer}</span>}
                       </span>
                       <div style={{ display: "flex", gap: "0.4rem" }}>
                         <button className="btn" style={{ fontSize: "0.75rem" }} onClick={() => startEditTrack(t)}>
@@ -361,11 +361,11 @@ export function MyMusicPage() {
                       Search
                     </button>
                   </div>
-                  {remixOfId && <div style={{ fontSize: "0.75rem", color: "var(--accent-forum)" }}>Selected — clear by picking another or reloading.</div>}
+                  {remixOfId && <div style={{ fontSize: "0.75rem", color: "var(--accent-forum)" }}>Selected - clear by picking another or reloading.</div>}
                   {remixResults.map((r) => (
                     <div key={r.id} style={{ display: "flex", justifyContent: "space-between", fontSize: "0.8rem", marginTop: "0.2rem" }}>
                       <span>
-                        {r.title} — {r.albumTitle}
+                        {r.title} - {r.albumTitle}
                       </span>
                       <button className="btn" style={{ fontSize: "0.7rem" }} type="button" onClick={() => setRemixOfId(r.id)}>
                         select
@@ -424,7 +424,7 @@ export function MyMusicPage() {
               {playlistItems.map((item) => (
                 <div key={item.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: "0.9rem", marginBottom: "0.3rem" }}>
                   <span>
-                    {item.title} <span style={{ color: "var(--text-dim)" }}>— {item.albumTitle}</span>
+                    {item.title} <span style={{ color: "var(--text-dim)" }}>- {item.albumTitle}</span>
                   </span>
                   <button className="btn btn-danger" style={{ fontSize: "0.75rem" }} onClick={() => removePlaylistItem(item.id)}>
                     remove
@@ -440,10 +440,10 @@ export function MyMusicPage() {
                     onChange={(e) => setCommunityTrackChoice(e.target.value ? Number(e.target.value) : "")}
                     style={{ flex: 1 }}
                   >
-                    <option value="">— select —</option>
+                    <option value="">- select -</option>
                     {myCommunityTracks.map((t) => (
                       <option key={t.id} value={t.id}>
-                        {t.title} — {t.albumTitle}
+                        {t.title} - {t.albumTitle}
                       </option>
                     ))}
                   </select>
@@ -464,7 +464,7 @@ export function MyMusicPage() {
                 {trackResults.map((t) => (
                   <div key={t.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: "0.85rem", marginTop: "0.3rem" }}>
                     <span>
-                      {t.title} <span style={{ color: "var(--text-dim)" }}>— {t.albumTitle}</span>
+                      {t.title} <span style={{ color: "var(--text-dim)" }}>- {t.albumTitle}</span>
                     </span>
                     <button className="btn" style={{ fontSize: "0.75rem" }} onClick={() => addOfficialTrackToPlaylist(t.id)}>
                       add

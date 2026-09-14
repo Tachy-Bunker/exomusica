@@ -34,7 +34,7 @@ export async function linkPreviewRoutes(app: FastifyInstance): Promise<void> {
     } catch {
       return reply.code(400).send({ error: "invalid url" });
     }
-    // Only ever fetch plain web pages — never let this become a way to
+    // Only ever fetch plain web pages - never let this become a way to
     // reach internal services or other schemes via a pasted chat link.
     if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
       return reply.code(400).send({ error: "only http/https URLs are supported" });
@@ -50,7 +50,7 @@ export async function linkPreviewRoutes(app: FastifyInstance): Promise<void> {
       if (!contentType.includes("text/html")) {
         return { url: parsed.toString(), title: parsed.hostname, description: null, image: null };
       }
-      // Only read the head — og/title tags are always near the top, and
+      // Only read the head - og/title tags are always near the top, and
       // this avoids downloading an entire large page just for metadata.
       const reader = res.body?.getReader();
       let html = "";

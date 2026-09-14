@@ -11,7 +11,7 @@ export async function emojiRoutes(app: FastifyInstance): Promise<void> {
     });
   });
 
-  // Accepts one or many files in a single multipart request — this is the
+  // Accepts one or many files in a single multipart request - this is the
   // "import a big palette at once" path as well as the single-emoji path,
   // same endpoint either way.
   app.post("/api/admin/emojis", { preHandler: requireAdmin }, async (req, reply) => {

@@ -68,7 +68,7 @@ async function main() {
       data: {
         albumId: album.id,
         title: "Half Light I",
-        fileUrl: "https://example.com/audio/half-light-i.mp3", // REPLACE with a real hosted file — this won't play
+        fileUrl: "https://example.com/audio/half-light-i.mp3", // REPLACE with a real hosted file - this won't play
         format: "MP3",
         durationSeconds: 312,
         position: 0,
@@ -120,7 +120,7 @@ async function main() {
         authorId: demoUser.id,
         createdAt: now,
         dayKey,
-        contentRaw: `Been listening to the new **${album.title}** on repeat — check track:${track.id}`,
+        contentRaw: `Been listening to the new **${album.title}** on repeat - check track:${track.id}`,
       },
     });
   }
@@ -131,7 +131,7 @@ async function main() {
     create: {
       slug: "branch-index",
       title: "Branch Index",
-      contentMarkdown: "# Branches\n\n- **Ambient Drift** — slow textures, tape loops, room tone.\n",
+      contentMarkdown: "# Branches\n\n- **Ambient Drift** - slow textures, tape loops, room tone.\n",
       updatedById: admin.id,
     },
     update: {},
@@ -160,7 +160,7 @@ async function main() {
     const existing = await prisma.customFont.findUnique({ where: { name } });
     if (existing) continue;
     const sourcePath = path.join(seedAssetsDir, file);
-    if (!existsSync(sourcePath)) continue; // seed-assets not present in this build — skip quietly
+    if (!existsSync(sourcePath)) continue; // seed-assets not present in this build - skip quietly
 
     const fontsDir = path.join(UPLOADS_DIR, "fonts");
     await mkdir(fontsDir, { recursive: true });

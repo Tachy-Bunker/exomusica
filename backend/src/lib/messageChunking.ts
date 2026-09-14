@@ -4,7 +4,7 @@ export const MESSAGE_CHUNK_SIZE = 300;
 
 /** Splits an array into chunks of MESSAGE_CHUNK_SIZE (or a custom size).
  *  Used by anything that needs to walk a channel's full message history
- *  without loading it all into memory at once — the chat export feature
+ *  without loading it all into memory at once - the chat export feature
  *  and the Discord import tool both build on this. */
 export function chunk<T>(items: T[], size: number = MESSAGE_CHUNK_SIZE): T[][] {
   const result: T[][] = [];
@@ -17,7 +17,7 @@ export function chunk<T>(items: T[], size: number = MESSAGE_CHUNK_SIZE): T[][] {
 /** Walks a channel's entire message history in chunks, oldest first,
  *  calling `onChunk` for each batch. Uses the same cursor-based pagination
  *  as the live feed endpoint (paginate by position in creation order, not
- *  raw id — imported history can have ids that don't match creation order
+ *  raw id - imported history can have ids that don't match creation order
  *  chronologically). */
 export async function walkChannelHistoryInChunks(
   prisma: PrismaClient,

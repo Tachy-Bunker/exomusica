@@ -43,7 +43,7 @@ const CAMERA_ACCEL = 1800;
 const CAMERA_FRICTION = 5;
 const CAMERA_MAX_SPEED = 900;
 const CROSSHAIR_LOOKAHEAD = 0.16; // fraction of camera velocity the crosshair leads by
-const CROSSHAIR_MAX_OFFSET = 65; // px — caps how far the crosshair can drift from center
+const CROSSHAIR_MAX_OFFSET = 65; // px - caps how far the crosshair can drift from center
 const CROSSHAIR_CATCHUP_RATE = 2.2; // higher = the visor catches up to the crosshair faster
 const LOCK_RADIUS = 58; // px from screen center to start locking on
 const LOCK_TIME = 0.9; // seconds of holding a target to complete the lock
@@ -53,7 +53,7 @@ const LOCK_TIME = 0.9; // seconds of holding a target to complete the lock
  *  branch always renders the same cluster shape rather than re-randomizing
  *  on every load. Occasionally lets one shard drift further from center,
  *  per the "don't be afraid to make one crystal far from its origin"
- *  brief — the actual jitter/orbit motion is applied via CSS animation
+ *  brief - the actual jitter/orbit motion is applied via CSS animation
  *  delay offsets, not here. */
 function generateCrystalShards(count: number, seedBase: number): string[] {
   const shards: string[] = [];
@@ -109,7 +109,7 @@ function buildNodes(branches: Branch[], spacing: number): MapNode[] {
   });
 
   anchors.forEach((b) => {
-    // Uneven scatter — not a clean grid or perfect circle, deliberately.
+    // Uneven scatter - not a clean grid or perfect circle, deliberately.
     const angle = Math.random() * Math.PI * 2;
     const radius = (350 + Math.random() * WORLD_SPREAD) * spacing;
     const bx = Math.cos(angle) * radius;
@@ -230,7 +230,7 @@ export function SpaceMap({
     api<{ scanSfxUrl: string | null }>("/api/site-settings").then((s) => setScanSfxUrl(s.scanSfxUrl));
   }, []);
 
-  // Fully tears down the audio graph on unmount — leaving the browser to
+  // Fully tears down the audio graph on unmount - leaving the browser to
   // garbage-collect an Audio element on its own schedule (the previous
   // approach) is exactly what let the loop keep sounding after navigating
   // away and back.
@@ -330,7 +330,7 @@ export function SpaceMap({
   useEffect(() => {
     if (!scanSfxUrl) return;
     const isRevealing = !!lockedNode && (revealedCount < lockedNodeDisplayName.length || actionRevealedCount < currentActionLength);
-    if (isRevealing === wasRevealingRef.current) return; // no state change — don't re-trigger the fade
+    if (isRevealing === wasRevealingRef.current) return; // no state change - don't re-trigger the fade
     wasRevealingRef.current = isRevealing;
 
     if (!scanSfxRef.current) scanSfxRef.current = new GaplessLoop();
@@ -349,7 +349,7 @@ export function SpaceMap({
     function handleKeyDown(e: KeyboardEvent) {
       if (isTypingTarget(e.target)) return;
       // event.code is the physical key position, not the character it
-      // produces — "KeyW" is always the key at the WASD spot regardless of
+      // produces - "KeyW" is always the key at the WASD spot regardless of
       // layout, so this is ZQSD on an AZERTY keyboard for free, with no
       // separate layout detection needed.
       if (["KeyW", "KeyA", "KeyS", "KeyD"].includes(e.code)) {
@@ -440,7 +440,7 @@ export function SpaceMap({
             n.homeY = parent.y + Math.sin(n.angle) * n.orbitRadius;
           }
         }
-        // Anchors: homeX/homeY intentionally untouched here — they stay at
+        // Anchors: homeX/homeY intentionally untouched here - they stay at
         // their scattered base spot; the wander offset below is what
         // actually moves them, gently, around that fixed point.
         else if (!n.isAnchor) {
@@ -509,7 +509,7 @@ export function SpaceMap({
           if (n.visibility === "BABY_CRYSTALS") {
             const el = crystalElRefs.current.get(n.id);
             if (el) {
-              // Pure world coordinates — this element lives inside
+              // Pure world coordinates - this element lives inside
               // .space-map-field, which is already centered (left/top:
               // 50%) and camera-panned via its own CSS transform. Adding
               // w/2+cam.x here would double-apply that offset (the bug
@@ -542,7 +542,7 @@ export function SpaceMap({
         }
       }
 
-      // Re-render roughly 30fps worth of React updates — the physics loop
+      // Re-render roughly 30fps worth of React updates - the physics loop
       // itself still runs every animation frame for smoothness.
       frameCount++;
       if (frameCount % 2 === 0) setRenderTick((v) => v + 1);
@@ -586,10 +586,10 @@ export function SpaceMap({
   // Compass: top-level nodes (central-cluster + anchors) currently outside
   // the visible container get a small arrow at the edge pointing toward
   // them, so an anchor scattered far away is never truly "lost". Orbiting
-  // children are skipped — they stay near their visible parent anyway, and
+  // children are skipped - they stay near their visible parent anyway, and
   // an arrow per satellite would just be clutter.
   const container = containerRef.current;
-  const compassPoints: { angle: number; label: string; playing: boolean }[] = [];
+  const compassPoints: { angle: number; label: string; playing: boolean; isBabyCrystals: boolean }[] = [];
   if (container) {
     const w = container.clientWidth;
     const h = container.clientHeight;
@@ -598,7 +598,12 @@ export function SpaceMap({
       const screenX = w / 2 + cameraRef.current.x + n.x;
       const screenY = h / 2 + cameraRef.current.y + n.y;
       if (screenX < 0 || screenX > w || screenY < 0 || screenY > h) {
-        compassPoints.push({ angle: Math.atan2(screenY - h / 2, screenX - w / 2), label: n.name, playing: currentTrack?.branchSlug === n.slug });
+        compassPoints.push({
+          angle: Math.atan2(screenY - h / 2, screenX - w / 2),
+          label: n.name,
+          playing: currentTrack?.branchSlug === n.slug,
+          isBabyCrystals: n.visibility === "BABY_CRYSTALS",
+        });
       }
     }
   }
@@ -673,7 +678,7 @@ export function SpaceMap({
             >
               ×
             </button>
-            Your browser is rendering this without hardware acceleration, which is slow — quality's been dropped
+            Your browser is rendering this without hardware acceleration, which is slow - quality's been dropped
             automatically. This is a browser/GPU setting, not something this site controls; check your browser's
             hardware acceleration setting if you'd like it faster.
           </div>
@@ -745,9 +750,9 @@ export function SpaceMap({
             left: `${50 + Math.cos(c.angle) * 46}%`,
             top: `${50 + Math.sin(c.angle) * 46}%`,
             transform: `translate(-50%, -50%) rotate(${c.angle}rad)`,
-            color: c.playing ? "var(--accent-audio)" : undefined,
-            textShadow: c.playing ? "0 0 6px var(--accent-audio)" : undefined,
-            opacity: c.playing ? 1 : undefined,
+            color: c.playing ? "var(--accent-audio)" : c.isBabyCrystals ? "var(--accent-forum-dim)" : undefined,
+            textShadow: c.playing ? "0 0 6px var(--accent-audio)" : c.isBabyCrystals ? "0 0 6px var(--accent-forum-dim)" : undefined,
+            opacity: c.playing ? 1 : c.isBabyCrystals ? 0.55 : undefined,
           }}
         >
           ➤

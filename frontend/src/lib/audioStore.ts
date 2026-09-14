@@ -9,7 +9,7 @@ type RepeatMode = "off" | "all" | "one";
 interface AudioState {
   currentTrack: PlayableTrackDTO | null;
   queue: PlayableTrackDTO[]; // upcoming tracks, in play order
-  history: PlayableTrackDTO[]; // played stack, most recent last — powers "previous"
+  history: PlayableTrackDTO[]; // played stack, most recent last - powers "previous"
   shuffle: boolean;
   repeatMode: RepeatMode;
   isPlaying: boolean;
@@ -134,7 +134,7 @@ export const useAudioStore = create<AudioState>((set, get) => ({
 
   // Shuffling reorders what's already queued; turning it off just stops
   // applying it to future additions rather than trying to reconstruct the
-  // pre-shuffle order — a reasonable simplification, not full undo.
+  // pre-shuffle order - a reasonable simplification, not full undo.
   toggleShuffle: () =>
     set((s) => (s.shuffle ? { shuffle: false } : { shuffle: true, queue: shuffleArray(s.queue) })),
 

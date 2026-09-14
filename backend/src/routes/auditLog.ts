@@ -26,7 +26,7 @@ export async function auditLogRoutes(app: FastifyInstance): Promise<void> {
     },
   );
 
-  // Deliberately a real, irreversible clear — this is a log, not data
+  // Deliberately a real, irreversible clear - this is a log, not data
   // anyone's account is attributed by; nothing else references these rows.
   app.delete("/api/admin/audit-log", { preHandler: requireAdmin }, async (req) => {
     const result = await prisma.auditLog.deleteMany({});

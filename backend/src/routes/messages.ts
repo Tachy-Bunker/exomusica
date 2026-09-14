@@ -19,9 +19,9 @@ const messageInclude = {
 } as const;
 
 interface MessageQuery {
-  day?: string; // YYYY-MM-DD — archived-day view
-  before?: string; // message id cursor — live feed pagination
-  q?: string; // search string — scoped to this channel
+  day?: string; // YYYY-MM-DD - archived-day view
+  before?: string; // message id cursor - live feed pagination
+  q?: string; // search string - scoped to this channel
   limit?: string;
 }
 
@@ -51,10 +51,10 @@ export async function messageRoutes(app: FastifyInstance): Promise<void> {
               `
             ).map((r) => r.id)
           : null;
-        if (textSearchIds && textSearchIds.length === 0) return []; // free text matched nothing — has:/from: can't narrow further
+        if (textSearchIds && textSearchIds.length === 0) return []; // free text matched nothing - has:/from: can't narrow further
 
         const author = parsed.fromUsername ? await prisma.user.findUnique({ where: { username: parsed.fromUsername } }) : null;
-        if (parsed.fromUsername && !author) return []; // named user doesn't exist — no point querying
+        if (parsed.fromUsername && !author) return []; // named user doesn't exist - no point querying
 
         const hasConditions = parsed.hasFilters.map((h) => {
           if (h === "link") return { contentRaw: { contains: "http" } };
@@ -94,7 +94,7 @@ export async function messageRoutes(app: FastifyInstance): Promise<void> {
 
       // --- live feed: most recent first, paginate backward with `before` --
       // Uses Prisma's cursor+skip pagination (paginate by *position in the
-      // requested order*) rather than "WHERE id < before" — a raw id
+      // requested order*) rather than "WHERE id < before" - a raw id
       // comparison would silently break once a channel has Discord history
       // backfilled into it, since those imported rows get higher ids than
       // their (older) createdAt timestamps.
@@ -110,7 +110,7 @@ export async function messageRoutes(app: FastifyInstance): Promise<void> {
     },
   );
 
-  // Site-wide, any channel, regardless of follow status — powers the
+  // Site-wide, any channel, regardless of follow status - powers the
   // notification widget's "recent activity" section and the client-side
   // check for whether an unfollowed-topic message deserves a sound.
   app.get<{ Querystring: { limit?: string } }>("/api/recent-messages", async (req) => {
@@ -131,7 +131,7 @@ export async function messageRoutes(app: FastifyInstance): Promise<void> {
     }));
   });
 
-  // Distinct authors in this channel — powers the from: search autocomplete.
+  // Distinct authors in this channel - powers the from: search autocomplete.
   app.get<{ Params: { slug: string } }>("/api/channels/:slug/participants", async (req, reply) => {
     const channel = await prisma.forumChannel.findUnique({ where: { slug: req.params.slug } });
     if (!channel) return reply.code(404).send({ error: "no such channel" });
@@ -143,7 +143,7 @@ export async function messageRoutes(app: FastifyInstance): Promise<void> {
     return rows.map((r) => r.author.username);
   });
 
-  // Ephemeral — no persistence, just relayed to everyone else currently
+  // Ephemeral - no persistence, just relayed to everyone else currently
   // watching this channel. The client is responsible for re-sending every
   // few seconds while the composer has content, and for clearing its own
   // display of this after a short timeout if no further ping arrives (so a
@@ -162,7 +162,7 @@ export async function messageRoutes(app: FastifyInstance): Promise<void> {
     if (!channel) return reply.code(404).send({ error: "no such channel" });
 
     // groupBy only returns dayKeys that actually have messages, so empty
-    // days never show up in the calendar — no pruning job needed.
+    // days never show up in the calendar - no pruning job needed.
     const days = await prisma.message.groupBy({
       by: ["dayKey"],
       where: { channelId: channel.id, isDeleted: false },
@@ -198,7 +198,7 @@ export async function messageRoutes(app: FastifyInstance): Promise<void> {
 
       if (attachmentIds && attachmentIds.length > 0) {
         // Only attach files this user uploaded and that aren't already
-        // claimed by another message — prevents linking someone else's
+        // claimed by another message - prevents linking someone else's
         // upload, or the same upload, into two messages.
         await prisma.attachment.updateMany({
           where: { id: { in: attachmentIds }, uploaderId: req.user!.id, messageId: null },
@@ -206,7 +206,7 @@ export async function messageRoutes(app: FastifyInstance): Promise<void> {
         });
       }
 
-      // Posting in a topic implies interest in it — auto-follow so replies
+      // Posting in a topic implies interest in it - auto-follow so replies
       // trigger the normal email/notification path. upsert rather than
       // create so this is a no-op if they already follow it.
       await prisma.channelFollow.upsert({
@@ -275,7 +275,7 @@ export async function messageRoutes(app: FastifyInstance): Promise<void> {
           if (f.user.notifyDiscordFollowedReplies && (f.user.discordUserId || f.user.discordUsername)) {
             void sendDiscordDM(
               { discordUserId: f.user.discordUserId, discordUsername: f.user.discordUsername },
-              `New activity in ${channel.name} — ${full.author.username}: ${contentRaw.slice(0, 150)}\nhttps://exomusica.com/topic/${channel.slug}#m-${message.id}`,
+              `New activity in ${channel.name} - ${full.author.username}: ${contentRaw.slice(0, 150)}\nhttps://exomusica.com/topic/${channel.slug}#m-${message.id}`,
             );
           }
         }
@@ -330,7 +330,7 @@ export async function messageRoutes(app: FastifyInstance): Promise<void> {
     },
   );
 
-  // Full chat export — walks the whole channel history in chunks of 300
+  // Full chat export - walks the whole channel history in chunks of 300
   // (never loads it all into memory at once) and returns a plain-text
   // file: one line per message, "YYYY-MM-DD-HH-MM-SS:username:message".
   app.get<{ Params: { slug: string } }>("/api/channels/:slug/export", { preHandler: requireAuth }, async (req, reply) => {
@@ -358,7 +358,7 @@ export async function messageRoutes(app: FastifyInstance): Promise<void> {
     return lines.join("\n");
   });
 
-  // Attachment list for the export — the export itself is plain text, so
+  // Attachment list for the export - the export itself is plain text, so
   // attachments are handed back as a flat list of URLs/filenames for the
   // user to download individually rather than bundling a zip server-side.
   app.get<{ Params: { slug: string } }>("/api/channels/:slug/export/attachments", { preHandler: requireAuth }, async (req, reply) => {

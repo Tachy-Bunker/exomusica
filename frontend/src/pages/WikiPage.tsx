@@ -125,7 +125,7 @@ export function WikiPage() {
   );
 
   if (!isDesktop) {
-    // Single column — the article first, Pages menu after a separator at the
+    // Single column - the article first, Pages menu after a separator at the
     // end, not a sidebar (there's no horizontal room for one on mobile).
     return (
       <div style={{ fontSize: `${scale}rem` }}>

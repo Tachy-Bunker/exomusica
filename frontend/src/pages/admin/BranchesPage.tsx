@@ -181,7 +181,7 @@ export function BranchesPage() {
             value={form.parentId}
             onChange={(e) => setForm((f) => ({ ...f, parentId: e.target.value }))}
           >
-            <option value="">— none, top-level —</option>
+            <option value="">- none, top-level -</option>
             {branches.map((b) => (
               <option key={b.id} value={b.id}>
                 {b.name}
@@ -217,7 +217,7 @@ export function BranchesPage() {
                     onChange={(e) => setEditForm((f) => ({ ...f, description: e.target.value }))}
                   />
                   <select value={editForm.fontId} onChange={(e) => setEditForm((f) => ({ ...f, fontId: e.target.value }))}>
-                    <option value="">— site default font —</option>
+                    <option value="">- site default font -</option>
                     {fonts.map((f) => (
                       <option key={f.id} value={f.id}>
                         {f.name}
@@ -225,7 +225,7 @@ export function BranchesPage() {
                     ))}
                   </select>
                   <select value={editForm.parentId} onChange={(e) => setEditForm((f) => ({ ...f, parentId: e.target.value }))}>
-                    <option value="">— Join/About (center) —</option>
+                    <option value="">- Join/About (center) -</option>
                     {branches
                       .filter((other) => other.id !== b.id)
                       .map((other) => (
@@ -248,7 +248,7 @@ export function BranchesPage() {
                     onChange={(e) => setEditForm((f) => ({ ...f, guideAssetId: e.target.value }))}
                     style={{ marginTop: "0.3rem" }}
                   >
-                    <option value="">— no intro guide —</option>
+                    <option value="">- no intro guide -</option>
                     {guideAssets.map((g) => (
                       <option key={g.id} value={g.id}>
                         {g.name}
@@ -273,7 +273,7 @@ export function BranchesPage() {
                     style={{ marginTop: "0.3rem", width: "100%" }}
                   />
                   <input
-                    placeholder="Discord webhook URL (optional — for the {username} | Exo-API format)"
+                    placeholder="Discord webhook URL (optional - for the {username} | Exo-API format)"
                     value={editForm.discordWebhookUrl}
                     onChange={(e) => setEditForm((f) => ({ ...f, discordWebhookUrl: e.target.value }))}
                     style={{ marginTop: "0.3rem", width: "100%" }}
@@ -299,7 +299,7 @@ export function BranchesPage() {
                   <td className="mono">{b.slug}</td>
                 </>
               )}
-              <td className="mono">{b.channel?.slug ?? "—"}</td>
+              <td className="mono">{b.channel?.slug ?? "-"}</td>
               <td>
                 <select value={b.visibility ?? "VISIBLE"} onChange={(e) => setVisibility(b, e.target.value as "VISIBLE" | "HIDDEN" | "BABY_CRYSTALS")}>
                   <option value="VISIBLE">Visible</option>

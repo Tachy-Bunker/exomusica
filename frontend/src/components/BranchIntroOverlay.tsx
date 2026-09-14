@@ -26,7 +26,7 @@ export function BranchIntroOverlay({ gifUrl, voiceoverUrl, text, onDone }: Props
     }
   }, [visible, voiceoverUrl]);
 
-  // Sequences through the timed lines — each character reveals evenly
+  // Sequences through the timed lines - each character reveals evenly
   // across that line's own duration, then advances to the next line once
   // the duration elapses (a fixed timer, not just "reveal finished", so
   // timing stays accurate to what was authored even for very short lines).
@@ -41,7 +41,7 @@ export function BranchIntroOverlay({ gifUrl, voiceoverUrl, text, onDone }: Props
     const advanceTimer = setTimeout(() => {
       clearInterval(charTimer);
       if (lineIndex < lines.length - 1) setLineIndex((i) => i + 1);
-      else if (!voiceoverUrl) dismiss(); // no audio to wait on — end after the last line
+      else if (!voiceoverUrl) dismiss(); // no audio to wait on - end after the last line
     }, line.duration * 1000);
     return () => {
       clearInterval(charTimer);

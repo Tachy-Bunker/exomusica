@@ -24,7 +24,7 @@ export interface FieldFlyer {
 export interface FieldRenderState {
   pointerX: number; // CSS px, spacemap-relative, origin at center (matches prototype's toClipXY output)
   pointerY: number;
-  cameraX: number; // CSS px — the spacemap's camera pan offset, makes the field navigable via WASD/joystick
+  cameraX: number; // CSS px - the spacemap's camera pan offset, makes the field navigable via WASD/joystick
   cameraY: number;
   time: number; // ms
   seed: number;
@@ -53,7 +53,7 @@ export class FieldRenderer {
   private canvas: HTMLCanvasElement;
   private gl: WebGLRenderingContext | null;
   private program: WebGLProgram | null = null;
-  private cssWidth = 1; // last width passed to resize() — the prototype scales the pointer uniform by this directly, not by anything derived from dpr
+  private cssWidth = 1; // last width passed to resize() - the prototype scales the pointer uniform by this directly, not by anything derived from dpr
   private cssHeight = 1;
 
   private uResolution: WebGLUniformLocation | null = null;
@@ -86,7 +86,7 @@ export class FieldRenderer {
     if (!this.gl) return;
     const gl = this.gl;
 
-    // Diagnostic only — never affects rendering. If the GPU is
+    // Diagnostic only - never affects rendering. If the GPU is
     // blacklisted or hardware acceleration is off, WebGL can silently
     // fall back to a software rasterizer (SwiftShader/llvmpipe/etc)
     // rather than failing outright, which would fully explain identical
@@ -100,7 +100,7 @@ export class FieldRenderer {
         const isSoftware = /swiftshader|llvmpipe|software|microsoft basic render/i.test(renderer);
         if (isSoftware) {
           console.warn(
-            `Spacemap: WebGL is running on a software renderer ("${renderer}") instead of the GPU — this will be slow. Check that hardware acceleration is enabled for this browser specifically.`,
+            `Spacemap: WebGL is running on a software renderer ("${renderer}") instead of the GPU - this will be slow. Check that hardware acceleration is enabled for this browser specifically.`,
           );
           useMapQualityStore.getState().setSoftwareRendererName(renderer);
         }
@@ -147,7 +147,7 @@ export class FieldRenderer {
 
   /** Sub-native resolution scale, ported as-is from the prototype: renders
    *  at ~0.4-0.62x device pixels, CSS upscales the canvas back to full
-   *  size. This is most of the prototype's performance headroom — step 6
+   *  size. This is most of the prototype's performance headroom - step 6
    *  is where this becomes device-tier-aware, not here. */
   resize(cssWidth: number, cssHeight: number): void {
     this.cssWidth = cssWidth;
@@ -169,7 +169,7 @@ export class FieldRenderer {
 
     gl.uniform2f(this.uResolution, this.canvas.width, this.canvas.height);
     // Matches the prototype exactly: `pointerX * fieldCanvas.width / innerWidth`
-    // — scaled by the canvas's *own* render-target width over the real CSS
+    // - scaled by the canvas's *own* render-target width over the real CSS
     // window width, not by anything derived from devicePixelRatio.
     gl.uniform2f(this.uPointer, (state.pointerX * this.canvas.width) / this.cssWidth, (state.pointerY * this.canvas.width) / this.cssWidth);
     // Negated: panning the camera right (positive cameraX, per the spacemap's

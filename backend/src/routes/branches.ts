@@ -49,7 +49,7 @@ export async function branchRoutes(app: FastifyInstance): Promise<void> {
     }));
   });
 
-  // Admin sees everything, hidden included — needed to ever unhide something.
+  // Admin sees everything, hidden included - needed to ever unhide something.
   app.get("/api/admin/branches", { preHandler: requireAdmin }, async () => {
     return prisma.branch.findMany({
       include: { channel: { select: { id: true, slug: true, discordChannelId: true, discordWebhookUrl: true } } },
@@ -68,7 +68,7 @@ export async function branchRoutes(app: FastifyInstance): Promise<void> {
 
   // Read-only summary for the homepage tree's music-preview hover card.
   // Full album CRUD (create/edit, collaborator cards, stream/download
-  // links) is Phase 3 — this just makes existing Album/Track rows visible.
+  // links) is Phase 3 - this just makes existing Album/Track rows visible.
   app.get<{ Params: { slug: string } }>("/api/branches/:slug/albums", async (req, reply) => {
     const branch = await prisma.branch.findUnique({ where: { slug: req.params.slug } });
     if (!branch) return reply.code(404).send({ error: "no such branch" });
@@ -96,7 +96,7 @@ export async function branchRoutes(app: FastifyInstance): Promise<void> {
   });
 
   // Creating a branch also creates its one ForumChannel in the same
-  // transaction — the spec ties every branch to exactly one forum topic,
+  // transaction - the spec ties every branch to exactly one forum topic,
   // so there's no world where you'd want one without the other.
   app.post<{ Body: CreateBranchBody }>(
     "/api/admin/branches",
@@ -152,9 +152,9 @@ export async function branchRoutes(app: FastifyInstance): Promise<void> {
 
   // Cascades to its ForumChannel, every message in it (and their
   // reactions/bookmarks/attachment rows), every album (tracks, links,
-  // gallery, collaborator links), and channel-follows — all handled at the
+  // gallery, collaborator links), and channel-follows - all handled at the
   // database level via onDelete: Cascade, not hand-rolled deletion order
-  // here. Uploaded files on disk are not cleaned up by this — the DB rows
+  // here. Uploaded files on disk are not cleaned up by this - the DB rows
   // referencing them are gone, but the files themselves stay in uploads/
   // until removed manually. Irreversible; "hidden" is the reversible option.
   app.delete<{ Params: { id: string } }>("/api/admin/branches/:id", { preHandler: requireAdmin }, async (req, reply) => {

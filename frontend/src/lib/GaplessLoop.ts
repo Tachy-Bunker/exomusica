@@ -63,7 +63,7 @@ export class GaplessLoop {
     }
   }
 
-  /** Fully tears down the audio graph — call on unmount so a loop can
+  /** Fully tears down the audio graph - call on unmount so a loop can
    *  never keep sounding after the component that started it is gone. */
   dispose(): void {
     this.stopSource();

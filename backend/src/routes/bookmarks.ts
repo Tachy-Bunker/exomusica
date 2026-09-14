@@ -27,7 +27,7 @@ export async function bookmarkRoutes(app: FastifyInstance): Promise<void> {
     },
   );
 
-  // Powers "show my bookmarks when I open this day's archive" — one call
+  // Powers "show my bookmarks when I open this day's archive" - one call
   // per day view rather than N calls per message.
   app.get<{ Params: { slug: string }; Querystring: { day?: string } }>(
     "/api/channels/:slug/bookmarks",

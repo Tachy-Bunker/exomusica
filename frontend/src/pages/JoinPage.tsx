@@ -46,12 +46,12 @@ export function JoinPage() {
             id="username"
             required
             pattern="[a-zA-Z0-9_.\-]{3,32}"
-            title="3-32 characters: letters, numbers, underscore, hyphen, or period — no spaces"
+            title="3-32 characters: letters, numbers, underscore, hyphen, or period - no spaces"
             value={form.username}
             onChange={(e) => update("username", e.target.value)}
           />
           <span style={{ fontSize: "0.75rem", color: "var(--text-dim)" }}>
-            Letters, numbers, underscore, hyphen, or period only — no spaces.
+            Letters, numbers, underscore, hyphen, or period only - no spaces.
           </span>
         </div>
         <div className="field">

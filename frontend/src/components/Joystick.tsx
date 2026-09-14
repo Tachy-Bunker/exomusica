@@ -11,7 +11,7 @@ export function Joystick({ onMove, onRelease }: { onMove: (dx: number, dy: numbe
     const base = baseRef.current;
     if (!base) return;
     const rect = base.getBoundingClientRect();
-    const baseRadius = rect.width / 2; // actual rendered size — the base is vmin-sized now, not a fixed px constant
+    const baseRadius = rect.width / 2; // actual rendered size - the base is vmin-sized now, not a fixed px constant
     const centerX = rect.left + rect.width / 2;
     const centerY = rect.top + rect.height / 2;
     let dx = touch.clientX - centerX;

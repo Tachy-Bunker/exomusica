@@ -7,10 +7,10 @@ interface EmbedSettings {
 }
 
 const PAGE_TYPES: { key: string; label: string; placeholders: string }[] = [
-  { key: "Homepage", label: "Homepage (Spacemap)", placeholders: "No placeholders — this page has no single entity to pull from." },
-  { key: "BranchDefault", label: "Branches (default — used unless a branch sets its own)", placeholders: "{title}, {description}" },
+  { key: "Homepage", label: "Homepage (Spacemap)", placeholders: "No placeholders - this page has no single entity to pull from." },
+  { key: "BranchDefault", label: "Branches (default - used unless a branch sets its own)", placeholders: "{title}, {description}" },
   { key: "AlbumDefault", label: "Albums (default)", placeholders: "{title}, {trackCount}, {composer}" },
-  { key: "WikiDefault", label: "Wiki pages (default)", placeholders: "{title}, {content:N} — N is how many characters to show, e.g. {content:160}" },
+  { key: "WikiDefault", label: "Wiki pages (default)", placeholders: "{title}, {content:N} - N is how many characters to show, e.g. {content:160}" },
   { key: "NewsDefault", label: "News (default)", placeholders: "{title}, {content:N}" },
   { key: "ForumDefault", label: "Forum topics (default)", placeholders: "{title}, {description}" },
 ];
@@ -30,7 +30,7 @@ export function EmbedsAdminPage() {
   }
   useEffect(load, []);
 
-  // One Save per page-type section, saving title + description together —
+  // One Save per page-type section, saving title + description together -
   // matching the Email Templates page's pattern (edit everything for a
   // type, one Save button) rather than a save per individual field.
   async function saveSection(key: string) {
@@ -72,7 +72,7 @@ export function EmbedsAdminPage() {
       <h1>Favicon & Embeds</h1>
       <p style={{ fontSize: "0.85rem", color: "var(--text-dim)" }}>
         Controls the site's browser tab icon, and what title/description/image show up when a link is shared on
-        Discord, Twitter, etc. Individual branches, albums, wiki pages, and news posts can override these later —
+        Discord, Twitter, etc. Individual branches, albums, wiki pages, and news posts can override these later -
         for now, everything on a given page type uses the same default template.
       </p>
 

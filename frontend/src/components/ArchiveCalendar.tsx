@@ -66,7 +66,7 @@ export function ArchiveCalendar({ archiveDays, selectedDay, onSelect, label = "B
     const idx = list.indexOf(referenceDay);
     let target: string | undefined;
     if (idx === -1) {
-      // Not currently on an active day — find the nearest one in that direction.
+      // Not currently on an active day - find the nearest one in that direction.
       target = direction === 1 ? list.find((d) => d > referenceDay) : [...list].reverse().find((d) => d < referenceDay);
     } else {
       target = list[idx + direction];
@@ -157,7 +157,7 @@ export function ArchiveCalendar({ archiveDays, selectedDay, onSelect, label = "B
                     onSelect(key);
                     setOpen(false);
                   }}
-                  title={isActive ? `${key} — has messages` : key}
+                  title={isActive ? `${key} - has messages` : key}
                   style={{
                     aspectRatio: "1",
                     fontSize: "0.75rem",

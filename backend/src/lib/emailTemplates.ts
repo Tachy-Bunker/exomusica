@@ -49,7 +49,7 @@ export const DEFAULT_TEMPLATES: Record<EmailType, TemplateContent> = {
     bodyHtml: "<p>Hi {{username}},</p><p>{{senderUsername}} sent you a message:</p><blockquote>{{messageExcerpt}}</blockquote>",
   },
   JOIN_APPROVED: {
-    subject: "You're in — Exomusica",
+    subject: "You're in - Exomusica",
     bodyHtml:
       "<p>Hi {{username}},</p><p>Your Exomusica account is approved. Log in with the username and password you signed up with.</p>",
   },
@@ -77,7 +77,7 @@ export function renderTemplate(template: TemplateContent, vars: Record<string, s
   return { subject: fill(template.subject), bodyHtml: fill(template.bodyHtml) };
 }
 
-/** The one function call sites should use — looks up the (possibly
+/** The one function call sites should use - looks up the (possibly
  *  admin-edited) template, fills in username/date plus whatever the type
  *  needs, and sends both an HTML body and a crude tag-stripped plaintext
  *  fallback for clients that want it. */

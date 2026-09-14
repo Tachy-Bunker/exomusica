@@ -1,5 +1,5 @@
 // IMPORTANT: this module exists purely for visual reactivity (RMS-driven
-// animation). It must never be able to break actual audio playback — if
+// animation). It must never be able to break actual audio playback - if
 // anything here fails, visuals simply stay non-reactive; audio keeps
 // playing normally regardless. Every operation that touches the shared
 // AudioContext or the <audio> element's routing is wrapped so a failure
@@ -12,7 +12,7 @@ let boundEl: HTMLAudioElement | null = null;
 let gainNode: GainNode | null = null;
 
 // Guards against calling createMediaElementSource twice on the same
-// element, which throws — the WeakSet survives across bindAudioElement
+// element, which throws - the WeakSet survives across bindAudioElement
 // re-calls even if the analyser setup itself is skipped on a later call.
 const sourcedElements = new WeakSet<HTMLAudioElement>();
 
@@ -30,7 +30,7 @@ export function initAnalyser(el: HTMLAudioElement): void {
     node.fftSize = 256;
     // Critical: connect all the way through to the destination, or the
     // element's audio output gets rerouted into this graph and never
-    // reaches speakers — this chain is what keeps playback audible.
+    // reaches speakers - this chain is what keeps playback audible.
     source.connect(gain);
     gain.connect(node);
     node.connect(ctx.destination);
@@ -41,14 +41,14 @@ export function initAnalyser(el: HTMLAudioElement): void {
     boundEl = el;
   } catch (err) {
     // Any failure here (e.g. a stricter browser policy) just means no
-    // reactive visuals — never touch playback itself in this catch.
+    // reactive visuals - never touch playback itself in this catch.
     console.error("Audio analyser setup failed (visuals only, playback unaffected):", err);
   }
 }
 
 /** Sets the ReplayGain adjustment for the currently playing track, in dB
  *  (converted to a linear multiplier). Safe to call even if the gain
- *  node was never set up (e.g. analyser setup failed) — playback is
+ *  node was never set up (e.g. analyser setup failed) - playback is
  *  never affected either way, it just won't be volume-normalized. */
 export function setReplayGainDb(db: number | null): void {
   if (!gainNode || !ctx) return;
@@ -61,13 +61,13 @@ export function setReplayGainDb(db: number | null): void {
 }
 
 /** This context is created suspended by default and browsers require an
- *  explicit resume tied to a user gesture — without this, the main
+ *  explicit resume tied to a user gesture - without this, the main
  *  player's audio (routed through this context once initAnalyser runs)
  *  goes completely silent with no error, since .play() on the element
  *  still succeeds even though the graph it feeds into isn't running.
  *  Called from audioStore.play() itself, synchronously, so the resume
  *  request happens in the exact same gesture as the click that triggered
- *  playback — the safest possible timing for browser autoplay policy. */
+ *  playback - the safest possible timing for browser autoplay policy. */
 export function resumeAnalyserContextIfNeeded(): void {
   if (ctx && ctx.state === "suspended") {
     ctx.resume().catch((err) => console.error("Failed to resume analyser audio context:", err));

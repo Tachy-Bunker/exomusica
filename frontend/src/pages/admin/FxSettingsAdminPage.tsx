@@ -48,14 +48,14 @@ export function FxSettingsAdminPage() {
     <div>
       <h1>Spacemap field</h1>
       <p style={{ color: "var(--text-dim)", maxWidth: 500 }}>
-        Controls for the Entoptic Cemetery background — the fold/interference field, wardens, static, and
+        Controls for the Entoptic Cemetery background - the fold/interference field, wardens, static, and
         chromatic aberration on the homepage spacemap. Changes apply site-wide for every visitor.
       </p>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: "0.8rem", maxWidth: 900 }}>
         {SLIDERS.map((s) => (
           <div className="field" key={s.key}>
             <label>
-              {s.label} — {settings[s.key]}
+              {s.label} - {settings[s.key]}
             </label>
             <input
               type="range"

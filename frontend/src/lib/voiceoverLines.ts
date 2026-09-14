@@ -3,7 +3,7 @@ export interface VoiceoverLine {
   text: string;
 }
 
-// Matches lines like "<2.3> This is line one" — falls back to treating an
+// Matches lines like "<2.3> This is line one" - falls back to treating an
 // unmatched line as plain text shown for a default duration, so existing
 // plain voiceover text (no timing syntax) still works.
 const LINE_PATTERN = /^<([\d.]+)>\s*(.*)$/;

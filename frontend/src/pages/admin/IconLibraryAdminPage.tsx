@@ -40,7 +40,7 @@ export function IconLibraryAdminPage() {
       <h1>Icon Library</h1>
       <p style={{ fontSize: "0.85rem", color: "var(--text-dim)" }}>
         Upload named SVG/PNG icons once here, then pick from this list when adding or editing a link on any album or
-        collaborator page — useful for streaming service logos (Spotify, YouTube, Bandcamp, etc).
+        collaborator page - useful for streaming service logos (Spotify, YouTube, Bandcamp, etc).
       </p>
 
       <div className="field" style={{ display: "flex", gap: "0.5rem", alignItems: "flex-end", marginBottom: "1.5rem" }}>

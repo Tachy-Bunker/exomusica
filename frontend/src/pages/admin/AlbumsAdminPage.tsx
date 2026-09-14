@@ -322,10 +322,10 @@ export function AlbumsAdminPage() {
         </p>
         <div style={{ display: "flex", gap: "0.5rem" }}>
           <select value={duplicateSourceId} onChange={(e) => setDuplicateSourceId(e.target.value ? Number(e.target.value) : "")} style={{ flex: 1 }}>
-            <option value="">— select a community album —</option>
+            <option value="">- select a community album -</option>
             {communityAlbums.map((a) => (
               <option key={a.id} value={a.id}>
-                {a.title} — {a.owner}
+                {a.title} - {a.owner}
               </option>
             ))}
           </select>
@@ -401,14 +401,14 @@ export function AlbumsAdminPage() {
                 />
               </div>
               <div className="field">
-                <label>Page content (markdown — text, images, embeds)</label>
+                <label>Page content (markdown - text, images, embeds)</label>
                 <textarea
                   ref={contentTextareaRef}
                   rows={6}
                   style={{ width: "100%" }}
                   value={albumEditForm.contentMarkdown}
                   onChange={(e) => setAlbumEditForm((f) => ({ ...f, contentMarkdown: e.target.value }))}
-                  placeholder="Optional — shown on the album's public page"
+                  placeholder="Optional - shown on the album's public page"
                 />
                 <input type="file" accept="image/*,audio/*,video/*" onChange={handleContentMediaUpload} style={{ fontSize: "0.75rem" }} />
               </div>
@@ -427,7 +427,7 @@ export function AlbumsAdminPage() {
             <div style={{ marginBottom: "1rem" }}>
               <p style={{ fontSize: "0.85rem", color: "var(--text-dim)", marginBottom: "0.3rem" }}>
                 {detail.composer}
-                {detail.description ? ` — ${detail.description}` : ""}
+                {detail.description ? ` - ${detail.description}` : ""}
               </p>
               <button className="btn" onClick={startEditAlbumInfo}>
                 Edit title / composer / description
@@ -482,7 +482,7 @@ export function AlbumsAdminPage() {
               <div key={l.id} style={{ display: "flex", gap: "0.5rem", alignItems: "center", marginBottom: "0.4rem" }}>
                 {currentIconUrl && <img src={currentIconUrl} alt="" style={{ width: 20, height: 20, objectFit: "contain" }} />}
                 <span style={{ fontSize: "0.85rem" }}>
-                  {l.label} — <span style={{ color: "var(--text-dim)" }}>{l.url}</span>
+                  {l.label} - <span style={{ color: "var(--text-dim)" }}>{l.url}</span>
                 </span>
                 <select
                   value={l.linkIconId ?? ""}
@@ -697,7 +697,7 @@ export function AlbumsAdminPage() {
                 </option>
                 {collaborators.map((c) => (
                   <option key={c.id} value={c.id}>
-                    {c.name} — {c.role}
+                    {c.name} - {c.role}
                   </option>
                 ))}
               </select>

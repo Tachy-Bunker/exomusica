@@ -36,17 +36,17 @@ export const FX_DEFAULTS = {
 export type FxSettings = typeof FX_DEFAULTS;
 
 /** Shared mutable pointer ref, updated once per frame by whoever owns the
- *  crosshair — step 3 of the migration wires the spacemap reticle into this
+ *  crosshair - step 3 of the migration wires the spacemap reticle into this
  *  instead of the field running its own lerp. Exported so that component
  *  can reach in without needing this hook to know about it. */
 export const pointerRef = { x: 0, y: 0 };
 
 /** Camera pan offset (CSS px), same convention as the spacemap's own
- *  cameraRef — feeding this into the field makes it navigable via the
+ *  cameraRef - feeding this into the field makes it navigable via the
  *  existing WASD/joystick controls instead of a static background. */
 export const cameraOffsetRef = { x: 0, y: 0 };
 
-/** Bridge to the WardenSystem instance living inside this hook's effect —
+/** Bridge to the WardenSystem instance living inside this hook's effect -
  *  the spacemap's own physics tick loop already computes per-node screen
  *  positions for hit-testing/lock-on, this lets it push those straight
  *  into the wardens without either side needing to know the other's
@@ -77,7 +77,7 @@ export function useSpacemapField(settings: FxSettings = FX_DEFAULTS) {
     const seed = (Math.random() * 0xffffffff) >>> 0;
     const field = new FieldRenderer(fieldCanvas);
     const wardens = new WardenSystem(wardenCanvas, seed);
-    // No initial random set — bindToBranches (called by the spacemap as
+    // No initial random set - bindToBranches (called by the spacemap as
     // soon as its branch list loads) populates wardens 1:1 with branches.
     // Warden count is never independently admin-configurable.
     wardenBridge.bindToBranches = (branches) => wardens.bindToBranches(branches);

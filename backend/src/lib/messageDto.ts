@@ -7,7 +7,7 @@ type LinkableAuthor = Pick<User, "username" | "avatarUrl" | "isGhost" | "linkedU
 };
 
 /** Resolves a message's displayed author through a ghost's link, if one is
- *  set — a persistent mapping (not a one-time backfill), so this same
+ *  set - a persistent mapping (not a one-time backfill), so this same
  *  resolution keeps working for messages a future Discord bot bridge
  *  creates under the ghost's discordId, without needing per-message
  *  reassignment. */

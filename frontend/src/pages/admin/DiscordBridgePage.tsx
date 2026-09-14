@@ -14,8 +14,8 @@ export function DiscordBridgePage() {
   const [announceSaved, setAnnounceSaved] = useState(false);
 
   const EVENT_OPTIONS: { key: string; label: string }[] = [
-    { key: "join_applied", label: '"{username} applied!" — someone submits a join request' },
-    { key: "join_approved", label: '"{username} approved for Exomusical experiments!" — a request is approved' },
+    { key: "join_applied", label: '"{username} applied!" - someone submits a join request' },
+    { key: "join_approved", label: '"{username} approved for Exomusical experiments!" - a request is approved' },
     { key: "news_published", label: "A News post is announced to subscribers" },
     { key: "calls_for_artists", label: "A Call for Artists is broadcast" },
     { key: "calls_for_ideas", label: "A Call for Ideas is broadcast" },
@@ -92,14 +92,14 @@ export function DiscordBridgePage() {
       <p style={{ color: "var(--text-dim)", fontSize: "0.9rem" }}>
         Bridges a forum topic to a Discord channel, both ways. Website messages post to Discord as a webhook message
         named "{"{username}"} | Exo-API" (if you set a webhook below for that topic) or a plain bot message prefixed
-        with "{"{username}"}: " otherwise. Discord messages import back as a ghost account — link one to a real
+        with "{"{username}"}: " otherwise. Discord messages import back as a ghost account - link one to a real
         account from Users, same as a CSV import.
       </p>
 
       <div className="field">
         <label>Bot token</label>
         <p style={{ fontSize: "0.8rem", color: "var(--text-dim)" }}>
-          Currently {tokenSet ? "configured" : "not set — the bridge is inactive"}. Create a bot at{" "}
+          Currently {tokenSet ? "configured" : "not set - the bridge is inactive"}. Create a bot at{" "}
           <a href="https://discord.com/developers/applications" target="_blank" rel="noreferrer">
             discord.com/developers/applications
           </a>
@@ -117,17 +117,17 @@ export function DiscordBridgePage() {
             Save
           </button>
         </div>
-        {saved && <span style={{ fontSize: "0.85rem", color: "var(--accent-audio)" }}>Saved ✓ — reconnecting…</span>}
+        {saved && <span style={{ fontSize: "0.85rem", color: "var(--accent-audio)" }}>Saved ✓ - reconnecting…</span>}
       </div>
 
       <p style={{ fontSize: "0.85rem", color: "var(--text-dim)", marginTop: "1.5rem" }}>
-        Connect individual topics to Discord channels from the Forum topics page — each topic's edit form has
+        Connect individual topics to Discord channels from the Forum topics page - each topic's edit form has
         "Discord channel ID" and an optional "Discord webhook URL" field. Forwarded messages borrow the sender's
         real Discord avatar automatically, if they've set a Discord username in their account.
       </p>
       <p style={{ fontSize: "0.8rem", color: "var(--text-dim)" }}>
         DMs and avatar lookups also need the "Server Members Intent" enabled on the same Bot page as Message
-        Content — without it, username-based lookups (DMs, avatar borrowing) won't find anyone.
+        Content - without it, username-based lookups (DMs, avatar borrowing) won't find anyone.
       </p>
 
       <h2 style={{ fontSize: "1rem", marginTop: "1.5rem" }}>Announcements</h2>
@@ -156,14 +156,14 @@ export function DiscordBridgePage() {
 
       <h2 style={{ fontSize: "1rem", marginTop: "1.5rem" }}>Online presence</h2>
       <p style={{ fontSize: "0.85rem", color: "var(--text-dim)" }}>
-        Discord members who are online (not offline/invisible) count toward the website's own online-user count —
+        Discord members who are online (not offline/invisible) count toward the website's own online-user count -
         blended into the total, never shown or labeled separately. Requires the "Presence Intent" enabled on the
         same Bot page as Message Content and Server Members. Leave the channel ID blank to count everyone online in
         the server; set it to only count members who can see that specific channel.
       </p>
       <div className="field" style={{ maxWidth: 420 }}>
         <label>Presence channel ID (optional)</label>
-        <input placeholder="Discord channel ID — leave blank for the whole server" value={presenceChannelId} onChange={(e) => setPresenceChannelId(e.target.value)} />
+        <input placeholder="Discord channel ID - leave blank for the whole server" value={presenceChannelId} onChange={(e) => setPresenceChannelId(e.target.value)} />
       </div>
       <button className="btn btn-primary" onClick={savePresenceChannel} style={{ marginTop: "0.5rem" }}>
         Save presence settings

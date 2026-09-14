@@ -344,13 +344,13 @@ export function FontsAdminPage() {
       <h1>Fonts &amp; Misc</h1>
       <p style={{ color: "var(--text-dim)", fontSize: "0.9rem" }}>
         Upload OTF, TTF, WOFF, or WOFF2 files. Once uploaded, assign one to any branch, discussion topic, wiki page,
-        or blog post from that item's edit screen — each picks independently from this library.
+        or blog post from that item's edit screen - each picks independently from this library.
       </p>
 
       <div className="field" style={{ maxWidth: 360 }}>
         <label>Sitewide default font</label>
         <select value={siteDefaultFontId ?? ""} onChange={(e) => setSiteDefault(e.target.value)}>
-          <option value="">— built-in default (Space Grotesk) —</option>
+          <option value="">- built-in default (Space Grotesk) -</option>
           {fonts.map((f) => (
             <option key={f.id} value={f.id}>
               {f.name}
@@ -387,7 +387,7 @@ export function FontsAdminPage() {
       <div className="field" style={{ maxWidth: 420 }}>
         <label>Spacemap scan loop</label>
         <p style={{ fontSize: "0.75rem", color: "var(--text-dim)", marginTop: 0 }}>
-          Loops with a smooth fade in/out while text is being revealed in the homepage spacemap — the branch-lock
+          Loops with a smooth fade in/out while text is being revealed in the homepage spacemap - the branch-lock
           name reveal and the F/E/T action hint. Spacemap only, not used anywhere else.
         </p>
         {scanSfxUrl && (
@@ -409,7 +409,7 @@ export function FontsAdminPage() {
       <div className="field" style={{ maxWidth: 420 }}>
         <label>Link-click sound</label>
         <p style={{ fontSize: "0.75rem", color: "var(--text-dim)", marginTop: 0 }}>
-          Plays whenever the user clicks any hyperlink, site-wide — header nav, external links, spacemap branches,
+          Plays whenever the user clicks any hyperlink, site-wide - header nav, external links, spacemap branches,
           album links from the player.
         </p>
         {linkClickSfxUrl && (
@@ -431,7 +431,7 @@ export function FontsAdminPage() {
       <div className="field" style={{ maxWidth: 420 }}>
         <label>Chat-open sound</label>
         <p style={{ fontSize: "0.75rem", color: "var(--text-dim)", marginTop: 0 }}>
-          Plays once whenever a new chat location (branch or forum topic) is opened — desktop dock or mobile, either
+          Plays once whenever a new chat location (branch or forum topic) is opened - desktop dock or mobile, either
           way.
         </p>
         {chatOpenSfxUrl && (
@@ -472,10 +472,10 @@ export function FontsAdminPage() {
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.6rem" }}>
           <input type="range" min={10} max={100} step={1} value={chatHudRevealRate} onChange={(e) => setChatHudRevealRate(Number(e.target.value))} />
-          <span style={{ fontSize: "0.8rem" }}>Reveal rate — {chatHudRevealRate}ms/letter</span>
+          <span style={{ fontSize: "0.8rem" }}>Reveal rate - {chatHudRevealRate}ms/letter</span>
         </div>
 
-        <label>Splash hints (rotates through these — falls back to "Write a message..." if empty)</label>
+        <label>Splash hints (rotates through these - falls back to "Write a message..." if empty)</label>
         {chatSplashMessages.map((msg, i) => (
           <div key={i} style={{ display: "flex", gap: "0.4rem", marginBottom: "0.2rem" }}>
             <input value={msg} readOnly style={{ flex: 1, fontSize: "0.85rem" }} />
@@ -531,7 +531,7 @@ export function FontsAdminPage() {
       <div className="field" style={{ maxWidth: 420 }}>
         <label>Content text size</label>
         <p style={{ fontSize: "0.75rem", color: "var(--text-dim)", marginTop: 0 }}>
-          Wiki, News, Forums, and the chat toolbar buttons — multiplier over the base size.
+          Wiki, News, Forums, and the chat toolbar buttons - multiplier over the base size.
         </p>
         <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.4rem" }}>
           <input
@@ -542,7 +542,7 @@ export function FontsAdminPage() {
             value={contentTextScaleDesktop}
             onChange={(e) => setContentTextScaleDesktop(Number(e.target.value))}
           />
-          <span style={{ fontSize: "0.8rem" }}>Desktop — {contentTextScaleDesktop.toFixed(1)}x</span>
+          <span style={{ fontSize: "0.8rem" }}>Desktop - {contentTextScaleDesktop.toFixed(1)}x</span>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.4rem" }}>
           <input
@@ -553,7 +553,7 @@ export function FontsAdminPage() {
             value={contentTextScaleMobile}
             onChange={(e) => setContentTextScaleMobile(Number(e.target.value))}
           />
-          <span style={{ fontSize: "0.8rem" }}>Mobile — {contentTextScaleMobile.toFixed(1)}x</span>
+          <span style={{ fontSize: "0.8rem" }}>Mobile - {contentTextScaleMobile.toFixed(1)}x</span>
         </div>
         <button className="btn btn-primary" onClick={saveContentScale}>
           Save text size
@@ -563,15 +563,15 @@ export function FontsAdminPage() {
       <div className="field" style={{ maxWidth: 420 }}>
         <label>Site-wide effects</label>
         <p style={{ fontSize: "0.75rem", color: "var(--text-dim)", marginTop: 0 }}>
-          Chromatic aberration and the moiré generator — both run across the whole site now, not just the spacemap.
+          Chromatic aberration and the moiré generator - both run across the whole site now, not just the spacemap.
         </p>
         <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.3rem" }}>
           <input type="range" min={0} max={1} step={0.01} value={caInitial} onChange={(e) => setCaInitial(Number(e.target.value))} />
-          <span style={{ fontSize: "0.8rem" }}>Aberration initial — {caInitial.toFixed(2)}</span>
+          <span style={{ fontSize: "0.8rem" }}>Aberration initial - {caInitial.toFixed(2)}</span>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.6rem" }}>
           <input type="range" min={0} max={1} step={0.01} value={caBurst} onChange={(e) => setCaBurst(Number(e.target.value))} />
-          <span style={{ fontSize: "0.8rem" }}>Aberration burst — {caBurst.toFixed(2)}</span>
+          <span style={{ fontSize: "0.8rem" }}>Aberration burst - {caBurst.toFixed(2)}</span>
         </div>
 
         <p style={{ fontSize: "0.8rem", fontWeight: 600, marginBottom: "0.3rem" }}>Moiré generator</p>
@@ -591,23 +591,23 @@ export function FontsAdminPage() {
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.3rem" }}>
           <input type="range" min={0} max={1} step={0.01} value={moireOpacity} onChange={(e) => setMoireOpacity(Number(e.target.value))} />
-          <span style={{ fontSize: "0.8rem" }}>Opacity — {moireOpacity.toFixed(2)}</span>
+          <span style={{ fontSize: "0.8rem" }}>Opacity - {moireOpacity.toFixed(2)}</span>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.3rem" }}>
           <input type="range" min={0.2} max={5} step={0.1} value={moireSize} onChange={(e) => setMoireSize(Number(e.target.value))} />
-          <span style={{ fontSize: "0.8rem" }}>Size — {moireSize.toFixed(1)}x</span>
+          <span style={{ fontSize: "0.8rem" }}>Size - {moireSize.toFixed(1)}x</span>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.3rem" }}>
           <input type="range" min={0} max={100} step={1} value={moireOffsetMin} onChange={(e) => setMoireOffsetMin(Number(e.target.value))} />
-          <span style={{ fontSize: "0.8rem" }}>Offset min — {moireOffsetMin}px</span>
+          <span style={{ fontSize: "0.8rem" }}>Offset min - {moireOffsetMin}px</span>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.3rem" }}>
           <input type="range" min={0} max={200} step={1} value={moireOffsetMax} onChange={(e) => setMoireOffsetMax(Number(e.target.value))} />
-          <span style={{ fontSize: "0.8rem" }}>Offset max — {moireOffsetMax}px</span>
+          <span style={{ fontSize: "0.8rem" }}>Offset max - {moireOffsetMax}px</span>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.3rem" }}>
           <input type="range" min={0} max={2} step={0.01} value={moireOffsetSpeed} onChange={(e) => setMoireOffsetSpeed(Number(e.target.value))} />
-          <span style={{ fontSize: "0.8rem" }}>Offset speed — {moireOffsetSpeed.toFixed(2)} Hz</span>
+          <span style={{ fontSize: "0.8rem" }}>Offset speed - {moireOffsetSpeed.toFixed(2)} Hz</span>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.3rem" }}>
           <select value={moireWaveform} onChange={(e) => setMoireWaveform(e.target.value as "sine" | "triangle")}>
@@ -618,7 +618,7 @@ export function FontsAdminPage() {
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.4rem" }}>
           <input type="range" min={0} max={2} step={0.01} value={moireRotationSpeed} onChange={(e) => setMoireRotationSpeed(Number(e.target.value))} />
-          <span style={{ fontSize: "0.8rem" }}>Rotation speed — {moireRotationSpeed.toFixed(2)}/s</span>
+          <span style={{ fontSize: "0.8rem" }}>Rotation speed - {moireRotationSpeed.toFixed(2)}/s</span>
         </div>
         <button className="btn btn-primary" onClick={saveEffects}>
           Save effects
@@ -643,14 +643,14 @@ export function FontsAdminPage() {
         <input placeholder="Username" value={smtpUser} onChange={(e) => setSmtpUser(e.target.value)} style={{ marginBottom: "0.3rem" }} />
         <input
           type="password"
-          placeholder={smtpPasswordSet ? "•••••••• (set — leave blank to keep)" : "Password"}
+          placeholder={smtpPasswordSet ? "•••••••• (set - leave blank to keep)" : "Password"}
           value={smtpPassword}
           onChange={(e) => setSmtpPassword(e.target.value)}
           style={{ marginBottom: "0.3rem" }}
         />
         <input placeholder="From address" value={smtpFrom} onChange={(e) => setSmtpFrom(e.target.value)} style={{ marginBottom: "0.5rem" }} />
         <input
-          placeholder="Display name (e.g. Exomusica) — shown instead of the address's own prefix"
+          placeholder="Display name (e.g. Exomusica) - shown instead of the address's own prefix"
           value={smtpFromName}
           onChange={(e) => setSmtpFromName(e.target.value)}
           style={{ marginBottom: "0.5rem" }}
@@ -670,7 +670,7 @@ export function FontsAdminPage() {
       </div>
 
       <div style={{ display: "flex", gap: "0.5rem", marginBottom: "1rem" }}>
-        <input placeholder="Display name (optional — defaults to filename)" value={name} onChange={(e) => setName(e.target.value)} style={{ flex: 1 }} />
+        <input placeholder="Display name (optional - defaults to filename)" value={name} onChange={(e) => setName(e.target.value)} style={{ flex: 1 }} />
         <input ref={fileInputRef} type="file" accept=".otf,.ttf,.woff,.woff2" />
         <button className="btn btn-primary" onClick={handleUpload}>
           Upload

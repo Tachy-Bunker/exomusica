@@ -108,7 +108,7 @@ export function EmailTemplatesAdminPage() {
       <h2 style={{ fontSize: "1rem" }}>Send a broadcast</h2>
       <p style={{ fontSize: "0.85rem", color: "var(--text-dim)" }}>
         Goes to every member with that notification type enabled. Uses the CALL_FOR_IDEAS / CALL_FOR_ARTISTS
-        template above for the wrapping — subject and body here fill its {"{{subject}}"} / {"{{body}}"} tokens.
+        template above for the wrapping - subject and body here fill its {"{{subject}}"} / {"{{body}}"} tokens.
       </p>
       <div className="field">
         <select value={broadcast.type} onChange={(e) => setBroadcast((b) => ({ ...b, type: e.target.value }))}>

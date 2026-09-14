@@ -7,7 +7,7 @@ import { playOneShotSfx } from "./oneShotSfx";
 interface VolumeMixerState {
   notifications: number; // 0..1
   sfxIdle: number; // SFX volume when nothing is playing
-  sfxPlaying: number; // SFX volume while music is playing — ducked
+  sfxPlaying: number; // SFX volume while music is playing - ducked
   music: number;
   loaded: boolean;
   load: () => Promise<void>;
@@ -44,7 +44,7 @@ export const useVolumeMixerStore = create<VolumeMixerState>((set, get) => ({
   },
 }));
 
-/** The SFX volume to actually use right now — idle or ducked, depending on
+/** The SFX volume to actually use right now - idle or ducked, depending on
  *  whether a track is currently playing. Every SFX call site should read
  *  this instead of a single flat value. */
 export function getCurrentSfxVolume(): number {

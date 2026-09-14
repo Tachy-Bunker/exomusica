@@ -1,5 +1,5 @@
 // Extracted verbatim from the Entoptic Cemetery prototype. Do not "clean up"
-// or reformat the GLSL here — every constant and term was tuned by eye in
+// or reformat the GLSL here - every constant and term was tuned by eye in
 // the original, and this file exists specifically so the math stays
 // byte-for-byte what was verified working there.
 
@@ -232,7 +232,7 @@ void main(){
 }
 `;
 
-// Foreground overlay: TV static snow. Ported here 1:1 for step 1 parity —
+// Foreground overlay: TV static snow. Ported here 1:1 for step 1 parity -
 // step 4 of the migration plan replaces this WebGL pass with a CSS tiled
 // texture and deletes the canvas that uses it, but until that step lands
 // this needs to exist and behave exactly like the prototype's.

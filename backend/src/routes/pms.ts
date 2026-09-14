@@ -7,7 +7,7 @@ import { createNotification } from "../lib/notify.js";
 
 export async function pmRoutes(app: FastifyInstance): Promise<void> {
   // One row per conversation partner, most recent message first. Grouped
-  // in JS rather than SQL — the conversation count per user is small
+  // in JS rather than SQL - the conversation count per user is small
   // enough that this isn't worth a window-function query yet.
   app.get("/api/pms", { preHandler: requireAuth }, async (req) => {
     const me = req.user!.id;
