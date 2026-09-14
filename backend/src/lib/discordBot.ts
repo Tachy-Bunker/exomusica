@@ -5,6 +5,7 @@ import { toDayKey } from "./dayKey.js";
 import { broadcast } from "./chatHub.js";
 import { toMessageDTO } from "./messageDto.js";
 import { resolveMentions, translateMentionsFromDiscord } from "./mentions.js";
+import { setDiscordOnlineCount } from "./presence.js";
 import { createNotification } from "./notify.js";
 import { saveMessageAttachment } from "./storage.js";
 
@@ -217,6 +218,21 @@ export async function sendDiscordAnnouncement(event: AnnouncementEvent, message:
   }
 }
 
+/** Triggers Discord's native typing indicator in the given channel — this
+ *  necessarily shows as the bot typing, not the specific website user,
+ *  since Discord's API has no concept of "a webhook-impersonated user is
+ *  typing"; sendTyping() only works for the bot's own identity. Lasts
+ *  about 10 seconds on Discord's side per call. */
+export async function triggerDiscordTyping(discordChannelId: string): Promise<void> {
+  if (!client) return;
+  try {
+    const channel = await client.channels.fetch(discordChannelId);
+    if (channel?.isTextBased() && "sendTyping" in channel) await channel.sendTyping();
+  } catch (err) {
+    console.error("Discord bridge: failed to send typing indicator:", err);
+  }
+}
+
 export async function forwardMessageToDiscord(
   channelSlug: string,
   authorUsername: string,
@@ -317,6 +333,7 @@ export async function initDiscordBot(): Promise<void> {
     }
     connectionStatus = "disconnected";
     lastError = null;
+    setDiscordOnlineCount(0);
     console.log("Discord bridge: no token configured, bridge inactive.");
     return;
   }
@@ -331,8 +348,28 @@ export async function initDiscordBot(): Promise<void> {
   connectionStatus = "connecting";
 
   const newClient = new Client({
-    intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages, GatewayIntentBits.MessageContent, GatewayIntentBits.GuildMembers],
+    intents: [
+      GatewayIntentBits.Guilds,
+      GatewayIntentBits.GuildMessages,
+      GatewayIntentBits.MessageContent,
+      GatewayIntentBits.GuildMembers,
+      GatewayIntentBits.GuildPresences,
+      GatewayIntentBits.GuildMessageTyping,
+    ],
     partials: [Partials.Message, Partials.Channel],
+  });
+
+  newClient.on("typingStart", (typing) => {
+    if (typing.user.bot) return; // don't bridge the bot's own typing signal back to itself
+    void (async () => {
+      try {
+        const channel = await prisma.forumChannel.findFirst({ where: { discordChannelId: typing.channel.id }, select: { slug: true } });
+        if (!channel) return;
+        broadcast(channel.slug, { type: "typing", username: typing.user.username });
+      } catch (err) {
+        console.error("Discord bridge: failed to relay typing indicator to the website:", err);
+      }
+    })();
   });
 
   newClient.on("messageCreate", (message) => {
@@ -358,6 +395,42 @@ export async function initDiscordBot(): Promise<void> {
     connectionStatus = "disconnected";
     console.warn("Discord bridge: shard disconnected.");
   });
+
+  // Blends Discord's own online-member count into the website's presence
+  // count — deliberately never exposed or labeled as Discord-sourced
+  // anywhere, per an explicit choice not to reveal where any of it came
+  // from. presenceUpdate fires very frequently in an active server, so
+  // this is debounced rather than recomputing on every single event.
+  let presenceDebounce: ReturnType<typeof setTimeout> | null = null;
+  async function refreshDiscordOnlineCount() {
+    if (presenceDebounce) clearTimeout(presenceDebounce);
+    presenceDebounce = setTimeout(async () => {
+      try {
+        const settings = await prisma.siteSettings.findUnique({ where: { id: 1 } });
+        const guild = newClient.guilds.cache.first();
+        if (!guild) return;
+        const members = await guild.members.fetch();
+        const channelId = settings?.discordPresenceChannelId;
+        const channel = channelId ? await guild.channels.fetch(channelId).catch(() => null) : null;
+        let count = 0;
+        for (const member of members.values()) {
+          if (member.user.bot) continue;
+          const status = member.presence?.status;
+          if (!status || status === "offline" || status === "invisible") continue;
+          if (channel && channel.isTextBased() && "permissionsFor" in channel) {
+            const perms = channel.permissionsFor(member);
+            if (!perms?.has("ViewChannel")) continue;
+          }
+          count++;
+        }
+        setDiscordOnlineCount(count);
+      } catch (err) {
+        console.error("Discord bridge: failed to compute online presence count:", err);
+      }
+    }, 5000);
+  }
+  newClient.on("presenceUpdate", () => void refreshDiscordOnlineCount());
+  newClient.once("ready", () => void refreshDiscordOnlineCount());
 
   try {
     await newClient.login(token);

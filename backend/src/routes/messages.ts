@@ -9,7 +9,7 @@ import { createNotification } from "../lib/notify.js";
 import { resolveMentions, translateMentionsForDiscord } from "../lib/mentions.js";
 import { parseSearchQuery } from "../lib/searchQuery.js";
 import { walkChannelHistoryInChunks } from "../lib/messageChunking.js";
-import { forwardMessageToDiscord, sendDiscordDM } from "../lib/discordBot.js";
+import { forwardMessageToDiscord, sendDiscordDM, triggerDiscordTyping } from "../lib/discordBot.js";
 
 const messageInclude = {
   author: { select: { username: true, avatarUrl: true, isGhost: true, discordUsername: true, discordUserId: true, linkedUserId: true, linkedUser: { select: { username: true, avatarUrl: true } } } },
@@ -151,6 +151,8 @@ export async function messageRoutes(app: FastifyInstance): Promise<void> {
   // forever to everyone else).
   app.post<{ Params: { slug: string } }>("/api/channels/:slug/typing", { preHandler: requireAuth }, async (req, reply) => {
     broadcast(req.params.slug, { type: "typing", username: req.user!.username });
+    const channel = await prisma.forumChannel.findUnique({ where: { slug: req.params.slug }, select: { discordChannelId: true } });
+    if (channel?.discordChannelId) void triggerDiscordTyping(channel.discordChannelId);
     return reply.code(204).send();
   });
 

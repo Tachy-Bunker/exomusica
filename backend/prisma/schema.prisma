@@ -651,6 +651,7 @@ model SiteSettings {
   categoryOrder      Json?   // string[] — admin-controlled forum topic category display order
   discordBotToken    String? // Discord bot token — the bridge is inactive if this is unset
   discordAnnounceChannelId String? // channel the bot posts admin-selected announcements to, as itself (Exo-API)
+  discordPresenceChannelId String? // if set, only guild members who can see this channel count toward online presence; if unset, all online guild members do
   discordAnnounceEvents    Json?   // string[] — which event types are enabled, e.g. ["join_applied","join_approved","news_published","calls_for_artists","calls_for_ideas"]
   faviconUrl         String? // site-wide favicon
   ogHomepageTitle       String?

@@ -7,6 +7,8 @@ import { useProfileStore } from "../lib/profileStore";
 import { Avatar } from "../components/Avatar";
 import { useVolumeMixerStore } from "../lib/volumeMixerStore";
 import { useSiteEffectsStore } from "../lib/siteEffectsStore";
+import { compressImageToMaxSize } from "../lib/compressImage";
+import { useSavedFeedback } from "../lib/useSavedFeedback";
 
 interface FollowedChannel {
   slug: string;
@@ -73,6 +75,7 @@ export function AccountSettingsPage() {
   const [profileSaved, setProfileSaved] = useState(false);
   const mixer = useVolumeMixerStore();
   const [mixerSaved, setMixerSaved] = useState(false);
+  const discordFeedback = useSavedFeedback();
 
   async function saveMixer() {
     await mixer.save();
@@ -118,11 +121,15 @@ export function AccountSettingsPage() {
   }
 
   async function uploadAvatar() {
-    const file = avatarInputRef.current?.files?.[0];
+    let file = avatarInputRef.current?.files?.[0];
     if (!file) return;
-    if (file.size > 1024 * 1024) {
-      setAvatarError("Image must be 1MB or smaller.");
-      return;
+    const MAX_BYTES = 1024 * 1024;
+    if (file.size > MAX_BYTES) {
+      file = await compressImageToMaxSize(file, MAX_BYTES);
+      if (file.size > MAX_BYTES) {
+        setAvatarError("Image must be 1MB or smaller — couldn't compress it enough automatically.");
+        return;
+      }
     }
     setAvatarError(null);
     const formData = new FormData();
@@ -357,8 +364,12 @@ export function AccountSettingsPage() {
           placeholder="e.g. 259653581316161536"
           value={me.discordUserId ?? ""}
           onChange={(e) => setMe({ ...me, discordUserId: e.target.value })}
-          onBlur={() => api("/api/account/notifications", { method: "PATCH", body: JSON.stringify({ discordUserId: me.discordUserId || null }) })}
+          onBlur={async () => {
+            await api("/api/account/notifications", { method: "PATCH", body: JSON.stringify({ discordUserId: me.discordUserId || null }) });
+            discordFeedback.flash();
+          }}
         />
+        {discordFeedback.saved && <span style={{ fontSize: "0.8rem", color: "var(--accent-audio)" }}>Saved ✓</span>}
         <p style={{ fontSize: "0.75rem", color: "var(--text-dim)", marginTop: "0.2rem" }}>
           In Discord: User Settings → Advanced → enable Developer Mode, then right-click your own name → Copy User
           ID.
@@ -370,8 +381,12 @@ export function AccountSettingsPage() {
           placeholder="e.g. tachy_bunker"
           value={me.discordUsername ?? ""}
           onChange={(e) => setMe({ ...me, discordUsername: e.target.value })}
-          onBlur={() => api("/api/account/notifications", { method: "PATCH", body: JSON.stringify({ discordUsername: me.discordUsername || null }) })}
+          onBlur={async () => {
+            await api("/api/account/notifications", { method: "PATCH", body: JSON.stringify({ discordUsername: me.discordUsername || null }) });
+            discordFeedback.flash();
+          }}
         />
+        {discordFeedback.saved && <span style={{ fontSize: "0.8rem", color: "var(--accent-audio)" }}>Saved ✓</span>}
         <p style={{ fontSize: "0.75rem", color: "var(--text-dim)", marginTop: "0.2rem" }}>
           Only used if no ID is set above — requires being in a Discord server the bot is also in.
         </p>

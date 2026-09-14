@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { api } from "../lib/api";
 import { useAuth } from "../lib/auth";
 import { useDocumentTitle } from "../lib/useDocumentTitle";
+import { useToastStore } from "../lib/toastStore";
 
 interface MyAlbum {
   id: number;
@@ -158,6 +159,7 @@ export function MyMusicPage() {
       body: JSON.stringify({ title: editTitle.trim(), composer: editComposer.trim() || null }),
     });
     setEditingTrackId(null);
+    useToastStore.getState().showToast("Saved ✓");
     const album = albums.find((a) => a.id === albumId);
     if (album) openAlbumManage(album);
   }
@@ -174,6 +176,7 @@ export function MyMusicPage() {
     try {
       await api(`/api/community-albums/${albumId}/cover`, { method: "POST", body: formData });
       if (coverInputRef.current) coverInputRef.current.value = "";
+      useToastStore.getState().showToast("Cover saved ✓");
       loadAlbums();
     } finally {
       setCoverUploadingAlbumId(null);

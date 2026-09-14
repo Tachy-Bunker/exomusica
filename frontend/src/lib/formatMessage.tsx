@@ -99,9 +99,23 @@ function renderInline(
     else if (userId !== undefined) {
       const resolved = mentionCache?.get(userId);
       nodes.push(
-        <span key={key} className="mention" title={resolved ? undefined : "Not yet resolved"}>
-          @{resolved ? resolved.username : userId}
-        </span>,
+        resolved ? (
+          <span
+            key={key}
+            className="mention"
+            style={{ cursor: "pointer" }}
+            onClick={(e) => {
+              e.preventDefault();
+              onLinkClick?.(`/u/${resolved.username}`);
+            }}
+          >
+            @{resolved.username}
+          </span>
+        ) : (
+          <span key={key} className="mention" title="Not yet resolved">
+            @{userId}
+          </span>
+        ),
       );
     }
     else if (channelId !== undefined)

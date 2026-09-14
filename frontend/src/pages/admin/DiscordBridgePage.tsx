@@ -8,6 +8,8 @@ export function DiscordBridgePage() {
   const [newToken, setNewToken] = useState("");
   const [saved, setSaved] = useState(false);
   const [announceChannelId, setAnnounceChannelId] = useState("");
+  const [presenceChannelId, setPresenceChannelId] = useState("");
+  const [presenceSaved, setPresenceSaved] = useState(false);
   const [announceEvents, setAnnounceEvents] = useState<string[]>([]);
   const [announceSaved, setAnnounceSaved] = useState(false);
 
@@ -26,12 +28,14 @@ export function DiscordBridgePage() {
       lastError: string | null;
       discordAnnounceChannelId: string | null;
       discordAnnounceEvents: string[];
+      discordPresenceChannelId: string | null;
     }>("/api/admin/discord-bridge/status").then((s) => {
       setTokenSet(s.discordBotTokenSet);
       setStatus(s.status);
       setLastError(s.lastError);
       setAnnounceChannelId(s.discordAnnounceChannelId ?? "");
       setAnnounceEvents(s.discordAnnounceEvents ?? []);
+      setPresenceChannelId(s.discordPresenceChannelId ?? "");
     });
   }
 
@@ -60,6 +64,12 @@ export function DiscordBridgePage() {
     });
     setAnnounceSaved(true);
     setTimeout(() => setAnnounceSaved(false), 2000);
+  }
+
+  async function savePresenceChannel() {
+    await api("/api/admin/site-settings", { method: "PATCH", body: JSON.stringify({ discordPresenceChannelId: presenceChannelId || null }) });
+    setPresenceSaved(true);
+    setTimeout(() => setPresenceSaved(false), 2000);
   }
 
   const statusColor = status === "connected" ? "var(--accent-audio)" : status === "connecting" ? "var(--text-dim)" : "var(--accent-danger)";
@@ -143,6 +153,22 @@ export function DiscordBridgePage() {
         Save announcement settings
       </button>
       {announceSaved && <span style={{ marginLeft: "0.6rem", fontSize: "0.85rem", color: "var(--accent-audio)" }}>Saved ✓</span>}
+
+      <h2 style={{ fontSize: "1rem", marginTop: "1.5rem" }}>Online presence</h2>
+      <p style={{ fontSize: "0.85rem", color: "var(--text-dim)" }}>
+        Discord members who are online (not offline/invisible) count toward the website's own online-user count —
+        blended into the total, never shown or labeled separately. Requires the "Presence Intent" enabled on the
+        same Bot page as Message Content and Server Members. Leave the channel ID blank to count everyone online in
+        the server; set it to only count members who can see that specific channel.
+      </p>
+      <div className="field" style={{ maxWidth: 420 }}>
+        <label>Presence channel ID (optional)</label>
+        <input placeholder="Discord channel ID — leave blank for the whole server" value={presenceChannelId} onChange={(e) => setPresenceChannelId(e.target.value)} />
+      </div>
+      <button className="btn btn-primary" onClick={savePresenceChannel} style={{ marginTop: "0.5rem" }}>
+        Save presence settings
+      </button>
+      {presenceSaved && <span style={{ marginLeft: "0.6rem", fontSize: "0.85rem", color: "var(--accent-audio)" }}>Saved ✓</span>}
     </div>
   );
 }

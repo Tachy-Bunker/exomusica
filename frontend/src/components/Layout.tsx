@@ -37,6 +37,7 @@ import { useChatDockStore } from "../lib/chatDockStore";
 import { usePresenceStore } from "../lib/presenceStore";
 import { useChatPipStore } from "../lib/chatPipStore";
 import { PopoutChatContent } from "./PopoutChatContent";
+import { Toast } from "./Toast";
 import { createPortal } from "react-dom";
 import { useIsDesktop } from "../lib/useIsDesktop";
 import { ChatDock } from "./ChatDock";
@@ -354,6 +355,7 @@ export function Layout() {
       <PlayerBar />
       <ChatDock />
       <div className="crt-overlay" />
+      <Toast />
       {pipWindow && createPortal(<PopoutChatContent />, pipWindow.document.body)}
     </div>
   );

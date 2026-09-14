@@ -164,6 +164,7 @@ export async function siteSettingsRoutes(app: FastifyInstance): Promise<void> {
     return {
       discordBotTokenSet: !!settings?.discordBotToken,
       discordAnnounceChannelId: settings?.discordAnnounceChannelId ?? null,
+      discordPresenceChannelId: settings?.discordPresenceChannelId ?? null,
       discordAnnounceEvents: settings?.discordAnnounceEvents ?? [],
       ...getDiscordBridgeStatus(),
     };
@@ -235,6 +236,7 @@ export async function siteSettingsRoutes(app: FastifyInstance): Promise<void> {
       categoryOrder: string[];
       discordBotToken: string | null;
       discordAnnounceChannelId: string | null;
+      discordPresenceChannelId: string | null;
       discordAnnounceEvents: string[];
       ogHomepageTitle: string | null;
       ogHomepageDescription: string | null;
@@ -292,6 +294,7 @@ export async function siteSettingsRoutes(app: FastifyInstance): Promise<void> {
       "categoryOrder",
       "discordBotToken",
       "discordAnnounceChannelId",
+      "discordPresenceChannelId",
       "discordAnnounceEvents",
       "ogHomepageTitle",
       "ogHomepageDescription",
