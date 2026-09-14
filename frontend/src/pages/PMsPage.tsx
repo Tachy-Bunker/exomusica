@@ -3,6 +3,7 @@ import { useParams, Link, useNavigate } from "react-router-dom";
 import { api } from "../lib/api";
 import { AttachmentPreview } from "../components/AttachmentPreview";
 import { renderMessageContent } from "../lib/formatMessage";
+import { useMentionResolutionStore } from "../lib/mentionResolutionStore";
 
 interface Conversation {
   partner: string;
@@ -24,6 +25,13 @@ export function PMsPage() {
   const navigate = useNavigate();
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [thread, setThread] = useState<ThreadMessage[]>([]);
+  const mentionCache = useMentionResolutionStore((s) => s.cache);
+  const resolveMentions = useMentionResolutionStore((s) => s.resolve);
+
+  useEffect(() => {
+    const ids = thread.flatMap((m) => [...m.contentRaw.matchAll(/<@(\d+)>/g)].map((match) => match[1]));
+    if (ids.length > 0) resolveMentions(ids);
+  }, [thread, resolveMentions]);
   const [draft, setDraft] = useState("");
   const [pendingAttachments, setPendingAttachments] = useState<{ id: number; filename: string }[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -104,7 +112,7 @@ export function PMsPage() {
                     maxWidth: "70%",
                   }}
                 >
-                  {renderMessageContent(m.contentRaw, navigate)}
+                  {renderMessageContent(m.contentRaw, navigate, mentionCache)}
                   {m.attachments.map((a) => (
                     <AttachmentPreview key={a.id} attachment={a} />
                   ))}

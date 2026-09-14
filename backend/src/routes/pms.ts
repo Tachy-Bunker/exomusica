@@ -3,6 +3,7 @@ import { prisma } from "../lib/prisma.js";
 import { requireAuth } from "../lib/auth.js";
 import { sendTemplatedMail } from "../lib/emailTemplates.js";
 import { sendDiscordDM } from "../lib/discordBot.js";
+import { createNotification } from "../lib/notify.js";
 
 export async function pmRoutes(app: FastifyInstance): Promise<void> {
   // One row per conversation partner, most recent message first. Grouped
@@ -86,6 +87,14 @@ export async function pmRoutes(app: FastifyInstance): Promise<void> {
       }
 
       const sender = await prisma.user.findUnique({ where: { id: req.user!.id } });
+      void createNotification(
+        other.id,
+        "pm",
+        `${sender?.username ?? "Someone"} sent you a message`,
+        (contentRaw || "(attachment)").slice(0, 120),
+        { channelSlug: sender?.username },
+      ).catch((err) => app.log.error(err, "PM createNotification failed"));
+
       if (other.notifyPrivateMessage && other.email) {
         void sendTemplatedMail("PRIVATE_MESSAGE", other.email, other.username, {
           senderUsername: sender?.username ?? "Someone",

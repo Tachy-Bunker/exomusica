@@ -978,9 +978,10 @@ th {
 
 .space-compass-arrow {
   position: absolute;
-  color: var(--accent-forum);
+  color: var(--accent-forum-dim);
+  opacity: 0.55;
   font-size: 1.1rem;
-  text-shadow: 0 0 6px var(--accent-forum);
+  text-shadow: 0 0 6px var(--accent-forum-dim);
   pointer-events: none;
   z-index: 3;
 }

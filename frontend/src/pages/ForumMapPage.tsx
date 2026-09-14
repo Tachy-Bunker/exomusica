@@ -1,10 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { api } from "../lib/api";
+import { renderMessageContent } from "../lib/formatMessage";
 import { useIsDesktop } from "../lib/useIsDesktop";
 import { useChatDockStore } from "../lib/chatDockStore";
 import { isTypingTarget } from "../lib/isTypingTarget";
 import { getRMS } from "../lib/audioAnalyser";
+import { useMentionResolutionStore } from "../lib/mentionResolutionStore";
 
 interface MapNode {
   id: number;
@@ -114,6 +116,8 @@ export function ForumMapPage() {
   const [fireflySpeed, setFireflySpeed] = useState(1);
   const [activeNodeId, setActiveNodeId] = useState<number | null>(null);
   const [preview, setPreview] = useState<PreviewMessage[]>([]);
+  const mentionCache = useMentionResolutionStore((s) => s.cache);
+  const resolveMentions = useMentionResolutionStore((s) => s.resolve);
   const containerRef = useRef<HTMLDivElement>(null);
   const reticleRef = useRef<HTMLDivElement>(null);
   const dragState = useRef<{ startClientX: number; startClientY: number; panX: number; panY: number; moved: boolean; startNodeId: number | null } | null>(null);
@@ -205,8 +209,12 @@ export function ForumMapPage() {
       setPreview([]);
       return;
     }
-    api<PreviewMessage[]>(`/api/channels/${activeNode.channel.slug}/messages?limit=4`).then(setPreview);
-  }, [activeNode]);
+    api<PreviewMessage[]>(`/api/channels/${activeNode.channel.slug}/messages?limit=4`).then((msgs) => {
+      setPreview(msgs);
+      const ids = msgs.flatMap((m) => [...m.contentRaw.matchAll(/<@(\d+)>/g)].map((match) => match[1]));
+      if (ids.length > 0) resolveMentions(ids);
+    });
+  }, [activeNode, resolveMentions]);
 
   const previewScrollRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -727,7 +735,7 @@ export function ForumMapPage() {
                       ) : (
                         [...preview].reverse().map((m) => (
                           <div key={m.id} style={{ marginBottom: "0.25rem", overflowWrap: "break-word" }}>
-                            <span style={{ color: "var(--accent-audio)" }}>{m.authorUsername}:</span> {m.contentRaw.slice(0, 80)}
+                            <span style={{ color: "var(--accent-audio)" }}>{m.authorUsername}:</span> {renderMessageContent(m.contentRaw, navigate, mentionCache)}
                           </div>
                         ))
                       )}

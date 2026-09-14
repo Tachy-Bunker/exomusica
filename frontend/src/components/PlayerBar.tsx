@@ -308,6 +308,7 @@ export function PlayerBar() {
           ref={overlayRef}
           onMouseDown={handleOverlayDragStart}
           onTouchStart={handleOverlayDragStart}
+          onClick={() => setExpanded(false)}
           style={{
             transform: `translateY(${dragOffset}px)`,
             opacity: 1 - dragOffset / 800,
@@ -340,7 +341,7 @@ export function PlayerBar() {
 
             <div className="seek-row">
               <span className="mono">{formatTime(seekPreview ?? currentTime)}</span>
-              <div className="player-seek-strip player-seek-strip--expanded" onClick={handleSeekStripClick}>
+              <div className="player-seek-strip player-seek-strip--expanded" onClick={(e) => { e.stopPropagation(); handleSeekStripClick(e); }}>
                 <div className="player-seek-track">
                   <div className="player-seek-fill" style={{ width: `${progressPct}%` }} />
                 </div>
@@ -348,7 +349,7 @@ export function PlayerBar() {
               <span className="mono">{formatTime(effectiveDuration)}</span>
             </div>
 
-            <div className="player-transport" style={{ justifyContent: "center", marginTop: "0.8rem" }}>
+            <div className="player-transport" style={{ justifyContent: "center", marginTop: "0.8rem" }} onClick={(e) => e.stopPropagation()}>
               <button className={`btn ${shuffle ? "btn-primary" : ""}`} onClick={toggleShuffle} title="Shuffle (P)">
                 <ShuffleIcon size={18} />
               </button>
@@ -367,7 +368,7 @@ export function PlayerBar() {
             </div>
 
             {currentTrack.bookmarks.length > 0 && (
-              <div className="bookmarks" style={{ marginTop: "0.8rem" }}>
+              <div className="bookmarks" style={{ marginTop: "0.8rem" }} onClick={(e) => e.stopPropagation()}>
                 {currentTrack.bookmarks.map((b) => (
                   <button key={b.label + b.timestampSeconds} onClick={() => seek(b.timestampSeconds)}>
                     {b.label} · {formatTime(b.timestampSeconds)}
@@ -377,7 +378,7 @@ export function PlayerBar() {
             )}
 
             {queue.length > 0 && (
-              <div style={{ marginTop: "1.2rem", width: "100%", maxWidth: 480, opacity: 0.35 }}>
+              <div style={{ marginTop: "1.2rem", width: "100%", maxWidth: 480, opacity: 0.35 }} onClick={(e) => e.stopPropagation()}>
                 <div style={{ fontSize: "0.75rem", textTransform: "uppercase", color: "var(--text-dim)", marginBottom: "0.3rem" }}>
                   Up next ({queue.length})
                 </div>

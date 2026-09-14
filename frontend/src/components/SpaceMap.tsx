@@ -747,6 +747,7 @@ export function SpaceMap({
             transform: `translate(-50%, -50%) rotate(${c.angle}rad)`,
             color: c.playing ? "var(--accent-audio)" : undefined,
             textShadow: c.playing ? "0 0 6px var(--accent-audio)" : undefined,
+            opacity: c.playing ? 1 : undefined,
           }}
         >
           ➤

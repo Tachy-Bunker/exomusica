@@ -137,6 +137,10 @@ export function NotificationWidget({ offsetRight = 0, inline = false }: { offset
 
   function handleNotificationClick(n: Notification) {
     setOpen(false);
+    if (n.eventKey === "pm" && n.channelSlug) {
+      navigate(`/pms/${n.channelSlug}`);
+      return;
+    }
     if (n.channelSlug && n.messageId) {
       navigate(jumpUrl(n.channelSlug, Math.floor(new Date(n.createdAt).getTime() / 1000), n.messageId));
     }
