@@ -2,7 +2,6 @@ import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Link } from "react-router-dom";
 import { bindAudioElement, useAudioStore } from "../lib/audioStore";
-import { initAnalyser } from "../lib/audioAnalyser";
 import { useIsDesktop } from "../lib/useIsDesktop";
 import { useFixedPortalRoot } from "../lib/useFixedPortalRoot";
 import { PreviousIcon, NextIcon, LoopIcon, LoopOneIcon, ExpandIcon, CollapseIcon, ShuffleIcon, QueueIcon } from "./Icons";
@@ -197,13 +196,6 @@ export function PlayerBar() {
         ref={(el) => {
           audioRef.current = el;
           bindAudioElement(el);
-          if (el) {
-            try {
-              initAnalyser(el);
-            } catch (err) {
-              console.error("Analyser init failed (visuals only):", err);
-            }
-          }
         }}
         onTimeUpdate={(e) => setProgress(e.currentTarget.currentTime, e.currentTarget.duration || 0)}
         onLoadedMetadata={(e) => setProgress(e.currentTarget.currentTime, e.currentTarget.duration || 0)}
