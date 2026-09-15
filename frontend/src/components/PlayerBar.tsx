@@ -205,7 +205,6 @@ export function PlayerBar() {
             }
           }
         }}
-        crossOrigin="anonymous"
         onTimeUpdate={(e) => setProgress(e.currentTarget.currentTime, e.currentTarget.duration || 0)}
         onLoadedMetadata={(e) => setProgress(e.currentTarget.currentTime, e.currentTarget.duration || 0)}
         onPause={() => useAudioStore.setState({ isPlaying: false })}
