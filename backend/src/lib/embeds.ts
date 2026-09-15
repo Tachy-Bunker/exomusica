@@ -1,6 +1,17 @@
 import { prisma } from "./prisma.js";
 import type { PlayableTrackDTO } from "./types.js";
 
+/** If fileUrl is our own storage (a relative /uploads/... path), returns
+ *  it unchanged. If it's an absolute external URL, rewrites it to the
+ *  same-origin audio-proxy path instead, so every consumer of this DTO
+ *  — playback, ReplayGain analysis — sees a same-origin URL and never
+ *  hits a CORS restriction, without needing to know or care that the
+ *  underlying file actually lives elsewhere. */
+export function resolvePlayableUrl(fileUrl: string, kind: "track" | "community-track", id: number): string {
+  if (fileUrl.startsWith("/")) return fileUrl;
+  return `/api/audio-proxy/${kind}/${id}`;
+}
+
 type TrackWithRelations = Awaited<ReturnType<typeof fetchTracksByIds>>[number];
 
 async function fetchTracksByIds(ids: number[]) {
@@ -15,7 +26,7 @@ export function trackToDTO(t: TrackWithRelations): PlayableTrackDTO {
   return {
     id: t.id,
     title: t.title,
-    fileUrl: t.fileUrl,
+    fileUrl: resolvePlayableUrl(t.fileUrl, "track", t.id),
     format: t.format,
     durationSeconds: t.durationSeconds,
     position: t.position,

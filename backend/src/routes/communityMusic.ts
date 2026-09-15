@@ -3,6 +3,7 @@ import type { Prisma } from "@prisma/client";
 import { prisma } from "../lib/prisma.js";
 import { requireAuth, requireAdmin, verifyToken } from "../lib/auth.js";
 import { saveCommunityTrackAudio, saveCommunityAlbumCover } from "../lib/storage.js";
+import { resolvePlayableUrl } from "../lib/embeds.js";
 import { probeAudioDuration } from "../lib/audioProbe.js";
 
 async function uniqueCommunityAlbumSlug(title: string): Promise<string> {
@@ -142,7 +143,7 @@ export async function communityMusicRoutes(app: FastifyInstance): Promise<void> 
       tracks: album.tracks.map((t) => ({
         id: t.id,
         title: t.title,
-        fileUrl: t.attachment?.storagePath ?? t.externalUrl ?? "",
+        fileUrl: resolvePlayableUrl(t.attachment?.storagePath ?? t.externalUrl ?? "", "community-track", t.id),
         format: t.format,
         durationSeconds: t.durationSeconds,
         position: t.position,
@@ -382,7 +383,7 @@ export async function communityMusicRoutes(app: FastifyInstance): Promise<void> 
           source: "official" as const,
           trackId: item.track.id,
           title: item.track.title,
-          fileUrl: item.track.fileUrl,
+          fileUrl: resolvePlayableUrl(item.track.fileUrl, "track", item.track.id),
           durationSeconds: item.track.durationSeconds,
           albumTitle: item.track.album.title,
           albumSlug: item.track.album.slug,
@@ -398,7 +399,7 @@ export async function communityMusicRoutes(app: FastifyInstance): Promise<void> 
         source: "community" as const,
         trackId: ct.id,
         title: ct.title,
-        fileUrl: ct.attachment?.storagePath ?? ct.externalUrl ?? "",
+        fileUrl: resolvePlayableUrl(ct.attachment?.storagePath ?? ct.externalUrl ?? "", "community-track", ct.id),
         durationSeconds: ct.durationSeconds,
         albumTitle: ct.album.title,
         albumSlug: ct.album.slug,

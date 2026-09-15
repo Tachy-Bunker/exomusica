@@ -2,6 +2,7 @@ import type { FastifyInstance } from "fastify";
 import { prisma } from "../lib/prisma.js";
 import { requireAdmin } from "../lib/auth.js";
 import { saveSiteImage } from "../lib/storage.js";
+import { resolvePlayableUrl } from "../lib/embeds.js";
 
 function slugify(name: string): string {
   return (
@@ -60,7 +61,7 @@ export async function collaboratorRoutes(app: FastifyInstance): Promise<void> {
       albumMap.get(album.id)!.tracks.push({
         id: tc.track.id,
         title: tc.track.title,
-        fileUrl: tc.track.fileUrl,
+        fileUrl: resolvePlayableUrl(tc.track.fileUrl, "track", tc.track.id),
         format: tc.track.format,
         durationSeconds: tc.track.durationSeconds,
         position: tc.track.position,
