@@ -1646,3 +1646,8 @@ th {
   transform: scale(1.15) rotate(-4deg);
   filter: drop-shadow(0 0 6px var(--accent-forum-dim));
 }
+
+@keyframes playlistVennBlobDrift {
+  0%, 100% { transform: translate(-50%, -50%) scale(1); }
+  50% { transform: translate(-50%, -50%) scale(1.035); }
+}

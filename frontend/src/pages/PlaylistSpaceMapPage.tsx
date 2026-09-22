@@ -9,6 +9,7 @@ import { useSpacemapField, FX_DEFAULTS, type FxSettings } from "../lib/entoptic/
 import { useMapQualityStore } from "../lib/mapQualityStore";
 import { Joystick } from "../components/Joystick";
 import type { PlayableTrackDTO } from "../lib/types";
+import { layoutGenreBlobs, layoutTracks, blobBorderRadius, spiralOrder, type TrackPoint } from "../lib/vennLayout";
 
 interface PlaylistAlbum {
   slug: string;
@@ -36,7 +37,7 @@ interface PlaylistDetail {
   slug: string;
   title: string;
   ownerId: number;
-  fxSettings: (Partial<FxSettings> & { coverSize?: number; spacing?: number; roamSpeed?: number }) | null;
+  fxSettings: (Partial<FxSettings> & { coverSize?: number; spacing?: number; roamSpeed?: number; vennHueStart?: number; vennHueEnd?: number }) | null;
   albums: PlaylistAlbum[];
   items: PlaylistItem[];
 }
@@ -108,7 +109,17 @@ export function PlaylistSpaceMapPage() {
   const clearQueue = useAudioStore((s) => s.clearQueue);
   const setCurrentPlaylist = useAudioStore((s) => s.setCurrentPlaylist);
   const [playlist, setPlaylist] = useState<PlaylistDetail | null>(null);
-  const [controls, setControls] = useState({ coverSize: DEFAULT_COVER_SIZE, bgBright: 0.5, bgSat: 0.5, bgContrast: 0.5, rmsBrightnessAmount: 0.3, spacing: 1, roamSpeed: 1 });
+  const [controls, setControls] = useState({
+    coverSize: DEFAULT_COVER_SIZE,
+    bgBright: 0.5,
+    bgSat: 0.5,
+    bgContrast: 0.5,
+    rmsBrightnessAmount: 0.3,
+    spacing: 1,
+    roamSpeed: 1,
+    vennHueStart: 260,
+    vennHueEnd: 20,
+  });
   const [, forceRender] = useState(0);
   const [lockedId, setLockedId] = useState<number | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -116,6 +127,13 @@ export function PlaylistSpaceMapPage() {
   const setMapQuality = useMapQualityStore((s) => s.setQuality);
   const softwareRendererName = useMapQualityStore((s) => s.softwareRendererName);
   const [dismissedSwNotice, setDismissedSwNotice] = useState(false);
+  const [viewMode, setViewMode] = useState<"map" | "venn">("map");
+  // Persists while playback keeps coming from this playlist - cleared
+  // the moment the player switches away, per the explicit requirement
+  // that colors survive a requeue from the same playlist but not a
+  // switch to something else.
+  const [litTrackIds, setLitTrackIds] = useState<Set<number>>(new Set());
+  const vennOriginTrackIdRef = useRef<number | null>(null);
 
   const containerRef = useRef<HTMLDivElement>(null);
   const cameraRef = useRef({ x: 0, y: 0, vx: 0, vy: 0 });
@@ -144,6 +162,8 @@ export function PlaylistSpaceMapPage() {
         rmsBrightnessAmount: p.fxSettings?.rmsBrightnessAmount ?? 0.3,
         spacing: p.fxSettings?.spacing ?? 1,
         roamSpeed: p.fxSettings?.roamSpeed ?? 1,
+        vennHueStart: p.fxSettings?.vennHueStart ?? 260,
+        vennHueEnd: p.fxSettings?.vennHueEnd ?? 20,
       });
     });
   }
@@ -191,6 +211,63 @@ export function PlaylistSpaceMapPage() {
       return { ...a, id: seed % 1000000, homeX, homeY, x: homeX, y: homeY, wanderSeed: rand() * 1000 };
     });
   }, [playlist, controls.spacing]);
+
+  const vennBlobs = useMemo(() => {
+    if (!playlist) return [];
+    return layoutGenreBlobs(playlist.items.map((i) => ({ id: i.trackId, genres: i.genres })));
+  }, [playlist]);
+  const vennTracks = useMemo(() => {
+    if (!playlist) return [];
+    return layoutTracks(
+      playlist.items.map((i) => ({ id: i.trackId, genres: i.genres })),
+      vennBlobs,
+    );
+  }, [playlist, vennBlobs]);
+  const vennTrackByItemId = useMemo(() => new Map(playlist?.items.map((item) => [item.id, vennTracks.find((v) => v.trackId === item.trackId)]) ?? []), [playlist, vennTracks]);
+
+  useEffect(() => {
+    return useAudioStore.subscribe((state) => {
+      if (!playlist) return;
+      if (state.currentPlaylist?.slug !== playlist.slug) {
+        setLitTrackIds((prev) => (prev.size === 0 ? prev : new Set()));
+        vennOriginTrackIdRef.current = null;
+      }
+    });
+  }, [playlist]);
+
+  function playVennTrack(item: PlaylistItem) {
+    const p = playlistRef.current;
+    if (!p) return;
+    play(playlistItemToPlayable(item));
+    clearQueue();
+    setCurrentPlaylist({ slug: p.slug, title: p.title });
+    setLitTrackIds((prev) => new Set(prev).add(item.trackId));
+    vennOriginTrackIdRef.current = item.trackId;
+  }
+
+  // Spiral-neighbor autoplay: once a track started from Venn Views
+  // finishes, move to the nearest-in-spiral-order unplayed track around
+  // wherever playback originally started, rather than the normal queue
+  // order. Only engages while still on this same playlist in Venn mode -
+  // if the user navigated elsewhere or switched playback source, this
+  // does nothing and normal queue/repeat behavior takes over.
+  useEffect(() => {
+    if (viewMode !== "venn") return;
+    return useAudioStore.subscribe((state, prevState) => {
+      if (!prevState.isPlaying || state.isPlaying) return; // only reacts to playback actually stopping
+      if (state.queue.length > 0) return; // playNext() found something in the queue - not a real dead-end
+      if (state.currentTrack?.id !== prevState.currentTrack?.id) return; // a different track started - not the track-end dead-end case
+      const p = playlistRef.current;
+      const originId = vennOriginTrackIdRef.current;
+      if (!p || originId === null || prevState.currentPlaylist?.slug !== p.slug) return;
+      const order = spiralOrder(vennTracks, originId);
+      const next = order.find((t) => !litTrackIds.has(t.trackId));
+      if (!next) return;
+      const item = p.items.find((i) => i.trackId === next.trackId);
+      if (item) playVennTrack(item);
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [viewMode, vennTracks, litTrackIds]);
 
   async function playAlbum(node: AlbumNode) {
     const tracks =
@@ -402,7 +479,14 @@ export function PlaylistSpaceMapPage() {
           <button className="btn" style={{ position: "absolute", top: 12, left: 12, zIndex: 5 }} onClick={() => navigate(`/playlist/${playlist.slug}/list`)}>
             View as list
           </button>
-          <div style={{ position: "absolute", top: 12, left: 130, zIndex: 5, display: "flex", alignItems: "center", gap: "0.3rem", background: "var(--bg-elevated)", padding: "0.2rem 0.5rem", borderRadius: "var(--radius)" }}>
+          <button
+            className="btn"
+            style={{ position: "absolute", top: 12, left: 108, zIndex: 5, ...(viewMode === "venn" ? { outline: "1px solid var(--accent-forum)" } : {}) }}
+            onClick={() => setViewMode((m) => (m === "venn" ? "map" : "venn"))}
+          >
+            Views as Venn
+          </button>
+          <div style={{ position: "absolute", top: 12, left: 245, zIndex: 5, display: "flex", alignItems: "center", gap: "0.3rem", background: "var(--bg-elevated)", padding: "0.2rem 0.5rem", borderRadius: "var(--radius)" }}>
             <label style={{ fontSize: "0.7rem", color: "var(--text-dim)" }} title="Lower this if the map feels laggy">
               Quality
             </label>
@@ -500,11 +584,21 @@ export function PlaylistSpaceMapPage() {
                     <label style={{ fontSize: "0.75rem" }}>Roaming speed</label>
                     <input type="range" min={0} max={2.5} step={0.05} value={controls.roamSpeed} onChange={(e) => updateControl({ roamSpeed: Number(e.target.value) })} />
                   </div>
+                  <div className="field">
+                    <label style={{ fontSize: "0.75rem" }}>Venn Views color start (hue)</label>
+                    <input type="range" min={0} max={360} step={1} value={controls.vennHueStart} onChange={(e) => updateControl({ vennHueStart: Number(e.target.value) })} />
+                  </div>
+                  <div className="field">
+                    <label style={{ fontSize: "0.75rem" }}>Venn Views color end (hue)</label>
+                    <input type="range" min={0} max={360} step={1} value={controls.vennHueEnd} onChange={(e) => updateControl({ vennHueEnd: Number(e.target.value) })} />
+                  </div>
                 </div>
               )}
             </div>
           )}
 
+          {viewMode === "map" && (
+            <>
           {nodesRef.current.map((a) => (
             <Link
               key={a.id}
@@ -556,6 +650,79 @@ export function PlaylistSpaceMapPage() {
               ➤
             </div>
           ))}
+            </>
+          )}
+
+          {viewMode === "venn" && (
+            <>
+              {vennBlobs.map((b) => (
+                <div
+                  key={b.name}
+                  title={b.name}
+                  style={{
+                    position: "absolute",
+                    left: `calc(50% + ${cameraRef.current.x + b.x}px)`,
+                    top: `calc(50% + ${cameraRef.current.y + b.y}px)`,
+                    transform: "translate(-50%, -50%)",
+                    width: b.radius * 2,
+                    height: b.radius * 2,
+                    borderRadius: blobBorderRadius(b),
+                    background: `hsla(${controls.vennHueStart + (hashOf(b.name) % 60) - 30}, 55%, 45%, 0.16)`,
+                    border: `1px solid hsla(${controls.vennHueStart + (hashOf(b.name) % 60) - 30}, 55%, 60%, 0.4)`,
+                    zIndex: 1,
+                    pointerEvents: "none",
+                    animation: `playlistVennBlobDrift ${18 + (hashOf(b.name) % 8)}s ease-in-out infinite`,
+                  }}
+                />
+              ))}
+              {vennBlobs.map((b) => (
+                <div
+                  key={`label-${b.name}`}
+                  style={{
+                    position: "absolute",
+                    left: `calc(50% + ${cameraRef.current.x + b.x}px)`,
+                    top: `calc(50% + ${cameraRef.current.y + b.y - b.radius - 10}px)`,
+                    transform: "translate(-50%, -50%)",
+                    fontSize: "0.75rem",
+                    color: "var(--text-dim)",
+                    zIndex: 2,
+                    pointerEvents: "none",
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  {b.name}
+                </div>
+              ))}
+              {playlist.items.map((item) => {
+                const point = vennTrackByItemId.get(item.id);
+                if (!point) return null;
+                const lit = litTrackIds.has(item.trackId);
+                const hue = controls.vennHueStart + ((controls.vennHueEnd - controls.vennHueStart) * (hashOf(item.title) % 100)) / 100;
+                return (
+                  <button
+                    key={item.id}
+                    title={item.title}
+                    onClick={() => playVennTrack(item)}
+                    style={{
+                      position: "absolute",
+                      left: `calc(50% + ${cameraRef.current.x + point.x}px)`,
+                      top: `calc(50% + ${cameraRef.current.y + point.y}px)`,
+                      transform: "translate(-50%, -50%)",
+                      width: lit ? 14 : 10,
+                      height: lit ? 14 : 10,
+                      borderRadius: "50%",
+                      border: "none",
+                      cursor: "pointer",
+                      zIndex: 3,
+                      background: lit ? `hsl(${hue}, 85%, 78%)` : `hsl(${hue}, 60%, 50%)`,
+                      boxShadow: lit ? `0 0 8px 2px hsla(${hue}, 85%, 78%, 0.7)` : "none",
+                      transition: "width 0.2s, height 0.2s",
+                    }}
+                  />
+                );
+              })}
+            </>
+          )}
 
           {/* Always-visible center "Play all" marker, anchored in world space at the origin like any album node */}
           <div
