@@ -20,6 +20,7 @@ interface PlaylistItem {
   branchSlug: string | null;
   replayGainDb: number | null;
   genres: string[];
+  trackPosition: number;
 }
 interface PlaylistDetail {
   id: number;
@@ -108,6 +109,9 @@ export function PlaylistPage() {
       albumGroups.set(key, { title: item.albumTitle, coverArtUrl: item.coverArtUrl, source: item.source, slug: item.albumSlug, items: [] });
     }
     albumGroups.get(key)!.items.push(item);
+  }
+  for (const group of albumGroups.values()) {
+    group.items.sort((a, b) => a.trackPosition - b.trackPosition);
   }
 
   return (

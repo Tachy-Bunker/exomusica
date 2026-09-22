@@ -37,7 +37,7 @@ interface PlaylistDetail {
   slug: string;
   title: string;
   ownerId: number;
-  fxSettings: (Partial<FxSettings> & { coverSize?: number; spacing?: number; roamSpeed?: number; vennHueStart?: number; vennHueEnd?: number }) | null;
+  fxSettings: (Partial<FxSettings> & { coverSize?: number; spacing?: number; roamSpeed?: number; vennHueStart?: number; vennHueEnd?: number; vennBlobSize?: number }) | null;
   albums: PlaylistAlbum[];
   items: PlaylistItem[];
 }
@@ -119,6 +119,7 @@ export function PlaylistSpaceMapPage() {
     roamSpeed: 1,
     vennHueStart: 260,
     vennHueEnd: 20,
+    vennBlobSize: 1,
   });
   const [, forceRender] = useState(0);
   const [lockedId, setLockedId] = useState<number | null>(null);
@@ -148,6 +149,9 @@ export function PlaylistSpaceMapPage() {
   playlistRef.current = playlist;
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const controlsRef = useRef(controls);
+  const touchDragRef = useRef<{ startClientX: number; startClientY: number; startCamX: number; startCamY: number } | null>(null);
+  const viewModeRef = useRef(viewMode);
+  viewModeRef.current = viewMode;
   controlsRef.current = controls;
 
   function reload() {
@@ -164,6 +168,7 @@ export function PlaylistSpaceMapPage() {
         roamSpeed: p.fxSettings?.roamSpeed ?? 1,
         vennHueStart: p.fxSettings?.vennHueStart ?? 260,
         vennHueEnd: p.fxSettings?.vennHueEnd ?? 20,
+        vennBlobSize: p.fxSettings?.vennBlobSize ?? 1,
       });
     });
   }
@@ -214,16 +219,18 @@ export function PlaylistSpaceMapPage() {
 
   const vennBlobs = useMemo(() => {
     if (!playlist) return [];
-    return layoutGenreBlobs(playlist.items.map((i) => ({ id: i.trackId, genres: i.genres })));
+    return layoutGenreBlobs(playlist.items.filter((i) => i.genres.length > 0).map((i) => ({ id: i.trackId, genres: i.genres })));
   }, [playlist]);
   const vennTracks = useMemo(() => {
     if (!playlist) return [];
     return layoutTracks(
-      playlist.items.map((i) => ({ id: i.trackId, genres: i.genres })),
+      playlist.items.filter((i) => i.genres.length > 0).map((i) => ({ id: i.trackId, genres: i.genres })),
       vennBlobs,
     );
   }, [playlist, vennBlobs]);
   const vennTrackByItemId = useMemo(() => new Map(playlist?.items.map((item) => [item.id, vennTracks.find((v) => v.trackId === item.trackId)]) ?? []), [playlist, vennTracks]);
+  const vennTracksRef = useRef(vennTracks);
+  vennTracksRef.current = vennTracks;
 
   useEffect(() => {
     return useAudioStore.subscribe((state) => {
@@ -295,7 +302,7 @@ export function PlaylistSpaceMapPage() {
   function playAllPlaylist() {
     const p = playlistRef.current;
     if (!p || p.items.length === 0) return;
-    const all = p.items.map(playlistItemToPlayable);
+    const all = shuffleArray(p.items.map(playlistItemToPlayable));
     const [first, ...rest] = all;
     play(first);
     clearQueue();
@@ -303,9 +310,35 @@ export function PlaylistSpaceMapPage() {
     setCurrentPlaylist({ slug: p.slug, title: p.title });
   }
 
+  function handleTouchStart(e: React.TouchEvent) {
+    if (e.touches.length !== 1) return;
+    if ((e.target as HTMLElement).closest?.(".space-joystick-base")) return;
+    const t = e.touches[0];
+    touchDragRef.current = { startClientX: t.clientX, startClientY: t.clientY, startCamX: cameraRef.current.x, startCamY: cameraRef.current.y };
+  }
+  function handleTouchMove(e: React.TouchEvent) {
+    if (!touchDragRef.current || e.touches.length !== 1) return;
+    e.preventDefault();
+    const t = e.touches[0];
+    const drag = touchDragRef.current;
+    cameraRef.current.x = drag.startCamX + (t.clientX - drag.startClientX);
+    cameraRef.current.y = drag.startCamY + (t.clientY - drag.startClientY);
+    cameraRef.current.vx = 0;
+    cameraRef.current.vy = 0;
+  }
+  function handleTouchEnd() {
+    touchDragRef.current = null;
+  }
+
   function playLocked() {
     const id = lockedIdRef.current;
     if (id === null) return;
+    if (viewModeRef.current === "venn") {
+      const p = playlistRef.current;
+      const item = p?.items.find((i) => i.trackId === id);
+      if (item) playVennTrack(item);
+      return;
+    }
     if (id === -1) {
       playAllPlaylist();
       return;
@@ -379,20 +412,32 @@ export function PlaylistSpaceMapPage() {
       }
 
       // --- crosshair lock-on: nearest node to screen center, including
-      // the always-present center "Play all" pseudo-target (id -1) ---
+      // the always-present center "Play all" pseudo-target (id -1) in
+      // map mode; in Venn mode locks onto track dot positions instead,
+      // with no Play all target since that button is hidden there. ---
       {
         let nearestId: number | null = null;
         let nearestDist = LOCK_RADIUS;
-        const centerDist = Math.hypot(cam.x, cam.y);
-        if (centerDist < nearestDist) {
-          nearestId = -1;
-          nearestDist = centerDist;
-        }
-        for (const n of nodesRef.current) {
-          const dist = Math.hypot(cam.x + n.x, cam.y + n.y);
-          if (dist < nearestDist) {
-            nearestId = n.id;
-            nearestDist = dist;
+        if (viewModeRef.current === "venn") {
+          for (const t of vennTracksRef.current) {
+            const dist = Math.hypot(cam.x + t.x, cam.y + t.y);
+            if (dist < nearestDist) {
+              nearestId = t.trackId;
+              nearestDist = dist;
+            }
+          }
+        } else {
+          const centerDist = Math.hypot(cam.x, cam.y);
+          if (centerDist < nearestDist) {
+            nearestId = -1;
+            nearestDist = centerDist;
+          }
+          for (const n of nodesRef.current) {
+            const dist = Math.hypot(cam.x + n.x, cam.y + n.y);
+            if (dist < nearestDist) {
+              nearestId = n.id;
+              nearestDist = dist;
+            }
           }
         }
         if (nearestId !== lockedIdRef.current) {
@@ -458,6 +503,9 @@ export function PlaylistSpaceMapPage() {
     <div
       ref={containerRef}
       tabIndex={0}
+      onTouchStart={handleTouchStart}
+      onTouchMove={handleTouchMove}
+      onTouchEnd={handleTouchEnd}
       style={{
         position: "relative",
         height: "calc(100dvh - var(--nav-height, 3.6rem) - 3rem - var(--player-height, 0px))",
@@ -592,6 +640,10 @@ export function PlaylistSpaceMapPage() {
                     <label style={{ fontSize: "0.75rem" }}>Venn Views color end (hue)</label>
                     <input type="range" min={0} max={360} step={1} value={controls.vennHueEnd} onChange={(e) => updateControl({ vennHueEnd: Number(e.target.value) })} />
                   </div>
+                  <div className="field">
+                    <label style={{ fontSize: "0.75rem" }}>Venn blob size</label>
+                    <input type="range" min={0.4} max={2.5} step={0.05} value={controls.vennBlobSize} onChange={(e) => updateControl({ vennBlobSize: Number(e.target.value) })} />
+                  </div>
                 </div>
               )}
             </div>
@@ -599,37 +651,51 @@ export function PlaylistSpaceMapPage() {
 
           {viewMode === "map" && (
             <>
-          {nodesRef.current.map((a) => (
-            <Link
-              key={a.id}
-              to={a.source === "official" ? `/album/${a.slug}` : `/community-album/${a.slug}`}
-              style={{
-                position: "absolute",
-                left: `calc(50% + ${cameraRef.current.x + a.x}px)`,
-                top: `calc(50% + ${cameraRef.current.y + a.y}px)`,
-                transform: "translate(-50%, -50%)",
-                zIndex: 3,
-                textAlign: "center",
-                textDecoration: "none",
-                color: "var(--text)",
-                width: controls.coverSize * 1.4,
-              }}
-            >
-              <div
+          {nodesRef.current.map((a) => {
+            const isPlayingAlbum = currentTrack?.albumSlug === a.slug;
+            const size = isPlayingAlbum ? controls.coverSize * 1.15 : controls.coverSize;
+            return (
+              <Link
+                key={a.id}
+                to={a.source === "official" ? `/album/${a.slug}` : `/community-album/${a.slug}`}
                 style={{
-                  width: controls.coverSize,
-                  height: controls.coverSize,
-                  margin: "0 auto",
-                  borderRadius: "var(--radius)",
-                  border: "1px solid var(--border)",
-                  background: a.coverArtUrl ? `url(${a.coverArtUrl}) center/cover` : "var(--bg-elevated)",
+                  position: "absolute",
+                  left: `calc(50% + ${cameraRef.current.x + a.x}px)`,
+                  top: `calc(50% + ${cameraRef.current.y + a.y}px)`,
+                  transform: "translate(-50%, -50%)",
+                  zIndex: 3,
+                  textAlign: "center",
+                  textDecoration: "none",
+                  color: isPlayingAlbum ? "#fff" : "var(--text)",
+                  width: controls.coverSize * 1.4,
                 }}
-              />
-              <div style={{ fontSize: Math.max(9, controls.coverSize * 0.125), marginTop: "0.2rem", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                {a.title}
-              </div>
-            </Link>
-          ))}
+              >
+                <div
+                  style={{
+                    width: size,
+                    height: size,
+                    margin: "0 auto",
+                    borderRadius: "var(--radius)",
+                    border: "1px solid var(--border)",
+                    background: a.coverArtUrl ? `url(${a.coverArtUrl}) center/cover` : "var(--bg-elevated)",
+                    transition: "width 0.25s ease, height 0.25s ease",
+                  }}
+                />
+                <div
+                  style={{
+                    fontSize: Math.max(9, controls.coverSize * 0.125),
+                    marginTop: "0.2rem",
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                    whiteSpace: "nowrap",
+                    textShadow: isPlayingAlbum ? "0 0 6px #fff" : undefined,
+                  }}
+                >
+                  {a.title}
+                </div>
+              </Link>
+            );
+          })}
 
           {compassPoints.map((c, i) => (
             <div
@@ -664,8 +730,8 @@ export function PlaylistSpaceMapPage() {
                     left: `calc(50% + ${cameraRef.current.x + b.x}px)`,
                     top: `calc(50% + ${cameraRef.current.y + b.y}px)`,
                     transform: "translate(-50%, -50%)",
-                    width: b.radius * 2,
-                    height: b.radius * 2,
+                    width: b.radius * 2 * controls.vennBlobSize,
+                    height: b.radius * 2 * controls.vennBlobSize,
                     borderRadius: blobBorderRadius(b),
                     background: `hsla(${controls.vennHueStart + (hashOf(b.name) % 60) - 30}, 55%, 45%, 0.16)`,
                     border: `1px solid hsla(${controls.vennHueStart + (hashOf(b.name) % 60) - 30}, 55%, 60%, 0.4)`,
@@ -724,7 +790,8 @@ export function PlaylistSpaceMapPage() {
             </>
           )}
 
-          {/* Always-visible center "Play all" marker, anchored in world space at the origin like any album node */}
+          {/* Always-visible center "Play all" marker, anchored in world space at the origin like any album node - map mode only, since Venn mode has its own play entry points */}
+          {viewMode === "map" && (
           <div
             style={{
               position: "absolute",
@@ -756,7 +823,7 @@ export function PlaylistSpaceMapPage() {
             </div>
             <div style={{ fontSize: Math.max(9, controls.coverSize * 0.11), marginTop: "0.15rem" }}>Play all</div>
           </div>
-
+          )}
           <div className="space-reticle" ref={reticleRef}>
             <div
               className="space-reticle-ring"
@@ -780,7 +847,12 @@ export function PlaylistSpaceMapPage() {
                 cursor: !isDesktop ? "pointer" : undefined,
               }}
             >
-              {lockedId === -1 ? "Play all" : nodesRef.current.find((n) => n.id === lockedId)?.title} {isDesktop ? "(F)" : "- tap to play"}
+              {viewMode === "venn"
+                ? playlist.items.find((i) => i.trackId === lockedId)?.title
+                : lockedId === -1
+                  ? "Play all"
+                  : nodesRef.current.find((n) => n.id === lockedId)?.title}{" "}
+              {isDesktop ? "(F)" : "- tap to play"}
             </p>
           )}
 

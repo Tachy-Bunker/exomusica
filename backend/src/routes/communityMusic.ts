@@ -455,6 +455,7 @@ export async function communityMusicRoutes(app: FastifyInstance): Promise<void> 
           branchSlug: item.track.album.branch?.slug ?? null,
           replayGainDb: item.track.replayGainDb,
           genres: [] as string[],
+          trackPosition: item.track.position,
         };
       }
       const ct = item.communityTrack!;
@@ -472,6 +473,7 @@ export async function communityMusicRoutes(app: FastifyInstance): Promise<void> 
         branchSlug: null,
         genres: ct.genres,
         replayGainDb: ct.replayGainDb,
+        trackPosition: ct.position,
       };
     });
     // Distinct albums referenced by this playlist's tracks - the

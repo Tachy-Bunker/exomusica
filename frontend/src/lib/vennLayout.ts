@@ -115,7 +115,7 @@ export function layoutGenreBlobs(tracks: VennTrack[]): GenreBlob[] {
 
   return blobs.map((b) => {
     const rand = seededRand(hashOf(b.name) + 1);
-    const shapeOffsets = Array.from({ length: SHAPE_POINTS }, () => 0.78 + rand() * 0.44);
+    const shapeOffsets = Array.from({ length: SHAPE_POINTS }, () => 0.55 + rand() * 0.9);
     return { name: b.name, x: b.x, y: b.y, radius: b.radius, shapeOffsets };
   });
 }
@@ -130,7 +130,7 @@ export function layoutGenreBlobs(tracks: VennTrack[]): GenreBlob[] {
  *  SVG-viewport coordinate mismatch entirely. */
 export function blobBorderRadius(blob: GenreBlob): string {
   const o = blob.shapeOffsets;
-  const pct = (i: number) => `${Math.round(35 + o[i % o.length] * 40)}%`;
+  const pct = (i: number) => `${Math.round(15 + o[i % o.length] * 75)}%`;
   return `${pct(0)} ${pct(1)} ${pct(2)} ${pct(3)} / ${pct(4)} ${pct(5)} ${pct(6)} ${pct(7)}`;
 }
 
