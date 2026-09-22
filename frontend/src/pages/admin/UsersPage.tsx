@@ -12,6 +12,8 @@ interface UserSummary {
   linkedUser?: { id: number; username: string } | null;
   _count?: { messages: number };
   createdAt: string;
+  storageUsedBytes: number;
+  storageLimitBytes: number;
 }
 
 interface UserDetail extends UserSummary {
@@ -206,6 +208,7 @@ export function UsersPage() {
           <tr>
             <th>Username</th>
             <th>Status</th>
+            <th>Storage</th>
             <th>Joined</th>
             <th></th>
           </tr>
@@ -216,6 +219,9 @@ export function UsersPage() {
               <tr key={u.id}>
                 <td>{u.username}</td>
                 <td>{u.isGhost ? "ghost" : u.isAdmin ? "admin" : "active"}</td>
+                <td className="mono" style={{ fontSize: "0.8rem" }}>
+                  {u.isGhost ? "-" : u.isAdmin ? "unlimited" : `${(u.storageUsedBytes / 1024 / 1024).toFixed(1)} / ${(u.storageLimitBytes / 1024 / 1024).toFixed(0)}MB`}
+                </td>
                 <td className="mono">{new Date(u.createdAt).toLocaleDateString()}</td>
                 <td style={{ whiteSpace: "nowrap" }}>
                   {!u.isGhost && (

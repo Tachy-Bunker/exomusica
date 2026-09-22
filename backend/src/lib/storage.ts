@@ -74,7 +74,7 @@ export async function saveMessageAttachment(
 ) {
   const user = await prisma.user.findUniqueOrThrow({ where: { id: uploaderId } });
   const newTotal = user.storageUsedBytes + BigInt(buffer.length);
-  if (!options.bypassQuota && newTotal > user.storageLimitBytes) {
+  if (!options.bypassQuota && !user.isAdmin && newTotal > user.storageLimitBytes) {
     throw new Error(
       `this attachment would push you over your ${Number(user.storageLimitBytes) / 1024 / 1024}MB storage limit`,
     );
@@ -144,7 +144,7 @@ export async function saveSiteImage(
 export async function saveCommunityAlbumCover(uploaderId: number, filename: string, mimeType: string, buffer: Buffer) {
   const user = await prisma.user.findUniqueOrThrow({ where: { id: uploaderId } });
   const newTotal = user.storageUsedBytes + BigInt(buffer.length);
-  if (newTotal > user.storageLimitBytes) {
+  if (!user.isAdmin && newTotal > user.storageLimitBytes) {
     throw new Error(`this cover would push you over your ${Number(user.storageLimitBytes) / 1024 / 1024}MB storage limit`);
   }
 
@@ -283,7 +283,7 @@ export async function saveCommunityTrackAudio(uploaderId: number, filename: stri
 
   const user = await prisma.user.findUniqueOrThrow({ where: { id: uploaderId } });
   const newTotal = user.storageUsedBytes + BigInt(buffer.length);
-  if (newTotal > user.storageLimitBytes) {
+  if (!user.isAdmin && newTotal > user.storageLimitBytes) {
     throw new Error(`this file would push you over your ${Number(user.storageLimitBytes) / 1024 / 1024}MB storage limit`);
   }
 
@@ -315,7 +315,7 @@ export async function saveCommunityTrackAudio(uploaderId: number, filename: stri
 export async function saveSampleBankFile(uploaderId: number, filename: string, mimeType: string, buffer: Buffer) {
   const user = await prisma.user.findUniqueOrThrow({ where: { id: uploaderId } });
   const newTotal = user.storageUsedBytes + BigInt(buffer.length);
-  if (newTotal > user.storageLimitBytes) {
+  if (!user.isAdmin && newTotal > user.storageLimitBytes) {
     throw new Error(`this file would push you over your ${Number(user.storageLimitBytes) / 1024 / 1024}MB storage limit`);
   }
 

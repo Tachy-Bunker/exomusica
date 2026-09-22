@@ -18,6 +18,7 @@ interface AlbumDetailTrack {
   fileUrl: string;
   durationSeconds: number | null;
   composer: string | null;
+  lyrics: string | null;
 }
 interface MyPlaylist {
   id: number;
@@ -145,21 +146,62 @@ export function MyMusicPage() {
   const [editingTrackId, setEditingTrackId] = useState<number | null>(null);
   const [editTitle, setEditTitle] = useState("");
   const [editComposer, setEditComposer] = useState("");
+  const [editLyrics, setEditLyrics] = useState("");
+  const replaceFileInputRef = useRef<HTMLInputElement>(null);
+  const [replacingTrackId, setReplacingTrackId] = useState<number | null>(null);
 
   function startEditTrack(t: AlbumDetailTrack) {
     setEditingTrackId(t.id);
     setEditTitle(t.title);
     setEditComposer(t.composer ?? "");
+    setEditLyrics(t.lyrics ?? "");
   }
 
   async function saveTrackEdit(albumId: number) {
     if (!editingTrackId) return;
     await api(`/api/community-tracks/${editingTrackId}`, {
       method: "PATCH",
-      body: JSON.stringify({ title: editTitle.trim(), composer: editComposer.trim() || null }),
+      body: JSON.stringify({ title: editTitle.trim(), composer: editComposer.trim() || null, lyrics: editLyrics.trim() || null }),
     });
     setEditingTrackId(null);
     useToastStore.getState().showToast("Saved ✓");
+    const album = albums.find((a) => a.id === albumId);
+    if (album) openAlbumManage(album);
+  }
+
+  async function moveTrack(albumId: number, trackId: number, direction: -1 | 1) {
+    const index = albumTracks.findIndex((t) => t.id === trackId);
+    const swapWith = index + direction;
+    if (index === -1 || swapWith < 0 || swapWith >= albumTracks.length) return;
+    const reordered = [...albumTracks];
+    [reordered[index], reordered[swapWith]] = [reordered[swapWith], reordered[index]];
+    await api(`/api/community-albums/${albumId}/tracks/reorder`, {
+      method: "POST",
+      body: JSON.stringify({ trackIds: reordered.map((t) => t.id) }),
+    });
+    const album = albums.find((a) => a.id === albumId);
+    if (album) openAlbumManage(album);
+  }
+
+  async function replaceTrackFile(albumId: number) {
+    const trackId = replacingTrackId;
+    const file = replaceFileInputRef.current?.files?.[0];
+    if (!trackId || !file) return;
+    const formData = new FormData();
+    formData.append("file", file);
+    await api(`/api/community-tracks/${trackId}/replace-file`, { method: "POST", body: formData });
+    setReplacingTrackId(null);
+    if (replaceFileInputRef.current) replaceFileInputRef.current.value = "";
+    useToastStore.getState().showToast("File replaced ✓");
+    const album = albums.find((a) => a.id === albumId);
+    if (album) openAlbumManage(album);
+  }
+
+  async function replaceTrackLink(albumId: number, trackId: number) {
+    const url = prompt("New link (URL) for this track:");
+    if (!url) return;
+    await api(`/api/community-tracks/${trackId}/replace-file`, { method: "POST", body: JSON.stringify({ url }) });
+    useToastStore.getState().showToast("Link replaced ✓");
     const album = albums.find((a) => a.id === albumId);
     if (album) openAlbumManage(album);
   }
@@ -315,15 +357,26 @@ export function MyMusicPage() {
               {albumTracks.map((t) => (
                 <div key={t.id} style={{ fontSize: "0.9rem", marginBottom: "0.3rem" }}>
                   {editingTrackId === t.id ? (
-                    <div style={{ display: "flex", gap: "0.3rem", alignItems: "center", flexWrap: "wrap" }}>
-                      <input value={editTitle} onChange={(e) => setEditTitle(e.target.value)} placeholder="Title" style={{ fontSize: "0.85rem" }} />
-                      <input value={editComposer} onChange={(e) => setEditComposer(e.target.value)} placeholder="Composer (optional)" style={{ fontSize: "0.85rem" }} />
-                      <button className="btn btn-primary" style={{ fontSize: "0.75rem" }} onClick={() => saveTrackEdit(a.id)}>
-                        save
-                      </button>
-                      <button className="btn" style={{ fontSize: "0.75rem" }} onClick={() => setEditingTrackId(null)}>
-                        cancel
-                      </button>
+                    <div style={{ display: "flex", flexDirection: "column", gap: "0.3rem" }}>
+                      <div style={{ display: "flex", gap: "0.3rem", alignItems: "center", flexWrap: "wrap" }}>
+                        <input value={editTitle} onChange={(e) => setEditTitle(e.target.value)} placeholder="Title" style={{ fontSize: "0.85rem" }} />
+                        <input value={editComposer} onChange={(e) => setEditComposer(e.target.value)} placeholder="Composer (optional)" style={{ fontSize: "0.85rem" }} />
+                      </div>
+                      <textarea
+                        value={editLyrics}
+                        onChange={(e) => setEditLyrics(e.target.value)}
+                        placeholder="Lyrics / description (optional) - shown expandable on the album page and playlist list view"
+                        rows={4}
+                        style={{ fontSize: "0.8rem", width: "100%", resize: "vertical" }}
+                      />
+                      <div>
+                        <button className="btn btn-primary" style={{ fontSize: "0.75rem" }} onClick={() => saveTrackEdit(a.id)}>
+                          save
+                        </button>{" "}
+                        <button className="btn" style={{ fontSize: "0.75rem" }} onClick={() => setEditingTrackId(null)}>
+                          cancel
+                        </button>
+                      </div>
                     </div>
                   ) : (
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
@@ -331,10 +384,34 @@ export function MyMusicPage() {
                         {t.title}
                         {t.composer && <span style={{ color: "var(--text-dim)" }}> - {t.composer}</span>}
                       </span>
-                      <div style={{ display: "flex", gap: "0.4rem" }}>
+                      <div style={{ display: "flex", gap: "0.4rem", alignItems: "center" }}>
+                        <button className="btn" style={{ fontSize: "0.7rem", padding: "0.1rem 0.4rem" }} onClick={() => moveTrack(a.id, t.id, -1)} title="Move up">
+                          ↑
+                        </button>
+                        <button className="btn" style={{ fontSize: "0.7rem", padding: "0.1rem 0.4rem" }} onClick={() => moveTrack(a.id, t.id, 1)} title="Move down">
+                          ↓
+                        </button>
                         <button className="btn" style={{ fontSize: "0.75rem" }} onClick={() => startEditTrack(t)}>
                           edit
                         </button>
+                        {replacingTrackId === t.id ? (
+                          <>
+                            <input ref={replaceFileInputRef} type="file" accept="audio/*" style={{ fontSize: "0.7rem", maxWidth: 140 }} />
+                            <button className="btn btn-primary" style={{ fontSize: "0.7rem" }} onClick={() => replaceTrackFile(a.id)}>
+                              upload
+                            </button>
+                            <button className="btn" style={{ fontSize: "0.7rem" }} onClick={() => replaceTrackLink(a.id, t.id)}>
+                              or link
+                            </button>
+                            <button className="btn" style={{ fontSize: "0.7rem" }} onClick={() => setReplacingTrackId(null)}>
+                              cancel
+                            </button>
+                          </>
+                        ) : (
+                          <button className="btn" style={{ fontSize: "0.75rem" }} onClick={() => setReplacingTrackId(t.id)}>
+                            replace file
+                          </button>
+                        )}
                         <button className="btn btn-danger" style={{ fontSize: "0.75rem" }} onClick={() => deleteTrack(t.id, a.id)}>
                           remove
                         </button>

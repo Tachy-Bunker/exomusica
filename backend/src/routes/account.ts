@@ -229,6 +229,8 @@ export async function accountRoutes(app: FastifyInstance): Promise<void> {
           linkedUserId: true,
           linkedUser: { select: { id: true, username: true } },
           createdAt: true,
+          storageUsedBytes: true,
+          storageLimitBytes: true,
           _count: { select: { messages: true } },
         },
         orderBy: { username: "asc" },
@@ -239,7 +241,11 @@ export async function accountRoutes(app: FastifyInstance): Promise<void> {
       const rank = (u: (typeof users)[number]) => (!u.isGhost ? 0 : u.linkedUserId ? 1 : 2);
       users.sort((a, b) => rank(a) - rank(b) || a.username.localeCompare(b.username));
       const total = users.length;
-      const pageUsers = ghostsOnly === "true" ? users : users.slice((page - 1) * pageSize, page * pageSize);
+      const pageUsers = (ghostsOnly === "true" ? users : users.slice((page - 1) * pageSize, page * pageSize)).map((u) => ({
+        ...u,
+        storageUsedBytes: Number(u.storageUsedBytes),
+        storageLimitBytes: Number(u.storageLimitBytes),
+      }));
       return { users: pageUsers, total, page, pageSize };
     },
   );

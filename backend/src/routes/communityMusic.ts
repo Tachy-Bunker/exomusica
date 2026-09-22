@@ -147,6 +147,7 @@ export async function communityMusicRoutes(app: FastifyInstance): Promise<void> 
         format: t.format,
         durationSeconds: t.durationSeconds,
         position: t.position,
+        lyrics: t.lyrics,
         albumTitle: album.title,
         albumSlug: album.slug,
         coverArtUrl: album.coverArtUrl,
@@ -298,7 +299,7 @@ export async function communityMusicRoutes(app: FastifyInstance): Promise<void> 
     return reply.code(201).send(track);
   });
 
-  app.patch<{ Params: { id: string }; Body: Partial<{ title: string; composer: string | null }> }>(
+  app.patch<{ Params: { id: string }; Body: Partial<{ title: string; composer: string | null; lyrics: string | null }> }>(
     "/api/community-tracks/:id",
     { preHandler: requireAuth },
     async (req, reply) => {
@@ -308,6 +309,67 @@ export async function communityMusicRoutes(app: FastifyInstance): Promise<void> 
       return prisma.communityTrack.update({ where: { id: track.id }, data: req.body ?? {} });
     },
   );
+
+  // Bulk reorder — accepts the album's full track id list in the new
+  // desired order, and writes each track's position in one transaction
+  // rather than requiring one PATCH request per moved track.
+  app.post<{ Params: { id: string }; Body: { trackIds: number[] } }>(
+    "/api/community-albums/:id/tracks/reorder",
+    { preHandler: requireAuth },
+    async (req, reply) => {
+      const album = await prisma.communityAlbum.findUnique({ where: { id: Number(req.params.id) }, include: { tracks: { select: { id: true } } } });
+      if (!album) return reply.code(404).send({ error: "no such album" });
+      if (album.ownerId !== req.user!.id) return reply.code(403).send({ error: "not your album" });
+      const { trackIds } = req.body ?? { trackIds: [] };
+      const albumTrackIds = new Set(album.tracks.map((t) => t.id));
+      if (trackIds.length !== albumTrackIds.size || !trackIds.every((id) => albumTrackIds.has(id))) {
+        return reply.code(400).send({ error: "trackIds must include exactly this album's tracks" });
+      }
+      await prisma.$transaction(trackIds.map((id, position) => prisma.communityTrack.update({ where: { id }, data: { position } })));
+      return reply.code(204).send();
+    },
+  );
+
+  app.post<{ Params: { id: string } }>("/api/community-tracks/:id/replace-file", { preHandler: requireAuth }, async (req, reply) => {
+    const track = await prisma.communityTrack.findUnique({ where: { id: Number(req.params.id) }, include: { album: true } });
+    if (!track) return reply.code(404).send({ error: "no such track" });
+    if (track.album.ownerId !== req.user!.id) return reply.code(403).send({ error: "not your track" });
+
+    if (req.isMultipart()) {
+      const file = await req.file();
+      if (!file) return reply.code(400).send({ error: "no file uploaded" });
+      const buffer = await file.toBuffer();
+      let attachment;
+      try {
+        attachment = await saveCommunityTrackAudio(req.user!.id, file.filename, file.mimetype, buffer);
+      } catch (err) {
+        return reply.code(400).send({ error: err instanceof Error ? err.message : "upload failed" });
+      }
+      const updated = await prisma.communityTrack.update({
+        where: { id: track.id },
+        data: { attachmentId: attachment.id, externalUrl: null, format: formatFromMime(file.mimetype), durationSeconds: null },
+      });
+      void probeAudioDuration(attachment.storagePath)
+        .then((seconds) => {
+          if (seconds) return prisma.communityTrack.update({ where: { id: track.id }, data: { durationSeconds: seconds } });
+        })
+        .catch(() => {});
+      return updated;
+    }
+
+    const { url } = (req.body ?? {}) as { url?: string };
+    if (!url) return reply.code(400).send({ error: "url is required" });
+    const updated = await prisma.communityTrack.update({
+      where: { id: track.id },
+      data: { externalUrl: url, attachmentId: null, durationSeconds: null },
+    });
+    void probeAudioDuration(url)
+      .then((seconds) => {
+        if (seconds) return prisma.communityTrack.update({ where: { id: track.id }, data: { durationSeconds: seconds } });
+      })
+      .catch(() => {});
+    return updated;
+  });
 
   app.delete<{ Params: { id: string } }>("/api/community-tracks/:id", { preHandler: requireAuth }, async (req, reply) => {
     const track = await prisma.communityTrack.findUnique({ where: { id: Number(req.params.id) }, include: { album: true } });

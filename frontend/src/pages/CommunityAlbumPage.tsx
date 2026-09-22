@@ -11,6 +11,7 @@ interface CommunityTrackPlayable extends PlayableTrackDTO {
   likeCount: number;
   likedByMe: boolean;
   remixOf: { title: string; albumSlug: string } | null;
+  lyrics: string | null;
 }
 
 interface CommunityAlbumDetail {
@@ -27,6 +28,7 @@ interface CommunityAlbumDetail {
 export function CommunityAlbumPage() {
   const { slug } = useParams<{ slug: string }>();
   const [album, setAlbum] = useState<CommunityAlbumDetail | null>(null);
+  const [expandedLyrics, setExpandedLyrics] = useState<Set<number>>(new Set());
   const play = useAudioStore((s) => s.play);
   const addToQueue = useAudioStore((s) => s.addToQueue);
   const clearQueue = useAudioStore((s) => s.clearQueue);
@@ -114,40 +116,60 @@ export function CommunityAlbumPage() {
           <p style={{ color: "var(--text-dim)" }}>No tracks yet.</p>
         ) : (
           album.tracks.map((t, i) => (
-            <div
-              key={t.id}
-              style={{ display: "flex", alignItems: "center", gap: "0.6rem", padding: "0.4rem 0.6rem", border: "1px solid var(--border)", borderRadius: "var(--radius)" }}
-            >
-              <button className="btn" onClick={() => playTrack(t)}>
-                ▶
-              </button>
-              <button className="btn" onClick={() => addToQueue([t])} title="Add to queue">
-                +
-              </button>
-              <span className="mono" style={{ color: "var(--text-dim)", fontSize: "0.8rem" }}>
-                {i + 1}
-              </span>
-              <span style={{ flex: 1 }}>
-                {t.title}
-                <span style={{ display: "block", fontSize: "0.7rem", color: "var(--text-dim)" }}>
-                  {PERMISSION_LABEL[t.permission]}
-                  {t.remixOf && (
-                    <>
-                      {" · a remix of "}
-                      <Link to={`/community-album/${t.remixOf.albumSlug}`}>{t.remixOf.title}</Link>
-                    </>
-                  )}
+            <div key={t.id} style={{ border: "1px solid var(--border)", borderRadius: "var(--radius)" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "0.6rem", padding: "0.4rem 0.6rem" }}>
+                <button className="btn" onClick={() => playTrack(t)}>
+                  ▶
+                </button>
+                <button className="btn" onClick={() => addToQueue([t])} title="Add to queue">
+                  +
+                </button>
+                <span className="mono" style={{ color: "var(--text-dim)", fontSize: "0.8rem" }}>
+                  {i + 1}
                 </span>
-              </span>
-              <AddToPlaylistControl communityTrackId={t.id} />
-              <button
-                className="btn"
-                onClick={() => toggleLike(t.id)}
-                title="Resonate"
-                style={{ color: t.likedByMe ? "var(--accent-forum)" : undefined }}
-              >
-                ◈ {t.likeCount}
-              </button>
+                <span style={{ flex: 1 }}>
+                  {t.title}
+                  <span style={{ display: "block", fontSize: "0.7rem", color: "var(--text-dim)" }}>
+                    {PERMISSION_LABEL[t.permission]}
+                    {t.remixOf && (
+                      <>
+                        {" · a remix of "}
+                        <Link to={`/community-album/${t.remixOf.albumSlug}`}>{t.remixOf.title}</Link>
+                      </>
+                    )}
+                  </span>
+                </span>
+                {t.lyrics && (
+                  <button
+                    className="btn"
+                    style={{ fontSize: "0.75rem" }}
+                    onClick={() =>
+                      setExpandedLyrics((prev) => {
+                        const next = new Set(prev);
+                        if (next.has(t.id)) next.delete(t.id);
+                        else next.add(t.id);
+                        return next;
+                      })
+                    }
+                  >
+                    {expandedLyrics.has(t.id) ? "hide lyrics" : "lyrics"}
+                  </button>
+                )}
+                <AddToPlaylistControl communityTrackId={t.id} />
+                <button
+                  className="btn"
+                  onClick={() => toggleLike(t.id)}
+                  title="Resonate"
+                  style={{ color: t.likedByMe ? "var(--accent-forum)" : undefined }}
+                >
+                  ◈ {t.likeCount}
+                </button>
+              </div>
+              {t.lyrics && expandedLyrics.has(t.id) && (
+                <div style={{ padding: "0 0.6rem 0.6rem", fontSize: "0.85rem", whiteSpace: "pre-wrap", color: "var(--text-dim)", borderTop: "1px solid var(--border)" }}>
+                  {t.lyrics}
+                </div>
+              )}
             </div>
           ))
         )}
