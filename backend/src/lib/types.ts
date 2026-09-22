@@ -17,6 +17,7 @@ export interface PlayableTrackDTO {
   bookmarks: { label: string; timestampSeconds: number }[];
   replayGainDb: number | null;
   source: "official" | "community";
+  genres: string[];
 }
 
 export interface MessageDTO {

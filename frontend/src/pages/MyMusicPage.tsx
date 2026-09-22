@@ -19,6 +19,7 @@ interface AlbumDetailTrack {
   durationSeconds: number | null;
   composer: string | null;
   lyrics: string | null;
+  genres: string[];
 }
 interface MyPlaylist {
   id: number;
@@ -147,6 +148,7 @@ export function MyMusicPage() {
   const [editTitle, setEditTitle] = useState("");
   const [editComposer, setEditComposer] = useState("");
   const [editLyrics, setEditLyrics] = useState("");
+  const [editGenres, setEditGenres] = useState("");
   const replaceFileInputRef = useRef<HTMLInputElement>(null);
   const [replacingTrackId, setReplacingTrackId] = useState<number | null>(null);
 
@@ -155,13 +157,19 @@ export function MyMusicPage() {
     setEditTitle(t.title);
     setEditComposer(t.composer ?? "");
     setEditLyrics(t.lyrics ?? "");
+    setEditGenres(t.genres.join(", "));
   }
 
   async function saveTrackEdit(albumId: number) {
     if (!editingTrackId) return;
     await api(`/api/community-tracks/${editingTrackId}`, {
       method: "PATCH",
-      body: JSON.stringify({ title: editTitle.trim(), composer: editComposer.trim() || null, lyrics: editLyrics.trim() || null }),
+      body: JSON.stringify({
+        title: editTitle.trim(),
+        composer: editComposer.trim() || null,
+        lyrics: editLyrics.trim() || null,
+        genres: editGenres.split(",").map((g) => g.trim()).filter(Boolean),
+      }),
     });
     setEditingTrackId(null);
     useToastStore.getState().showToast("Saved ✓");
@@ -361,6 +369,12 @@ export function MyMusicPage() {
                       <div style={{ display: "flex", gap: "0.3rem", alignItems: "center", flexWrap: "wrap" }}>
                         <input value={editTitle} onChange={(e) => setEditTitle(e.target.value)} placeholder="Title" style={{ fontSize: "0.85rem" }} />
                         <input value={editComposer} onChange={(e) => setEditComposer(e.target.value)} placeholder="Composer (optional)" style={{ fontSize: "0.85rem" }} />
+                        <input
+                          value={editGenres}
+                          onChange={(e) => setEditGenres(e.target.value)}
+                          placeholder="Genres, comma-separated (for Venn Views)"
+                          style={{ fontSize: "0.85rem", minWidth: 220 }}
+                        />
                       </div>
                       <textarea
                         value={editLyrics}

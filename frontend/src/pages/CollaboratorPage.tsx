@@ -70,6 +70,7 @@ export function CollaboratorPage() {
         bookmarks: [],
         replayGainDb: null,
         source: "official" as const,
+        genres: [] as string[],
       })),
   );
 
@@ -184,6 +185,7 @@ export function CollaboratorPage() {
                           bookmarks: [],
                           replayGainDb: null,
                           source: "official" as const,
+        genres: [] as string[],
                         },
                       ])
                     }

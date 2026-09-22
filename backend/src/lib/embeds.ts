@@ -38,6 +38,7 @@ export function trackToDTO(t: TrackWithRelations): PlayableTrackDTO {
     bookmarks: t.bookmarks.map((b) => ({ label: b.label, timestampSeconds: b.timestampSeconds })),
     replayGainDb: t.replayGainDb,
     source: "official",
+    genres: [],
   };
 }
 

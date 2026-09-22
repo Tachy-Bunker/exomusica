@@ -29,6 +29,7 @@ interface PlaylistItem {
   composer: string | null;
   branchSlug: string | null;
   replayGainDb: number | null;
+  genres: string[];
 }
 interface PlaylistDetail {
   id: number;
@@ -78,6 +79,7 @@ function playlistItemToPlayable(item: PlaylistItem): PlayableTrackDTO {
     bookmarks: [],
     replayGainDb: item.replayGainDb,
     source: item.source,
+    genres: item.genres,
   };
 }
 

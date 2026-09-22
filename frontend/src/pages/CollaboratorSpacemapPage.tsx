@@ -59,6 +59,7 @@ export function CollaboratorSpacemapPage() {
       bookmarks: [],
       replayGainDb: null,
       source: "official" as const,
+        genres: [] as string[],
     })),
   );
 

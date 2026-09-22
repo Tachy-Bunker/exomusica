@@ -156,6 +156,7 @@ export async function communityMusicRoutes(app: FastifyInstance): Promise<void> 
         bookmarks: [],
         replayGainDb: t.replayGainDb,
         source: "community" as const,
+        genres: t.genres,
         permission: t.permission,
         likeCount: t._count.likes,
         likedByMe: myLikes.has(t.id),
@@ -299,7 +300,7 @@ export async function communityMusicRoutes(app: FastifyInstance): Promise<void> 
     return reply.code(201).send(track);
   });
 
-  app.patch<{ Params: { id: string }; Body: Partial<{ title: string; composer: string | null; lyrics: string | null }> }>(
+  app.patch<{ Params: { id: string }; Body: Partial<{ title: string; composer: string | null; lyrics: string | null; genres: string[] }> }>(
     "/api/community-tracks/:id",
     { preHandler: requireAuth },
     async (req, reply) => {
@@ -453,6 +454,7 @@ export async function communityMusicRoutes(app: FastifyInstance): Promise<void> 
           composer: item.track.album.composer,
           branchSlug: item.track.album.branch?.slug ?? null,
           replayGainDb: item.track.replayGainDb,
+          genres: [] as string[],
         };
       }
       const ct = item.communityTrack!;
@@ -468,6 +470,7 @@ export async function communityMusicRoutes(app: FastifyInstance): Promise<void> 
         coverArtUrl: ct.album.coverArtUrl,
         composer: ct.composer ?? ct.album.composer,
         branchSlug: null,
+        genres: ct.genres,
         replayGainDb: ct.replayGainDb,
       };
     });
@@ -501,7 +504,7 @@ export async function communityMusicRoutes(app: FastifyInstance): Promise<void> 
     async (req, reply) => {
       const playlist = await prisma.playlist.findUnique({ where: { id: Number(req.params.id) } });
       if (!playlist) return reply.code(404).send({ error: "no such playlist" });
-      if (playlist.ownerId !== req.user!.id) return reply.code(403).send({ error: "not your playlist" });
+      if (playlist.ownerId !== req.user!.id && !req.user!.isAdmin) return reply.code(403).send({ error: "not your playlist" });
       const updated = await prisma.playlist.update({ where: { id: playlist.id }, data: { fxSettingsJson: (req.body ?? {}) as Prisma.InputJsonValue } });
       return { fxSettings: updated.fxSettingsJson };
     },
