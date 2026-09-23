@@ -88,6 +88,7 @@ model User {
   communityTrackLikes CommunityTrackLike[]
   playlistCollaborations PlaylistCollaborator[]
   sampleBankItems SampleBankItem[]
+  studies         Study[]
   challengeSubmissions ChallengeSubmission[]
   questionsAsked ForumChannel[]
   bookmarks        Bookmark[]
@@ -181,6 +182,7 @@ model ForumChannel {
   messages Message[]
   mapNode  ForumMapNode?
   follows  ChannelFollow[]
+  study    Study?
 }
 
 model ChannelFollow {

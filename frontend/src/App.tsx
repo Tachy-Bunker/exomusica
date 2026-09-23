@@ -37,6 +37,7 @@ import { ChannelsPage } from "./pages/admin/ChannelsPage";
 import { UsersPage } from "./pages/admin/UsersPage";
 import { AlbumsAdminPage } from "./pages/admin/AlbumsAdminPage";
 import { WikiAdminPage } from "./pages/admin/WikiAdminPage";
+import { AllTracksAdminPage } from "./pages/admin/AllTracksAdminPage";
 import { BlogAdminPage } from "./pages/admin/BlogAdminPage";
 import { EmojiAdminPage } from "./pages/admin/EmojiAdminPage";
 import { EmailTemplatesAdminPage } from "./pages/admin/EmailTemplatesAdminPage";
@@ -110,6 +111,7 @@ export default function App() {
                 <Route path="users" element={<UsersPage />} />
                 <Route path="albums" element={<AlbumsAdminPage />} />
                 <Route path="wiki" element={<WikiAdminPage />} />
+                <Route path="all-tracks" element={<AllTracksAdminPage />} />
                 <Route path="blog" element={<BlogAdminPage />} />
                 <Route path="emoji" element={<EmojiAdminPage />} />
                 <Route path="email-templates" element={<EmailTemplatesAdminPage />} />
