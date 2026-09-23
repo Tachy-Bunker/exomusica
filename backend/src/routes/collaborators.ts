@@ -65,6 +65,7 @@ export async function collaboratorRoutes(app: FastifyInstance): Promise<void> {
         format: tc.track.format,
         durationSeconds: tc.track.durationSeconds,
         position: tc.track.position,
+        genres: tc.track.genres,
       });
     }
 

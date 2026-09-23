@@ -44,6 +44,7 @@ import { ChatDock } from "./ChatDock";
 import { NotificationWidget } from "./NotificationWidget";
 import { OnlineOrbs } from "./OnlineOrbs";
 import { PlayerBar } from "./PlayerBar";
+import { TrackPreloader } from "./TrackPreloader";
 import { resumeSharedContextIfNeeded } from "../lib/oneShotSfx";
 import { resumeAnalyserContextIfNeeded } from "../lib/audioAnalyser";
 
@@ -353,6 +354,7 @@ export function Layout() {
       </main>
 
       <PlayerBar />
+      <TrackPreloader />
       <ChatDock />
       <div className="crt-overlay" />
       <Toast />

@@ -28,7 +28,7 @@ enum AudioFormat {
   AAC
 }
 
-// A User row is never hard-deleted — messages must stay attributed. isGhost
+// A User row is never hard-deleted - messages must stay attributed. isGhost
 // marks an account that can't log in; ghostReason says why, since a
 // Discord-import placeholder and a real member who deleted their account
 // are both "ghosts" for attribution purposes but need different handling
@@ -40,7 +40,7 @@ enum GhostReason {
 
 model User {
   id                    Int          @id @default(autoincrement())
-  username              String       @unique // kept forever, even for ghosts — attribution needs a name
+  username              String       @unique // kept forever, even for ghosts - attribution needs a name
   email                 String?      @unique // null once a ghost: no login, no PII to leak
   passwordHash          String?      // null for any ghost (Discord-import never had one; deleted accounts have it cleared)
   avatarUrl             String?
@@ -51,16 +51,16 @@ model User {
   ghostReason           GhostReason?
   claimToken            String?      @unique // only ever set for DISCORD_IMPORT ghosts
   discordId             String?      @unique // Discord snowflake, for idempotent re-import and any future bot bridge
-  linkedUserId          Int?         // ghost's discordId is linked to this real account — resolved at read time everywhere (messages, mentions, export), not a one-time reassignment, since a future bot bridge needs this mapping to keep working for new messages too
+  linkedUserId          Int?         // ghost's discordId is linked to this real account - resolved at read time everywhere (messages, mentions, export), not a one-time reassignment, since a future bot bridge needs this mapping to keep working for new messages too
   linkedUser            User?        @relation("GhostLink", fields: [linkedUserId], references: [id])
   linkedGhosts          User[]       @relation("GhostLink")
   collaboratorProfile   Collaborator?
   deletedAt             DateTime? // set when a real account is ghosted (self- or admin-deleted)
   storageUsedBytes      BigInt       @default(0)
-  storageLimitBytes     BigInt       @default(524288000) // 500MB — raised alongside the 100MB per-attachment limit, since local storage is meant to be temporary now (see the Storage admin tool)
+  storageLimitBytes     BigInt       @default(524288000) // 500MB - raised alongside the 100MB per-attachment limit, since local storage is meant to be temporary now (see the Storage admin tool)
   volumeNotifications   Float        @default(0.8)
   volumeSfxIdle         Float        @default(0.8) // SFX volume when no music is playing
-  volumeSfxPlaying      Float        @default(0.6) // SFX volume while music is playing — ducked so it doesn't compete
+  volumeSfxPlaying      Float        @default(0.6) // SFX volume while music is playing - ducked so it doesn't compete
   volumeMusic           Float        @default(1.0)
   caEnabled             Boolean      @default(true)
   moireEnabled          Boolean      @default(false)
@@ -69,8 +69,8 @@ model User {
   notifyDailySummary    Boolean      @default(false)
   notifyFollowedReplies Boolean      @default(true)
   notifyPrivateMessage  Boolean      @default(true)
-  discordUsername             String?  // for the bot to DM — matched against the bot's shared-server member list, not a stored user ID
-  discordUserId               String?  @unique // preferred over discordUsername — a direct fetch by snowflake ID, more reliable than searching guild members by name
+  discordUsername             String?  // for the bot to DM - matched against the bot's shared-server member list, not a stored user ID
+  discordUserId               String?  @unique // preferred over discordUsername - a direct fetch by snowflake ID, more reliable than searching guild members by name
   notifyDiscordWeeklySummary  Boolean  @default(false)
   notifyDiscordDailySummary   Boolean  @default(false)
   notifyDiscordFollowedReplies Boolean @default(false)
@@ -135,7 +135,7 @@ model Branch {
   description String?
   coverArtUrl String?
   hidden      Boolean  @default(false) // soft take-down: excluded from public listings, data untouched
-  visibility  BranchVisibility @default(VISIBLE) // supersedes `hidden` — kept alongside it rather than migrated destructively; see deploy notes for the backfill
+  visibility  BranchVisibility @default(VISIBLE) // supersedes `hidden` - kept alongside it rather than migrated destructively; see deploy notes for the backfill
   crystalCount Int @default(5) // number of shard fragments rendered for a Baby Crystals branch, admin-controlled to reflect project progress
   isAnchor    Boolean  @default(false) // true + no parent = independent anchor elsewhere on the map, not part of the central cluster
   guideAssetId  Int?
@@ -163,9 +163,9 @@ model ForumChannel {
   ogTitle       String?
   ogDescription String?
   ogImageUrl    String?
-  contentMarkdown String? @db.Text // optional illustrative content shown on the topic's page — images, text, embeds
+  contentMarkdown String? @db.Text // optional illustrative content shown on the topic's page - images, text, embeds
   discordChannelId  String? @unique // the Discord channel this topic is bridged to
-  discordWebhookUrl String? // optional — lets outgoing messages show as "{username} | Exo-API" instead of a plain bot message prefixed with the username
+  discordWebhookUrl String? // optional - lets outgoing messages show as "{username} | Exo-API" instead of a plain bot message prefixed with the username
   category    String?
   position    Int         @default(0)
   kind        ChannelKind
@@ -212,7 +212,7 @@ model Message {
   isDeleted    Boolean      @default(false)
   editedAt     DateTime?
   importedFrom String? // e.g. "discord:<author-id>:<timestamp>" for traceability
-  discordMessageId String? @unique // set once forwarded to Discord — lets a Discord-side reply resolve back to this message
+  discordMessageId String? @unique // set once forwarded to Discord - lets a Discord-side reply resolve back to this message
 
   reactions   Reaction[]
   bookmarks   Bookmark[]
@@ -290,7 +290,7 @@ model Album {
   composer    String // default/primary composer shown on the album as a whole
   coverArtUrl String?
   description String?  @db.Text
-  contentMarkdown String? @db.Text // optional illustrative content shown on the album's page — images, text, embeds
+  contentMarkdown String? @db.Text // optional illustrative content shown on the album's page - images, text, embeds
   createdAt   DateTime @default(now())
 
   tracks        Track[]
@@ -299,7 +299,7 @@ model Album {
   galleryImages AlbumGalleryImage[]
 }
 
-// Replaces the old fixed streamUrl/downloadUrl pair — named, unlimited,
+// Replaces the old fixed streamUrl/downloadUrl pair - named, unlimited,
 // reorderable (Spotify, Bandcamp, archive.org, whatever else).
 model LinkIcon {
   id  Int    @id @default(autoincrement())
@@ -315,7 +315,7 @@ model AlbumLink {
   album    Album  @relation(fields: [albumId], references: [id], onDelete: Cascade)
   label    String
   url      String
-  iconUrl  String? // legacy per-link upload — kept for anything set before the icon library existed
+  iconUrl  String? // legacy per-link upload - kept for anything set before the icon library existed
   linkIconId Int?
   linkIcon   LinkIcon? @relation(fields: [linkIconId], references: [id])
   position Int    @default(0)
@@ -338,14 +338,15 @@ model Track {
   format          AudioFormat
   durationSeconds Int?
   position        Int         @default(0)
-  replayGainDb    Float? // sitewide loudness normalization — null means not yet analyzed
+  replayGainDb    Float? // sitewide loudness normalization - null means not yet analyzed
+  genres          String[] @default([]) // user-assigned, as many as wanted - drives Venn Views placement
 
   bookmarks    AudioBookmark[]
   collaborators TrackCollaborator[] // per-track composer/credit override, checkbox-selected from the album's collaborators
   playlistItems PlaylistItem[]
 }
 
-// Multi-select ("checkboxes") credit per track — a track can have more than
+// Multi-select ("checkboxes") credit per track - a track can have more than
 // one composer when multiple collaborators worked on it specifically,
 // distinct from Album.composer which is just the album-level default.
 model TrackCollaborator {
@@ -374,7 +375,7 @@ enum AboutFeatureKind {
 // One ordered, admin-curated list powers the About page. A COLLABORATOR
 // entry points at a Collaborator but carries its own description/image
 // (independent of that collaborator's bio/pictureUrl used elsewhere, e.g.
-// album credits) — the About page description doesn't have to match what
+// album credits) - the About page description doesn't have to match what
 // shows on an album. AWARD and CUSTOM need no collaborator at all; this is
 // the "awards, images with a description" extensibility asked for without
 // another schema change when that's actually built.
@@ -400,7 +401,7 @@ model Collaborator {
   position     Int     @default(0) // admin-controlled order for the all-collaborators wiki index
   bio          String? @db.Text
   pictureUrl   String?
-  legacyLinksJson Json? // old unedited links blob — kept for the one-time migration script, no longer read by the app
+  legacyLinksJson Json? // old unedited links blob - kept for the one-time migration script, no longer read by the app
   links        CollaboratorLink[]
   linkedUserId Int?    @unique
   linkedUser   User?   @relation(fields: [linkedUserId], references: [id])
@@ -512,7 +513,7 @@ enum EmailType {
 }
 
 // Admin-editable HTML per email type. A missing row for a type just means
-// "using the built-in default" (see lib/emailTemplates.ts) — this table
+// "using the built-in default" (see lib/emailTemplates.ts) - this table
 // only holds overrides, so shipping a new email type never requires a
 // migration to backfill rows.
 model EmailTemplate {
@@ -523,7 +524,7 @@ model EmailTemplate {
 }
 
 // Admin-uploaded fonts (OTF/TTF/WOFF/WOFF2), assignable per-branch,
-// per-topic, per-wiki-page, or per-blog-post — each of those four gets its
+// per-topic, per-wiki-page, or per-blog-post - each of those four gets its
 // own optional fontId rather than one global "site font" choice.
 // Admin-uploaded notification sounds, assignable as the default for any
 // NotificationEvent and overridable per-user in account settings.
@@ -539,12 +540,12 @@ model NotificationSound {
 }
 
 // Admin can create as many of these as they want ("any number... for
-// events") — key is what application code actually fires by; label is
+// events") - key is what application code actually fires by; label is
 // what the user sees in their preferences. Four are seeded (see seed.ts):
 // message_followed_topic, message_other_topic, join_approved,
-// account_updated — those four are the ones real code paths trigger today.
+// account_updated - those four are the ones real code paths trigger today.
 // Extra events an admin creates beyond those four are valid, storable, and
-// selectable in preferences, but nothing fires them automatically yet —
+// selectable in preferences, but nothing fires them automatically yet -
 // there's no code path wired to an arbitrary new key.
 model NotificationEvent {
   id             Int                @id @default(autoincrement())
@@ -569,7 +570,7 @@ model UserSoundPref {
   @@id([userId, eventId])
 }
 
-// Persistent per-user inbox — powers the notification widget (so it has
+// Persistent per-user inbox - powers the notification widget (so it has
 // history across reloads, not just whatever arrived while connected) and
 // is what the personal WebSocket channel pushes as it's created.
 model Notification {
@@ -587,7 +588,7 @@ model Notification {
   @@index([userId, createdAt])
 }
 
-// Singleton row (id is always 1) — sitewide settings that aren't tied to
+// Singleton row (id is always 1) - sitewide settings that aren't tied to
 // any specific branch/topic/wiki/blog. Currently just the default font
 // applied everywhere nothing more specific overrides it.
 // Admin-uploaded GIFs for the guide-character intro sequence (an "Aurora"-
@@ -609,7 +610,7 @@ model SiteSettings {
   forumMapInitialX    Float @default(0)
   forumMapInitialY    Float @default(0)
   forumMapInitialZoom Float @default(1)
-  forumMapNavSpeed    Float @default(1) // multiplier on WASD/joystick acceleration — independent of zoom level
+  forumMapNavSpeed    Float @default(1) // multiplier on WASD/joystick acceleration - independent of zoom level
   forumMapFireflySize Float @default(1) // multiplier on each firefly's rendered size
   forumMapFireflySpeed Float @default(1) // multiplier on the fireflies' orbit speed
   spotlightCommunityTrackId Int? // admin-curated "featured this week" pick, shown at the top of /community
@@ -639,20 +640,20 @@ model SiteSettings {
   smtpUser           String?
   smtpPassword       String?
   smtpFrom           String?
-  smtpFromName       String? // display name shown to recipients — without this, most email clients just show the address's own prefix
+  smtpFromName       String? // display name shown to recipients - without this, most email clients just show the address's own prefix
   chatOpenSfxUrl     String? // plays once whenever a new chat location (branch/topic) is opened
   joinNotifyEmail    String? // admin gets emailed here whenever a new join request comes in
   joinNotifyDiscordUsername String? // admin also gets DMed here, if the bridge bot shares a server with this Discord account
-  joinNotifyDiscordUserId   String? // preferred over the username above — a direct, reliable lookup by snowflake ID
+  joinNotifyDiscordUserId   String? // preferred over the username above - a direct, reliable lookup by snowflake ID
   linkClickSfxUrl    String? // plays whenever the user clicks any hyperlink, site-wide
   chatHudRevealRate  Float   @default(30) // ms per character for the letter-by-letter chat reveal
   chatHudSfxUrl      String? // loops during the reveal
-  chatSplashMessages Json?   // string[] — admin-managed rotating hints, "Write a message..." is the fallback if empty
-  categoryOrder      Json?   // string[] — admin-controlled forum topic category display order
-  discordBotToken    String? // Discord bot token — the bridge is inactive if this is unset
+  chatSplashMessages Json?   // string[] - admin-managed rotating hints, "Write a message..." is the fallback if empty
+  categoryOrder      Json?   // string[] - admin-controlled forum topic category display order
+  discordBotToken    String? // Discord bot token - the bridge is inactive if this is unset
   discordAnnounceChannelId String? // channel the bot posts admin-selected announcements to, as itself (Exo-API)
   discordPresenceChannelId String? // if set, only guild members who can see this channel count toward online presence; if unset, all online guild members do
-  discordAnnounceEvents    Json?   // string[] — which event types are enabled, e.g. ["join_applied","join_approved","news_published","calls_for_artists","calls_for_ideas"]
+  discordAnnounceEvents    Json?   // string[] - which event types are enabled, e.g. ["join_applied","join_approved","news_published","calls_for_artists","calls_for_ideas"]
   faviconUrl         String? // site-wide favicon
   ogHomepageTitle       String?
   ogHomepageDescription String?
@@ -675,14 +676,14 @@ model SiteSettings {
   ogCollaboratorDefaultTitle       String?
   ogCollaboratorDefaultDescription String?
   ogCollaboratorDefaultImageUrl    String?
-  ogForumsIndexTitle       String? // shared by both /discussion (list) and /discussion/map — one embed for the whole Forums section
+  ogForumsIndexTitle       String? // shared by both /discussion (list) and /discussion/map - one embed for the whole Forums section
   ogForumsIndexDescription String?
   ogForumsIndexImageUrl    String?
 }
 
 model FxSettings {
   id                 Int    @id @default(1)
-  spacingMultiplier  Float  @default(1.3) // scales repulsion radius/strength and world spread — raised above 1.0 by default since the map was reported as too cluttered
+  spacingMultiplier  Float  @default(1.3) // scales repulsion radius/strength and world spread - raised above 1.0 by default since the map was reported as too cluttered
   debrisCount        Int    @default(320)
   wardenSizeMin      Float  @default(24)
   wardenSizeMax      Float  @default(44)
@@ -691,7 +692,7 @@ model FxSettings {
   drift              Float  @default(0.38)
   lurk               Float  @default(0.45)
   bgBright           Float  @default(0.5)
-  rmsBrightnessAmount Float @default(0.3) // how much audio RMS pushes background brightness above bgBright while playing — 0 disables the effect
+  rmsBrightnessAmount Float @default(0.3) // how much audio RMS pushes background brightness above bgBright while playing - 0 disables the effect
   bgSat              Float  @default(0.5)
   bgContrast         Float  @default(0.5)
   vignette           Float  @default(0.5)
@@ -711,7 +712,7 @@ model CustomFont {
   name       String   @unique // display name shown in admin, e.g. "Anomaly Mono"
   familyName String   @unique // sanitized CSS font-family value, derived from name
   fileUrl    String
-  format     String // "opentype" | "truetype" | "woff" | "woff2" — goes straight into the @font-face src
+  format     String // "opentype" | "truetype" | "woff" | "woff2" - goes straight into the @font-face src
   createdAt  DateTime @default(now())
 
   branches     Branch[]
@@ -757,12 +758,12 @@ model ForumMapNode {
   children  ForumMapNode[]   @relation("MapTree")
   x         Float            @default(0)
   y         Float            @default(0)
-  color     String? // admin override — falls back to a type-based default when unset
-  size      Float?  // admin override for the node's radius — same fallback
-  hidden    Boolean @default(false) // hidden by default — parent shows a reveal handle instead, until the visitor interacts with it
+  color     String? // admin override - falls back to a type-based default when unset
+  size      Float?  // admin override for the node's radius - same fallback
+  hidden    Boolean @default(false) // hidden by default - parent shows a reveal handle instead, until the visitor interacts with it
 }
 
-// --- Sample/patch bank: raw material separate from finished tracks —
+// --- Sample/patch bank: raw material separate from finished tracks -
 // field recordings, synth presets, alterant scripts, one-shots. A flat,
 // tagged library rather than albums, since there's no natural "release"
 // structure for this kind of material.
@@ -857,9 +858,9 @@ model CommunityTrack {
   durationSeconds Int?
   position        Int            @default(0)
   permission      TrackPermission @default(LISTEN_ONLY) // creator-set: how others may use this track
-  replayGainDb    Float? // sitewide loudness normalization — null means not yet analyzed
+  replayGainDb    Float? // sitewide loudness normalization - null means not yet analyzed
   lyrics          String? // also acts as a description; shown expandable on the album page and playlist list view
-  genres          String[] @default([]) // user-assigned, as many as wanted — drives Venn Views placement
+  genres          String[] @default([]) // user-assigned, as many as wanted - drives Venn Views placement
 
   playlistItems PlaylistItem[]
   likes         CommunityTrackLike[]
@@ -869,7 +870,7 @@ model CommunityTrack {
   challengeSubmissions ChallengeSubmission[]
 }
 
-// A lightweight "resonate" signal — deliberately simpler than the full
+// A lightweight "resonate" signal - deliberately simpler than the full
 // emoji-reaction system chat uses, just a single toggle per user per track.
 model CommunityTrackLike {
   id        Int            @id @default(autoincrement())
@@ -889,7 +890,7 @@ model Playlist {
   slug        String   @unique
   title       String
   description String?  @db.Text
-  fxSettingsJson Json? // owner-customizable visual controls for this playlist's spacemap view — null means "use the same defaults as the main spacemap"
+  fxSettingsJson Json? // owner-customizable visual controls for this playlist's spacemap view - null means "use the same defaults as the main spacemap"
   createdAt   DateTime @default(now())
 
   items PlaylistItem[]
@@ -897,7 +898,7 @@ model Playlist {
   mapNode ForumMapNode?
 }
 
-// Anyone the owner adds here can add/remove tracks too — a genuinely
+// Anyone the owner adds here can add/remove tracks too - a genuinely
 // shared, multi-person playlist rather than a solo one. The owner alone
 // can add/remove collaborators or delete the playlist itself.
 model PlaylistCollaborator {
@@ -912,7 +913,7 @@ model PlaylistCollaborator {
 }
 
 // Exactly one of trackId (an official release) / communityTrackId (a
-// user-submitted one) is set per row — a playlist can freely mix both.
+// user-submitted one) is set per row - a playlist can freely mix both.
 model PlaylistItem {
   id               Int             @id @default(autoincrement())
   playlistId       Int

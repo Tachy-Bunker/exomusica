@@ -454,7 +454,7 @@ export async function communityMusicRoutes(app: FastifyInstance): Promise<void> 
           composer: item.track.album.composer,
           branchSlug: item.track.album.branch?.slug ?? null,
           replayGainDb: item.track.replayGainDb,
-          genres: [] as string[],
+          genres: item.track.genres,
           trackPosition: item.track.position,
         };
       }

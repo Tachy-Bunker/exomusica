@@ -31,7 +31,7 @@ interface AlbumDetail {
   links: { id: number; label: string; url: string; iconUrl: string | null; linkIconId: number | null; linkIcon: { id: number; name: string; url: string } | null }[];
   gallery: { id: number; url: string }[];
   collaborators: { id: number; name: string }[];
-  tracks: { id: number; title: string; fileUrl: string; format: string; position: number; composers: { id: number }[] }[];
+  tracks: { id: number; title: string; fileUrl: string; format: string; position: number; genres: string[]; composers: { id: number }[] }[];
 }
 
 export function AlbumsAdminPage() {
@@ -57,7 +57,7 @@ export function AlbumsAdminPage() {
   const [detail, setDetail] = useState<AlbumDetail | null>(null);
   const [linkForm, setLinkForm] = useState({ label: "", url: "" });
   const [editingTrackId, setEditingTrackId] = useState<number | null>(null);
-  const [trackEditForm, setTrackEditForm] = useState({ title: "", fileUrl: "", format: "MP3" });
+  const [trackEditForm, setTrackEditForm] = useState({ title: "", fileUrl: "", format: "MP3", genres: "" });
   const [editingAlbumInfo, setEditingAlbumInfo] = useState(false);
   const [albumEditForm, setAlbumEditForm] = useState({ title: "", composer: "", description: "", contentMarkdown: "", ogTitle: "", ogDescription: "", ogImageUrl: "" });
   const contentTextareaRef = useRef<HTMLTextAreaElement>(null);
@@ -180,13 +180,19 @@ export function AlbumsAdminPage() {
     if (managingSlug) loadDetail(managingSlug);
   }
 
-  function startEditTrack(t: { id: number; title: string; fileUrl: string; format: string }) {
+  function startEditTrack(t: { id: number; title: string; fileUrl: string; format: string; genres: string[] }) {
     setEditingTrackId(t.id);
-    setTrackEditForm({ title: t.title, fileUrl: t.fileUrl, format: t.format });
+    setTrackEditForm({ title: t.title, fileUrl: t.fileUrl, format: t.format, genres: t.genres.join(", ") });
   }
 
   async function saveTrackEdit(id: number) {
-    await api(`/api/admin/tracks/${id}`, { method: "PATCH", body: JSON.stringify(trackEditForm) });
+    await api(`/api/admin/tracks/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify({
+        ...trackEditForm,
+        genres: trackEditForm.genres.split(",").map((g) => g.trim()).filter(Boolean),
+      }),
+    });
     setEditingTrackId(null);
     if (managingSlug) loadDetail(managingSlug);
   }
@@ -546,6 +552,12 @@ export function AlbumsAdminPage() {
                       </option>
                     ))}
                   </select>
+                  <input
+                    value={trackEditForm.genres}
+                    onChange={(e) => setTrackEditForm((f) => ({ ...f, genres: e.target.value }))}
+                    placeholder="Genres, comma-separated (for Venn Views)"
+                    style={{ flex: 2, minWidth: 200 }}
+                  />
                   <button className="btn btn-primary" onClick={() => saveTrackEdit(t.id)}>
                     Save
                   </button>

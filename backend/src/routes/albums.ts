@@ -277,7 +277,7 @@ export async function albumRoutes(app: FastifyInstance): Promise<void> {
 
   app.patch<{
     Params: { id: string };
-    Body: Partial<{ title: string; fileUrl: string; format: string; durationSeconds: number }>;
+    Body: Partial<{ title: string; fileUrl: string; format: string; durationSeconds: number; genres: string[] }>;
   }>("/api/admin/tracks/:id", { preHandler: requireAdmin }, async (req) => {
     const data = { ...req.body };
     // If the fileUrl is changing and no explicit duration was given,

@@ -37,7 +37,7 @@ interface PlaylistDetail {
   slug: string;
   title: string;
   ownerId: number;
-  fxSettings: (Partial<FxSettings> & { coverSize?: number; spacing?: number; roamSpeed?: number; vennHueStart?: number; vennHueEnd?: number; vennBlobSize?: number }) | null;
+  fxSettings: (Partial<FxSettings> & { coverSize?: number; spacing?: number; roamSpeed?: number; vennHueStart?: number; vennHueEnd?: number; vennBlobSize?: number; vennSpacing?: number }) | null;
   albums: PlaylistAlbum[];
   items: PlaylistItem[];
 }
@@ -120,6 +120,7 @@ export function PlaylistSpaceMapPage() {
     vennHueStart: 260,
     vennHueEnd: 20,
     vennBlobSize: 1,
+    vennSpacing: 1,
   });
   const [, forceRender] = useState(0);
   const [lockedId, setLockedId] = useState<number | null>(null);
@@ -150,6 +151,7 @@ export function PlaylistSpaceMapPage() {
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const controlsRef = useRef(controls);
   const touchDragRef = useRef<{ startClientX: number; startClientY: number; startCamX: number; startCamY: number } | null>(null);
+  const pinchRef = useRef<{ startDist: number; startBlobSize: number; startSpacing: number } | null>(null);
   const viewModeRef = useRef(viewMode);
   viewModeRef.current = viewMode;
   controlsRef.current = controls;
@@ -169,6 +171,7 @@ export function PlaylistSpaceMapPage() {
         vennHueStart: p.fxSettings?.vennHueStart ?? 260,
         vennHueEnd: p.fxSettings?.vennHueEnd ?? 20,
         vennBlobSize: p.fxSettings?.vennBlobSize ?? 1,
+        vennSpacing: p.fxSettings?.vennSpacing ?? 1,
       });
     });
   }
@@ -217,10 +220,11 @@ export function PlaylistSpaceMapPage() {
     });
   }, [playlist, controls.spacing]);
 
-  const vennBlobs = useMemo(() => {
+  const rawVennBlobs = useMemo(() => {
     if (!playlist) return [];
     return layoutGenreBlobs(playlist.items.filter((i) => i.genres.length > 0).map((i) => ({ id: i.trackId, genres: i.genres })));
   }, [playlist]);
+  const vennBlobs = useMemo(() => rawVennBlobs.map((b) => ({ ...b, x: b.x * controls.vennSpacing, y: b.y * controls.vennSpacing })), [rawVennBlobs, controls.vennSpacing]);
   const vennTracks = useMemo(() => {
     if (!playlist) return [];
     return layoutTracks(
@@ -232,12 +236,21 @@ export function PlaylistSpaceMapPage() {
   const vennTracksRef = useRef(vennTracks);
   vennTracksRef.current = vennTracks;
 
+  // Tracks are marked "lit" the moment they actually become the current
+  // track while still playing from this playlist - covers a direct
+  // click/F-key play, and also normal queue advancement once the whole
+  // spiral-ordered queue is populated (see playVennTrack below), so
+  // there's no need to separately intercept "track ended" events.
   useEffect(() => {
-    return useAudioStore.subscribe((state) => {
+    return useAudioStore.subscribe((state, prevState) => {
       if (!playlist) return;
       if (state.currentPlaylist?.slug !== playlist.slug) {
         setLitTrackIds((prev) => (prev.size === 0 ? prev : new Set()));
         vennOriginTrackIdRef.current = null;
+        return;
+      }
+      if (state.currentTrack && state.currentTrack.id !== prevState.currentTrack?.id) {
+        setLitTrackIds((prev) => new Set(prev).add(state.currentTrack!.id));
       }
     });
   }, [playlist]);
@@ -248,33 +261,18 @@ export function PlaylistSpaceMapPage() {
     play(playlistItemToPlayable(item));
     clearQueue();
     setCurrentPlaylist({ slug: p.slug, title: p.title });
-    setLitTrackIds((prev) => new Set(prev).add(item.trackId));
     vennOriginTrackIdRef.current = item.trackId;
+    // Queues every other track in the playlist (not just a handful),
+    // ordered by spiral distance from wherever playback started - the
+    // normal queue/ended() flow then walks through this in order, so no
+    // separate reactive "pick the next one" logic is needed anymore.
+    const order = spiralOrder(vennTracksRef.current, item.trackId);
+    const rest = order
+      .map((point) => p.items.find((i) => i.trackId === point.trackId))
+      .filter((i): i is PlaylistItem => !!i)
+      .map(playlistItemToPlayable);
+    addToQueue(rest);
   }
-
-  // Spiral-neighbor autoplay: once a track started from Venn Views
-  // finishes, move to the nearest-in-spiral-order unplayed track around
-  // wherever playback originally started, rather than the normal queue
-  // order. Only engages while still on this same playlist in Venn mode -
-  // if the user navigated elsewhere or switched playback source, this
-  // does nothing and normal queue/repeat behavior takes over.
-  useEffect(() => {
-    if (viewMode !== "venn") return;
-    return useAudioStore.subscribe((state, prevState) => {
-      if (!prevState.isPlaying || state.isPlaying) return; // only reacts to playback actually stopping
-      if (state.queue.length > 0) return; // playNext() found something in the queue - not a real dead-end
-      if (state.currentTrack?.id !== prevState.currentTrack?.id) return; // a different track started - not the track-end dead-end case
-      const p = playlistRef.current;
-      const originId = vennOriginTrackIdRef.current;
-      if (!p || originId === null || prevState.currentPlaylist?.slug !== p.slug) return;
-      const order = spiralOrder(vennTracks, originId);
-      const next = order.find((t) => !litTrackIds.has(t.trackId));
-      if (!next) return;
-      const item = p.items.find((i) => i.trackId === next.trackId);
-      if (item) playVennTrack(item);
-    });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [viewMode, vennTracks, litTrackIds]);
 
   async function playAlbum(node: AlbumNode) {
     const tracks =
@@ -311,12 +309,30 @@ export function PlaylistSpaceMapPage() {
   }
 
   function handleTouchStart(e: React.TouchEvent) {
-    if (e.touches.length !== 1) return;
     if ((e.target as HTMLElement).closest?.(".space-joystick-base")) return;
+    if (e.touches.length === 2 && viewModeRef.current === "venn") {
+      touchDragRef.current = null;
+      const [a, b] = [e.touches[0], e.touches[1]];
+      const d = Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY);
+      pinchRef.current = { startDist: d, startBlobSize: controlsRef.current.vennBlobSize, startSpacing: controlsRef.current.vennSpacing };
+      return;
+    }
+    if (e.touches.length !== 1) return;
     const t = e.touches[0];
     touchDragRef.current = { startClientX: t.clientX, startClientY: t.clientY, startCamX: cameraRef.current.x, startCamY: cameraRef.current.y };
   }
   function handleTouchMove(e: React.TouchEvent) {
+    if (e.touches.length === 2 && pinchRef.current) {
+      e.preventDefault();
+      const [a, b] = [e.touches[0], e.touches[1]];
+      const d = Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY);
+      const ratio = d / pinchRef.current.startDist;
+      updateControl({
+        vennBlobSize: Math.min(2.5, Math.max(0.4, pinchRef.current.startBlobSize * ratio)),
+        vennSpacing: Math.min(2.5, Math.max(0.4, pinchRef.current.startSpacing * ratio)),
+      });
+      return;
+    }
     if (!touchDragRef.current || e.touches.length !== 1) return;
     e.preventDefault();
     const t = e.touches[0];
@@ -328,6 +344,7 @@ export function PlaylistSpaceMapPage() {
   }
   function handleTouchEnd() {
     touchDragRef.current = null;
+    pinchRef.current = null;
   }
 
   function playLocked() {
@@ -644,6 +661,10 @@ export function PlaylistSpaceMapPage() {
                     <label style={{ fontSize: "0.75rem" }}>Venn blob size</label>
                     <input type="range" min={0.4} max={2.5} step={0.05} value={controls.vennBlobSize} onChange={(e) => updateControl({ vennBlobSize: Number(e.target.value) })} />
                   </div>
+                  <div className="field">
+                    <label style={{ fontSize: "0.75rem" }}>Venn spacing</label>
+                    <input type="range" min={0.4} max={2.5} step={0.05} value={controls.vennSpacing} onChange={(e) => updateControl({ vennSpacing: Number(e.target.value) })} />
+                  </div>
                 </div>
               )}
             </div>
@@ -653,7 +674,7 @@ export function PlaylistSpaceMapPage() {
             <>
           {nodesRef.current.map((a) => {
             const isPlayingAlbum = currentTrack?.albumSlug === a.slug;
-            const size = isPlayingAlbum ? controls.coverSize * 1.15 : controls.coverSize;
+            const size = isPlayingAlbum ? controls.coverSize * 1.3 : controls.coverSize;
             return (
               <Link
                 key={a.id}
@@ -747,11 +768,13 @@ export function PlaylistSpaceMapPage() {
                   style={{
                     position: "absolute",
                     left: `calc(50% + ${cameraRef.current.x + b.x}px)`,
-                    top: `calc(50% + ${cameraRef.current.y + b.y - b.radius - 10}px)`,
+                    top: `calc(50% + ${cameraRef.current.y + b.y - b.radius * controls.vennBlobSize * 0.55}px)`,
                     transform: "translate(-50%, -50%)",
                     fontSize: "0.75rem",
-                    color: "var(--text-dim)",
-                    zIndex: 2,
+                    fontWeight: 600,
+                    color: "#fff",
+                    textShadow: "0 0 4px rgba(0,0,0,0.9), 0 0 8px rgba(0,0,0,0.6)",
+                    zIndex: 4,
                     pointerEvents: "none",
                     whiteSpace: "nowrap",
                   }}

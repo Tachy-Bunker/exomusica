@@ -11,6 +11,7 @@ interface DiscographyTrack {
   format: string;
   durationSeconds: number | null;
   position: number;
+  genres: string[];
 }
 
 interface DiscographyAlbum {
@@ -59,7 +60,7 @@ export function CollaboratorSpacemapPage() {
       bookmarks: [],
       replayGainDb: null,
       source: "official" as const,
-        genres: [] as string[],
+        genres: t.genres,
     })),
   );
 
