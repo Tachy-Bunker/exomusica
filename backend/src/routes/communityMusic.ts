@@ -534,6 +534,20 @@ export async function communityMusicRoutes(app: FastifyInstance): Promise<void> 
     return reply.code(201).send(playlist);
   });
 
+  app.patch<{ Params: { id: string }; Body: Partial<{ title: string; description: string | null }> }>(
+    "/api/playlists/:id",
+    { preHandler: requireAuth },
+    async (req, reply) => {
+      const playlist = await prisma.playlist.findUnique({ where: { id: Number(req.params.id) } });
+      if (!playlist) return reply.code(404).send({ error: "no such playlist" });
+      if (playlist.ownerId !== req.user!.id) return reply.code(403).send({ error: "not your playlist" });
+      const { title, description } = req.body ?? {};
+      if (title !== undefined && !title.trim()) return reply.code(400).send({ error: "title cannot be empty" });
+      const updated = await prisma.playlist.update({ where: { id: playlist.id }, data: { ...(title !== undefined ? { title: title.trim() } : {}), ...(description !== undefined ? { description } : {}) } });
+      return updated;
+    },
+  );
+
   app.delete<{ Params: { id: string } }>("/api/playlists/:id", { preHandler: requireAuth }, async (req, reply) => {
     const playlist = await prisma.playlist.findUnique({ where: { id: Number(req.params.id) } });
     if (!playlist) return reply.code(404).send({ error: "no such playlist" });

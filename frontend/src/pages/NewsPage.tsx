@@ -73,10 +73,10 @@ export function NewsPage() {
     if (!isDesktop || slug) return; // only on the list view
     function onKeyDown(e: KeyboardEvent) {
       if (isTypingTarget(e.target)) return;
-      if (e.code === "ArrowLeft") {
+      if (e.code === "ArrowUp") {
         e.preventDefault();
         setSelectedIndex((i) => Math.max(0, i - 1));
-      } else if (e.code === "ArrowRight") {
+      } else if (e.code === "ArrowDown") {
         e.preventDefault();
         setSelectedIndex((i) => Math.min(posts.length - 1, i + 1));
       } else if (e.code === "Enter" || e.key.toLowerCase() === "t") {
@@ -111,7 +111,7 @@ export function NewsPage() {
   return (
     <div style={{ fontSize: `${scale}rem` }}>
       <h1>
-        News{isDesktop && <span style={{ opacity: 0.4, fontWeight: "normal", fontSize: "0.6em" }}> (use ←→)</span>}
+        News{isDesktop && <span style={{ opacity: 0.4, fontWeight: "normal", fontSize: "0.6em" }}> (use ↑↓)</span>}
       </h1>
       <NewsletterForm />
       <div style={{ marginTop: "1.5rem", display: "flex", flexDirection: "column", gap: "1rem", maxWidth: 640 }}>

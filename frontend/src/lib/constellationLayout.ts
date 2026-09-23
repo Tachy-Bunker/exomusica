@@ -123,7 +123,7 @@ export function layoutConstellationRegions(tracks: ConstellationTrack[]): Conste
  *  deterministic per track so positions are stable across reloads. */
 export function layoutStars(tracks: ConstellationTrack[], regions: ConstellationRegion[]): Star[] {
   const regionByName = new Map(regions.map((r) => [r.name, r]));
-  return tracks
+  const stars = tracks
     .filter((t) => t.genres.length > 0 && regionByName.has(t.genres[0]))
     .map((t) => {
       const region = regionByName.get(t.genres[0])!;
@@ -135,6 +135,45 @@ export function layoutStars(tracks: ConstellationTrack[], regions: Constellation
       const r = Math.sqrt(rand()) * spread; // sqrt for uniform area density, not center-biased
       return { trackId: t.id, x: region.x + Math.cos(angle) * r, y: region.y + Math.sin(angle) * r, rootGenre: t.genres[0], genres: t.genres };
     });
+
+  // Minimum-distance pass: a pure random scatter can still land two
+  // stars almost on top of each other by chance, especially in a
+  // small constellation. Push any too-close pair apart, grouped by
+  // constellation only - stars in different regions are already far
+  // enough apart that they never need to interact here.
+  const MIN_DIST = 26;
+  const byRoot = new Map<string, typeof stars>();
+  for (const s of stars) {
+    if (!byRoot.has(s.rootGenre)) byRoot.set(s.rootGenre, []);
+    byRoot.get(s.rootGenre)!.push(s);
+  }
+  for (const group of byRoot.values()) {
+    for (let iter = 0; iter < 40; iter++) {
+      let moved = false;
+      for (let i = 0; i < group.length; i++) {
+        for (let j = i + 1; j < group.length; j++) {
+          const a = group[i];
+          const b = group[j];
+          const dx = b.x - a.x;
+          const dy = b.y - a.y;
+          const dist = Math.hypot(dx, dy) || 0.001;
+          if (dist < MIN_DIST) {
+            const push = (MIN_DIST - dist) / 2;
+            const ux = dx / dist;
+            const uy = dy / dist;
+            a.x -= ux * push;
+            a.y -= uy * push;
+            b.x += ux * push;
+            b.y += uy * push;
+            moved = true;
+          }
+        }
+      }
+      if (!moved) break;
+    }
+  }
+
+  return stars;
 }
 
 /** All connection lines for every star: the faint always-visible

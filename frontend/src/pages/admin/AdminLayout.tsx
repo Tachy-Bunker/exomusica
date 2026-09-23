@@ -38,6 +38,9 @@ export function AdminLayout() {
         <NavLink to="/admin/all-tracks" className={({ isActive }) => (isActive ? "active" : "")}>
           All Tracks
         </NavLink>
+        <NavLink to="/admin/studies" className={({ isActive }) => (isActive ? "active" : "")}>
+          Studies
+        </NavLink>
         <NavLink to="/admin/wiki" className={({ isActive }) => (isActive ? "active" : "")}>
           Wiki
         </NavLink>

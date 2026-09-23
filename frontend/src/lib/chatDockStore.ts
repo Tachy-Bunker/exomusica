@@ -32,11 +32,10 @@ export const useChatDockStore = create<ChatDockState>()(
       // content.
       openChat: (slug, name, branchSlug) =>
         set({ openChannelSlug: slug, openChannelName: name, openBranchSlug: branchSlug ?? null, collapsed: false }),
-      // "Close" now means collapse, not wipe - once a topic has been
-      // opened, it stays remembered (and persists across a full page
-      // reload) until the user deliberately opens a different one. This
-      // is what E toggles, and what the dock's own close button now does.
-      close: () => set({ collapsed: true }),
+      // Fully hides the dock - distinct from collapse, which keeps the
+      // channel remembered and just minimizes. This is what the dock's
+      // own X button does; E and the "_" button still just collapse.
+      close: () => set({ openChannelSlug: null, openChannelName: null, openBranchSlug: null, collapsed: false }),
       toggleCollapse: () => set((s) => ({ collapsed: !s.collapsed })),
       setWidth: (width) => set({ width: Math.min(window.innerWidth * 0.7, Math.max(280, width)) }),
       setPageChannel: (channel) => set({ pageChannel: channel }),

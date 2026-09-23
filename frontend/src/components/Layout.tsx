@@ -68,6 +68,15 @@ export function Layout() {
   const suppressGlobalEShortcut = useChatDockStore((s) => s.suppressGlobalEShortcut);
 
   useEffect(() => {
+    function handleEscape(e: KeyboardEvent) {
+      if (e.key !== "Escape") return;
+      if (!isTypingTarget(e.target)) return;
+      (e.target as HTMLElement).blur();
+    }
+    window.addEventListener("keydown", handleEscape);
+    return () => window.removeEventListener("keydown", handleEscape);
+  }, []);
+  useEffect(() => {
     if (!isDesktop) return;
     function handleShortcut(e: KeyboardEvent) {
       if (isTypingTarget(e.target)) return;

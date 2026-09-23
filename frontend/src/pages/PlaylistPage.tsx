@@ -36,6 +36,8 @@ interface PlaylistDetail {
 export function PlaylistPage() {
   const { slug } = useParams<{ slug: string }>();
   const [playlist, setPlaylist] = useState<PlaylistDetail | null>(null);
+  const [editingTitle, setEditingTitle] = useState(false);
+  const [titleDraft, setTitleDraft] = useState("");
   const [collabUsername, setCollabUsername] = useState("");
   const { user } = useAuth();
   const play = useAudioStore((s) => s.play);
@@ -46,6 +48,13 @@ export function PlaylistPage() {
   function reload() {
     if (!slug) return;
     api<PlaylistDetail>(`/api/playlists/${slug}`).then(setPlaylist);
+  }
+
+  async function saveTitle() {
+    if (!playlist || !titleDraft.trim()) return;
+    await api(`/api/playlists/${playlist.id}`, { method: "PATCH", body: JSON.stringify({ title: titleDraft.trim() }) });
+    setEditingTitle(false);
+    reload();
   }
 
   useEffect(reload, [slug]);
@@ -118,7 +127,33 @@ export function PlaylistPage() {
     <div style={{ maxWidth: 720 }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
         <div>
-          <h1 style={{ marginBottom: "0.1rem" }}>{playlist.title}</h1>
+          {editingTitle ? (
+            <div style={{ display: "flex", gap: "0.4rem", alignItems: "center" }}>
+              <input value={titleDraft} onChange={(e) => setTitleDraft(e.target.value)} style={{ fontSize: "1.3rem" }} autoFocus />
+              <button className="btn btn-primary" style={{ fontSize: "0.8rem" }} onClick={saveTitle}>
+                save
+              </button>
+              <button className="btn" style={{ fontSize: "0.8rem" }} onClick={() => setEditingTitle(false)}>
+                cancel
+              </button>
+            </div>
+          ) : (
+            <h1 style={{ marginBottom: "0.1rem" }}>
+              {playlist.title}
+              {user?.id === playlist.ownerId && (
+                <button
+                  className="btn"
+                  style={{ fontSize: "0.7rem", marginLeft: "0.5rem", verticalAlign: "middle" }}
+                  onClick={() => {
+                    setTitleDraft(playlist.title);
+                    setEditingTitle(true);
+                  }}
+                >
+                  rename
+                </button>
+              )}
+            </h1>
+          )}
           <p style={{ color: "var(--text-dim)", marginTop: 0 }}>by {playlist.owner}</p>
         </div>
         <div style={{ display: "flex", gap: "0.5rem" }}>

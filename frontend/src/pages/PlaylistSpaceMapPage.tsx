@@ -355,7 +355,10 @@ export function PlaylistSpaceMapPage() {
     if (viewModeRef.current === "venn") {
       const p = playlistRef.current;
       const item = p?.items.find((i) => i.trackId === id);
-      if (item) playVennTrack(item);
+      if (item) {
+        playVennTrack(item);
+        setScanPanelItemId(item.id);
+      }
       return;
     }
     if (id === -1) {
@@ -753,7 +756,7 @@ export function PlaylistSpaceMapPage() {
           {viewMode === "venn" && (
             <>
               <svg
-                style={{ position: "absolute", left: "50%", top: "50%", overflow: "visible", zIndex: 1, pointerEvents: "none", width: 0, height: 0 }}
+                style={{ position: "absolute", left: "50%", top: "50%", overflow: "visible", zIndex: 1, pointerEvents: "none", width: 1, height: 1 }}
               >
                 <g transform={`translate(${cameraRef.current.x}, ${cameraRef.current.y})`}>
                   <defs>
@@ -769,7 +772,7 @@ export function PlaylistSpaceMapPage() {
                     const isCross = l.kind === "cross-genre";
                     const lit = litTrackIds.has(l.trackId);
                     const hovered = hoveredTrackId === l.trackId;
-                    const opacity = isCross ? (lit ? 0.95 : hovered ? 0.55 : 0) : 0.14;
+                    const opacity = isCross ? (lit ? 0.95 : hovered ? 0.55 : 0) : 0.24;
                     if (opacity === 0) return null;
                     return (
                       <line
@@ -789,28 +792,48 @@ export function PlaylistSpaceMapPage() {
                 </g>
               </svg>
 
-              {regions.map((r) => (
-                <div
-                  key={r.name}
-                  style={{
-                    position: "absolute",
-                    left: `calc(50% + ${cameraRef.current.x + r.x}px)`,
-                    top: `calc(50% + ${cameraRef.current.y + r.y}px)`,
-                    transform: "translate(-50%, -50%)",
-                    fontSize: `${Math.max(0.6, Math.min(1.15, controls.vennBlobSize * (0.75 + Math.sqrt(r.trackCount) * 0.05)))}rem`,
-                    fontWeight: 600,
-                    letterSpacing: "0.04em",
-                    color: "#eaf6ff",
-                    textShadow: "0 0 4px rgba(0,0,0,0.9), 0 0 10px rgba(0,0,0,0.6)",
-                    zIndex: 2,
-                    pointerEvents: "none",
-                    whiteSpace: "nowrap",
-                    textTransform: "uppercase",
-                  }}
-                >
-                  {r.name}
-                </div>
-              ))}
+              {regions.map((r) => {
+                const starSize = Math.max(10, Math.min(34, 8 + Math.sqrt(r.trackCount) * 6)) * (controls.vennBlobSize / 1.2 + 0.4);
+                return (
+                  <div key={r.name}>
+                    <div
+                      title={`${r.name} - ${r.trackCount} track${r.trackCount === 1 ? "" : "s"}`}
+                      style={{
+                        position: "absolute",
+                        left: `calc(50% + ${cameraRef.current.x + r.x}px)`,
+                        top: `calc(50% + ${cameraRef.current.y + r.y}px)`,
+                        transform: "translate(-50%, -50%)",
+                        width: starSize,
+                        height: starSize,
+                        borderRadius: "50%",
+                        background: "radial-gradient(circle, #fff 0%, #cfe8ff 35%, rgba(143, 184, 255, 0.15) 75%, transparent 100%)",
+                        boxShadow: `0 0 ${starSize * 0.9}px ${starSize * 0.25}px rgba(180, 210, 255, 0.35)`,
+                        zIndex: 2,
+                        pointerEvents: "none",
+                      }}
+                    />
+                    <div
+                      style={{
+                        position: "absolute",
+                        left: `calc(50% + ${cameraRef.current.x + r.x}px)`,
+                        top: `calc(50% + ${cameraRef.current.y + r.y + starSize * 0.65 + 10}px)`,
+                        transform: "translate(-50%, -50%)",
+                        fontSize: `${Math.max(0.6, Math.min(1.15, controls.vennBlobSize * (0.75 + Math.sqrt(r.trackCount) * 0.05)))}rem`,
+                        fontWeight: 600,
+                        letterSpacing: "0.04em",
+                        color: "#eaf6ff",
+                        textShadow: "0 0 4px rgba(0,0,0,0.9), 0 0 10px rgba(0,0,0,0.6)",
+                        zIndex: 2,
+                        pointerEvents: "none",
+                        whiteSpace: "nowrap",
+                        textTransform: "uppercase",
+                      }}
+                    >
+                      {r.name}
+                    </div>
+                  </div>
+                );
+              })}
 
               {playlist.items.map((item) => {
                 const point = starByTrackId.get(item.trackId);

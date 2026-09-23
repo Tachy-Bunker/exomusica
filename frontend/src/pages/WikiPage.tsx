@@ -56,6 +56,8 @@ export function WikiPage() {
     flatOrder.push(p);
     for (const c of pages.filter((c) => c.parentId === p.id)) flatOrder.push(c);
   }
+  const STUDIES_SENTINEL: WikiSummary = { id: -999, slug: "__studies__", title: "Studies", parentId: null };
+  flatOrder.push(STUDIES_SENTINEL);
   const [selectedIndex, setSelectedIndex] = useState(0);
   useEffect(() => {
     const i = flatOrder.findIndex((p) => p.slug === slug);
@@ -74,7 +76,8 @@ export function WikiPage() {
         setSelectedIndex((i) => Math.min(flatOrder.length - 1, i + 1));
       } else if (e.code === "Enter" || e.key.toLowerCase() === "t") {
         const target = flatOrder[selectedIndex];
-        if (target) navigate(`/wiki/${target.slug}`);
+        if (target?.id === -999) navigate("/studies");
+        else if (target) navigate(`/wiki/${target.slug}`);
       }
     }
     window.addEventListener("keydown", onKeyDown);
@@ -109,10 +112,13 @@ export function WikiPage() {
           ))}
       </ul>
       <h3 style={{ fontSize: `${0.9 * scale}rem`, marginTop: "1rem" }}>Studies</h3>
-      <p style={{ fontSize: `${0.75 * scale}rem`, color: "var(--text-dim)", marginBottom: "0.3rem" }}>
-        Documented phenomena and experiments, each with their own discussion.
-      </p>
-      <Link to="/studies">Browse studies →</Link>
+      <p style={{ fontSize: `${0.68 * scale}rem`, color: "var(--text-dim)", marginBottom: "0.3rem" }}>Documented experimental lab</p>
+      <Link
+        to="/studies"
+        style={flatOrder[selectedIndex]?.id === -999 ? { outline: "1px dashed var(--accent-forum)", padding: "0 0.2rem" } : undefined}
+      >
+        Browse studies →
+      </Link>
     </nav>
   );
 
