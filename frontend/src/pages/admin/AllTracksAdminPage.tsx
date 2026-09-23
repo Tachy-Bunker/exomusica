@@ -153,7 +153,19 @@ export function AllTracksAdminPage() {
                 <td>
                   <input type="checkbox" checked={selected.has(key)} onChange={() => toggleSelected(key)} />
                 </td>
-                <td>{r.kind === "official" ? "official" : "community"}</td>
+                <td>
+                  {r.kind === "official" ? "official" : "community"}
+                  {(() => {
+                    const url = r.fileUrl ?? "";
+                    const looksValid = url.startsWith("/") || /^https?:\/\//.test(url);
+                    if (looksValid || !url) return null;
+                    return (
+                      <span title={`Malformed file URL, will fail playback: "${url}"`} style={{ color: "#e2703f", marginLeft: "0.3rem" }}>
+                        ⚠
+                      </span>
+                    );
+                  })()}
+                </td>
                 <td>
                   <input
                     value={draft.title}

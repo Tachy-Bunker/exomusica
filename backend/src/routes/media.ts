@@ -36,6 +36,7 @@ export async function mediaRoutes(app: FastifyInstance): Promise<void> {
     try {
       parsed = new URL(externalUrl);
     } catch {
+      req.log.warn({ kind, id, externalUrl }, "audio-proxy: stored URL is not a valid absolute URL");
       return reply.code(400).send({ error: "stored URL is not a valid absolute URL" });
     }
     if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
