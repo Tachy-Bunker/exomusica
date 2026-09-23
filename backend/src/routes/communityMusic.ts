@@ -467,6 +467,7 @@ export async function communityMusicRoutes(app: FastifyInstance): Promise<void> 
           branchSlug: item.track.album.branch?.slug ?? null,
           replayGainDb: item.track.replayGainDb,
           genres: item.track.genres,
+          lyrics: null as string | null,
           trackPosition: item.track.position,
         };
       }
@@ -484,6 +485,7 @@ export async function communityMusicRoutes(app: FastifyInstance): Promise<void> 
         composer: ct.composer ?? ct.album.composer,
         branchSlug: null,
         genres: ct.genres,
+        lyrics: ct.lyrics,
         replayGainDb: ct.replayGainDb,
         trackPosition: ct.position,
       };

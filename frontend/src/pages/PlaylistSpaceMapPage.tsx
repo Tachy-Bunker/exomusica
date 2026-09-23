@@ -9,7 +9,9 @@ import { useSpacemapField, FX_DEFAULTS, type FxSettings } from "../lib/entoptic/
 import { useMapQualityStore } from "../lib/mapQualityStore";
 import { Joystick } from "../components/Joystick";
 import type { PlayableTrackDTO } from "../lib/types";
-import { layoutGenreBlobs, layoutTracks, blobBorderRadius, spiralOrder, type TrackPoint } from "../lib/vennLayout";
+import { spiralOrder, type TrackPoint } from "../lib/vennLayout";
+import { layoutConstellationRegions, layoutStars, buildConnectionLines, type ConstellationTrack } from "../lib/constellationLayout";
+import { ConstellationScanPanel } from "../components/ConstellationScanPanel";
 
 interface PlaylistAlbum {
   slug: string;
@@ -31,6 +33,7 @@ interface PlaylistItem {
   branchSlug: string | null;
   replayGainDb: number | null;
   genres: string[];
+  lyrics: string | null;
 }
 interface PlaylistDetail {
   id: number;
@@ -220,19 +223,18 @@ export function PlaylistSpaceMapPage() {
     });
   }, [playlist, controls.spacing]);
 
-  const rawVennBlobs = useMemo(() => {
-    if (!playlist) return [];
-    return layoutGenreBlobs(playlist.items.filter((i) => i.genres.length > 0).map((i) => ({ id: i.trackId, genres: i.genres })));
-  }, [playlist]);
-  const vennBlobs = useMemo(() => rawVennBlobs.map((b) => ({ ...b, x: b.x * controls.vennSpacing, y: b.y * controls.vennSpacing })), [rawVennBlobs, controls.vennSpacing]);
-  const vennTracks = useMemo(() => {
-    if (!playlist) return [];
-    return layoutTracks(
-      playlist.items.filter((i) => i.genres.length > 0).map((i) => ({ id: i.trackId, genres: i.genres })),
-      vennBlobs,
-    );
-  }, [playlist, vennBlobs]);
-  const vennTrackByItemId = useMemo(() => new Map(playlist?.items.map((item) => [item.id, vennTracks.find((v) => v.trackId === item.trackId)]) ?? []), [playlist, vennTracks]);
+  const constellationTracks: ConstellationTrack[] = useMemo(
+    () => (playlist ? playlist.items.filter((i) => i.genres.length > 0).map((i) => ({ id: i.trackId, genres: i.genres })) : []),
+    [playlist],
+  );
+  const rawRegions = useMemo(() => layoutConstellationRegions(constellationTracks), [constellationTracks]);
+  const regions = useMemo(() => rawRegions.map((r) => ({ ...r, x: r.x * controls.vennSpacing, y: r.y * controls.vennSpacing })), [rawRegions, controls.vennSpacing]);
+  const stars = useMemo(() => layoutStars(constellationTracks, regions), [constellationTracks, regions]);
+  const connectionLines = useMemo(() => buildConnectionLines(stars, regions), [stars, regions]);
+  const vennTracks: TrackPoint[] = stars;
+  const starByTrackId = useMemo(() => new Map(stars.map((s) => [s.trackId, s])), [stars]);
+  const [hoveredTrackId, setHoveredTrackId] = useState<number | null>(null);
+  const [scanPanelItemId, setScanPanelItemId] = useState<number | null>(null);
   const vennTracksRef = useRef(vennTracks);
   vennTracksRef.current = vennTracks;
 
@@ -556,7 +558,7 @@ export function PlaylistSpaceMapPage() {
                 })
               }
             >
-              Views as Venn
+              View as constellation
             </button>
             <div style={{ display: "flex", alignItems: "center", gap: "0.3rem", background: "var(--bg-elevated)", padding: "0.2rem 0.5rem", borderRadius: "var(--radius)" }}>
               <label style={{ fontSize: "0.7rem", color: "var(--text-dim)" }} title="Lower this if the map feels laggy">
@@ -666,7 +668,7 @@ export function PlaylistSpaceMapPage() {
                     <input type="range" min={0} max={360} step={1} value={controls.vennHueEnd} onChange={(e) => updateControl({ vennHueEnd: Number(e.target.value) })} />
                   </div>
                   <div className="field">
-                    <label style={{ fontSize: "0.75rem" }}>Venn blob size</label>
+                    <label style={{ fontSize: "0.75rem" }}>Star/label size</label>
                     <input type="range" min={0.4} max={2.5} step={0.05} value={controls.vennBlobSize} onChange={(e) => updateControl({ vennBlobSize: Number(e.target.value) })} />
                   </div>
                   <div className="field">
@@ -750,74 +752,117 @@ export function PlaylistSpaceMapPage() {
 
           {viewMode === "venn" && (
             <>
-              {vennBlobs.map((b) => (
+              <svg
+                style={{ position: "absolute", left: "50%", top: "50%", overflow: "visible", zIndex: 1, pointerEvents: "none", width: 0, height: 0 }}
+              >
+                <g transform={`translate(${cameraRef.current.x}, ${cameraRef.current.y})`}>
+                  <defs>
+                    <filter id="starGlow" x="-200%" y="-200%" width="500%" height="500%">
+                      <feGaussianBlur stdDeviation="3" result="blur" />
+                      <feMerge>
+                        <feMergeNode in="blur" />
+                        <feMergeNode in="SourceGraphic" />
+                      </feMerge>
+                    </filter>
+                  </defs>
+                  {connectionLines.map((l, i) => {
+                    const isCross = l.kind === "cross-genre";
+                    const lit = litTrackIds.has(l.trackId);
+                    const hovered = hoveredTrackId === l.trackId;
+                    const opacity = isCross ? (lit ? 0.95 : hovered ? 0.55 : 0) : 0.14;
+                    if (opacity === 0) return null;
+                    return (
+                      <line
+                        key={i}
+                        x1={l.fromX}
+                        y1={l.fromY}
+                        x2={l.toX}
+                        y2={l.toY}
+                        stroke={isCross ? "#4fd4c4" : "#8fb8ff"}
+                        strokeWidth={isCross && lit ? 1.6 : 1}
+                        opacity={opacity}
+                        filter={isCross && lit ? "url(#starGlow)" : undefined}
+                        style={{ transition: "opacity 0.25s" }}
+                      />
+                    );
+                  })}
+                </g>
+              </svg>
+
+              {regions.map((r) => (
                 <div
-                  key={b.name}
-                  title={b.name}
+                  key={r.name}
                   style={{
                     position: "absolute",
-                    left: `calc(50% + ${cameraRef.current.x + b.x}px)`,
-                    top: `calc(50% + ${cameraRef.current.y + b.y}px)`,
+                    left: `calc(50% + ${cameraRef.current.x + r.x}px)`,
+                    top: `calc(50% + ${cameraRef.current.y + r.y}px)`,
                     transform: "translate(-50%, -50%)",
-                    width: b.radius * 2 * controls.vennBlobSize,
-                    height: b.radius * 2 * controls.vennBlobSize,
-                    borderRadius: blobBorderRadius(b),
-                    background: `hsla(${controls.vennHueStart + (hashOf(b.name) % 60) - 30}, 55%, 45%, 0.16)`,
-                    border: `1px solid hsla(${controls.vennHueStart + (hashOf(b.name) % 60) - 30}, 55%, 60%, 0.4)`,
-                    zIndex: 1,
-                    pointerEvents: "none",
-                    animation: `playlistVennBlobDrift ${18 + (hashOf(b.name) % 8)}s ease-in-out infinite`,
-                  }}
-                />
-              ))}
-              {vennBlobs.map((b) => (
-                <div
-                  key={`label-${b.name}`}
-                  style={{
-                    position: "absolute",
-                    left: `calc(50% + ${cameraRef.current.x + b.x}px)`,
-                    top: `calc(50% + ${cameraRef.current.y + b.y - b.radius * controls.vennBlobSize * 0.55}px)`,
-                    transform: "translate(-50%, -50%)",
-                    fontSize: `${Math.max(0.55, Math.min(1.1, b.radius * controls.vennBlobSize * 0.045))}rem`,
+                    fontSize: `${Math.max(0.6, Math.min(1.15, controls.vennBlobSize * (0.75 + Math.sqrt(r.trackCount) * 0.05)))}rem`,
                     fontWeight: 600,
-                    color: "#fff",
-                    textShadow: "0 0 4px rgba(0,0,0,0.9), 0 0 8px rgba(0,0,0,0.6)",
-                    zIndex: 4,
+                    letterSpacing: "0.04em",
+                    color: "#eaf6ff",
+                    textShadow: "0 0 4px rgba(0,0,0,0.9), 0 0 10px rgba(0,0,0,0.6)",
+                    zIndex: 2,
                     pointerEvents: "none",
                     whiteSpace: "nowrap",
+                    textTransform: "uppercase",
                   }}
                 >
-                  {b.name}
+                  {r.name}
                 </div>
               ))}
+
               {playlist.items.map((item) => {
-                const point = vennTrackByItemId.get(item.id);
+                const point = starByTrackId.get(item.trackId);
                 if (!point) return null;
                 const lit = litTrackIds.has(item.trackId);
+                const hovered = hoveredTrackId === item.trackId;
                 const hue = controls.vennHueStart + ((controls.vennHueEnd - controls.vennHueStart) * (hashOf(item.title) % 100)) / 100;
+                const size = (lit ? 14 : hovered ? 12 : 9) * (controls.vennBlobSize / 1.2 + 0.4);
                 return (
                   <button
                     key={item.id}
                     title={item.title}
-                    onClick={() => playVennTrack(item)}
+                    onMouseEnter={() => setHoveredTrackId(item.trackId)}
+                    onMouseLeave={() => setHoveredTrackId((id) => (id === item.trackId ? null : id))}
+                    onClick={() => {
+                      playVennTrack(item);
+                      setScanPanelItemId(item.id);
+                    }}
                     style={{
                       position: "absolute",
                       left: `calc(50% + ${cameraRef.current.x + point.x}px)`,
                       top: `calc(50% + ${cameraRef.current.y + point.y}px)`,
                       transform: "translate(-50%, -50%)",
-                      width: lit ? 14 : 10,
-                      height: lit ? 14 : 10,
+                      width: size,
+                      height: size,
                       borderRadius: "50%",
                       border: "none",
                       cursor: "pointer",
                       zIndex: 3,
-                      background: lit ? `hsl(${hue}, 85%, 78%)` : `hsl(${hue}, 60%, 50%)`,
-                      boxShadow: lit ? `0 0 8px 2px hsla(${hue}, 85%, 78%, 0.7)` : "none",
-                      transition: "width 0.2s, height 0.2s",
+                      background: lit ? `hsl(${hue}, 85%, 82%)` : `hsl(${hue}, 55%, 65%)`,
+                      boxShadow: lit ? `0 0 10px 3px hsla(${hue}, 85%, 80%, 0.8)` : hovered ? `0 0 6px 1px hsla(${hue}, 70%, 70%, 0.6)` : "none",
+                      transition: "width 0.15s, height 0.15s, box-shadow 0.2s",
                     }}
                   />
                 );
               })}
+
+              {scanPanelItemId &&
+                (() => {
+                  const item = playlist.items.find((i) => i.id === scanPanelItemId);
+                  if (!item) return null;
+                  return (
+                    <ConstellationScanPanel
+                      title={item.title}
+                      composer={item.composer ?? ""}
+                      rootGenre={item.genres[0] ?? ""}
+                      genres={item.genres}
+                      description={item.lyrics}
+                      onClose={() => setScanPanelItemId(null)}
+                    />
+                  );
+                })()}
             </>
           )}
 
