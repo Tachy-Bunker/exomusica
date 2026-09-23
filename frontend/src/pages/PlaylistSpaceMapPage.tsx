@@ -34,19 +34,29 @@ interface PlaylistItem {
   replayGainDb: number | null;
   genres: string[];
   lyrics: string | null;
+  trackPosition: number;
 }
 interface PlaylistDetail {
   id: number;
   slug: string;
   title: string;
   ownerId: number;
-  fxSettings: (Partial<FxSettings> & { coverSize?: number; spacing?: number; roamSpeed?: number; vennHueStart?: number; vennHueEnd?: number; vennBlobSize?: number; vennSpacing?: number }) | null;
+  fxSettings: (Partial<FxSettings> & { coverSize?: number; spacing?: number; roamSpeed?: number; vennHueStart?: number; vennHueEnd?: number; vennBlobSize?: number; vennSpacing?: number; vennRepelFactor?: number }) | null;
   albums: PlaylistAlbum[];
   items: PlaylistItem[];
 }
 
 interface AlbumNode extends PlaylistAlbum {
   id: number;
+  homeX: number;
+  homeY: number;
+  x: number;
+  y: number;
+  wanderSeed: number;
+}
+
+interface StarNode {
+  trackId: number;
   homeX: number;
   homeY: number;
   x: number;
@@ -124,6 +134,7 @@ export function PlaylistSpaceMapPage() {
     vennHueEnd: 20,
     vennBlobSize: 1,
     vennSpacing: 1,
+    vennRepelFactor: 1,
   });
   const [, forceRender] = useState(0);
   const [lockedId, setLockedId] = useState<number | null>(null);
@@ -175,6 +186,7 @@ export function PlaylistSpaceMapPage() {
         vennHueEnd: p.fxSettings?.vennHueEnd ?? 20,
         vennBlobSize: p.fxSettings?.vennBlobSize ?? 1,
         vennSpacing: p.fxSettings?.vennSpacing ?? 1,
+        vennRepelFactor: p.fxSettings?.vennRepelFactor ?? 1,
       });
     });
   }
@@ -234,25 +246,56 @@ export function PlaylistSpaceMapPage() {
   const vennTracks: TrackPoint[] = stars;
   const starByTrackId = useMemo(() => new Map(stars.map((s) => [s.trackId, s])), [stars]);
   const [hoveredTrackId, setHoveredTrackId] = useState<number | null>(null);
+  const [crosshairNearTrackId, setCrosshairNearTrackId] = useState<number | null>(null);
+  const crosshairNearTrackIdRef = useRef<number | null>(null);
   const [scanPanelItemId, setScanPanelItemId] = useState<number | null>(null);
   const vennTracksRef = useRef(vennTracks);
-  vennTracksRef.current = vennTracks;
+  useEffect(() => {
+    vennTracksRef.current = vennTracks;
+  }, [vennTracks]);
+  const starNodesRef = useRef<Map<number, StarNode>>(new Map());
+  const hoveredTrackIdRef = useRef<number | null>(null);
+  hoveredTrackIdRef.current = hoveredTrackId;
+  useEffect(() => {
+    const next = new Map<number, StarNode>();
+    for (const s of stars) {
+      const existing = starNodesRef.current.get(s.trackId);
+      const rand = seededRand(hashOf(`starwander:${s.trackId}`));
+      next.set(s.trackId, {
+        trackId: s.trackId,
+        homeX: s.x,
+        homeY: s.y,
+        x: existing ? existing.x : s.x,
+        y: existing ? existing.y : s.y,
+        wanderSeed: rand() * 1000,
+      });
+    }
+    starNodesRef.current = next;
+  }, [stars]);
 
   // Tracks are marked "lit" the moment they actually become the current
   // track while still playing from this playlist - covers a direct
   // click/F-key play, and also normal queue advancement once the whole
   // spiral-ordered queue is populated (see playVennTrack below), so
   // there's no need to separately intercept "track ended" events.
+  // Only the currently-playing track is "lit" at any moment - not an
+  // accumulated history of everything played this session. The scan
+  // panel follows the same signal: it always reflects whatever's
+  // currently playing from this playlist, not just the last thing
+  // clicked, and clears when nothing here is playing.
   useEffect(() => {
     return useAudioStore.subscribe((state, prevState) => {
       if (!playlist) return;
-      if (state.currentPlaylist?.slug !== playlist.slug) {
+      if (state.currentPlaylist?.slug !== playlist.slug || !state.currentTrack) {
         setLitTrackIds((prev) => (prev.size === 0 ? prev : new Set()));
-        vennOriginTrackIdRef.current = null;
+        setScanPanelItemId(null);
+        if (state.currentPlaylist?.slug !== playlist.slug) vennOriginTrackIdRef.current = null;
         return;
       }
-      if (state.currentTrack && state.currentTrack.id !== prevState.currentTrack?.id) {
-        setLitTrackIds((prev) => new Set(prev).add(state.currentTrack!.id));
+      if (state.currentTrack.id !== prevState.currentTrack?.id) {
+        setLitTrackIds(new Set([state.currentTrack.id]));
+        const matchingItem = playlist.items.find((i) => i.trackId === state.currentTrack!.id);
+        if (matchingItem) setScanPanelItemId(matchingItem.id);
       }
     });
   }, [playlist]);
@@ -276,27 +319,26 @@ export function PlaylistSpaceMapPage() {
     addToQueue(rest);
   }
 
-  async function playAlbum(node: AlbumNode) {
-    const tracks =
-      node.source === "official"
-        ? (await api<{ tracks: PlayableTrackDTO[] }>(`/api/albums/${node.slug}`)).tracks
-        : (await api<{ tracks: PlayableTrackDTO[] }>(`/api/community-albums/${node.slug}`)).tracks;
-    if (tracks.length === 0) return;
-    const [first, ...restOfAlbum] = tracks;
+  function playAlbum(node: AlbumNode) {
+    const p = playlistRef.current;
+    if (!p) return;
+    const albumItems = p.items
+      .filter((item) => item.source === node.source && item.albumSlug === node.slug)
+      .sort((a, b) => a.trackPosition - b.trackPosition)
+      .map(playlistItemToPlayable);
+    if (albumItems.length === 0) return;
+    const [first, ...restOfAlbum] = albumItems;
     play(first);
     clearQueue();
     addToQueue(restOfAlbum);
 
-    const p = playlistRef.current;
-    if (p) {
-      setCurrentPlaylist({ slug: p.slug, title: p.title });
-      // Smart contextualization: once this album finishes, keep playing
-      // through the rest of the playlist rather than just stopping -
-      // shuffled, and with this album's own tracks excluded so nothing
-      // repeats right after it just played.
-      const restOfPlaylist = p.items.filter((item) => !(item.source === node.source && item.albumSlug === node.slug)).map(playlistItemToPlayable);
-      addToQueue(shuffleArray(restOfPlaylist));
-    }
+    setCurrentPlaylist({ slug: p.slug, title: p.title });
+    // Smart contextualization: once this album finishes, keep playing
+    // through the rest of the playlist rather than just stopping -
+    // shuffled, and with this album's own tracks excluded so nothing
+    // repeats right after it just played.
+    const restOfPlaylist = p.items.filter((item) => !(item.source === node.source && item.albumSlug === node.slug)).map(playlistItemToPlayable);
+    addToQueue(shuffleArray(restOfPlaylist));
   }
 
   function playAllPlaylist() {
@@ -448,6 +490,10 @@ export function PlaylistSpaceMapPage() {
               nearestDist = dist;
             }
           }
+          if (nearestId !== crosshairNearTrackIdRef.current) {
+            crosshairNearTrackIdRef.current = nearestId;
+            setCrosshairNearTrackId(nearestId);
+          }
         } else {
           const centerDist = Math.hypot(cam.x, cam.y);
           if (centerDist < nearestDist) {
@@ -496,6 +542,41 @@ export function PlaylistSpaceMapPage() {
         }
         n.x += (fx / DAMPING) * dt;
         n.y += (fy / DAMPING) * dt;
+      }
+
+      // --- constellation stars: same wander-around-home + repel
+      // pattern as album covers, but frozen for whichever star is
+      // currently hovered (mouse or crosshair) so it's easy to read
+      // and click precisely rather than chasing a moving target. ---
+      if (viewModeRef.current === "venn") {
+        const starNodes = starNodesRef.current;
+        const frozenId = hoveredTrackIdRef.current ?? crosshairNearTrackIdRef.current;
+        const starRepelRadius = 34 * controlsRef.current.vennRepelFactor;
+        for (const n of starNodes.values()) {
+          if (n.trackId === frozenId) continue;
+          const wanderX = Math.sin(t * 0.4 + n.wanderSeed) * 22;
+          const wanderY = Math.cos(t * 0.33 + n.wanderSeed) * 22;
+          const targetX = n.homeX + wanderX;
+          const targetY = n.homeY + wanderY;
+          let fx = (targetX - n.x) * SPRING;
+          let fy = (targetY - n.y) * SPRING;
+          if (controlsRef.current.vennRepelFactor > 0) {
+            for (const other of starNodes.values()) {
+              if (other === n) continue;
+              const dx = n.x - other.x;
+              const dy = n.y - other.y;
+              const dist = Math.sqrt(dx * dx + dy * dy) || 0.001;
+              if (dist < starRepelRadius) {
+                const push = ((starRepelRadius - dist) / starRepelRadius) * REPEL_STRENGTH * 0.5;
+                fx += (dx / dist) * push;
+                fy += (dy / dist) * push;
+              }
+            }
+          }
+          n.x += (fx / DAMPING) * dt;
+          n.y += (fy / DAMPING) * dt;
+        }
+        vennTracksRef.current = [...starNodes.values()].map((n) => ({ trackId: n.trackId, x: n.x, y: n.y, genres: [] }));
       }
 
       forceRender((v) => (v + 1) % 1000000);
@@ -609,14 +690,14 @@ export function PlaylistSpaceMapPage() {
             </p>
           )}
           {user?.id === playlist.ownerId && (
-            <div style={{ position: "absolute", top: 12, right: 12, zIndex: 5 }}>
+            <div style={{ position: "absolute", bottom: 12, right: 12, zIndex: 5, display: "flex", flexDirection: "column-reverse", alignItems: "flex-end" }}>
               <button className="btn" onClick={() => setSettingsOpen((v) => !v)}>
                 ⚙ {settingsOpen ? "Close" : "Settings"}
               </button>
               {settingsOpen && (
                 <div
                   style={{
-                    marginTop: "0.4rem",
+                    marginBottom: "0.4rem",
                     background: "var(--bg-elevated)",
                     border: "1px solid var(--border)",
                     padding: "0.6rem",
@@ -625,6 +706,8 @@ export function PlaylistSpaceMapPage() {
                     flexDirection: "column",
                     gap: "0.4rem",
                     minWidth: 200,
+                    maxHeight: "70vh",
+                    overflowY: "auto",
                   }}
                 >
                   <div className="field">
@@ -675,8 +758,14 @@ export function PlaylistSpaceMapPage() {
                     <input type="range" min={0.4} max={2.5} step={0.05} value={controls.vennBlobSize} onChange={(e) => updateControl({ vennBlobSize: Number(e.target.value) })} />
                   </div>
                   <div className="field">
-                    <label style={{ fontSize: "0.75rem" }}>Venn spacing</label>
+                    <label style={{ fontSize: "0.75rem" }}>Constellation spacing</label>
                     <input type="range" min={0.4} max={2.5} step={0.05} value={controls.vennSpacing} onChange={(e) => updateControl({ vennSpacing: Number(e.target.value) })} />
+                  </div>
+                  <div className="field">
+                    <label style={{ fontSize: "0.75rem" }} title="How strongly stars push each other apart to avoid clustering">
+                      De-cluttering
+                    </label>
+                    <input type="range" min={0} max={2.5} step={0.05} value={controls.vennRepelFactor} onChange={(e) => updateControl({ vennRepelFactor: Number(e.target.value) })} />
                   </div>
                 </div>
               )}
@@ -771,16 +860,18 @@ export function PlaylistSpaceMapPage() {
                   {connectionLines.map((l, i) => {
                     const isCross = l.kind === "cross-genre";
                     const lit = litTrackIds.has(l.trackId);
-                    const hovered = hoveredTrackId === l.trackId;
+                    const hovered = hoveredTrackId === l.trackId || crosshairNearTrackId === l.trackId;
                     const opacity = isCross ? (lit ? 0.95 : hovered ? 0.55 : 0) : 0.24;
                     if (opacity === 0) return null;
+                    const fromLive = starNodesRef.current.get(l.trackId);
+                    const toLive = l.toTrackId !== null ? starNodesRef.current.get(l.toTrackId) : null;
                     return (
                       <line
                         key={i}
-                        x1={l.fromX}
-                        y1={l.fromY}
-                        x2={l.toX}
-                        y2={l.toY}
+                        x1={fromLive?.x ?? l.fromX}
+                        y1={fromLive?.y ?? l.fromY}
+                        x2={toLive?.x ?? l.toX}
+                        y2={toLive?.y ?? l.toY}
                         stroke={isCross ? "#4fd4c4" : "#8fb8ff"}
                         strokeWidth={isCross && lit ? 1.6 : 1}
                         opacity={opacity}
@@ -793,7 +884,8 @@ export function PlaylistSpaceMapPage() {
               </svg>
 
               {regions.map((r) => {
-                const starSize = Math.max(10, Math.min(34, 8 + Math.sqrt(r.trackCount) * 6)) * (controls.vennBlobSize / 1.2 + 0.4);
+                const trackOrbBase = 9 * (controls.vennBlobSize / 1.2 + 0.4);
+                const starSize = trackOrbBase * 8 * Math.pow(1.07, Math.max(0, r.trackCount - 1));
                 return (
                   <div key={r.name}>
                     <div
@@ -836,10 +928,10 @@ export function PlaylistSpaceMapPage() {
               })}
 
               {playlist.items.map((item) => {
-                const point = starByTrackId.get(item.trackId);
+                const point = starNodesRef.current.get(item.trackId) ?? starByTrackId.get(item.trackId);
                 if (!point) return null;
                 const lit = litTrackIds.has(item.trackId);
-                const hovered = hoveredTrackId === item.trackId;
+                const hovered = hoveredTrackId === item.trackId || crosshairNearTrackId === item.trackId;
                 const hue = controls.vennHueStart + ((controls.vennHueEnd - controls.vennHueStart) * (hashOf(item.title) % 100)) / 100;
                 const size = (lit ? 14 : hovered ? 12 : 9) * (controls.vennBlobSize / 1.2 + 0.4);
                 return (

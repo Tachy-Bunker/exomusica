@@ -25,6 +25,7 @@ export interface Star {
  *  fan out from it). */
 export interface ConnectionLine {
   trackId: number;
+  toTrackId: number | null; // set for "shape" lines (track-to-track); null for "cross-genre" (track-to-region, which doesn't roam)
   fromX: number;
   fromY: number;
   toX: number;
@@ -55,26 +56,27 @@ function hashOf(s: string): number {
  *  repels to stay legible. */
 export function layoutConstellationRegions(tracks: ConstellationTrack[]): ConstellationRegion[] {
   const rootCounts = new Map<string, number>();
+  const allGenres = new Set<string>();
   for (const t of tracks) {
     if (t.genres.length === 0) continue;
     const root = t.genres[0];
     rootCounts.set(root, (rootCounts.get(root) ?? 0) + 1);
+    for (const g of t.genres) allGenres.add(g);
   }
-  const roots = [...rootCounts.keys()];
-  if (roots.length === 0) return [];
+  const names = [...allGenres];
+  if (names.length === 0) return [];
 
   const crossWeight = new Map<string, number>();
   for (const t of tracks) {
     if (t.genres.length < 2) continue;
     const root = t.genres[0];
     for (const g of t.genres.slice(1)) {
-      if (!rootCounts.has(g)) continue; // only connect to genres that are actually someone's root
       const key = [root, g].sort().join("\u0000");
       crossWeight.set(key, (crossWeight.get(key) ?? 0) + 1);
     }
   }
 
-  const regions = roots.map((name) => {
+  const regions = names.map((name) => {
     const seed = hashOf(name);
     const rand = seededRand(seed);
     const angle = rand() * Math.PI * 2;
@@ -116,7 +118,7 @@ export function layoutConstellationRegions(tracks: ConstellationTrack[]): Conste
     }
   }
 
-  return regions.map((r) => ({ name: r.name, x: r.x, y: r.y, trackCount: rootCounts.get(r.name)! }));
+  return regions.map((r) => ({ name: r.name, x: r.x, y: r.y, trackCount: rootCounts.get(r.name) ?? 0 }));
 }
 
 /** Scatters each constellation's tracks as stars within its region -
@@ -201,7 +203,7 @@ export function buildConnectionLines(stars: Star[], regions: ConstellationRegion
       if (others.length === 0) continue;
       others.sort((a, b) => Math.hypot(a.x - s.x, a.y - s.y) - Math.hypot(b.x - s.x, b.y - s.y));
       const nearest = others[0];
-      lines.push({ trackId: s.trackId, fromX: s.x, fromY: s.y, toX: nearest.x, toY: nearest.y, kind: "shape", toGenre: s.rootGenre });
+      lines.push({ trackId: s.trackId, toTrackId: nearest.trackId, fromX: s.x, fromY: s.y, toX: nearest.x, toY: nearest.y, kind: "shape", toGenre: s.rootGenre });
     }
   }
 
@@ -211,7 +213,7 @@ export function buildConnectionLines(stars: Star[], regions: ConstellationRegion
     for (const g of s.genres.slice(1)) {
       const region = regionByName.get(g);
       if (!region) continue;
-      lines.push({ trackId: s.trackId, fromX: s.x, fromY: s.y, toX: region.x, toY: region.y, kind: "cross-genre", toGenre: g });
+      lines.push({ trackId: s.trackId, toTrackId: null, fromX: s.x, fromY: s.y, toX: region.x, toY: region.y, kind: "cross-genre", toGenre: g });
     }
   }
 

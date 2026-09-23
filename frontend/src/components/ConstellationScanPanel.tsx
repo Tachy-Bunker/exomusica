@@ -63,7 +63,7 @@ export function ConstellationScanPanel({ title, composer, rootGenre, genres, des
       style={{
         position: "absolute",
         top: 12,
-        left: 12,
+        right: 12,
         zIndex: 6,
         width: collapsed ? "auto" : size.width,
         maxWidth: "calc(100% - 24px)",
