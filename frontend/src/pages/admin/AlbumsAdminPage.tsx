@@ -3,6 +3,8 @@ import { api, ApiError } from "../../lib/api";
 import type { Branch } from "../../lib/types";
 import { snippetFor } from "../../lib/markdownSnippet";
 import { SeoFieldsEditor } from "../../components/SeoFieldsEditor";
+import { GenreTextInput } from "../../components/GenreTextInput";
+import { VennGenrePicker } from "../../components/VennGenrePicker";
 
 interface AlbumSummary {
   id: number;
@@ -534,37 +536,53 @@ export function AlbumsAdminPage() {
                 </button>
               </div>
               {editingTrackId === t.id ? (
-                <>
-                  <input
-                    value={trackEditForm.title}
-                    onChange={(e) => setTrackEditForm((f) => ({ ...f, title: e.target.value }))}
-                    style={{ flex: 1 }}
-                  />
-                  <input
-                    value={trackEditForm.fileUrl}
-                    onChange={(e) => setTrackEditForm((f) => ({ ...f, fileUrl: e.target.value }))}
-                    style={{ flex: 2 }}
-                  />
-                  <select value={trackEditForm.format} onChange={(e) => setTrackEditForm((f) => ({ ...f, format: e.target.value }))}>
-                    {["OPUS", "MP3", "FLAC", "WAV", "OGG", "M4A", "AAC"].map((f) => (
-                      <option key={f} value={f}>
-                        {f}
-                      </option>
-                    ))}
-                  </select>
-                  <input
-                    value={trackEditForm.genres}
-                    onChange={(e) => setTrackEditForm((f) => ({ ...f, genres: e.target.value }))}
-                    placeholder="Genres, comma-separated (for Venn Views)"
-                    style={{ flex: 2, minWidth: 200 }}
-                  />
-                  <button className="btn btn-primary" onClick={() => saveTrackEdit(t.id)}>
-                    Save
-                  </button>
-                  <button className="btn" onClick={() => setEditingTrackId(null)}>
-                    Cancel
-                  </button>
-                </>
+                <div style={{ display: "flex", flexDirection: "column", gap: "0.3rem", flex: 1 }}>
+                  <div style={{ display: "flex", gap: "0.4rem", alignItems: "center", flexWrap: "wrap" }}>
+                    <input
+                      value={trackEditForm.title}
+                      onChange={(e) => setTrackEditForm((f) => ({ ...f, title: e.target.value }))}
+                      style={{ flex: 1 }}
+                    />
+                    <input
+                      value={trackEditForm.fileUrl}
+                      onChange={(e) => setTrackEditForm((f) => ({ ...f, fileUrl: e.target.value }))}
+                      style={{ flex: 2 }}
+                    />
+                    <select value={trackEditForm.format} onChange={(e) => setTrackEditForm((f) => ({ ...f, format: e.target.value }))}>
+                      {["OPUS", "MP3", "FLAC", "WAV", "OGG", "M4A", "AAC"].map((f) => (
+                        <option key={f} value={f}>
+                          {f}
+                        </option>
+                      ))}
+                    </select>
+                    <GenreTextInput
+                      value={trackEditForm.genres}
+                      onChange={(v) => setTrackEditForm((f) => ({ ...f, genres: v }))}
+                      placeholder="Genres, comma-separated (for Venn Views)"
+                    />
+                    <button className="btn btn-primary" onClick={() => saveTrackEdit(t.id)}>
+                      Save
+                    </button>
+                    <button className="btn" onClick={() => setEditingTrackId(null)}>
+                      Cancel
+                    </button>
+                  </div>
+                  {detail && (
+                    <VennGenrePicker
+                      contextTracks={detail.tracks.map((dt) => ({ id: dt.id, genres: dt.genres }))}
+                      selectedGenres={trackEditForm.genres.split(",").map((g) => g.trim()).filter(Boolean)}
+                      onToggleGenres={(genres) => {
+                        const currentList = trackEditForm.genres.split(",").map((g) => g.trim()).filter(Boolean);
+                        const currentLower = new Set(currentList.map((g) => g.toLowerCase()));
+                        const allSelected = genres.every((g) => currentLower.has(g.toLowerCase()));
+                        const next = allSelected
+                          ? currentList.filter((g) => !genres.map((x) => x.toLowerCase()).includes(g.toLowerCase()))
+                          : [...currentList, ...genres.filter((g) => !currentLower.has(g.toLowerCase()))];
+                        setTrackEditForm((f) => ({ ...f, genres: next.join(", ") }));
+                      }}
+                    />
+                  )}
+                </div>
               ) : (
                 <>
                   <span style={{ flex: 1, fontSize: "0.85rem" }}>{t.title}</span>

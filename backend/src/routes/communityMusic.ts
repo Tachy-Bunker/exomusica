@@ -70,6 +70,18 @@ export async function communityMusicRoutes(app: FastifyInstance): Promise<void> 
     return { status: "ok" };
   });
 
+  app.get("/api/genres", async () => {
+    const rows = await prisma.$queryRaw<{ genre: string }[]>`
+      SELECT DISTINCT genre FROM (
+        SELECT unnest(genres) AS genre FROM "CommunityTrack"
+        UNION
+        SELECT unnest(genres) AS genre FROM "Track"
+      ) all_genres
+      ORDER BY genre ASC
+    `;
+    return rows.map((r) => r.genre);
+  });
+
   app.get<{ Querystring: { q?: string } }>("/api/community-tracks/search", async (req) => {
     const q = req.query.q?.trim();
     if (!q) return [];

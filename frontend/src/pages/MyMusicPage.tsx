@@ -4,6 +4,8 @@ import { api } from "../lib/api";
 import { useAuth } from "../lib/auth";
 import { useDocumentTitle } from "../lib/useDocumentTitle";
 import { useToastStore } from "../lib/toastStore";
+import { GenreTextInput } from "../components/GenreTextInput";
+import { VennGenrePicker } from "../components/VennGenrePicker";
 
 interface MyAlbum {
   id: number;
@@ -369,13 +371,26 @@ export function MyMusicPage() {
                       <div style={{ display: "flex", gap: "0.3rem", alignItems: "center", flexWrap: "wrap" }}>
                         <input value={editTitle} onChange={(e) => setEditTitle(e.target.value)} placeholder="Title" style={{ fontSize: "0.85rem" }} />
                         <input value={editComposer} onChange={(e) => setEditComposer(e.target.value)} placeholder="Composer (optional)" style={{ fontSize: "0.85rem" }} />
-                        <input
-                          value={editGenres}
-                          onChange={(e) => setEditGenres(e.target.value)}
-                          placeholder="Genres, comma-separated (for Venn Views)"
-                          style={{ fontSize: "0.85rem", minWidth: 220 }}
-                        />
+                        <GenreTextInput value={editGenres} onChange={setEditGenres} placeholder="Genres, comma-separated (for Venn Views)" />
                       </div>
+                      <VennGenrePicker
+                        contextTracks={albumTracks.map((track) => ({ id: track.id, genres: track.genres }))}
+                        selectedGenres={editGenres.split(",").map((g) => g.trim()).filter(Boolean)}
+                        onToggleGenres={(genres) => {
+                          const currentList = editGenres.split(",").map((g) => g.trim()).filter(Boolean);
+                          const currentLower = new Set(currentList.map((g) => g.toLowerCase()));
+                          const allSelected = genres.every((g) => currentLower.has(g.toLowerCase()));
+                          let next = currentList;
+                          if (allSelected) {
+                            const toRemove = new Set(genres.map((g) => g.toLowerCase()));
+                            next = currentList.filter((g) => !toRemove.has(g.toLowerCase()));
+                          } else {
+                            const toAdd = genres.filter((g) => !currentLower.has(g.toLowerCase()));
+                            next = [...currentList, ...toAdd];
+                          }
+                          setEditGenres(next.join(", "));
+                        }}
+                      />
                       <textarea
                         value={editLyrics}
                         onChange={(e) => setEditLyrics(e.target.value)}
