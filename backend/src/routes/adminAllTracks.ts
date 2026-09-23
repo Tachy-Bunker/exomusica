@@ -7,13 +7,13 @@ export async function adminAllTracksRoutes(app: FastifyInstance): Promise<void> 
     const [officialTracks, communityTracks] = await Promise.all([
       prisma.track.findMany({
         include: {
-          album: { select: { title: true, slug: true, branch: { select: { name: true } } } },
+          album: { select: { title: true, slug: true, composer: true, branch: { select: { name: true } } } },
           collaborators: { include: { collaborator: { select: { name: true } } } },
         },
         orderBy: { id: "asc" },
       }),
       prisma.communityTrack.findMany({
-        include: { album: { select: { title: true, slug: true, owner: { select: { username: true } } } }, attachment: { select: { id: true } } },
+        include: { album: { select: { title: true, slug: true, composer: true, owner: { select: { username: true } } } }, attachment: { select: { id: true } } },
         orderBy: { id: "asc" },
       }),
     ]);
