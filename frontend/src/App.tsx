@@ -10,6 +10,8 @@ import { MiniChatWindowPage } from "./pages/MiniChatWindowPage";
 import { LoginPage } from "./pages/LoginPage";
 import { JoinPage } from "./pages/JoinPage";
 import { WikiPage } from "./pages/WikiPage";
+import { StudiesIndexPage } from "./pages/StudiesIndexPage";
+import { StudyPage } from "./pages/StudyPage";
 import { NewsPage } from "./pages/NewsPage";
 import { DiscussionIndexPage } from "./pages/DiscussionIndexPage";
 import { ForumMapPage } from "./pages/ForumMapPage";
@@ -75,6 +77,8 @@ export default function App() {
             <Route path="join" element={<JoinPage />} />
             <Route path="about" element={<Navigate to="/wiki" replace />} />
             <Route path="wiki" element={<WikiPage />} />
+            <Route path="studies" element={<StudiesIndexPage />} />
+            <Route path="study/:slug" element={<StudyPage />} />
             <Route path="wiki/:slug" element={<WikiPage />} />
             <Route path="news" element={<NewsPage />} />
             <Route path="news/:slug" element={<NewsPage />} />

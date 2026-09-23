@@ -3,7 +3,7 @@ import { api } from "../../lib/api";
 
 interface MapNode {
   id: number;
-  type: "TOPIC" | "ACTIVE_BRANCHES" | "GROWING_SEEDS" | "PLAYLIST" | "SAMPLE_BANK_ITEM" | "CHALLENGE";
+  type: "TOPIC" | "ACTIVE_BRANCHES" | "GROWING_SEEDS" | "PLAYLIST" | "SAMPLE_BANK_ITEM" | "CHALLENGE" | "STUDY";
   parentId: number | null;
   x: number;
   y: number;
@@ -14,6 +14,7 @@ interface MapNode {
   playlist: { slug: string; title: string; owner: { username: string } } | null;
   sampleBankItem: { id: number; title: string; owner: { username: string } } | null;
   challenge: { id: number; title: string } | null;
+  study: { slug: string; title: string } | null;
 }
 
 interface ChannelOption {
@@ -31,6 +32,7 @@ function nodeLabel(n: MapNode): string {
   if (n.type === "PLAYLIST" && n.playlist) return `[Playlist] ${n.playlist.title} - ${n.playlist.owner.username}`;
   if (n.type === "SAMPLE_BANK_ITEM" && n.sampleBankItem) return `[Sample] ${n.sampleBankItem.title} - ${n.sampleBankItem.owner.username}`;
   if (n.type === "CHALLENGE" && n.challenge) return `[Challenge] ${n.challenge.title}`;
+  if (n.type === "STUDY" && n.study) return `[Study] ${n.study.title}`;
   const name = n.channel?.name ?? "";
   if (n.type === "ACTIVE_BRANCHES") return `[Active] ${name}`;
   if (n.type === "GROWING_SEEDS") return `[Growing] ${name}`;

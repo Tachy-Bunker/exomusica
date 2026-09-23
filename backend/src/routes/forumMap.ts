@@ -10,6 +10,7 @@ export async function forumMapRoutes(app: FastifyInstance): Promise<void> {
         playlist: { select: { slug: true, title: true, owner: { select: { username: true } } } },
         sampleBankItem: { select: { id: true, title: true, owner: { select: { username: true } } } },
         challenge: { select: { id: true, title: true } },
+        study: { select: { slug: true, title: true, status: true, channelId: true } },
       },
     });
 
@@ -27,7 +28,11 @@ export async function forumMapRoutes(app: FastifyInstance): Promise<void> {
 
     return nodes.map((n) => ({
       ...n,
-      speakerCount: n.channel ? (speakerCountByChannelId.get(n.channelId!) ?? 0) : 0,
+      speakerCount: n.channel
+        ? (speakerCountByChannelId.get(n.channelId!) ?? 0)
+        : n.study?.channelId
+          ? (speakerCountByChannelId.get(n.study.channelId) ?? 0)
+          : 0,
     }));
   });
 

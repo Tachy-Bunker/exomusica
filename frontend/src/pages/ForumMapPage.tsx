@@ -10,7 +10,7 @@ import { useMentionResolutionStore } from "../lib/mentionResolutionStore";
 
 interface MapNode {
   id: number;
-  type: "TOPIC" | "ACTIVE_BRANCHES" | "GROWING_SEEDS" | "PLAYLIST" | "SAMPLE_BANK_ITEM" | "CHALLENGE";
+  type: "TOPIC" | "ACTIVE_BRANCHES" | "GROWING_SEEDS" | "PLAYLIST" | "SAMPLE_BANK_ITEM" | "CHALLENGE" | "STUDY";
   parentId: number | null;
   x: number;
   y: number;
@@ -21,6 +21,7 @@ interface MapNode {
   playlist: { slug: string; title: string; owner: { username: string } } | null;
   sampleBankItem: { id: number; title: string; owner: { username: string } } | null;
   challenge: { id: number; title: string } | null;
+  study: { slug: string; title: string; status: "IN_PROGRESS" | "COMPLETE" } | null;
   speakerCount: number;
 }
 
@@ -36,6 +37,7 @@ function nodeLabel(n: MapNode): string {
   if (n.type === "PLAYLIST") return n.playlist?.title ?? "";
   if (n.type === "SAMPLE_BANK_ITEM") return n.sampleBankItem?.title ?? "";
   if (n.type === "CHALLENGE") return n.challenge?.title ?? "";
+  if (n.type === "STUDY") return n.study?.title ?? "";
   return n.channel?.name ?? "";
 }
 
@@ -46,6 +48,7 @@ const NODE_STYLE: Record<MapNode["type"], { radius: number; color: string }> = {
   PLAYLIST: { radius: 16, color: "#8a6fd8" },
   SAMPLE_BANK_ITEM: { radius: 14, color: "#5fbf8f" },
   CHALLENGE: { radius: 16, color: "#d4b13f" },
+  STUDY: { radius: 16, color: "#4fd4c4" },
 };
 
 // Matches the spacemap's own camera feel exactly, just adapted to
@@ -235,6 +238,10 @@ export function ForumMapPage() {
       navigate(`/challenges`);
       return;
     }
+    if (n.type === "STUDY" && n.study) {
+      navigate(`/study/${n.study.slug}`);
+      return;
+    }
     if (!n.channel) return;
     if (isDesktop && !n.channel.contentMarkdown) {
       openChat(n.channel.slug, n.channel.name);
@@ -250,7 +257,7 @@ export function ForumMapPage() {
     }
     // The new node types (playlist/sample/challenge) have no chat preview
     // to show, so both desktop and mobile just navigate straight there.
-    if (isDesktop || n.type === "PLAYLIST" || n.type === "SAMPLE_BANK_ITEM" || n.type === "CHALLENGE") {
+    if (isDesktop || n.type === "PLAYLIST" || n.type === "SAMPLE_BANK_ITEM" || n.type === "CHALLENGE" || n.type === "STUDY") {
       goToNode(n);
       return;
     }

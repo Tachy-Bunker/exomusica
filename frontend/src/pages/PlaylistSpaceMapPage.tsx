@@ -129,7 +129,7 @@ export function PlaylistSpaceMapPage() {
   const setMapQuality = useMapQualityStore((s) => s.setQuality);
   const softwareRendererName = useMapQualityStore((s) => s.softwareRendererName);
   const [dismissedSwNotice, setDismissedSwNotice] = useState(false);
-  const [viewMode, setViewMode] = useState<"map" | "venn">("map");
+  const [viewMode, setViewMode] = useState<"map" | "venn">(() => (window.location.hash === "#venn" ? "venn" : "map"));
   // Persists while playback keeps coming from this playlist - cleared
   // the moment the player switches away, per the explicit requirement
   // that colors survive a requeue from the same playlist but not a
@@ -541,27 +541,35 @@ export function PlaylistSpaceMapPage() {
         <p style={{ position: "absolute", top: "50%", left: "50%", transform: "translate(-50%, -50%)", zIndex: 5 }}>Loading…</p>
       ) : (
         <>
-          <button className="btn" style={{ position: "absolute", top: 12, left: 12, zIndex: 5 }} onClick={() => navigate(`/playlist/${playlist.slug}/list`)}>
-            View as list
-          </button>
-          <button
-            className="btn"
-            style={{ position: "absolute", top: 12, left: 108, zIndex: 5, ...(viewMode === "venn" ? { outline: "1px solid var(--accent-forum)" } : {}) }}
-            onClick={() => setViewMode((m) => (m === "venn" ? "map" : "venn"))}
-          >
-            Views as Venn
-          </button>
-          <div style={{ position: "absolute", top: 12, left: 245, zIndex: 5, display: "flex", alignItems: "center", gap: "0.3rem", background: "var(--bg-elevated)", padding: "0.2rem 0.5rem", borderRadius: "var(--radius)" }}>
-            <label style={{ fontSize: "0.7rem", color: "var(--text-dim)" }} title="Lower this if the map feels laggy">
-              Quality
-            </label>
-            <select value={mapQuality} onChange={(e) => setMapQuality(Number(e.target.value))} style={{ fontSize: "0.7rem", padding: "0.1rem" }}>
-              <option value={0.2}>Potato</option>
-              <option value={0.4}>Low</option>
-              <option value={0.6}>Medium</option>
-              <option value={1}>High</option>
-              <option value={1.5}>Ultra</option>
-            </select>
+          <div style={{ position: "absolute", top: 12, left: 12, right: 90, zIndex: 5, display: "flex", flexWrap: "wrap", gap: "0.4rem", alignItems: "center" }}>
+            <button className="btn" onClick={() => navigate(`/playlist/${playlist.slug}/list`)}>
+              View as list
+            </button>
+            <button
+              className="btn"
+              style={viewMode === "venn" ? { outline: "1px solid var(--accent-forum)" } : undefined}
+              onClick={() =>
+                setViewMode((m) => {
+                  const next = m === "venn" ? "map" : "venn";
+                  history.replaceState(null, "", next === "venn" ? "#venn" : window.location.pathname);
+                  return next;
+                })
+              }
+            >
+              Views as Venn
+            </button>
+            <div style={{ display: "flex", alignItems: "center", gap: "0.3rem", background: "var(--bg-elevated)", padding: "0.2rem 0.5rem", borderRadius: "var(--radius)" }}>
+              <label style={{ fontSize: "0.7rem", color: "var(--text-dim)" }} title="Lower this if the map feels laggy">
+                Quality
+              </label>
+              <select value={mapQuality} onChange={(e) => setMapQuality(Number(e.target.value))} style={{ fontSize: "0.7rem", padding: "0.1rem" }}>
+                <option value={0.2}>Potato</option>
+                <option value={0.4}>Low</option>
+                <option value={0.6}>Medium</option>
+                <option value={1}>High</option>
+                <option value={1.5}>Ultra</option>
+              </select>
+            </div>
           </div>
           {softwareRendererName && !dismissedSwNotice && (
             <div
@@ -770,7 +778,7 @@ export function PlaylistSpaceMapPage() {
                     left: `calc(50% + ${cameraRef.current.x + b.x}px)`,
                     top: `calc(50% + ${cameraRef.current.y + b.y - b.radius * controls.vennBlobSize * 0.55}px)`,
                     transform: "translate(-50%, -50%)",
-                    fontSize: "0.75rem",
+                    fontSize: `${Math.max(0.55, Math.min(1.1, b.radius * controls.vennBlobSize * 0.045))}rem`,
                     fontWeight: 600,
                     color: "#fff",
                     textShadow: "0 0 4px rgba(0,0,0,0.9), 0 0 8px rgba(0,0,0,0.6)",

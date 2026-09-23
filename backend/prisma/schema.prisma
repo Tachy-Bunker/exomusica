@@ -733,6 +733,41 @@ model AuditLog {
   createdAt  DateTime @default(now())
 }
 
+enum StudyStatus {
+  IN_PROGRESS
+  COMPLETE
+}
+
+// A researcher's documented phenomenon/experiment - lighter-weight than
+// the Wiki, with a real lifecycle (in-progress vs complete) the Wiki's
+// plain published/unpublished model doesn't have. Annotations are
+// author-authored and author-editable only, rendered as a numbered
+// endnotes list the author references from the body as plain [1] [2]
+// text - not a live-linked or reader-editable citation system.
+model Study {
+  id          Int               @id @default(autoincrement())
+  slug        String            @unique
+  ownerId     Int
+  owner       User              @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  title       String
+  body        String            @db.Text
+  status      StudyStatus       @default(IN_PROGRESS)
+  channelId   Int?              @unique // auto-created discussion channel, findable from the study page and the forum map
+  channel     ForumChannel?     @relation(fields: [channelId], references: [id], onDelete: SetNull)
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+  annotations StudyAnnotation[]
+  mapNode     ForumMapNode?
+}
+
+model StudyAnnotation {
+  id       Int    @id @default(autoincrement())
+  studyId  Int
+  study    Study  @relation(fields: [studyId], references: [id], onDelete: Cascade)
+  position Int // the [1] [2] [3] numbering, author-reordered by drag or up/down
+  text     String @db.Text
+}
+
 enum ForumMapNodeType {
   TOPIC
   ACTIVE_BRANCHES
@@ -740,6 +775,7 @@ enum ForumMapNodeType {
   PLAYLIST
   SAMPLE_BANK_ITEM
   CHALLENGE
+  STUDY
 }
 
 model ForumMapNode {
@@ -753,6 +789,8 @@ model ForumMapNode {
   sampleBankItem   SampleBankItem? @relation(fields: [sampleBankItemId], references: [id], onDelete: Cascade)
   challengeId Int?           @unique
   challenge   Challenge?     @relation(fields: [challengeId], references: [id], onDelete: Cascade)
+  studyId Int?               @unique
+  study   Study?             @relation(fields: [studyId], references: [id], onDelete: Cascade)
   parentId  Int?
   parent    ForumMapNode?    @relation("MapTree", fields: [parentId], references: [id], onDelete: SetNull)
   children  ForumMapNode[]   @relation("MapTree")

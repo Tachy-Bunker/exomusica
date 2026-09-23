@@ -173,12 +173,37 @@ export function layoutTracks(tracks: VennTrack[], blobs: GenreBlob[]): TrackPoin
       const r = bounds + 60 + rand() * 40;
       return { trackId: t.id, x: Math.cos(angle) * r, y: Math.sin(angle) * r, genres: t.genres };
     }
-    const cx = matched.reduce((s, b) => s + b.x, 0) / matched.length;
-    const cy = matched.reduce((s, b) => s + b.y, 0) / matched.length;
-    const jitterR = Math.min(...matched.map((b) => b.radius)) * 0.5;
+    // Start from the average, then iteratively pull the point back
+    // inside any blob it currently sits outside of. A plain average can
+    // land outside one or more of the track's own genres entirely for
+    // 3+ genre combinations, since the force layout only pulls pairs of
+    // blobs together - it never guarantees a single point that's
+    // simultaneously inside three or more circles at once. This
+    // converges toward that actual common region when one exists,
+    // rather than just the geometric midpoint of the centers.
+    let x = matched.reduce((s, b) => s + b.x, 0) / matched.length;
+    let y = matched.reduce((s, b) => s + b.y, 0) / matched.length;
+    for (let iter = 0; iter < 12; iter++) {
+      let moved = false;
+      for (const b of matched) {
+        const dx = x - b.x;
+        const dy = y - b.y;
+        const dist = Math.hypot(dx, dy);
+        const maxDist = b.radius * 0.75; // stay comfortably inside, not right on the edge
+        if (dist > maxDist) {
+          const pull = (dist - maxDist) / dist;
+          x -= dx * pull * 0.5;
+          y -= dy * pull * 0.5;
+          moved = true;
+        }
+      }
+      if (!moved) break;
+    }
+
+    const jitterR = Math.min(...matched.map((b) => b.radius)) * 0.25;
     const jAngle = rand() * Math.PI * 2;
     const jDist = rand() * jitterR;
-    return { trackId: t.id, x: cx + Math.cos(jAngle) * jDist, y: cy + Math.sin(jAngle) * jDist, genres: t.genres };
+    return { trackId: t.id, x: x + Math.cos(jAngle) * jDist, y: y + Math.sin(jAngle) * jDist, genres: t.genres };
   });
 }
 
