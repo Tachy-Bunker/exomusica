@@ -5,11 +5,22 @@ import { useAuth } from "../lib/auth";
 import { renderMarkdown } from "../lib/markdown";
 import { useDocumentTitle } from "../lib/useDocumentTitle";
 import { useToastStore } from "../lib/toastStore";
+import { StudyChartView } from "../components/StudyChartView";
 
 interface Annotation {
   id: number;
   position: number;
   text: string;
+}
+
+interface Chart {
+  id: number;
+  position: number;
+  title: string;
+  kind: "LINE" | "BAR" | "SCATTER" | "TABLE";
+  xLabel: string | null;
+  yLabel: string | null;
+  dataCsv: string;
 }
 
 interface StudyDetail {
@@ -21,6 +32,7 @@ interface StudyDetail {
   owner: { id: number; username: string };
   channel: { slug: string } | null;
   annotations: Annotation[];
+  charts: Chart[];
 }
 
 export function StudyPage() {
@@ -34,6 +46,9 @@ export function StudyPage() {
   const [newAnnotation, setNewAnnotation] = useState("");
   const [editingAnnotationId, setEditingAnnotationId] = useState<number | null>(null);
   const [annotationDraft, setAnnotationDraft] = useState("");
+  const [addingChart, setAddingChart] = useState(false);
+  const [chartForm, setChartForm] = useState({ title: "", kind: "LINE" as Chart["kind"], xLabel: "", yLabel: "", dataCsv: "" });
+  const [editingChartId, setEditingChartId] = useState<number | null>(null);
 
   useDocumentTitle(study?.title ?? "Study");
 
@@ -101,6 +116,53 @@ export function StudyPage() {
     reload();
   }
 
+  function startAddChart() {
+    setChartForm({ title: "", kind: "LINE", xLabel: "", yLabel: "", dataCsv: "x,y\n1,2\n2,4\n3,3" });
+    setEditingChartId(null);
+    setAddingChart(true);
+  }
+
+  function startEditChart(c: Chart) {
+    setChartForm({ title: c.title, kind: c.kind, xLabel: c.xLabel ?? "", yLabel: c.yLabel ?? "", dataCsv: c.dataCsv });
+    setEditingChartId(c.id);
+    setAddingChart(true);
+  }
+
+  async function saveChart() {
+    if (!study || !chartForm.title.trim() || !chartForm.dataCsv.trim()) return;
+    const body = JSON.stringify({
+      title: chartForm.title.trim(),
+      kind: chartForm.kind,
+      xLabel: chartForm.xLabel.trim() || null,
+      yLabel: chartForm.yLabel.trim() || null,
+      dataCsv: chartForm.dataCsv,
+    });
+    if (editingChartId) {
+      await api(`/api/study-charts/${editingChartId}`, { method: "PATCH", body });
+    } else {
+      await api(`/api/studies/${study.slug}/charts`, { method: "POST", body });
+    }
+    setAddingChart(false);
+    useToastStore.getState().showToast("Saved ✓");
+    reload();
+  }
+
+  async function deleteChart(id: number) {
+    if (!confirm("Delete this chart?")) return;
+    await api(`/api/study-charts/${id}`, { method: "DELETE" });
+    reload();
+  }
+
+  async function moveChart(index: number, direction: -1 | 1) {
+    if (!study) return;
+    const swapWith = index + direction;
+    if (swapWith < 0 || swapWith >= study.charts.length) return;
+    const reordered = [...study.charts];
+    [reordered[index], reordered[swapWith]] = [reordered[swapWith], reordered[index]];
+    await api(`/api/studies/${study.slug}/charts/reorder`, { method: "POST", body: JSON.stringify({ chartIds: reordered.map((c) => c.id) }) });
+    reload();
+  }
+
   if (!study) return <p>Loading...</p>;
 
   return (
@@ -164,6 +226,96 @@ export function StudyPage() {
         <textarea value={draftBody} onChange={(e) => setDraftBody(e.target.value)} rows={16} style={{ width: "100%", fontFamily: "var(--font-mono)" }} />
       ) : (
         <div>{renderMarkdown(study.body, (path) => navigate(path))}</div>
+      )}
+
+      {(study.charts.length > 0 || isOwner) && (
+        <div style={{ marginTop: "2rem", borderTop: "1px solid var(--border)", paddingTop: "1rem" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <h2 style={{ fontSize: "0.95rem" }}>Charts &amp; data</h2>
+            {isOwner && !addingChart && (
+              <button className="btn" style={{ fontSize: "0.75rem" }} onClick={startAddChart}>
+                + add chart/table
+              </button>
+            )}
+          </div>
+
+          {study.charts.map((c, i) => (
+            <div key={c.id} style={{ margin: "1rem 0" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
+                <h3 style={{ fontSize: "0.85rem", margin: 0 }}>{c.title}</h3>
+                {isOwner && (
+                  <span style={{ fontSize: "0.72rem" }}>
+                    <button className="btn" style={{ padding: "0 0.3rem" }} onClick={() => moveChart(i, -1)}>
+                      ↑
+                    </button>
+                    <button className="btn" style={{ padding: "0 0.3rem" }} onClick={() => moveChart(i, 1)}>
+                      ↓
+                    </button>
+                    <button className="btn" style={{ padding: "0 0.3rem" }} onClick={() => startEditChart(c)}>
+                      edit
+                    </button>
+                    <button className="btn btn-danger" style={{ padding: "0 0.3rem" }} onClick={() => deleteChart(c.id)}>
+                      remove
+                    </button>
+                  </span>
+                )}
+              </div>
+              <StudyChartView kind={c.kind} xLabel={c.xLabel} yLabel={c.yLabel} dataCsv={c.dataCsv} />
+            </div>
+          ))}
+
+          {addingChart && (
+            <div style={{ border: "1px solid var(--border)", borderRadius: "var(--radius)", padding: "0.6rem", marginTop: "0.5rem" }}>
+              <div style={{ display: "flex", gap: "0.4rem", flexWrap: "wrap", marginBottom: "0.4rem" }}>
+                <input
+                  value={chartForm.title}
+                  onChange={(e) => setChartForm((f) => ({ ...f, title: e.target.value }))}
+                  placeholder="Chart title"
+                  style={{ fontSize: "0.85rem" }}
+                />
+                <select value={chartForm.kind} onChange={(e) => setChartForm((f) => ({ ...f, kind: e.target.value as Chart["kind"] }))}>
+                  <option value="LINE">Line</option>
+                  <option value="BAR">Bar</option>
+                  <option value="SCATTER">Scatter</option>
+                  <option value="TABLE">Table only</option>
+                </select>
+                {chartForm.kind !== "TABLE" && (
+                  <>
+                    <input
+                      value={chartForm.xLabel}
+                      onChange={(e) => setChartForm((f) => ({ ...f, xLabel: e.target.value }))}
+                      placeholder="X axis label (optional)"
+                      style={{ fontSize: "0.85rem" }}
+                    />
+                    <input
+                      value={chartForm.yLabel}
+                      onChange={(e) => setChartForm((f) => ({ ...f, yLabel: e.target.value }))}
+                      placeholder="Y axis label (optional)"
+                      style={{ fontSize: "0.85rem" }}
+                    />
+                  </>
+                )}
+              </div>
+              <p style={{ fontSize: "0.72rem", color: "var(--text-dim)", margin: "0 0 0.2rem" }}>
+                CSV - first row is headers. First column is X (or the row label for a table); every other column is its own data series.
+              </p>
+              <textarea
+                value={chartForm.dataCsv}
+                onChange={(e) => setChartForm((f) => ({ ...f, dataCsv: e.target.value }))}
+                rows={6}
+                style={{ width: "100%", fontFamily: "var(--font-mono)", fontSize: "0.8rem" }}
+              />
+              <div style={{ marginTop: "0.4rem" }}>
+                <button className="btn btn-primary" style={{ fontSize: "0.8rem" }} onClick={saveChart}>
+                  Save chart
+                </button>{" "}
+                <button className="btn" style={{ fontSize: "0.8rem" }} onClick={() => setAddingChart(false)}>
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
       )}
 
       {(study.annotations.length > 0 || isOwner) && (

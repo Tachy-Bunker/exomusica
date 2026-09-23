@@ -41,7 +41,12 @@ export async function studiesRoutes(app: FastifyInstance): Promise<void> {
   app.get<{ Params: { slug: string } }>("/api/studies/:slug", async (req, reply) => {
     const study = await prisma.study.findUnique({
       where: { slug: req.params.slug },
-      include: { owner: { select: { id: true, username: true } }, channel: { select: { slug: true } }, annotations: { orderBy: { position: "asc" } } },
+      include: {
+        owner: { select: { id: true, username: true } },
+        channel: { select: { slug: true } },
+        annotations: { orderBy: { position: "asc" } },
+        charts: { orderBy: { position: "asc" } },
+      },
     });
     if (!study) return reply.code(404).send({ error: "no such study" });
     return study;
@@ -134,4 +139,55 @@ export async function studiesRoutes(app: FastifyInstance): Promise<void> {
       return reply.code(204).send();
     },
   );
+
+  // --- Charts/data tables: author-only, positioned within the study ---
+
+  app.post<{ Params: { slug: string }; Body: { title: string; kind: "LINE" | "BAR" | "SCATTER" | "TABLE"; xLabel?: string; yLabel?: string; dataCsv: string } }>(
+    "/api/studies/:slug/charts",
+    { preHandler: requireAuth },
+    async (req, reply) => {
+      const study = await prisma.study.findUnique({ where: { slug: req.params.slug }, include: { charts: true } });
+      if (!study) return reply.code(404).send({ error: "no such study" });
+      if (study.ownerId !== req.user!.id && !req.user!.isAdmin) return reply.code(403).send({ error: "not your study" });
+      const { title, kind, xLabel, yLabel, dataCsv } = req.body ?? {};
+      if (!title?.trim() || !dataCsv?.trim()) return reply.code(400).send({ error: "title and dataCsv are required" });
+      const nextPosition = study.charts.length + 1;
+      const chart = await prisma.studyChart.create({
+        data: { studyId: study.id, position: nextPosition, title: title.trim(), kind: kind ?? "LINE", xLabel: xLabel?.trim() || null, yLabel: yLabel?.trim() || null, dataCsv },
+      });
+      return reply.code(201).send(chart);
+    },
+  );
+
+  app.patch<{ Params: { id: string }; Body: Partial<{ title: string; kind: "LINE" | "BAR" | "SCATTER" | "TABLE"; xLabel: string | null; yLabel: string | null; dataCsv: string }> }>(
+    "/api/study-charts/:id",
+    { preHandler: requireAuth },
+    async (req, reply) => {
+      const chart = await prisma.studyChart.findUnique({ where: { id: Number(req.params.id) }, include: { study: true } });
+      if (!chart) return reply.code(404).send({ error: "no such chart" });
+      if (chart.study.ownerId !== req.user!.id && !req.user!.isAdmin) return reply.code(403).send({ error: "not your study" });
+      return prisma.studyChart.update({ where: { id: chart.id }, data: req.body ?? {} });
+    },
+  );
+
+  app.delete<{ Params: { id: string } }>("/api/study-charts/:id", { preHandler: requireAuth }, async (req, reply) => {
+    const chart = await prisma.studyChart.findUnique({ where: { id: Number(req.params.id) }, include: { study: true } });
+    if (!chart) return reply.code(404).send({ error: "no such chart" });
+    if (chart.study.ownerId !== req.user!.id && !req.user!.isAdmin) return reply.code(403).send({ error: "not your study" });
+    await prisma.studyChart.delete({ where: { id: chart.id } });
+    return reply.code(204).send();
+  });
+
+  app.post<{ Params: { slug: string }; Body: { chartIds: number[] } }>("/api/studies/:slug/charts/reorder", { preHandler: requireAuth }, async (req, reply) => {
+    const study = await prisma.study.findUnique({ where: { slug: req.params.slug }, include: { charts: true } });
+    if (!study) return reply.code(404).send({ error: "no such study" });
+    if (study.ownerId !== req.user!.id && !req.user!.isAdmin) return reply.code(403).send({ error: "not your study" });
+    const { chartIds } = req.body ?? { chartIds: [] };
+    const ownIds = new Set(study.charts.map((c) => c.id));
+    if (chartIds.length !== ownIds.size || !chartIds.every((id) => ownIds.has(id))) {
+      return reply.code(400).send({ error: "chartIds must include exactly this study's charts" });
+    }
+    await prisma.$transaction(chartIds.map((id, i) => prisma.studyChart.update({ where: { id }, data: { position: i + 1 } })));
+    return reply.code(204).send();
+  });
 }

@@ -760,6 +760,30 @@ model Study {
   updatedAt   DateTime          @updatedAt
   annotations StudyAnnotation[]
   mapNode     ForumMapNode?
+  charts      StudyChart[]
+}
+
+enum StudyChartKind {
+  LINE
+  BAR
+  SCATTER
+  TABLE
+}
+
+// Data blocks a researcher embeds in a study - CSV text (first row is
+// headers) rather than a structured JSON shape, since that's the
+// simplest possible input for a scientist to paste from a spreadsheet
+// or type by hand, with no special editor needed.
+model StudyChart {
+  id       Int            @id @default(autoincrement())
+  studyId  Int
+  study    Study          @relation(fields: [studyId], references: [id], onDelete: Cascade)
+  position Int
+  title    String
+  kind     StudyChartKind @default(LINE)
+  xLabel   String?
+  yLabel   String?
+  dataCsv  String         @db.Text
 }
 
 model StudyAnnotation {
