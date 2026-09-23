@@ -36,8 +36,18 @@ export async function mediaRoutes(app: FastifyInstance): Promise<void> {
     try {
       parsed = new URL(externalUrl);
     } catch {
-      req.log.warn({ kind, id, externalUrl }, "audio-proxy: stored URL is not a valid absolute URL");
-      return reply.code(400).send({ error: "stored URL is not a valid absolute URL" });
+      // Older rows were sometimes entered without a scheme (e.g. typed
+      // as "archive.org/download/..." rather than pasted from a
+      // browser's address bar, which always includes "https://").
+      // new URL() has no base to resolve a schemeless string against
+      // and rejects it outright - retry once assuming https before
+      // giving up, since that's virtually always what was meant.
+      try {
+        parsed = new URL(`https://${externalUrl}`);
+      } catch {
+        req.log.warn({ kind, id, externalUrl }, "audio-proxy: stored URL is not a valid absolute URL, even with https:// assumed");
+        return reply.code(400).send({ error: "stored URL is not a valid absolute URL" });
+      }
     }
     if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
       return reply.code(400).send({ error: "only http/https URLs can be proxied" });
@@ -48,7 +58,7 @@ export async function mediaRoutes(app: FastifyInstance): Promise<void> {
 
     let upstream: Response;
     try {
-      upstream = await fetch(externalUrl, { headers: upstreamHeaders });
+      upstream = await fetch(parsed.href, { headers: upstreamHeaders });
     } catch (err) {
       req.log.error(err, "audio-proxy: upstream fetch failed");
       return reply.code(502).send({ error: "failed to fetch the source audio" });
