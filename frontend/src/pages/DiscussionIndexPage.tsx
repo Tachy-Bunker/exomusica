@@ -53,9 +53,14 @@ export function DiscussionIndexPage() {
     <div style={{ fontSize: `${scale}rem` }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <h1>Forums</h1>
-        <Link to="/discussion/map" className="btn">
-          View as map
-        </Link>
+        <div style={{ display: "flex", gap: "0.4rem" }}>
+          <Link to="/studies" className="btn">
+            Studies
+          </Link>
+          <Link to="/discussion/map" className="btn">
+            View as map
+          </Link>
+        </div>
       </div>
 
       {topics.length === 0 && <p style={{ color: "var(--text-dim)" }}>No topics yet.</p>}

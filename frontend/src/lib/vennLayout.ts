@@ -78,7 +78,7 @@ export function layoutGenreBlobs(tracks: VennTrack[]): GenreBlob[] {
   // convergence - this is a decorative layout, not a physics sim that
   // needs precision, and a fixed step count keeps this fast and
   // deterministic.
-  for (let step = 0; step < 220; step++) {
+  for (let step = 0; step < 350; step++) {
     for (let i = 0; i < blobs.length; i++) {
       for (let j = i + 1; j < blobs.length; j++) {
         const a = blobs[i];
@@ -88,7 +88,16 @@ export function layoutGenreBlobs(tracks: VennTrack[]): GenreBlob[] {
         const dist = Math.hypot(dx, dy) || 0.001;
         const key = [a.name, b.name].sort().join("\u0000");
         const shared = sharedWeight.get(key) ?? 0;
-        const targetGap = a.radius + b.radius - Math.min(a.radius, b.radius) * Math.min(0.8, shared * 0.25);
+        const countA = genreCounts.get(a.name)!;
+        const countB = genreCounts.get(b.name)!;
+        // Coverage relative to the smaller genre, not a raw shared
+        // count - a genre that only appears once, entirely alongside
+        // another genre, needs just as strong an overlap as a common
+        // genre sharing many tracks with another common one. Raw counts
+        // would under-weight the rare case badly.
+        const coverage = shared > 0 ? shared / Math.min(countA, countB) : 0;
+        const overlapFraction = shared > 0 ? Math.max(0.22, Math.min(0.92, coverage)) : 0; // any real co-occurrence guarantees at least some visible overlap
+        const targetGap = a.radius + b.radius - Math.min(a.radius, b.radius) * overlapFraction;
         const diff = dist - targetGap;
         // Spring toward the target gap - pulls closer when sharing
         // tracks (targetGap shrinks with more shared tracks, allowing

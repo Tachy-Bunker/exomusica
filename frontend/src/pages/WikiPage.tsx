@@ -108,6 +108,11 @@ export function WikiPage() {
             </li>
           ))}
       </ul>
+      <h3 style={{ fontSize: `${0.9 * scale}rem`, marginTop: "1rem" }}>Studies</h3>
+      <p style={{ fontSize: `${0.75 * scale}rem`, color: "var(--text-dim)", marginBottom: "0.3rem" }}>
+        Documented phenomena and experiments, each with their own discussion.
+      </p>
+      <Link to="/studies">Browse studies →</Link>
     </nav>
   );
 
