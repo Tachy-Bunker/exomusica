@@ -13,6 +13,7 @@ import { JoinPage } from "./pages/JoinPage";
 import { WikiPage } from "./pages/WikiPage";
 import { StudiesIndexPage } from "./pages/StudiesIndexPage";
 import { ContributePage } from "./pages/ContributePage";
+import { SubmitWorkPage } from "./pages/SubmitWorkPage";
 import { StudyPage } from "./pages/StudyPage";
 import { NewsPage } from "./pages/NewsPage";
 import { DiscussionIndexPage } from "./pages/DiscussionIndexPage";
@@ -42,6 +43,8 @@ import { WikiAdminPage } from "./pages/admin/WikiAdminPage";
 import { AllTracksAdminPage } from "./pages/admin/AllTracksAdminPage";
 import { StudiesAdminPage } from "./pages/admin/StudiesAdminPage";
 import { BranchContributeAdminPage } from "./pages/admin/BranchContributeAdminPage";
+import { SubmissionsAdminPage } from "./pages/admin/SubmissionsAdminPage";
+import { ContributorPointsAdminPage } from "./pages/admin/ContributorPointsAdminPage";
 import { BlogAdminPage } from "./pages/admin/BlogAdminPage";
 import { EmojiAdminPage } from "./pages/admin/EmojiAdminPage";
 import { EmailTemplatesAdminPage } from "./pages/admin/EmailTemplatesAdminPage";
@@ -86,6 +89,7 @@ export default function App() {
             <Route path="wiki" element={<WikiPage />} />
             <Route path="studies" element={<StudiesIndexPage />} />
             <Route path="contribute" element={<ContributePage />} />
+            <Route path="submit" element={<SubmitWorkPage />} />
             <Route path="study/:slug" element={<StudyPage />} />
             <Route path="wiki/:slug" element={<WikiPage />} />
             <Route path="news" element={<NewsPage />} />
@@ -121,6 +125,8 @@ export default function App() {
                 <Route path="all-tracks" element={<AllTracksAdminPage />} />
                 <Route path="studies" element={<StudiesAdminPage />} />
                 <Route path="branches/:id/contribute" element={<BranchContributeAdminPage />} />
+                <Route path="submissions" element={<SubmissionsAdminPage />} />
+                <Route path="contributor-points" element={<ContributorPointsAdminPage />} />
                 <Route path="blog" element={<BlogAdminPage />} />
                 <Route path="emoji" element={<EmojiAdminPage />} />
                 <Route path="email-templates" element={<EmailTemplatesAdminPage />} />

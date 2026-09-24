@@ -44,6 +44,8 @@ model User {
   email                 String?      @unique // null once a ghost: no login, no PII to leak
   passwordHash          String?      // null for any ghost (Discord-import never had one; deleted accounts have it cleared)
   avatarUrl             String?
+  contributorPointsEntries ContributorPointsEntry[]
+  pointsAwarded             ContributorPointsEntry[] @relation("PointsAwardedBy")
   bio                   String?
   links                 Json?
   isAdmin               Boolean      @default(false)
@@ -930,12 +932,30 @@ model CommunityAlbum {
   submissionChannel   ForumChannel?   @relation(fields: [submissionChannelId], references: [id], onDelete: SetNull)
 
   tracks CommunityTrack[]
+  pointsEntries ContributorPointsEntry[]
 }
 
 enum SubmissionStatus {
   PENDING
   APPROVED
   REJECTED
+}
+
+// A ledger, not a single counter, so awards stay auditable (who gave
+// how many points, when, and why) and can come from more than just
+// approved submissions - admin can award points manually too. Visible
+// to admins only.
+model ContributorPointsEntry {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  points    Int
+  reason    String
+  submissionId Int?
+  submission   CommunityAlbum? @relation(fields: [submissionId], references: [id], onDelete: SetNull)
+  awardedById Int?
+  awardedBy   User?  @relation("PointsAwardedBy", fields: [awardedById], references: [id], onDelete: SetNull)
+  createdAt DateTime @default(now())
 }
 
 enum TrackPermission {

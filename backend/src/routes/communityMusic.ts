@@ -148,6 +148,7 @@ export async function communityMusicRoutes(app: FastifyInstance): Promise<void> 
       where: { slug: req.params.slug },
       include: {
         owner: { select: { username: true } },
+        submissionChannel: { select: { slug: true } },
         tracks: {
           orderBy: { position: "asc" },
           include: { attachment: { select: { storagePath: true } }, _count: { select: { likes: true } }, remixOf: { select: { title: true, album: { select: { slug: true } } } } },
@@ -223,6 +224,11 @@ export async function communityMusicRoutes(app: FastifyInstance): Promise<void> 
       const album = await prisma.communityAlbum.findUnique({ where: { id: Number(req.params.id) } });
       if (!album || !album.targetBranchId) return reply.code(404).send({ error: "no such submission" });
       const updated = await prisma.communityAlbum.update({ where: { id: album.id }, data: { submissionStatus } });
+      if (submissionStatus === "APPROVED" && album.submissionStatus !== "APPROVED") {
+        await prisma.contributorPointsEntry.create({
+          data: { userId: album.ownerId, points: 10, reason: `Approved submission: ${album.title}`, submissionId: album.id, awardedById: req.user!.id },
+        });
+      }
       return updated;
     },
   );
@@ -322,6 +328,8 @@ export async function communityMusicRoutes(app: FastifyInstance): Promise<void> 
       const permission = permissionField && "value" in permissionField ? String(permissionField.value) : "LISTEN_ONLY";
       const remixOfField = file.fields.remixOfId;
       const remixOfId = remixOfField && "value" in remixOfField && remixOfField.value ? Number(remixOfField.value) : null;
+      const composerField = file.fields.composer;
+      const composer = composerField && "value" in composerField && composerField.value ? String(composerField.value) : null;
       if (!title) return reply.code(400).send({ error: "title is required" });
       const buffer = await file.toBuffer();
       let attachment;
@@ -335,6 +343,7 @@ export async function communityMusicRoutes(app: FastifyInstance): Promise<void> 
         data: {
           albumId: album.id,
           title,
+          composer,
           attachmentId: attachment.id,
           format: formatFromMime(file.mimetype),
           position,
