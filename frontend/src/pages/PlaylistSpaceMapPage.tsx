@@ -305,7 +305,10 @@ export function PlaylistSpaceMapPage() {
   );
   const rawRegions = useMemo(() => layoutConstellationRegions(constellationTracks), [constellationTracks]);
   const regions = useMemo(() => rawRegions.map((r) => ({ ...r, x: r.x * controls.vennSpacing, y: r.y * controls.vennSpacing })), [rawRegions, controls.vennSpacing]);
-  const stars = useMemo(() => layoutStars(constellationTracks, regions, controls.vennOrbDistance), [constellationTracks, regions, controls.vennOrbDistance]);
+  const stars = useMemo(
+    () => layoutStars(constellationTracks, regions, controls.vennOrbDistance, controls.vennBlobSize / 1.2 + 0.4),
+    [constellationTracks, regions, controls.vennOrbDistance, controls.vennBlobSize],
+  );
   const connectionLines = useMemo(() => buildConnectionLines(stars, regions), [stars, regions]);
   const allPlaylistGenres = useMemo(() => {
     const set = new Set<string>();
@@ -469,8 +472,8 @@ export function PlaylistSpaceMapPage() {
       const d = Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY);
       const ratio = d / pinchRef.current.startDist;
       updateControl({
-        vennBlobSize: Math.min(2.5, Math.max(0.4, pinchRef.current.startBlobSize * ratio)),
-        vennSpacing: Math.min(2.5, Math.max(0.4, pinchRef.current.startSpacing * ratio)),
+        vennBlobSize: Math.min(6, Math.max(0.15, pinchRef.current.startBlobSize * ratio)),
+        vennSpacing: Math.min(6, Math.max(0.15, pinchRef.current.startSpacing * ratio)),
       });
       return;
     }

@@ -141,6 +141,8 @@ export async function branchRoutes(app: FastifyInstance): Promise<void> {
       ogTitle: string | null;
       ogDescription: string | null;
       ogImageUrl: string | null;
+      briefMarkdown: string | null;
+      previewAttachmentId: number | null;
     }>;
   }>("/api/admin/branches/:id", { preHandler: requireAdmin }, async (req) => {
     const branch = await prisma.branch.update({ where: { id: Number(req.params.id) }, data: req.body ?? {} });

@@ -59,6 +59,7 @@ import { sampleBankAndChallengesRoutes } from "./routes/sampleBankAndChallenges.
 import { questionsRoutes } from "./routes/questions.js";
 import { studiesRoutes } from "./routes/studies.js";
 import { adminAllTracksRoutes } from "./routes/adminAllTracks.js";
+import { branchContributeRoutes } from "./routes/branchContribute.js";
 
 // Fastify's own default body limit is 1MB, applied before multipart even
 // parses anything - this was the real ceiling blocking larger uploads
@@ -115,6 +116,7 @@ await app.register(sampleBankAndChallengesRoutes);
 await app.register(questionsRoutes);
 await app.register(studiesRoutes);
 await app.register(adminAllTracksRoutes);
+await app.register(branchContributeRoutes);
 
 const port = Number(process.env.PORT ?? 3001);
 app.listen({ port, host: "0.0.0.0" }).catch((err) => {

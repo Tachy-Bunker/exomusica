@@ -128,7 +128,7 @@ export function layoutConstellationRegions(tracks: ConstellationTrack[]): Conste
 
 /** Scatters each constellation's tracks as stars within its region -
  *  deterministic per track so positions are stable across reloads. */
-export function layoutStars(tracks: ConstellationTrack[], regions: ConstellationRegion[], orbDistance = 1): Star[] {
+export function layoutStars(tracks: ConstellationTrack[], regions: ConstellationRegion[], orbDistance = 1, starSizeScale = 1): Star[] {
   const regionByName = new Map(regions.map((r) => [r.name, r]));
   const stars = tracks
     .filter((t) => t.genres.length > 0 && regionByName.has(t.genres[0]))
@@ -140,7 +140,7 @@ export function layoutStars(tracks: ConstellationTrack[], regions: Constellation
       const spread = 40 + Math.sqrt(region.trackCount) * 20;
       // Never spawn on top of the region's own star, which can be
       // sizable (grows with track count) - orbit it, don't overlap.
-      const approxRegionStarRadius = (9 * 8 * Math.pow(1.07, Math.max(0, region.trackCount - 1))) / 2;
+      const approxRegionStarRadius = (9 * starSizeScale * 8 * Math.pow(1.07, Math.max(0, region.trackCount - 1))) / 2;
       const minR = approxRegionStarRadius + 14 * orbDistance;
       const spreadWithOrbit = Math.max(spread, minR + 30 * orbDistance);
       const angle = rand() * Math.PI * 2;

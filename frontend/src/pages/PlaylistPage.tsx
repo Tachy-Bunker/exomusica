@@ -5,6 +5,7 @@ import { useAudioStore } from "../lib/audioStore";
 import { useAuth } from "../lib/auth";
 import { useDocumentTitle } from "../lib/useDocumentTitle";
 import type { PlayableTrackDTO } from "../lib/types";
+import { EmbedCodeModal } from "../components/EmbedCodeModal";
 
 interface PlaylistItem {
   id: number;
@@ -37,6 +38,7 @@ export function PlaylistPage() {
   const { slug } = useParams<{ slug: string }>();
   const [playlist, setPlaylist] = useState<PlaylistDetail | null>(null);
   const [editingTitle, setEditingTitle] = useState(false);
+  const [showEmbed, setShowEmbed] = useState(false);
   const [titleDraft, setTitleDraft] = useState("");
   const [collabUsername, setCollabUsername] = useState("");
   const { user } = useAuth();
@@ -167,8 +169,15 @@ export function PlaylistPage() {
               <path d="M27,5c-1.7,0-3,1.3-3,3c0,0.3,0,0.5,0.1,0.8l-5.4,3.8C18.2,12.2,17.6,12,17,12c-0.8,0-1.5,0.3-2.1,0.8L8,9.4 C8,9.2,8,9.1,8,9c0-1.7-1.3-3-3-3S2,7.3,2,9s1.3,3,3,3c0.8,0,1.5-0.3,2.1-0.8l7,3.5c0,0.1,0,0.2,0,0.4c0,0.9,0.4,1.7,1,2.2L12.2,24 c-0.1,0-0.1,0-0.2,0c-1.7,0-3,1.3-3,3s1.3,3,3,3s3-1.3,3-3c0-0.9-0.4-1.7-1-2.2l2.8-6.8c0.1,0,0.1,0,0.2,0c1.7,0,3-1.3,3-3 c0-0.3,0-0.5-0.1-0.8l5.4-3.8c0.5,0.4,1.1,0.6,1.7,0.6c1.7,0,3-1.3,3-3S28.7,5,27,5z" />
             </svg>
           </Link>
+          <button className="btn" title="Get embed code" onClick={() => setShowEmbed(true)}>
+            {"</>"}
+          </button>
         </div>
       </div>
+
+      {showEmbed && (
+        <EmbedCodeModal playlistSlug={playlist.slug} onClose={() => setShowEmbed(false)} />
+      )}
 
       {playlist.description && <p style={{ marginTop: "0.8rem" }}>{playlist.description}</p>}
 

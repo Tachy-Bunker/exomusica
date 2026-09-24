@@ -152,8 +152,27 @@ model Branch {
   posY        Float?
   createdAt   DateTime @default(now())
 
+  briefMarkdown       String?     @db.Text // admin-authored concept brief for contributors, shown on "Choose your next project"
+  previewAttachmentId Int?        @unique
+  previewAttachment   Attachment? @relation("BranchPreview", fields: [previewAttachmentId], references: [id])
+  sketches            BranchSketch[]
+  submissions         CommunityAlbum[] @relation("BranchSubmissions")
+
   channel ForumChannel?
   albums  Album[]
+}
+
+// Admin-curated chat attachments ("selected experiments") a contributor
+// can download as inspiration/source material for a branch - the admin
+// picks from what's already been shared in that branch's discussion,
+// nothing new to upload.
+model BranchSketch {
+  id           Int        @id @default(autoincrement())
+  branchId     Int
+  branch       Branch     @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  attachmentId Int        @unique
+  attachment   Attachment @relation("BranchSketchAttachment", fields: [attachmentId], references: [id])
+  addedAt      DateTime   @default(now())
 }
 
 model ForumChannel {
@@ -183,6 +202,7 @@ model ForumChannel {
   mapNode  ForumMapNode?
   follows  ChannelFollow[]
   study    Study?
+  submissionFor CommunityAlbum?
 }
 
 model ChannelFollow {
@@ -278,6 +298,8 @@ model Attachment {
   communityTrack   CommunityTrack?
   sampleBankItem   SampleBankItem?
   communityAlbumCover CommunityAlbum?
+  branchPreviewFor    Branch?       @relation("BranchPreview")
+  branchSketchFor     BranchSketch? @relation("BranchSketchAttachment")
 }
 
 model Album {
@@ -901,7 +923,19 @@ model CommunityAlbum {
   description String?  @db.Text
   createdAt   DateTime @default(now())
 
+  targetBranchId    Int?
+  targetBranch      Branch?           @relation("BranchSubmissions", fields: [targetBranchId], references: [id])
+  submissionStatus  SubmissionStatus?
+  submissionChannelId Int?            @unique
+  submissionChannel   ForumChannel?   @relation(fields: [submissionChannelId], references: [id], onDelete: SetNull)
+
   tracks CommunityTrack[]
+}
+
+enum SubmissionStatus {
+  PENDING
+  APPROVED
+  REJECTED
 }
 
 enum TrackPermission {

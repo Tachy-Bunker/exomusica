@@ -7,6 +7,7 @@ import { Layout } from "./components/Layout";
 import { RequireAdmin } from "./components/RequireAdmin";
 import { HomePage } from "./pages/HomePage";
 import { MiniChatWindowPage } from "./pages/MiniChatWindowPage";
+import { EmbedPlaylistPage } from "./pages/EmbedPlaylistPage";
 import { LoginPage } from "./pages/LoginPage";
 import { JoinPage } from "./pages/JoinPage";
 import { WikiPage } from "./pages/WikiPage";
@@ -73,6 +74,7 @@ export default function App() {
           <AuthProvider>
             <Routes>
               <Route path="chat-window" element={<MiniChatWindowPage />} />
+              <Route path="embed/playlist/:slug" element={<EmbedPlaylistPage />} />
               <Route element={<Layout />}>
                 <Route index element={<HomePage />} />
                 <Route path="login" element={<LoginPage />} />
