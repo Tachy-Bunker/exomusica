@@ -18,6 +18,8 @@ export async function branchContributeRoutes(app: FastifyInstance): Promise<void
         description: true,
         coverArtUrl: true,
         briefMarkdown: true,
+        contributeBackgroundUrl: true,
+        contributeBackgroundOpacity: true,
         previewAttachment: { select: { storagePath: true } },
         _count: { select: { sketches: true } },
       },
@@ -29,6 +31,8 @@ export async function branchContributeRoutes(app: FastifyInstance): Promise<void
       description: b.description,
       coverArtUrl: b.coverArtUrl,
       hasBrief: !!b.briefMarkdown,
+      backgroundUrl: b.contributeBackgroundUrl,
+      backgroundOpacity: b.contributeBackgroundOpacity,
       previewUrl: b.previewAttachment ? b.previewAttachment.storagePath : null,
       sketchCount: b._count.sketches,
     }));

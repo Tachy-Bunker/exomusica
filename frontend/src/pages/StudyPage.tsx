@@ -311,6 +311,12 @@ export function StudyPage() {
                 rows={6}
                 style={{ width: "100%", fontFamily: "var(--font-mono)", fontSize: "0.8rem" }}
               />
+              {chartForm.dataCsv.trim() && (
+                <div style={{ marginTop: "0.5rem", border: "1px solid var(--border)", borderRadius: "var(--radius)", padding: "0.5rem" }}>
+                  <p style={{ fontSize: "0.7rem", color: "var(--text-dim)", margin: "0 0 0.3rem" }}>Preview</p>
+                  <StudyChartView kind={chartForm.kind} xLabel={chartForm.xLabel || null} yLabel={chartForm.yLabel || null} dataCsv={chartForm.dataCsv} />
+                </div>
+              )}
               <div style={{ marginTop: "0.4rem" }}>
                 <button className="btn btn-primary" style={{ fontSize: "0.8rem" }} onClick={saveChart}>
                   Save chart

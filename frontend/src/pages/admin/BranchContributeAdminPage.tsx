@@ -9,6 +9,8 @@ interface BranchDetail {
   name: string;
   briefMarkdown: string | null;
   previewAttachmentId: number | null;
+  contributeBackgroundUrl: string | null;
+  contributeBackgroundOpacity: number;
 }
 interface Sketch {
   id: number;
@@ -26,6 +28,8 @@ export function BranchContributeAdminPage() {
   const { id } = useParams<{ id: string }>();
   const [branch, setBranch] = useState<BranchDetail | null>(null);
   const [briefDraft, setBriefDraft] = useState("");
+  const [bgUrlDraft, setBgUrlDraft] = useState("");
+  const [bgOpacityDraft, setBgOpacityDraft] = useState(0.3);
   const [sketches, setSketches] = useState<Sketch[]>([]);
   const [channelAttachments, setChannelAttachments] = useState<ChannelAttachment[] | null>(null);
   useDocumentTitle(branch ? `${branch.name} - Contribution settings` : "Contribution settings");
@@ -37,6 +41,8 @@ export function BranchContributeAdminPage() {
       if (match) {
         setBranch(match);
         setBriefDraft(match.briefMarkdown ?? "");
+        setBgUrlDraft(match.contributeBackgroundUrl ?? "");
+        setBgOpacityDraft(match.contributeBackgroundOpacity);
       }
     });
     api<Sketch[]>(`/api/admin/branches/${id}/sketches`).then(setSketches);
@@ -46,6 +52,15 @@ export function BranchContributeAdminPage() {
   async function saveBrief() {
     await api(`/api/admin/branches/${id}`, { method: "PATCH", body: JSON.stringify({ briefMarkdown: briefDraft || null }) });
     useToastStore.getState().showToast("Brief saved ✓");
+    load();
+  }
+
+  async function saveBackground() {
+    await api(`/api/admin/branches/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify({ contributeBackgroundUrl: bgUrlDraft || null, contributeBackgroundOpacity: bgOpacityDraft }),
+    });
+    useToastStore.getState().showToast("Background saved ✓");
     load();
   }
 
@@ -87,6 +102,18 @@ export function BranchContributeAdminPage() {
       <textarea value={briefDraft} onChange={(e) => setBriefDraft(e.target.value)} rows={12} style={{ width: "100%", fontFamily: "var(--font-mono)" }} />
       <button className="btn btn-primary" onClick={saveBrief} style={{ marginTop: "0.4rem" }}>
         Save brief
+      </button>
+
+      <h2 style={{ fontSize: "1rem", marginTop: "1.5rem" }}>Card background image</h2>
+      <p style={{ fontSize: "0.8rem", color: "var(--text-dim)" }}>Shown behind the card on "Choose your next project", at the opacity below.</p>
+      <input value={bgUrlDraft} onChange={(e) => setBgUrlDraft(e.target.value)} placeholder="Image URL" style={{ width: "100%" }} />
+      <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginTop: "0.4rem" }}>
+        <label style={{ fontSize: "0.8rem" }}>Opacity</label>
+        <input type="range" min={0} max={1} step={0.05} value={bgOpacityDraft} onChange={(e) => setBgOpacityDraft(Number(e.target.value))} />
+        <span style={{ fontSize: "0.8rem", color: "var(--text-dim)" }}>{bgOpacityDraft.toFixed(2)}</span>
+      </div>
+      <button className="btn btn-primary" onClick={saveBackground} style={{ marginTop: "0.4rem" }}>
+        Save background
       </button>
 
       <h2 style={{ fontSize: "1rem", marginTop: "1.5rem" }}>Preview audio</h2>

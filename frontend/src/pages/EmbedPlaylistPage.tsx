@@ -3,10 +3,12 @@ import { PlaylistSpaceMapPage } from "./PlaylistSpaceMapPage";
 import { PlayerBar } from "../components/PlayerBar";
 import { api } from "../lib/api";
 import { useCustomFont } from "../lib/useCustomFont";
+import { useGlobalPlayerShortcuts } from "../lib/useGlobalPlayerShortcuts";
 
 export function EmbedPlaylistPage() {
   const [siteFont, setSiteFont] = useState<{ familyName: string; fileUrl: string; format: string } | null>(null);
   useCustomFont(siteFont); // @font-face injection side effect
+  useGlobalPlayerShortcuts(); // play/pause/next/prev/seek/shuffle/loop - only ever wired in Layout.tsx before, which this page bypasses entirely
 
   useEffect(() => {
     document.documentElement.style.setProperty("--nav-height", "0px");
@@ -34,7 +36,7 @@ export function EmbedPlaylistPage() {
   }, [siteFont]);
 
   return (
-    <div style={{ minHeight: "100dvh", display: "flex", flexDirection: "column" }}>
+    <div style={{ minHeight: "100dvh", display: "flex", flexDirection: "column", fontFamily: "var(--font-body)", color: "var(--text)" }}>
       <div style={{ flex: 1, padding: "0.4rem" }}>
         <PlaylistSpaceMapPage />
       </div>

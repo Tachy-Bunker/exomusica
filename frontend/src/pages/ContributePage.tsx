@@ -9,6 +9,8 @@ interface ContributeBranch {
   description: string | null;
   coverArtUrl: string | null;
   hasBrief: boolean;
+  backgroundUrl: string | null;
+  backgroundOpacity: number;
   previewUrl: string | null;
   sketchCount: number;
 }
@@ -30,7 +32,21 @@ export function ContributePage() {
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: "1rem", marginTop: "1rem" }}>
         {branches.map((b) => (
-          <div key={b.slug} style={{ border: "1px solid var(--border)", borderRadius: "var(--radius)", overflow: "hidden", display: "flex", flexDirection: "column" }}>
+          <div key={b.slug} style={{ border: "1px solid var(--border)", borderRadius: "var(--radius)", overflow: "hidden", display: "flex", flexDirection: "column", position: "relative" }}>
+            {b.backgroundUrl && (
+              <div
+                style={{
+                  position: "absolute",
+                  inset: 0,
+                  backgroundImage: `url(${b.backgroundUrl})`,
+                  backgroundSize: "cover",
+                  backgroundPosition: "center",
+                  opacity: b.backgroundOpacity,
+                  zIndex: 0,
+                }}
+              />
+            )}
+            <div style={{ position: "relative", zIndex: 1, display: "flex", flexDirection: "column", flex: 1 }}>
             {b.coverArtUrl && <img src={b.coverArtUrl} alt="" style={{ width: "100%", aspectRatio: "16/9", objectFit: "cover" }} />}
             <div style={{ padding: "0.7rem", display: "flex", flexDirection: "column", gap: "0.4rem", flex: 1 }}>
               <h3 style={{ margin: 0 }}>{b.name}</h3>
@@ -58,6 +74,7 @@ export function ContributePage() {
                   Submit work
                 </Link>
               </div>
+            </div>
             </div>
           </div>
         ))}

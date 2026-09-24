@@ -155,6 +155,8 @@ model Branch {
   createdAt   DateTime @default(now())
 
   briefMarkdown       String?     @db.Text // admin-authored concept brief for contributors, shown on "Choose your next project"
+  contributeBackgroundUrl     String?
+  contributeBackgroundOpacity Float   @default(0.3)
   previewAttachmentId Int?        @unique
   previewAttachment   Attachment? @relation("BranchPreview", fields: [previewAttachmentId], references: [id])
   sketches            BranchSketch[]
