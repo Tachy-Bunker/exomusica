@@ -12,6 +12,7 @@ import type { PlayableTrackDTO } from "../lib/types";
 import { spiralOrder, type TrackPoint } from "../lib/vennLayout";
 import { layoutConstellationRegions, layoutStars, buildConnectionLines, type ConstellationTrack } from "../lib/constellationLayout";
 import { ConstellationScanPanel } from "../components/ConstellationScanPanel";
+import { VennCustomColorEditor } from "../components/VennCustomColorEditor";
 
 interface PlaylistAlbum {
   slug: string;
@@ -41,7 +42,21 @@ interface PlaylistDetail {
   slug: string;
   title: string;
   ownerId: number;
-  fxSettings: (Partial<FxSettings> & { coverSize?: number; spacing?: number; roamSpeed?: number; vennHueStart?: number; vennHueEnd?: number; vennBlobSize?: number; vennSpacing?: number; vennRepelFactor?: number }) | null;
+  fxSettings: (Partial<FxSettings> & {
+    coverSize?: number;
+    spacing?: number;
+    roamSpeed?: number;
+    vennHueStart?: number;
+    vennHueEnd?: number;
+    vennBlobSize?: number;
+    vennSpacing?: number;
+    vennRepelFactor?: number;
+    vennOrbDistance?: number;
+    vennSaturation?: number;
+    vennBrightness?: number;
+    vennUseCustomColors?: boolean;
+    vennCustomColors?: Record<string, string>;
+  }) | null;
   albums: PlaylistAlbum[];
   items: PlaylistItem[];
 }
@@ -78,6 +93,25 @@ function hashOf(s: string): number {
   let h = 0;
   for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0;
   return h;
+}
+
+function hexToHsl(hex: string): { h: number; s: number; l: number } | null {
+  const m = /^#?([0-9a-f]{6})$/i.exec(hex.trim());
+  if (!m) return null;
+  const r = parseInt(m[1].slice(0, 2), 16) / 255;
+  const g = parseInt(m[1].slice(2, 4), 16) / 255;
+  const b = parseInt(m[1].slice(4, 6), 16) / 255;
+  const max = Math.max(r, g, b);
+  const min = Math.min(r, g, b);
+  const l = (max + min) / 2;
+  if (max === min) return { h: 0, s: 0, l: l * 100 };
+  const d = max - min;
+  const s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+  let h: number;
+  if (max === r) h = ((g - b) / d + (g < b ? 6 : 0)) * 60;
+  else if (max === g) h = ((b - r) / d + 2) * 60;
+  else h = ((r - g) / d + 4) * 60;
+  return { h, s: s * 100, l: l * 100 };
 }
 
 function playlistItemToPlayable(item: PlaylistItem): PlayableTrackDTO {
@@ -138,7 +172,12 @@ export function PlaylistSpaceMapPage() {
     vennBlobSize: 1,
     vennSpacing: 1,
     vennRepelFactor: 1,
+    vennOrbDistance: 1,
+    vennSaturation: 1,
+    vennBrightness: 1,
   });
+  const [vennUseCustomColors, setVennUseCustomColors] = useState(false);
+  const [vennCustomColors, setVennCustomColors] = useState<Record<string, string>>({});
   const [, forceRender] = useState(0);
   const [lockedId, setLockedId] = useState<number | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -190,7 +229,12 @@ export function PlaylistSpaceMapPage() {
         vennBlobSize: p.fxSettings?.vennBlobSize ?? 1,
         vennSpacing: p.fxSettings?.vennSpacing ?? 1,
         vennRepelFactor: p.fxSettings?.vennRepelFactor ?? 1,
+        vennOrbDistance: p.fxSettings?.vennOrbDistance ?? 1,
+        vennSaturation: p.fxSettings?.vennSaturation ?? 1,
+        vennBrightness: p.fxSettings?.vennBrightness ?? 1,
       });
+      setVennUseCustomColors(p.fxSettings?.vennUseCustomColors ?? false);
+      setVennCustomColors(p.fxSettings?.vennCustomColors ?? {});
     });
   }
   useEffect(reload, [slug]);
@@ -204,7 +248,24 @@ export function PlaylistSpaceMapPage() {
     saveTimerRef.current = setTimeout(() => {
       const p = playlistRef.current;
       if (!p) return;
-      api(`/api/playlists/${p.id}/fx-settings`, { method: "PATCH", body: JSON.stringify({ ...controls, ...patch }) }).catch(() => {});
+      api(`/api/playlists/${p.id}/fx-settings`, {
+        method: "PATCH",
+        body: JSON.stringify({ ...controls, ...patch, vennUseCustomColors, vennCustomColors }),
+      }).catch(() => {});
+    }, 400);
+  }
+
+  function saveColorSettings(useCustom: boolean, customColors: Record<string, string>) {
+    setVennUseCustomColors(useCustom);
+    setVennCustomColors(customColors);
+    if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    saveTimerRef.current = setTimeout(() => {
+      const p = playlistRef.current;
+      if (!p) return;
+      api(`/api/playlists/${p.id}/fx-settings`, {
+        method: "PATCH",
+        body: JSON.stringify({ ...controls, vennUseCustomColors: useCustom, vennCustomColors: customColors }),
+      }).catch(() => {});
     }, 400);
   }
 
@@ -244,8 +305,13 @@ export function PlaylistSpaceMapPage() {
   );
   const rawRegions = useMemo(() => layoutConstellationRegions(constellationTracks), [constellationTracks]);
   const regions = useMemo(() => rawRegions.map((r) => ({ ...r, x: r.x * controls.vennSpacing, y: r.y * controls.vennSpacing })), [rawRegions, controls.vennSpacing]);
-  const stars = useMemo(() => layoutStars(constellationTracks, regions), [constellationTracks, regions]);
+  const stars = useMemo(() => layoutStars(constellationTracks, regions, controls.vennOrbDistance), [constellationTracks, regions, controls.vennOrbDistance]);
   const connectionLines = useMemo(() => buildConnectionLines(stars, regions), [stars, regions]);
+  const allPlaylistGenres = useMemo(() => {
+    const set = new Set<string>();
+    for (const item of playlist?.items ?? []) for (const g of item.genres) set.add(g);
+    return [...set].sort();
+  }, [playlist]);
   const backgroundStars = useMemo(() => {
     // Purely decorative field-filler, not tied to any genre or track -
     // a real night sky is dense with faint background stars, which is
@@ -802,6 +868,26 @@ export function PlaylistSpaceMapPage() {
                     </label>
                     <input type="range" min={0} max={6} step={0.05} value={controls.vennRepelFactor} onChange={(e) => updateControl({ vennRepelFactor: Number(e.target.value) })} />
                   </div>
+                  <div className="field">
+                    <label style={{ fontSize: "0.75rem" }} title="How far track orbs sit from their genre's star - they orbit it, never touch it">
+                      Orb distance from star
+                    </label>
+                    <input type="range" min={0.2} max={5} step={0.05} value={controls.vennOrbDistance} onChange={(e) => updateControl({ vennOrbDistance: Number(e.target.value) })} />
+                  </div>
+                  <div className="field">
+                    <label style={{ fontSize: "0.75rem" }}>Orb saturation</label>
+                    <input type="range" min={0} max={2.5} step={0.05} value={controls.vennSaturation} onChange={(e) => updateControl({ vennSaturation: Number(e.target.value) })} />
+                  </div>
+                  <div className="field">
+                    <label style={{ fontSize: "0.75rem" }}>Orb brightness</label>
+                    <input type="range" min={0.2} max={2} step={0.05} value={controls.vennBrightness} onChange={(e) => updateControl({ vennBrightness: Number(e.target.value) })} />
+                  </div>
+                  <VennCustomColorEditor
+                    genres={allPlaylistGenres}
+                    useCustom={vennUseCustomColors}
+                    customColors={vennCustomColors}
+                    onSave={saveColorSettings}
+                  />
                 </div>
               )}
             </div>
@@ -909,6 +995,13 @@ export function PlaylistSpaceMapPage() {
                     if (opacity === 0) return null;
                     const fromLive = starNodesRef.current.get(l.trackId);
                     const toLive = l.toTrackId !== null ? starNodesRef.current.get(l.toTrackId) : null;
+                    const lineCustomHex = vennUseCustomColors ? vennCustomColors[l.toGenre] : undefined;
+                    const lineCustomHsl = lineCustomHex ? hexToHsl(lineCustomHex) : null;
+                    const strokeColor = lineCustomHsl
+                      ? `hsl(${lineCustomHsl.h}, ${isCross ? 65 : 50}%, ${isCross ? 62 : 68}%)`
+                      : isCross
+                        ? "#4fd4c4"
+                        : "#8fb8ff";
                     return (
                       <line
                         key={i}
@@ -916,7 +1009,7 @@ export function PlaylistSpaceMapPage() {
                         y1={fromLive?.y ?? l.fromY}
                         x2={toLive?.x ?? l.toX}
                         y2={toLive?.y ?? l.toY}
-                        stroke={isCross ? "#4fd4c4" : "#8fb8ff"}
+                        stroke={strokeColor}
                         strokeWidth={isCross && lit ? 1.6 : 1}
                         opacity={opacity}
                         filter={isCross && lit ? "url(#starGlow)" : undefined}
@@ -937,8 +1030,10 @@ export function PlaylistSpaceMapPage() {
                 // matter how organically they're placed.
                 const brightness = 0.45 + rand() * 0.55;
                 const warmth = rand(); // 0 = cool blue-white, 1 = warm white
-                const core = warmth > 0.5 ? "#fff8ec" : "#eaf3ff";
-                const mid = warmth > 0.5 ? "#ffe9c2" : "#cfe8ff";
+                const customHex = vennUseCustomColors ? vennCustomColors[r.name] : undefined;
+                const customHsl = customHex ? hexToHsl(customHex) : null;
+                const core = customHsl ? `hsl(${customHsl.h}, 45%, 96%)` : warmth > 0.5 ? "#fff8ec" : "#eaf3ff";
+                const mid = customHsl ? `hsl(${customHsl.h}, 75%, 78%)` : warmth > 0.5 ? "#ffe9c2" : "#cfe8ff";
                 const hasSpikes = brightness > 0.75;
                 return (
                   <div key={r.name}>
@@ -1017,7 +1112,18 @@ export function PlaylistSpaceMapPage() {
                 if (!point) return null;
                 const lit = litTrackIds.has(item.trackId);
                 const hovered = hoveredTrackId === item.trackId || crosshairNearTrackId === item.trackId;
-                const hue = controls.vennHueStart + ((controls.vennHueEnd - controls.vennHueStart) * (hashOf(item.title) % 100)) / 100;
+                const rootGenre = item.genres[0];
+                const customHex = vennUseCustomColors ? vennCustomColors[rootGenre] : undefined;
+                const customHsl = customHex ? hexToHsl(customHex) : null;
+                const hue = customHsl ? customHsl.h : controls.vennHueStart + ((controls.vennHueEnd - controls.vennHueStart) * (hashOf(item.title) % 100)) / 100;
+                const baseSat = customHsl ? customHsl.s : 55;
+                const litSat = customHsl ? Math.min(100, customHsl.s + 30) : 85;
+                const baseLight = customHsl ? customHsl.l : 65;
+                const litLight = customHsl ? Math.min(95, customHsl.l + 17) : 82;
+                const sat = Math.max(0, Math.min(100, baseSat * controls.vennSaturation));
+                const litSatFinal = Math.max(0, Math.min(100, litSat * controls.vennSaturation));
+                const light = Math.max(0, Math.min(95, baseLight * controls.vennBrightness));
+                const litLightFinal = Math.max(0, Math.min(97, litLight * controls.vennBrightness));
                 const trackBrightness = 0.55 + seededRand(hashOf(`tracklook:${item.trackId}`))() * 0.45;
                 const size = (lit ? 14 : hovered ? 12 : 9) * (controls.vennBlobSize / 1.2 + 0.4);
                 return (
@@ -1042,8 +1148,12 @@ export function PlaylistSpaceMapPage() {
                       cursor: "pointer",
                       zIndex: 3,
                       opacity: lit || hovered ? 1 : trackBrightness,
-                      background: lit ? `hsl(${hue}, 85%, 82%)` : `hsl(${hue}, 55%, 65%)`,
-                      boxShadow: lit ? `0 0 10px 3px hsla(${hue}, 85%, 80%, 0.8)` : hovered ? `0 0 6px 1px hsla(${hue}, 70%, 70%, 0.6)` : "none",
+                      background: lit ? `hsl(${hue}, ${litSatFinal}%, ${litLightFinal}%)` : `hsl(${hue}, ${sat}%, ${light}%)`,
+                      boxShadow: lit
+                        ? `0 0 10px 3px hsla(${hue}, ${litSatFinal}%, ${Math.max(0, litLightFinal - 2)}%, 0.8)`
+                        : hovered
+                          ? `0 0 6px 1px hsla(${hue}, ${Math.min(100, sat + 15)}%, ${light}%, 0.6)`
+                          : "none",
                       transition: "width 0.15s, height 0.15s, box-shadow 0.2s",
                     }}
                   />

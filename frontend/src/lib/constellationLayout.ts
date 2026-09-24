@@ -123,7 +123,7 @@ export function layoutConstellationRegions(tracks: ConstellationTrack[]): Conste
 
 /** Scatters each constellation's tracks as stars within its region -
  *  deterministic per track so positions are stable across reloads. */
-export function layoutStars(tracks: ConstellationTrack[], regions: ConstellationRegion[]): Star[] {
+export function layoutStars(tracks: ConstellationTrack[], regions: ConstellationRegion[], orbDistance = 1): Star[] {
   const regionByName = new Map(regions.map((r) => [r.name, r]));
   const stars = tracks
     .filter((t) => t.genres.length > 0 && regionByName.has(t.genres[0]))
@@ -136,9 +136,10 @@ export function layoutStars(tracks: ConstellationTrack[], regions: Constellation
       // Never spawn on top of the region's own star, which can be
       // sizable (grows with track count) - orbit it, don't overlap.
       const approxRegionStarRadius = (9 * 8 * Math.pow(1.07, Math.max(0, region.trackCount - 1))) / 2;
-      const minR = approxRegionStarRadius + 14;
+      const minR = approxRegionStarRadius + 14 * orbDistance;
+      const spreadWithOrbit = Math.max(spread, minR + 30 * orbDistance);
       const angle = rand() * Math.PI * 2;
-      const r = minR + Math.sqrt(rand()) * Math.max(20, spread - minR); // sqrt for uniform area density, not center-biased
+      const r = minR + Math.sqrt(rand()) * Math.max(20, spreadWithOrbit - minR); // sqrt for uniform area density, not center-biased
       return { trackId: t.id, x: region.x + Math.cos(angle) * r, y: region.y + Math.sin(angle) * r, rootGenre: t.genres[0], genres: t.genres };
     });
 

@@ -53,17 +53,20 @@ export async function mediaRoutes(app: FastifyInstance): Promise<void> {
       return reply.code(400).send({ error: "only http/https URLs can be proxied", storedValue: externalUrl });
     }
 
-    const upstreamHeaders: Record<string, string> = {};
+    const upstreamHeaders: Record<string, string> = {
+      "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36",
+    };
     if (req.headers.range) upstreamHeaders.range = req.headers.range;
 
     let upstream: Response;
     try {
       upstream = await fetch(parsed.href, { headers: upstreamHeaders });
     } catch (err) {
-      req.log.error(err, "audio-proxy: upstream fetch failed");
+      req.log.error({ err, url: parsed.href }, "audio-proxy: upstream fetch failed");
       return reply.code(502).send({ error: "failed to fetch the source audio" });
     }
     if (!upstream.ok && upstream.status !== 206) {
+      req.log.warn({ url: parsed.href, upstreamStatus: upstream.status, upstreamStatusText: upstream.statusText }, "audio-proxy: upstream returned an error status");
       return reply.code(502).send({ error: `upstream returned ${upstream.status}` });
     }
 

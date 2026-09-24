@@ -216,20 +216,23 @@ export function MyMusicPage() {
     if (album) openAlbumManage(album);
   }
 
-  const coverInputRef = useRef<HTMLInputElement>(null);
+  const coverInputRefs = useRef<Map<number, HTMLInputElement>>(new Map());
   const [coverUploadingAlbumId, setCoverUploadingAlbumId] = useState<number | null>(null);
 
   async function uploadCover(albumId: number, fileOverride?: File) {
-    const file = fileOverride ?? coverInputRef.current?.files?.[0];
+    const inputEl = coverInputRefs.current.get(albumId);
+    const file = fileOverride ?? inputEl?.files?.[0];
     if (!file) return;
     const formData = new FormData();
     formData.append("file", file);
     setCoverUploadingAlbumId(albumId);
     try {
       await api(`/api/community-albums/${albumId}/cover`, { method: "POST", body: formData });
-      if (coverInputRef.current) coverInputRef.current.value = "";
+      if (inputEl) inputEl.value = "";
       useToastStore.getState().showToast("Cover saved ✓");
       loadAlbums();
+    } catch (err) {
+      useToastStore.getState().showToast(err instanceof Error ? err.message : "Cover upload failed");
     } finally {
       setCoverUploadingAlbumId(null);
     }
@@ -346,7 +349,15 @@ export function MyMusicPage() {
               title="Click here, then Ctrl+V / Cmd+V to paste an image directly"
               style={{ display: "flex", gap: "0.4rem", alignItems: "center", outline: "none", border: "1px dashed var(--border)", borderRadius: "var(--radius)", padding: "0.2rem 0.4rem" }}
             >
-              <input ref={coverInputRef} type="file" accept="image/*" style={{ fontSize: "0.7rem", width: 90 }} />
+              <input
+                ref={(el) => {
+                  if (el) coverInputRefs.current.set(a.id, el);
+                  else coverInputRefs.current.delete(a.id);
+                }}
+                type="file"
+                accept="image/*"
+                style={{ fontSize: "0.7rem", width: 90 }}
+              />
               <button className="btn" onClick={() => uploadCover(a.id)} disabled={coverUploadingAlbumId === a.id}>
                 {coverUploadingAlbumId === a.id ? "Uploading…" : "Set cover"}
               </button>

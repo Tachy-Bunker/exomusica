@@ -1,9 +1,33 @@
 import { randomUUID } from "node:crypto";
-import { mkdir, writeFile } from "node:fs/promises";
+import { mkdir, writeFile, unlink } from "node:fs/promises";
 import path from "node:path";
 import { prisma } from "./prisma.js";
 
 const UPLOADS_DIR = path.join(process.cwd(), "uploads");
+
+// Deletes an attachment's disk file and DB row, and reclaims its size
+// from the uploader's storage quota. Used whenever an attachment is
+// being replaced (a new cover, a new PFP, etc.) - without this, the
+// old file becomes orphaned but still counts against quota forever,
+// eventually silently blocking all future uploads for that user.
+export async function deleteAttachmentAndReclaim(attachmentId: number): Promise<void> {
+  const attachment = await prisma.attachment.findUnique({ where: { id: attachmentId } });
+  if (!attachment) return;
+  if (attachment.storagePath.startsWith("/uploads/")) {
+    try {
+      await unlink(path.join(UPLOADS_DIR, attachment.storagePath.slice("/uploads/".length)));
+    } catch {
+      // Already gone, or never existed on disk (e.g. an external URL) - fine either way.
+    }
+  }
+  await prisma.$transaction([
+    prisma.attachment.delete({ where: { id: attachmentId } }),
+    prisma.user.update({
+      where: { id: attachment.uploaderId },
+      data: { storageUsedBytes: { decrement: attachment.sizeBytes } },
+    }),
+  ]);
+}
 
 /** Keeps the human-readable filename shown to users (and offered as a
  *  download name) unique across the whole site. The actual file on disk

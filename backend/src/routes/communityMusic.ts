@@ -2,7 +2,7 @@ import type { FastifyInstance } from "fastify";
 import type { Prisma } from "@prisma/client";
 import { prisma } from "../lib/prisma.js";
 import { requireAuth, requireAdmin, verifyToken } from "../lib/auth.js";
-import { saveCommunityTrackAudio, saveCommunityAlbumCover } from "../lib/storage.js";
+import { saveCommunityTrackAudio, saveCommunityAlbumCover, deleteAttachmentAndReclaim } from "../lib/storage.js";
 import { resolvePlayableUrl } from "../lib/embeds.js";
 import { probeAudioDuration } from "../lib/audioProbe.js";
 
@@ -226,10 +226,14 @@ export async function communityMusicRoutes(app: FastifyInstance): Promise<void> 
     const buffer = await file.toBuffer();
     try {
       const attachment = await saveCommunityAlbumCover(req.user!.id, file.filename, file.mimetype, buffer);
+      const previousCoverAttachmentId = album.coverAttachmentId;
       const updated = await prisma.communityAlbum.update({
         where: { id: album.id },
         data: { coverArtUrl: attachment.storagePath, coverAttachmentId: attachment.id },
       });
+      if (previousCoverAttachmentId) {
+        await deleteAttachmentAndReclaim(previousCoverAttachmentId).catch((err) => req.log.warn({ err, previousCoverAttachmentId }, "cover: failed to reclaim previous cover's storage"));
+      }
       return updated;
     } catch (err) {
       return reply.code(400).send({ error: err instanceof Error ? err.message : "upload failed" });
