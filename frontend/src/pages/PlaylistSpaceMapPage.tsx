@@ -339,7 +339,6 @@ export function PlaylistSpaceMapPage() {
   }, []);
   const vennTracks: TrackPoint[] = stars;
   const starByTrackId = useMemo(() => new Map(stars.map((s) => [s.trackId, s])), [stars]);
-  const rootGenreByTrackId = useMemo(() => new Map(stars.map((s) => [s.trackId, s.rootGenre])), [stars]);
   const genresByTrackId = useMemo(() => new Map(stars.map((s) => [s.trackId, s.genres])), [stars]);
   const [hoveredTrackId, setHoveredTrackId] = useState<number | null>(null);
   const [crosshairNearTrackId, setCrosshairNearTrackId] = useState<number | null>(null);
@@ -352,14 +351,22 @@ export function PlaylistSpaceMapPage() {
   const crosshairNearGenreRef = useRef<string | null>(null);
   const crosshairNearTrackIdRef = useRef<number | null>(null);
   const [scanPanelItemId, setScanPanelItemId] = useState<number | null>(null);
-  const [hiddenGenres, setHiddenGenres] = useState<Set<string>>(new Set());
-  function toggleGenreVisible(genre: string) {
-    setHiddenGenres((prev) => {
-      const next = new Set(prev);
-      if (next.has(genre)) next.delete(genre);
-      else next.add(genre);
-      return next;
+  const [genreState, setGenreState] = useState<Record<string, "on" | "highlight" | "off">>({});
+  function cycleGenreState(genre: string) {
+    setGenreState((prev) => {
+      const current = prev[genre] ?? "on";
+      const next = current === "on" ? "highlight" : current === "highlight" ? "off" : "on";
+      return { ...prev, [genre]: next };
     });
+  }
+  // Mirrors a mixing console: when any genre is highlighted (soloed),
+  // only tracks touching a highlighted genre stay full - everything
+  // else dims regardless of its own on/off state. Otherwise plain
+  // on/off applies to the track's root genre alone.
+  const anyGenreHighlighted = useMemo(() => Object.values(genreState).some((s) => s === "highlight"), [genreState]);
+  function trackDimmed(trackGenres: string[]): boolean {
+    if (anyGenreHighlighted) return !trackGenres.some((g) => genreState[g] === "highlight");
+    return genreState[trackGenres[0]] === "off";
   }
   const vennTracksRef = useRef(vennTracks);
   useEffect(() => {
@@ -432,7 +439,7 @@ export function PlaylistSpaceMapPage() {
     const rest = order
       .map((point) => p.items.find((i) => i.trackId === point.trackId))
       .filter((i): i is PlaylistItem => !!i)
-      .filter((i) => !hiddenGenres.has(i.genres[0]))
+      .filter((i) => !trackDimmed(i.genres))
       .map(playlistItemToPlayable);
     addToQueue(rest);
   }
@@ -507,6 +514,22 @@ export function PlaylistSpaceMapPage() {
   function handleTouchEnd() {
     touchDragRef.current = null;
     pinchRef.current = null;
+  }
+  function handleMouseDown(e: React.MouseEvent) {
+    if (e.button !== 0) return; // left button only
+    if ((e.target as HTMLElement).closest?.(".space-joystick-base")) return;
+    touchDragRef.current = { startClientX: e.clientX, startClientY: e.clientY, startCamX: cameraRef.current.x, startCamY: cameraRef.current.y };
+  }
+  function handleMouseMove(e: React.MouseEvent) {
+    if (!touchDragRef.current) return;
+    const drag = touchDragRef.current;
+    cameraRef.current.x = drag.startCamX + (e.clientX - drag.startClientX);
+    cameraRef.current.y = drag.startCamY + (e.clientY - drag.startClientY);
+    cameraRef.current.vx = 0;
+    cameraRef.current.vy = 0;
+  }
+  function handleMouseUp() {
+    touchDragRef.current = null;
   }
 
   function playLocked() {
@@ -778,6 +801,10 @@ export function PlaylistSpaceMapPage() {
       onTouchStart={handleTouchStart}
       onTouchMove={handleTouchMove}
       onTouchEnd={handleTouchEnd}
+      onMouseDown={handleMouseDown}
+      onMouseMove={handleMouseMove}
+      onMouseUp={handleMouseUp}
+      onMouseLeave={handleMouseUp}
       style={{
         position: "relative",
         height: "calc(100dvh - var(--nav-height, 3.6rem) - 3rem - var(--player-height, 0px))",
@@ -1091,9 +1118,9 @@ export function PlaylistSpaceMapPage() {
                     const hovered = hoveredTrackId === l.trackId || crosshairNearTrackId === l.trackId;
                     const activeGenre = hoveredGenre ?? crosshairNearGenre;
                     const genreHoverMatch = !!activeGenre && (genresByTrackId.get(l.trackId) ?? []).includes(activeGenre);
-                    const lineGenreHidden = hiddenGenres.has(rootGenreByTrackId.get(l.trackId) ?? "");
+                    const dimmed = trackDimmed(genresByTrackId.get(l.trackId) ?? []) && !lit && !hovered;
                     let opacity: number;
-                    if (lineGenreHidden) opacity = 0;
+                    if (dimmed) opacity = 0;
                     else if (isCross) opacity = lit ? 0.95 : hovered || genreHoverMatch ? 0.55 : 0;
                     else if (isRoot) opacity = lit || hovered || genreHoverMatch ? 0.8 : 0.4;
                     else opacity = lit || hovered || genreHoverMatch ? 0.55 : 0.24;
@@ -1142,8 +1169,10 @@ export function PlaylistSpaceMapPage() {
                 const core = customHsl ? `hsl(${customHsl.h}, 45%, 96%)` : warmth > 0.5 ? "#fff8ec" : "#eaf3ff";
                 const mid = customHsl ? `hsl(${customHsl.h}, 75%, 78%)` : warmth > 0.5 ? "#ffe9c2" : "#cfe8ff";
                 const hasSpikes = brightness > 0.75;
-                const genreHidden = hiddenGenres.has(r.name);
-                const effBrightness = genreHidden ? brightness * 0.05 : brightness;
+                const thisGenreState = genreState[r.name] ?? "on";
+                const genreOff = thisGenreState === "off";
+                const genreSuppressedBySolo = anyGenreHighlighted && thisGenreState !== "highlight";
+                const effBrightness = genreOff || genreSuppressedBySolo ? brightness * 0.05 : thisGenreState === "highlight" ? Math.min(1, brightness * 1.3) : brightness;
                 return (
                   <div key={r.name}>
                     {hasSpikes && (
@@ -1177,8 +1206,8 @@ export function PlaylistSpaceMapPage() {
                       </>
                     )}
                     <div
-                      title={`${r.name} - ${r.trackCount} track${r.trackCount === 1 ? "" : "s"} (click to toggle)`}
-                      onClick={() => toggleGenreVisible(r.name)}
+                      title={`${r.name} - ${r.trackCount} track${r.trackCount === 1 ? "" : "s"} (click: on → highlight (solo) → off)`}
+                      onClick={() => cycleGenreState(r.name)}
                       onMouseEnter={() => setHoveredGenre(r.name)}
                       onMouseLeave={() => setHoveredGenre((g) => (g === r.name ? null : g))}
                       style={{
@@ -1198,7 +1227,7 @@ export function PlaylistSpaceMapPage() {
                       }}
                     />
                     <div
-                      onClick={() => toggleGenreVisible(r.name)}
+                      onClick={() => cycleGenreState(r.name)}
                       style={{
                         position: "absolute",
                         left: `calc(50% + ${cameraRef.current.x + r.x}px)`,
@@ -1208,7 +1237,7 @@ export function PlaylistSpaceMapPage() {
                         fontWeight: 600,
                         letterSpacing: "0.04em",
                         color: "#eaf6ff",
-                        opacity: genreHidden ? 0.3 : 1,
+                        opacity: genreOff || genreSuppressedBySolo ? 0.3 : 1,
                         textShadow: "0 0 4px rgba(0,0,0,0.9), 0 0 10px rgba(0,0,0,0.6)",
                         zIndex: 2,
                         cursor: "pointer",
@@ -1229,7 +1258,7 @@ export function PlaylistSpaceMapPage() {
                 const lit = litTrackIds.has(item.trackId);
                 const hovered = hoveredTrackId === item.trackId || crosshairNearTrackId === item.trackId;
                 const rootGenre = item.genres[0];
-                const genreHidden = hiddenGenres.has(rootGenre);
+                const dimmed = trackDimmed(item.genres) && !lit && !hovered;
                 const customHex = vennUseCustomColors ? vennCustomColors[rootGenre] : undefined;
                 const customHsl = customHex ? hexToHsl(customHex) : null;
                 const hue = customHsl ? customHsl.h : controls.vennHueStart + ((controls.vennHueEnd - controls.vennHueStart) * (hashOf(item.title) % 100)) / 100;
@@ -1264,7 +1293,7 @@ export function PlaylistSpaceMapPage() {
                       border: "none",
                       cursor: "pointer",
                       zIndex: 3,
-                      opacity: genreHidden ? 0.06 : lit || hovered ? 1 : trackBrightness,
+                      opacity: dimmed ? 0.06 : lit || hovered ? 1 : trackBrightness,
                       background: lit ? `hsl(${hue}, ${litSatFinal}%, ${litLightFinal}%)` : `hsl(${hue}, ${sat}%, ${light}%)`,
                       boxShadow: lit
                         ? `0 0 10px 3px hsla(${hue}, ${litSatFinal}%, ${Math.max(0, litLightFinal - 2)}%, 0.8)`
