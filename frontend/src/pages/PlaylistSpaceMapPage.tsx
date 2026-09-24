@@ -155,6 +155,10 @@ export function PlaylistSpaceMapPage() {
   const [searchParams] = useSearchParams();
   const hideControls = searchParams.get("hideControls") === "1";
   const isDesktop = useIsDesktop();
+  const isDesktopRef = useRef(isDesktop);
+  useEffect(() => {
+    isDesktopRef.current = isDesktop;
+  }, [isDesktop]);
   const currentTrack = useAudioStore((s) => s.currentTrack);
   const play = useAudioStore((s) => s.play);
   const addToQueue = useAudioStore((s) => s.addToQueue);
@@ -340,6 +344,10 @@ export function PlaylistSpaceMapPage() {
   const [hoveredTrackId, setHoveredTrackId] = useState<number | null>(null);
   const [crosshairNearTrackId, setCrosshairNearTrackId] = useState<number | null>(null);
   const [hoveredGenre, setHoveredGenre] = useState<string | null>(null);
+  const hoveredGenreRef = useRef<string | null>(null);
+  useEffect(() => {
+    hoveredGenreRef.current = hoveredGenre;
+  }, [hoveredGenre]);
   const [crosshairNearGenre, setCrosshairNearGenre] = useState<string | null>(null);
   const crosshairNearGenreRef = useRef<string | null>(null);
   const crosshairNearTrackIdRef = useRef<number | null>(null);
@@ -547,6 +555,7 @@ export function PlaylistSpaceMapPage() {
 
   useEffect(() => {
     let lastTime = performance.now();
+    let lastMovingTime = performance.now();
     let frameId: number;
     function frame(now: number) {
       const dt = Math.min((now - lastTime) / 1000, 0.05);
@@ -568,6 +577,7 @@ export function PlaylistSpaceMapPage() {
       cam.vx *= 1 - Math.min(CAMERA_FRICTION * dt, 1);
       cam.vy *= 1 - Math.min(CAMERA_FRICTION * dt, 1);
       const speed = Math.hypot(cam.vx, cam.vy);
+      if (speed > 2 || touchDragRef.current || pinchRef.current) lastMovingTime = now;
       if (speed > CAMERA_MAX_SPEED) {
         cam.vx = (cam.vx / speed) * CAMERA_MAX_SPEED;
         cam.vy = (cam.vy / speed) * CAMERA_MAX_SPEED;
@@ -668,53 +678,74 @@ export function PlaylistSpaceMapPage() {
       }
 
       // --- constellation stars: same wander-around-home + repel
-      // pattern as album covers, but frozen for whichever star is
-      // currently hovered (mouse or crosshair) so it's easy to read
-      // and click precisely rather than chasing a moving target. ---
+      // pattern as album covers. Two performance-driven freezes on top
+      // of the existing per-track hover freeze: hovering a star on
+      // desktop stops ALL star movement outright (the O(n^2) repel
+      // loop is the actual cost with many tracks, and it was running
+      // every frame regardless of hover before - this is what was
+      // causing the lag), and on mobile, 3s with no camera/touch
+      // activity eases every star back to its home point and then
+      // stops computing entirely once they arrive. ---
       if (viewModeRef.current === "venn") {
         const starNodes = starNodesRef.current;
-        const frozenId = hoveredTrackIdRef.current ?? crosshairNearTrackIdRef.current;
-        const starRepelRadius = 34 * controlsRef.current.vennRepelFactor;
-        const trackOrbBase = 9 * (controlsRef.current.vennBlobSize / 1.2 + 0.4);
-        for (const n of starNodes.values()) {
-          if (n.trackId === frozenId) continue;
-          const wanderX = Math.sin(t * 0.4 + n.wanderSeed) * 22;
-          const wanderY = Math.cos(t * 0.33 + n.wanderSeed) * 22;
-          const targetX = n.homeX + wanderX;
-          const targetY = n.homeY + wanderY;
-          let fx = (targetX - n.x) * SPRING;
-          let fy = (targetY - n.y) * SPRING;
-          // Orbit, don't overlap: the region's own star can be quite
-          // large (8x a track orb, growing with track count), so keep
-          // every track orb clear of it rather than letting them drift
-          // on top of it.
-          const regionStarRadius = (trackOrbBase * 8 * Math.pow(1.07, Math.max(0, n.regionTrackCount - 1))) / 2;
-          const clearance = regionStarRadius + 14;
-          const rdx = n.x - n.regionX;
-          const rdy = n.y - n.regionY;
-          const rdist = Math.sqrt(rdx * rdx + rdy * rdy) || 0.001;
-          if (rdist < clearance) {
-            const push = ((clearance - rdist) / clearance) * REPEL_STRENGTH * 0.6;
-            fx += (rdx / rdist) * push;
-            fy += (rdy / rdist) * push;
-          }
-          if (controlsRef.current.vennRepelFactor > 0) {
-            for (const other of starNodes.values()) {
-              if (other === n) continue;
-              const dx = n.x - other.x;
-              const dy = n.y - other.y;
-              const dist = Math.sqrt(dx * dx + dy * dy) || 0.001;
-              if (dist < starRepelRadius) {
-                const push = ((starRepelRadius - dist) / starRepelRadius) * REPEL_STRENGTH * 0.5;
-                fx += (dx / dist) * push;
-                fy += (dy / dist) * push;
+        const starHovered = hoveredGenreRef.current !== null || crosshairNearGenreRef.current !== null;
+        const desktopFreeze = isDesktopRef.current && starHovered;
+        const idleMs = now - lastMovingTime;
+        const mobileIdle = !isDesktopRef.current && idleMs > 3000;
+
+        if (!desktopFreeze) {
+          const frozenId = hoveredTrackIdRef.current ?? crosshairNearTrackIdRef.current;
+          const starRepelRadius = 34 * controlsRef.current.vennRepelFactor;
+          const trackOrbBase = 9 * (controlsRef.current.vennBlobSize / 1.2 + 0.4);
+          let anyMoved = false;
+          for (const n of starNodes.values()) {
+            if (n.trackId === frozenId) continue;
+            // Once settled at home during a mobile idle freeze, skip
+            // this star entirely rather than re-computing a wander
+            // target of (0,0) and a converged spring every frame.
+            if (mobileIdle) {
+              const settledDist = Math.hypot(n.x - n.homeX, n.y - n.homeY);
+              if (settledDist < 0.5) continue;
+            }
+            const wanderX = mobileIdle ? 0 : Math.sin(t * 0.4 + n.wanderSeed) * 22;
+            const wanderY = mobileIdle ? 0 : Math.cos(t * 0.33 + n.wanderSeed) * 22;
+            const targetX = n.homeX + wanderX;
+            const targetY = n.homeY + wanderY;
+            let fx = (targetX - n.x) * SPRING;
+            let fy = (targetY - n.y) * SPRING;
+            // Orbit, don't overlap: the region's own star can be quite
+            // large (8x a track orb, growing with track count), so keep
+            // every track orb clear of it rather than letting them drift
+            // on top of it.
+            const regionStarRadius = (trackOrbBase * 8 * Math.pow(1.07, Math.max(0, n.regionTrackCount - 1))) / 2;
+            const clearance = regionStarRadius + 14;
+            const rdx = n.x - n.regionX;
+            const rdy = n.y - n.regionY;
+            const rdist = Math.sqrt(rdx * rdx + rdy * rdy) || 0.001;
+            if (rdist < clearance) {
+              const push = ((clearance - rdist) / clearance) * REPEL_STRENGTH * 0.6;
+              fx += (rdx / rdist) * push;
+              fy += (rdy / rdist) * push;
+            }
+            if (!mobileIdle && controlsRef.current.vennRepelFactor > 0) {
+              for (const other of starNodes.values()) {
+                if (other === n) continue;
+                const dx = n.x - other.x;
+                const dy = n.y - other.y;
+                const dist = Math.sqrt(dx * dx + dy * dy) || 0.001;
+                if (dist < starRepelRadius) {
+                  const push = ((starRepelRadius - dist) / starRepelRadius) * REPEL_STRENGTH * 0.5;
+                  fx += (dx / dist) * push;
+                  fy += (dy / dist) * push;
+                }
               }
             }
+            n.x += (fx / DAMPING) * dt;
+            n.y += (fy / DAMPING) * dt;
+            anyMoved = true;
           }
-          n.x += (fx / DAMPING) * dt;
-          n.y += (fy / DAMPING) * dt;
+          if (anyMoved) vennTracksRef.current = [...starNodes.values()].map((n) => ({ trackId: n.trackId, x: n.x, y: n.y, genres: [] }));
         }
-        vennTracksRef.current = [...starNodes.values()].map((n) => ({ trackId: n.trackId, x: n.x, y: n.y, genres: [] }));
       }
 
       forceRender((v) => (v + 1) % 1000000);
