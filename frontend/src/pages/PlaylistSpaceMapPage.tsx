@@ -307,6 +307,10 @@ export function PlaylistSpaceMapPage() {
   );
   const rawRegions = useMemo(() => layoutConstellationRegions(constellationTracks), [constellationTracks]);
   const regions = useMemo(() => rawRegions.map((r) => ({ ...r, x: r.x * controls.vennSpacing, y: r.y * controls.vennSpacing })), [rawRegions, controls.vennSpacing]);
+  const regionsRef = useRef(regions);
+  useEffect(() => {
+    regionsRef.current = regions;
+  }, [regions]);
   const stars = useMemo(
     () => layoutStars(constellationTracks, regions, controls.vennOrbDistance, controls.vennBlobSize / 1.2 + 0.4),
     [constellationTracks, regions, controls.vennOrbDistance, controls.vennBlobSize],
@@ -332,8 +336,12 @@ export function PlaylistSpaceMapPage() {
   const vennTracks: TrackPoint[] = stars;
   const starByTrackId = useMemo(() => new Map(stars.map((s) => [s.trackId, s])), [stars]);
   const rootGenreByTrackId = useMemo(() => new Map(stars.map((s) => [s.trackId, s.rootGenre])), [stars]);
+  const genresByTrackId = useMemo(() => new Map(stars.map((s) => [s.trackId, s.genres])), [stars]);
   const [hoveredTrackId, setHoveredTrackId] = useState<number | null>(null);
   const [crosshairNearTrackId, setCrosshairNearTrackId] = useState<number | null>(null);
+  const [hoveredGenre, setHoveredGenre] = useState<string | null>(null);
+  const [crosshairNearGenre, setCrosshairNearGenre] = useState<string | null>(null);
+  const crosshairNearGenreRef = useRef<string | null>(null);
   const crosshairNearTrackIdRef = useRef<number | null>(null);
   const [scanPanelItemId, setScanPanelItemId] = useState<number | null>(null);
   const [hiddenGenres, setHiddenGenres] = useState<Set<string>>(new Set());
@@ -595,6 +603,19 @@ export function PlaylistSpaceMapPage() {
           if (nearestId !== crosshairNearTrackIdRef.current) {
             crosshairNearTrackIdRef.current = nearestId;
             setCrosshairNearTrackId(nearestId);
+          }
+          let nearestGenre: string | null = null;
+          let nearestGenreDist = LOCK_RADIUS;
+          for (const r of regionsRef.current) {
+            const dist = Math.hypot(cam.x + r.x, cam.y + r.y);
+            if (dist < nearestGenreDist) {
+              nearestGenre = r.name;
+              nearestGenreDist = dist;
+            }
+          }
+          if (nearestGenre !== crosshairNearGenreRef.current) {
+            crosshairNearGenreRef.current = nearestGenre;
+            setCrosshairNearGenre(nearestGenre);
           }
         } else {
           const centerDist = Math.hypot(cam.x, cam.y);
@@ -1034,10 +1055,17 @@ export function PlaylistSpaceMapPage() {
                   </defs>
                   {connectionLines.map((l, i) => {
                     const isCross = l.kind === "cross-genre";
+                    const isRoot = l.kind === "root";
                     const lit = litTrackIds.has(l.trackId);
                     const hovered = hoveredTrackId === l.trackId || crosshairNearTrackId === l.trackId;
+                    const activeGenre = hoveredGenre ?? crosshairNearGenre;
+                    const genreHoverMatch = !!activeGenre && (genresByTrackId.get(l.trackId) ?? []).includes(activeGenre);
                     const lineGenreHidden = hiddenGenres.has(rootGenreByTrackId.get(l.trackId) ?? "");
-                    const opacity = lineGenreHidden ? 0 : isCross ? (lit ? 0.95 : hovered ? 0.55 : 0) : 0.24;
+                    let opacity: number;
+                    if (lineGenreHidden) opacity = 0;
+                    else if (isCross) opacity = lit ? 0.95 : hovered || genreHoverMatch ? 0.55 : 0;
+                    else if (isRoot) opacity = lit || hovered || genreHoverMatch ? 0.8 : 0.4;
+                    else opacity = lit || hovered || genreHoverMatch ? 0.55 : 0.24;
                     if (opacity === 0) return null;
                     const fromLive = starNodesRef.current.get(l.trackId);
                     const toLive = l.toTrackId !== null ? starNodesRef.current.get(l.toTrackId) : null;
@@ -1047,7 +1075,9 @@ export function PlaylistSpaceMapPage() {
                       ? `hsl(${lineCustomHsl.h}, ${isCross ? 65 : 50}%, ${isCross ? 62 : 68}%)`
                       : isCross
                         ? "#4fd4c4"
-                        : "#8fb8ff";
+                        : isRoot
+                          ? "#a9c8ff"
+                          : "#8fb8ff";
                     return (
                       <line
                         key={i}
@@ -1056,7 +1086,7 @@ export function PlaylistSpaceMapPage() {
                         x2={toLive?.x ?? l.toX}
                         y2={toLive?.y ?? l.toY}
                         stroke={strokeColor}
-                        strokeWidth={isCross && lit ? 1.6 : 1}
+                        strokeWidth={isRoot ? 1.8 : isCross && lit ? 1.6 : 1}
                         opacity={opacity}
                         filter={isCross && lit ? "url(#starGlow)" : undefined}
                         style={{ transition: "opacity 0.25s" }}
@@ -1118,6 +1148,8 @@ export function PlaylistSpaceMapPage() {
                     <div
                       title={`${r.name} - ${r.trackCount} track${r.trackCount === 1 ? "" : "s"} (click to toggle)`}
                       onClick={() => toggleGenreVisible(r.name)}
+                      onMouseEnter={() => setHoveredGenre(r.name)}
+                      onMouseLeave={() => setHoveredGenre((g) => (g === r.name ? null : g))}
                       style={{
                         position: "absolute",
                         left: `calc(50% + ${cameraRef.current.x + r.x}px)`,
