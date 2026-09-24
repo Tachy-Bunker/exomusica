@@ -93,7 +93,7 @@ export function AllTracksAdminPage() {
     if (!draft) return;
     const genres = draft.genres.split(",").map((g) => g.trim()).filter(Boolean);
     if (r.kind === "official") {
-      await api(`/api/admin/tracks/${r.id}`, { method: "PATCH", body: JSON.stringify({ title: draft.title, genres }) });
+      await api(`/api/admin/tracks/${r.id}`, { method: "PATCH", body: JSON.stringify({ title: draft.title, genres, lyrics: draft.lyrics || null }) });
     } else {
       await api(`/api/community-tracks/${r.id}`, {
         method: "PATCH",
@@ -195,7 +195,6 @@ export function AllTracksAdminPage() {
                 <td>
                   <input
                     value={draft.lyrics}
-                    disabled={r.kind === "official"}
                     onChange={(e) => setEditDrafts((d) => ({ ...d, [key]: { ...draft, lyrics: e.target.value } }))}
                     style={{ width: 160, fontSize: "0.8rem" }}
                   />

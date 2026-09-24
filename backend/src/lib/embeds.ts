@@ -39,6 +39,7 @@ export function trackToDTO(t: TrackWithRelations): PlayableTrackDTO {
     replayGainDb: t.replayGainDb,
     source: "official",
     genres: t.genres,
+    lyrics: t.lyrics,
   };
 }
 

@@ -18,6 +18,7 @@ export interface PlayableTrackDTO {
   replayGainDb: number | null;
   source: "official" | "community";
   genres: string[];
+  lyrics: string | null;
 }
 
 export interface MessageDTO {

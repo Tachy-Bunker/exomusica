@@ -28,7 +28,7 @@ export async function adminAllTracksRoutes(app: FastifyInstance): Promise<void> 
       branchName: t.album.branch?.name ?? null,
       owner: null as string | null,
       genres: t.genres,
-      lyrics: null as string | null,
+      lyrics: t.lyrics,
       fileUrl: t.fileUrl,
       format: t.format,
       durationSeconds: t.durationSeconds,

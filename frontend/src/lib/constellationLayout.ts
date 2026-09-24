@@ -133,8 +133,12 @@ export function layoutStars(tracks: ConstellationTrack[], regions: Constellation
       // Spread scales gently with how many stars share this
       // constellation, so a big genre's stars don't all pile up.
       const spread = 40 + Math.sqrt(region.trackCount) * 20;
+      // Never spawn on top of the region's own star, which can be
+      // sizable (grows with track count) - orbit it, don't overlap.
+      const approxRegionStarRadius = (9 * 8 * Math.pow(1.07, Math.max(0, region.trackCount - 1))) / 2;
+      const minR = approxRegionStarRadius + 14;
       const angle = rand() * Math.PI * 2;
-      const r = Math.sqrt(rand()) * spread; // sqrt for uniform area density, not center-biased
+      const r = minR + Math.sqrt(rand()) * Math.max(20, spread - minR); // sqrt for uniform area density, not center-biased
       return { trackId: t.id, x: region.x + Math.cos(angle) * r, y: region.y + Math.sin(angle) * r, rootGenre: t.genres[0], genres: t.genres };
     });
 

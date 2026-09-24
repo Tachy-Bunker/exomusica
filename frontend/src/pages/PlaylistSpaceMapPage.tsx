@@ -62,6 +62,9 @@ interface StarNode {
   x: number;
   y: number;
   wanderSeed: number;
+  regionX: number;
+  regionY: number;
+  regionTrackCount: number;
 }
 
 function seededRand(seed: number): () => number {
@@ -243,6 +246,18 @@ export function PlaylistSpaceMapPage() {
   const regions = useMemo(() => rawRegions.map((r) => ({ ...r, x: r.x * controls.vennSpacing, y: r.y * controls.vennSpacing })), [rawRegions, controls.vennSpacing]);
   const stars = useMemo(() => layoutStars(constellationTracks, regions), [constellationTracks, regions]);
   const connectionLines = useMemo(() => buildConnectionLines(stars, regions), [stars, regions]);
+  const backgroundStars = useMemo(() => {
+    // Purely decorative field-filler, not tied to any genre or track -
+    // a real night sky is dense with faint background stars, which is
+    // exactly what a pure constellation layout (deliberately sparse and
+    // meaningful) can't provide on its own.
+    const rand = seededRand(1);
+    const list: { x: number; y: number; r: number; o: number }[] = [];
+    for (let i = 0; i < 500; i++) {
+      list.push({ x: (rand() - 0.5) * 3000, y: (rand() - 0.5) * 3000, r: 0.4 + rand() * rand() * 1.6, o: 0.15 + rand() * 0.5 });
+    }
+    return list;
+  }, []);
   const vennTracks: TrackPoint[] = stars;
   const starByTrackId = useMemo(() => new Map(stars.map((s) => [s.trackId, s])), [stars]);
   const [hoveredTrackId, setHoveredTrackId] = useState<number | null>(null);
@@ -257,10 +272,12 @@ export function PlaylistSpaceMapPage() {
   const hoveredTrackIdRef = useRef<number | null>(null);
   hoveredTrackIdRef.current = hoveredTrackId;
   useEffect(() => {
+    const regionByName = new Map(regions.map((r) => [r.name, r]));
     const next = new Map<number, StarNode>();
     for (const s of stars) {
       const existing = starNodesRef.current.get(s.trackId);
       const rand = seededRand(hashOf(`starwander:${s.trackId}`));
+      const region = regionByName.get(s.rootGenre);
       next.set(s.trackId, {
         trackId: s.trackId,
         homeX: s.x,
@@ -268,10 +285,13 @@ export function PlaylistSpaceMapPage() {
         x: existing ? existing.x : s.x,
         y: existing ? existing.y : s.y,
         wanderSeed: rand() * 1000,
+        regionX: region?.x ?? s.x,
+        regionY: region?.y ?? s.y,
+        regionTrackCount: region?.trackCount ?? 1,
       });
     }
     starNodesRef.current = next;
-  }, [stars]);
+  }, [stars, regions]);
 
   // Tracks are marked "lit" the moment they actually become the current
   // track while still playing from this playlist - covers a direct
@@ -552,6 +572,7 @@ export function PlaylistSpaceMapPage() {
         const starNodes = starNodesRef.current;
         const frozenId = hoveredTrackIdRef.current ?? crosshairNearTrackIdRef.current;
         const starRepelRadius = 34 * controlsRef.current.vennRepelFactor;
+        const trackOrbBase = 9 * (controlsRef.current.vennBlobSize / 1.2 + 0.4);
         for (const n of starNodes.values()) {
           if (n.trackId === frozenId) continue;
           const wanderX = Math.sin(t * 0.4 + n.wanderSeed) * 22;
@@ -560,6 +581,20 @@ export function PlaylistSpaceMapPage() {
           const targetY = n.homeY + wanderY;
           let fx = (targetX - n.x) * SPRING;
           let fy = (targetY - n.y) * SPRING;
+          // Orbit, don't overlap: the region's own star can be quite
+          // large (8x a track orb, growing with track count), so keep
+          // every track orb clear of it rather than letting them drift
+          // on top of it.
+          const regionStarRadius = (trackOrbBase * 8 * Math.pow(1.07, Math.max(0, n.regionTrackCount - 1))) / 2;
+          const clearance = regionStarRadius + 14;
+          const rdx = n.x - n.regionX;
+          const rdy = n.y - n.regionY;
+          const rdist = Math.sqrt(rdx * rdx + rdy * rdy) || 0.001;
+          if (rdist < clearance) {
+            const push = ((clearance - rdist) / clearance) * REPEL_STRENGTH * 0.6;
+            fx += (rdx / rdist) * push;
+            fy += (rdy / rdist) * push;
+          }
           if (controlsRef.current.vennRepelFactor > 0) {
             for (const other of starNodes.values()) {
               if (other === n) continue;
@@ -712,7 +747,7 @@ export function PlaylistSpaceMapPage() {
                 >
                   <div className="field">
                     <label style={{ fontSize: "0.75rem" }}>Cover size - {controls.coverSize}</label>
-                    <input type="range" min={32} max={140} value={controls.coverSize} onChange={(e) => updateControl({ coverSize: Number(e.target.value) })} />
+                    <input type="range" min={20} max={260} value={controls.coverSize} onChange={(e) => updateControl({ coverSize: Number(e.target.value) })} />
                   </div>
                   <div className="field">
                     <label style={{ fontSize: "0.75rem" }}>Background brightness</label>
@@ -743,7 +778,7 @@ export function PlaylistSpaceMapPage() {
                   </div>
                   <div className="field">
                     <label style={{ fontSize: "0.75rem" }}>Roaming speed</label>
-                    <input type="range" min={0} max={2.5} step={0.05} value={controls.roamSpeed} onChange={(e) => updateControl({ roamSpeed: Number(e.target.value) })} />
+                    <input type="range" min={0} max={6} step={0.05} value={controls.roamSpeed} onChange={(e) => updateControl({ roamSpeed: Number(e.target.value) })} />
                   </div>
                   <div className="field">
                     <label style={{ fontSize: "0.75rem" }}>Venn Views color start (hue)</label>
@@ -755,17 +790,17 @@ export function PlaylistSpaceMapPage() {
                   </div>
                   <div className="field">
                     <label style={{ fontSize: "0.75rem" }}>Star/label size</label>
-                    <input type="range" min={0.4} max={2.5} step={0.05} value={controls.vennBlobSize} onChange={(e) => updateControl({ vennBlobSize: Number(e.target.value) })} />
+                    <input type="range" min={0.15} max={6} step={0.05} value={controls.vennBlobSize} onChange={(e) => updateControl({ vennBlobSize: Number(e.target.value) })} />
                   </div>
                   <div className="field">
                     <label style={{ fontSize: "0.75rem" }}>Constellation spacing</label>
-                    <input type="range" min={0.4} max={2.5} step={0.05} value={controls.vennSpacing} onChange={(e) => updateControl({ vennSpacing: Number(e.target.value) })} />
+                    <input type="range" min={0.15} max={6} step={0.05} value={controls.vennSpacing} onChange={(e) => updateControl({ vennSpacing: Number(e.target.value) })} />
                   </div>
                   <div className="field">
                     <label style={{ fontSize: "0.75rem" }} title="How strongly stars push each other apart to avoid clustering">
                       De-cluttering
                     </label>
-                    <input type="range" min={0} max={2.5} step={0.05} value={controls.vennRepelFactor} onChange={(e) => updateControl({ vennRepelFactor: Number(e.target.value) })} />
+                    <input type="range" min={0} max={6} step={0.05} value={controls.vennRepelFactor} onChange={(e) => updateControl({ vennRepelFactor: Number(e.target.value) })} />
                   </div>
                 </div>
               )}
@@ -845,6 +880,15 @@ export function PlaylistSpaceMapPage() {
           {viewMode === "venn" && (
             <>
               <svg
+                style={{ position: "absolute", left: "50%", top: "50%", overflow: "visible", zIndex: 0, pointerEvents: "none", width: 1, height: 1 }}
+              >
+                <g transform={`translate(${cameraRef.current.x}, ${cameraRef.current.y})`}>
+                  {backgroundStars.map((s, i) => (
+                    <circle key={i} cx={s.x} cy={s.y} r={s.r} fill="#fff" opacity={s.o} />
+                  ))}
+                </g>
+              </svg>
+              <svg
                 style={{ position: "absolute", left: "50%", top: "50%", overflow: "visible", zIndex: 1, pointerEvents: "none", width: 1, height: 1 }}
               >
                 <g transform={`translate(${cameraRef.current.x}, ${cameraRef.current.y})`}>
@@ -886,8 +930,48 @@ export function PlaylistSpaceMapPage() {
               {regions.map((r) => {
                 const trackOrbBase = 9 * (controls.vennBlobSize / 1.2 + 0.4);
                 const starSize = trackOrbBase * 8 * Math.pow(1.07, Math.max(0, r.trackCount - 1));
+                const rand = seededRand(hashOf(`starlook:${r.name}`));
+                // Real starlight varies a lot in perceived brightness and
+                // has a subtle color temperature - a field of uniformly
+                // bright, uniformly white circles reads as artificial no
+                // matter how organically they're placed.
+                const brightness = 0.45 + rand() * 0.55;
+                const warmth = rand(); // 0 = cool blue-white, 1 = warm white
+                const core = warmth > 0.5 ? "#fff8ec" : "#eaf3ff";
+                const mid = warmth > 0.5 ? "#ffe9c2" : "#cfe8ff";
+                const hasSpikes = brightness > 0.75;
                 return (
                   <div key={r.name}>
+                    {hasSpikes && (
+                      <>
+                        <div
+                          style={{
+                            position: "absolute",
+                            left: `calc(50% + ${cameraRef.current.x + r.x}px)`,
+                            top: `calc(50% + ${cameraRef.current.y + r.y}px)`,
+                            transform: "translate(-50%, -50%)",
+                            width: starSize * 4.2,
+                            height: 1.5,
+                            background: `linear-gradient(90deg, transparent, rgba(255,255,255,${brightness * 0.55}) 45%, rgba(255,255,255,${brightness * 0.85}) 50%, rgba(255,255,255,${brightness * 0.55}) 55%, transparent)`,
+                            zIndex: 2,
+                            pointerEvents: "none",
+                          }}
+                        />
+                        <div
+                          style={{
+                            position: "absolute",
+                            left: `calc(50% + ${cameraRef.current.x + r.x}px)`,
+                            top: `calc(50% + ${cameraRef.current.y + r.y}px)`,
+                            transform: "translate(-50%, -50%)",
+                            width: 1.5,
+                            height: starSize * 4.2,
+                            background: `linear-gradient(180deg, transparent, rgba(255,255,255,${brightness * 0.55}) 45%, rgba(255,255,255,${brightness * 0.85}) 50%, rgba(255,255,255,${brightness * 0.55}) 55%, transparent)`,
+                            zIndex: 2,
+                            pointerEvents: "none",
+                          }}
+                        />
+                      </>
+                    )}
                     <div
                       title={`${r.name} - ${r.trackCount} track${r.trackCount === 1 ? "" : "s"}`}
                       style={{
@@ -898,8 +982,9 @@ export function PlaylistSpaceMapPage() {
                         width: starSize,
                         height: starSize,
                         borderRadius: "50%",
-                        background: "radial-gradient(circle, #fff 0%, #cfe8ff 35%, rgba(143, 184, 255, 0.15) 75%, transparent 100%)",
-                        boxShadow: `0 0 ${starSize * 0.9}px ${starSize * 0.25}px rgba(180, 210, 255, 0.35)`,
+                        opacity: brightness,
+                        background: `radial-gradient(circle, ${core} 0%, ${mid} 35%, rgba(143, 184, 255, 0.15) 75%, transparent 100%)`,
+                        boxShadow: `0 0 ${starSize * 0.9}px ${starSize * 0.25}px rgba(180, 210, 255, ${0.35 * brightness})`,
                         zIndex: 2,
                         pointerEvents: "none",
                       }}
@@ -933,6 +1018,7 @@ export function PlaylistSpaceMapPage() {
                 const lit = litTrackIds.has(item.trackId);
                 const hovered = hoveredTrackId === item.trackId || crosshairNearTrackId === item.trackId;
                 const hue = controls.vennHueStart + ((controls.vennHueEnd - controls.vennHueStart) * (hashOf(item.title) % 100)) / 100;
+                const trackBrightness = 0.55 + seededRand(hashOf(`tracklook:${item.trackId}`))() * 0.45;
                 const size = (lit ? 14 : hovered ? 12 : 9) * (controls.vennBlobSize / 1.2 + 0.4);
                 return (
                   <button
@@ -955,6 +1041,7 @@ export function PlaylistSpaceMapPage() {
                       border: "none",
                       cursor: "pointer",
                       zIndex: 3,
+                      opacity: lit || hovered ? 1 : trackBrightness,
                       background: lit ? `hsl(${hue}, 85%, 82%)` : `hsl(${hue}, 55%, 65%)`,
                       boxShadow: lit ? `0 0 10px 3px hsla(${hue}, 85%, 80%, 0.8)` : hovered ? `0 0 6px 1px hsla(${hue}, 70%, 70%, 0.6)` : "none",
                       transition: "width 0.15s, height 0.15s, box-shadow 0.2s",

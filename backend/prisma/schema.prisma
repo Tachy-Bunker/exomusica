@@ -342,6 +342,7 @@ model Track {
   position        Int         @default(0)
   replayGainDb    Float? // sitewide loudness normalization - null means not yet analyzed
   genres          String[] @default([]) // user-assigned, as many as wanted - drives Venn Views placement
+  lyrics          String?  @db.Text // also doubles as the constellation scan panel's logbook description
 
   bookmarks    AudioBookmark[]
   collaborators TrackCollaborator[] // per-track composer/credit override, checkbox-selected from the album's collaborators
