@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
+import { Link } from "react-router-dom";
 import { api, ApiError } from "../../lib/api";
 import type { Branch } from "../../lib/types";
 import { SeoFieldsEditor } from "../../components/SeoFieldsEditor";
@@ -333,6 +334,9 @@ export function BranchesPage() {
                     <button className="btn" onClick={() => startEdit(b)}>
                       Edit
                     </button>{" "}
+                    <Link className="btn" to={`/admin/branches/${b.id}/contribute`}>
+                      Contribute settings
+                    </Link>{" "}
                     <button className="btn btn-danger" onClick={() => handleDelete(b)}>
                       Delete
                     </button>

@@ -8,7 +8,11 @@ interface Props {
 
 export function EmbedCodeModal({ playlistSlug, onClose }: Props) {
   const [view, setView] = useState<"map" | "venn">("map");
-  const url = `${window.location.origin}/embed/playlist/${playlistSlug}${view === "venn" ? "#venn" : ""}`;
+  const [hideControls, setHideControls] = useState(false);
+  const params = new URLSearchParams();
+  if (hideControls) params.set("hideControls", "1");
+  const query = params.toString();
+  const url = `${window.location.origin}/embed/playlist/${playlistSlug}${query ? `?${query}` : ""}${view === "venn" ? "#venn" : ""}`;
   const snippet = `<iframe src="${url}" width="800" height="600" style="border:0;" allow="autoplay" title="Exomusica playlist"></iframe>`;
 
   function copy() {
@@ -37,6 +41,10 @@ export function EmbedCodeModal({ playlistSlug, onClose }: Props) {
             Constellation
           </button>
         </div>
+        <label style={{ display: "flex", alignItems: "center", gap: "0.4rem", fontSize: "0.82rem", marginBottom: "0.6rem" }}>
+          <input type="checkbox" checked={hideControls} onChange={(e) => setHideControls(e.target.checked)} />
+          Hide controls (view-mode buttons, settings, WASD hint) - just the visual and player
+        </label>
         <textarea readOnly value={snippet} rows={3} style={{ width: "100%", fontFamily: "var(--font-mono)", fontSize: "0.78rem" }} onClick={(e) => (e.target as HTMLTextAreaElement).select()} />
         <div style={{ display: "flex", justifyContent: "flex-end", gap: "0.5rem", marginTop: "0.6rem" }}>
           <button className="btn" onClick={onClose}>

@@ -15,6 +15,15 @@ async function uniqueCommunityAlbumSlug(title: string): Promise<string> {
   }
   return slug;
 }
+async function uniqueChannelSlug(title: string): Promise<string> {
+  const base = title.toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") || "channel";
+  let slug = base;
+  let n = 1;
+  while (await prisma.forumChannel.findUnique({ where: { slug } })) {
+    slug = `${base}-${++n}`;
+  }
+  return slug;
+}
 async function uniquePlaylistSlug(title: string): Promise<string> {
   const base = title.toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") || "playlist";
   let slug = base;
@@ -192,15 +201,62 @@ export async function communityMusicRoutes(app: FastifyInstance): Promise<void> 
     }
   });
 
-  app.post<{ Body: { title: string; composer: string; description?: string } }>(
+  app.get("/api/admin/submissions", { preHandler: requireAdmin }, async () => {
+    return prisma.communityAlbum.findMany({
+      where: { targetBranchId: { not: null } },
+      include: {
+        owner: { select: { username: true } },
+        targetBranch: { select: { slug: true, name: true } },
+        submissionChannel: { select: { slug: true } },
+        tracks: { select: { id: true } },
+      },
+      orderBy: { createdAt: "desc" },
+    });
+  });
+
+  app.patch<{ Params: { id: string }; Body: { submissionStatus: "APPROVED" | "REJECTED" | "PENDING" } }>(
+    "/api/admin/submissions/:id",
+    { preHandler: requireAdmin },
+    async (req, reply) => {
+      const { submissionStatus } = req.body ?? {};
+      if (!submissionStatus) return reply.code(400).send({ error: "submissionStatus is required" });
+      const album = await prisma.communityAlbum.findUnique({ where: { id: Number(req.params.id) } });
+      if (!album || !album.targetBranchId) return reply.code(404).send({ error: "no such submission" });
+      const updated = await prisma.communityAlbum.update({ where: { id: album.id }, data: { submissionStatus } });
+      return updated;
+    },
+  );
+
+  app.post<{ Body: { title: string; composer: string; description?: string; targetBranchSlug?: string } }>(
     "/api/community-albums",
     { preHandler: requireAuth },
     async (req, reply) => {
-      const { title, composer, description } = req.body ?? {};
+      const { title, composer, description, targetBranchSlug } = req.body ?? {};
       if (!title || !composer) return reply.code(400).send({ error: "title and composer are required" });
       const slug = await uniqueCommunityAlbumSlug(title);
+
+      let targetBranchId: number | undefined;
+      let submissionChannelId: number | undefined;
+      if (targetBranchSlug) {
+        const branch = await prisma.branch.findUnique({ where: { slug: targetBranchSlug }, select: { id: true, name: true } });
+        if (!branch) return reply.code(404).send({ error: "no such branch" });
+        targetBranchId = branch.id;
+        const channelSlug = await uniqueChannelSlug(`submission-${title}`);
+        const channel = await prisma.forumChannel.create({
+          data: { slug: channelSlug, name: `Submission: ${title}`, category: "Submissions", kind: "DISCUSSION", isUserQuestion: true, askedById: req.user!.id },
+        });
+        submissionChannelId = channel.id;
+      }
+
       const album = await prisma.communityAlbum.create({
-        data: { ownerId: req.user!.id, slug, title, composer, description },
+        data: {
+          ownerId: req.user!.id,
+          slug,
+          title,
+          composer,
+          description,
+          ...(targetBranchId ? { targetBranchId, submissionStatus: "PENDING" as const, submissionChannelId } : {}),
+        },
       });
       return reply.code(201).send(album);
     },

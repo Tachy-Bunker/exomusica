@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useParams, useNavigate, Link } from "react-router-dom";
+import { useParams, useNavigate, Link, useSearchParams } from "react-router-dom";
 import { api } from "../lib/api";
 import { useAuth } from "../lib/auth";
 import { useAudioStore, shuffleArray } from "../lib/audioStore";
@@ -152,6 +152,8 @@ export function PlaylistSpaceMapPage() {
   const { slug } = useParams<{ slug: string }>();
   const navigate = useNavigate();
   const { user } = useAuth();
+  const [searchParams] = useSearchParams();
+  const hideControls = searchParams.get("hideControls") === "1";
   const isDesktop = useIsDesktop();
   const currentTrack = useAudioStore((s) => s.currentTrack);
   const play = useAudioStore((s) => s.play);
@@ -742,6 +744,7 @@ export function PlaylistSpaceMapPage() {
         <p style={{ position: "absolute", top: "50%", left: "50%", transform: "translate(-50%, -50%)", zIndex: 5 }}>Loading…</p>
       ) : (
         <>
+          {!hideControls && (
           <div style={{ position: "absolute", top: 12, left: 12, right: 90, zIndex: 5, display: "flex", flexWrap: "wrap", gap: "0.4rem", alignItems: "center" }}>
             <button className="btn" title="View as list" onClick={() => navigate(`/playlist/${playlist.slug}/list`)}>
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -793,6 +796,7 @@ export function PlaylistSpaceMapPage() {
               </select>
             </div>
           </div>
+          )}
           {softwareRendererName && !dismissedSwNotice && (
             <div
               style={{
@@ -820,12 +824,12 @@ export function PlaylistSpaceMapPage() {
               automatically. This is a browser/GPU setting, not something this site controls.
             </div>
           )}
-          {isDesktop && (
+          {isDesktop && !hideControls && (
             <p style={{ position: "absolute", bottom: 12, left: "50%", transform: "translateX(-50%)", zIndex: 5, fontSize: "0.75rem", color: "var(--text-dim)" }}>
               WASD to navigate
             </p>
           )}
-          {user?.id === playlist.ownerId && (
+          {user?.id === playlist.ownerId && !hideControls && (
             <div style={{ position: "absolute", bottom: 12, right: 12, zIndex: 5, display: "flex", flexDirection: "column-reverse", alignItems: "flex-end" }}>
               <button className="btn" onClick={() => setSettingsOpen((v) => !v)}>
                 ⚙ {settingsOpen ? "Close" : "Settings"}

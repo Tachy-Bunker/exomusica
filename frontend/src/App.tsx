@@ -12,6 +12,7 @@ import { LoginPage } from "./pages/LoginPage";
 import { JoinPage } from "./pages/JoinPage";
 import { WikiPage } from "./pages/WikiPage";
 import { StudiesIndexPage } from "./pages/StudiesIndexPage";
+import { ContributePage } from "./pages/ContributePage";
 import { StudyPage } from "./pages/StudyPage";
 import { NewsPage } from "./pages/NewsPage";
 import { DiscussionIndexPage } from "./pages/DiscussionIndexPage";
@@ -40,6 +41,7 @@ import { AlbumsAdminPage } from "./pages/admin/AlbumsAdminPage";
 import { WikiAdminPage } from "./pages/admin/WikiAdminPage";
 import { AllTracksAdminPage } from "./pages/admin/AllTracksAdminPage";
 import { StudiesAdminPage } from "./pages/admin/StudiesAdminPage";
+import { BranchContributeAdminPage } from "./pages/admin/BranchContributeAdminPage";
 import { BlogAdminPage } from "./pages/admin/BlogAdminPage";
 import { EmojiAdminPage } from "./pages/admin/EmojiAdminPage";
 import { EmailTemplatesAdminPage } from "./pages/admin/EmailTemplatesAdminPage";
@@ -63,13 +65,14 @@ import { useIsDesktop } from "./lib/useIsDesktop";
 export default function App() {
   const isDesktop = useIsDesktop();
   const userCaEnabled = useSiteEffectsStore((s) => s.userCaEnabled);
-  const applyCaFilter = isDesktop && userCaEnabled;
+  const isEmbed = window.location.pathname.startsWith("/embed/");
+  const applyCaFilter = isDesktop && userCaEnabled && !isEmbed;
   return (
     <>
-      {isDesktop && <ChromaticAberrationLayer />}
+      {isDesktop && !isEmbed && <ChromaticAberrationLayer />}
       <div id="fixed-portal-root" />
       <div style={applyCaFilter ? { filter: "url(#caFilter)", minHeight: "100%" } : { minHeight: "100%" }}>
-        {isDesktop && <MoireLayer />}
+        {isDesktop && !isEmbed && <MoireLayer />}
         <BrowserRouter>
           <AuthProvider>
             <Routes>
@@ -82,6 +85,7 @@ export default function App() {
             <Route path="about" element={<Navigate to="/wiki" replace />} />
             <Route path="wiki" element={<WikiPage />} />
             <Route path="studies" element={<StudiesIndexPage />} />
+            <Route path="contribute" element={<ContributePage />} />
             <Route path="study/:slug" element={<StudyPage />} />
             <Route path="wiki/:slug" element={<WikiPage />} />
             <Route path="news" element={<NewsPage />} />
@@ -116,6 +120,7 @@ export default function App() {
                 <Route path="wiki" element={<WikiAdminPage />} />
                 <Route path="all-tracks" element={<AllTracksAdminPage />} />
                 <Route path="studies" element={<StudiesAdminPage />} />
+                <Route path="branches/:id/contribute" element={<BranchContributeAdminPage />} />
                 <Route path="blog" element={<BlogAdminPage />} />
                 <Route path="emoji" element={<EmojiAdminPage />} />
                 <Route path="email-templates" element={<EmailTemplatesAdminPage />} />
