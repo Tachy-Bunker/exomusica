@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type FormEvent, type ChangeEvent } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { api, ApiError } from "../../lib/api";
 import { snippetFor } from "../../lib/markdownSnippet";
 import { SeoFieldsEditor } from "../../components/SeoFieldsEditor";
@@ -80,8 +80,20 @@ export function ChannelsPage() {
     e.target.value = "";
   }
 
+  const [searchParams] = useSearchParams();
+
   function load() {
-    api<ChannelSummary[]>("/api/channels?kind=DISCUSSION").then(setTopics);
+    api<ChannelSummary[]>("/api/channels?kind=DISCUSSION").then((data) => {
+      setTopics(data);
+      const targetSlug = searchParams.get("slug");
+      if (targetSlug) {
+        const match = data.find((t) => t.slug === targetSlug);
+        if (match) {
+          startEdit(match);
+          setTimeout(() => document.getElementById(`channel-row-${match.id}`)?.scrollIntoView({ behavior: "smooth", block: "center" }), 100);
+        }
+      }
+    });
     api<Font[]>("/api/fonts").then(setFonts);
     api<{ categoryOrder: string[] | null }>("/api/site-settings").then((s) => setCategoryOrder(s.categoryOrder ?? []));
   }
@@ -234,7 +246,7 @@ export function ChannelsPage() {
         </thead>
         <tbody>
           {topics.map((t) => (
-            <tr key={t.slug}>
+            <tr key={t.slug} id={`channel-row-${t.id}`}>
               {editingId === t.id ? (
                 <td colSpan={3}>
                   <input value={editForm.name} onChange={(e) => setEditForm((f) => ({ ...f, name: e.target.value }))} style={{ marginBottom: "0.2rem" }} />

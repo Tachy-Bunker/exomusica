@@ -157,8 +157,15 @@ export function PlaylistPage() {
           <p style={{ color: "var(--text-dim)", marginTop: 0 }}>by {playlist.owner}</p>
         </div>
         <div style={{ display: "flex", gap: "0.5rem" }}>
-          <Link className="btn" to={`/playlist/${playlist.slug}`}>
-            View as spacemap
+          <Link className="btn" to={`/playlist/${playlist.slug}`} title="View as spacemap">
+            <svg width="18" height="18" viewBox="0 0 256 256" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
+              <path d="M128,116a48,48,0,1,1,48-48A48.05436,48.05436,0,0,1,128,116Zm60,8a48,48,0,1,0,48,48A48.05436,48.05436,0,0,0,188,124ZM68,124a48,48,0,1,0,48,48A48.05436,48.05436,0,0,0,68,124Z" />
+            </svg>
+          </Link>
+          <Link className="btn" to={`/playlist/${playlist.slug}#venn`} title="View as constellation">
+            <svg width="18" height="18" viewBox="0 0 32 32" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
+              <path d="M27,5c-1.7,0-3,1.3-3,3c0,0.3,0,0.5,0.1,0.8l-5.4,3.8C18.2,12.2,17.6,12,17,12c-0.8,0-1.5,0.3-2.1,0.8L8,9.4 C8,9.2,8,9.1,8,9c0-1.7-1.3-3-3-3S2,7.3,2,9s1.3,3,3,3c0.8,0,1.5-0.3,2.1-0.8l7,3.5c0,0.1,0,0.2,0,0.4c0,0.9,0.4,1.7,1,2.2L12.2,24 c-0.1,0-0.1,0-0.2,0c-1.7,0-3,1.3-3,3s1.3,3,3,3s3-1.3,3-3c0-0.9-0.4-1.7-1-2.2l2.8-6.8c0.1,0,0.1,0,0.2,0c1.7,0,3-1.3,3-3 c0-0.3,0-0.5-0.1-0.8l5.4-3.8c0.5,0.4,1.1,0.6,1.7,0.6c1.7,0,3-1.3,3-3S28.7,5,27,5z" />
+            </svg>
           </Link>
         </div>
       </div>

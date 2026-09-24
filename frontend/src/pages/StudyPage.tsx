@@ -193,6 +193,12 @@ export function StudyPage() {
           <>
             {" · "}
             <Link to={`/topic/${study.channel.slug}`}>discuss this study</Link>
+            {user?.isAdmin && (
+              <>
+                {" · "}
+                <Link to={`/admin/channels?slug=${study.channel.slug}`}>Discord link</Link>
+              </>
+            )}
           </>
         )}
       </p>

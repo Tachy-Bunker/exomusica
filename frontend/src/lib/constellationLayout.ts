@@ -30,7 +30,7 @@ export interface ConnectionLine {
   fromY: number;
   toX: number;
   toY: number;
-  kind: "shape" | "cross-genre";
+  kind: "shape" | "cross-genre" | "root";
   toGenre: string;
 }
 
@@ -118,7 +118,12 @@ export function layoutConstellationRegions(tracks: ConstellationTrack[]): Conste
     }
   }
 
-  return regions.map((r) => ({ name: r.name, x: r.x, y: r.y, trackCount: rootCounts.get(r.name) ?? 0 }));
+  return regions.map((r) => {
+    const jrand = seededRand(hashOf(`regionjitter:${r.name}`));
+    const jAngle = jrand() * Math.PI * 2;
+    const jDist = jrand() * 30;
+    return { name: r.name, x: r.x + Math.cos(jAngle) * jDist, y: r.y + Math.sin(jAngle) * jDist, trackCount: rootCounts.get(r.name) ?? 0 };
+  });
 }
 
 /** Scatters each constellation's tracks as stars within its region -
@@ -155,7 +160,7 @@ export function layoutStars(tracks: ConstellationTrack[], regions: Constellation
     byRoot.get(s.rootGenre)!.push(s);
   }
   for (const group of byRoot.values()) {
-    for (let iter = 0; iter < 40; iter++) {
+    for (let iter = 0; iter < 8; iter++) {
       let moved = false;
       for (let i = 0; i < group.length; i++) {
         for (let j = i + 1; j < group.length; j++) {
@@ -165,7 +170,7 @@ export function layoutStars(tracks: ConstellationTrack[], regions: Constellation
           const dy = b.y - a.y;
           const dist = Math.hypot(dx, dy) || 0.001;
           if (dist < MIN_DIST) {
-            const push = (MIN_DIST - dist) / 2;
+            const push = (MIN_DIST - dist) / 3;
             const ux = dx / dist;
             const uy = dy / dist;
             a.x -= ux * push;
@@ -197,6 +202,15 @@ export function buildConnectionLines(stars: Star[], regions: ConstellationRegion
   }
 
   const lines: ConnectionLine[] = [];
+
+  // Root line: every star gets a direct connection to its own genre's
+  // star - without this, a track visually floats near its region with
+  // no explicit line actually tying it to that star.
+  for (const s of stars) {
+    const region = regionByName.get(s.rootGenre);
+    if (!region) continue;
+    lines.push({ trackId: s.trackId, toTrackId: null, fromX: s.x, fromY: s.y, toX: region.x, toY: region.y, kind: "root", toGenre: s.rootGenre });
+  }
 
   // Shape lines: connect each star to its nearest same-constellation
   // neighbor(s) - a lightweight nearest-neighbor chain, not a full

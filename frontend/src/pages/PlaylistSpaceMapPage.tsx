@@ -326,10 +326,20 @@ export function PlaylistSpaceMapPage() {
   }, []);
   const vennTracks: TrackPoint[] = stars;
   const starByTrackId = useMemo(() => new Map(stars.map((s) => [s.trackId, s])), [stars]);
+  const rootGenreByTrackId = useMemo(() => new Map(stars.map((s) => [s.trackId, s.rootGenre])), [stars]);
   const [hoveredTrackId, setHoveredTrackId] = useState<number | null>(null);
   const [crosshairNearTrackId, setCrosshairNearTrackId] = useState<number | null>(null);
   const crosshairNearTrackIdRef = useRef<number | null>(null);
   const [scanPanelItemId, setScanPanelItemId] = useState<number | null>(null);
+  const [hiddenGenres, setHiddenGenres] = useState<Set<string>>(new Set());
+  function toggleGenreVisible(genre: string) {
+    setHiddenGenres((prev) => {
+      const next = new Set(prev);
+      if (next.has(genre)) next.delete(genre);
+      else next.add(genre);
+      return next;
+    });
+  }
   const vennTracksRef = useRef(vennTracks);
   useEffect(() => {
     vennTracksRef.current = vennTracks;
@@ -401,6 +411,7 @@ export function PlaylistSpaceMapPage() {
     const rest = order
       .map((point) => p.items.find((i) => i.trackId === point.trackId))
       .filter((i): i is PlaylistItem => !!i)
+      .filter((i) => !hiddenGenres.has(i.genres[0]))
       .map(playlistItemToPlayable);
     addToQueue(rest);
   }
@@ -729,21 +740,42 @@ export function PlaylistSpaceMapPage() {
       ) : (
         <>
           <div style={{ position: "absolute", top: 12, left: 12, right: 90, zIndex: 5, display: "flex", flexWrap: "wrap", gap: "0.4rem", alignItems: "center" }}>
-            <button className="btn" onClick={() => navigate(`/playlist/${playlist.slug}/list`)}>
-              View as list
+            <button className="btn" title="View as list" onClick={() => navigate(`/playlist/${playlist.slug}/list`)}>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path
+                  d="M8 8H20M11 12H20M14 16H20M4 8H4.01M7 12H7.01M10 16H10.01"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
             </button>
             <button
               className="btn"
-              style={viewMode === "venn" ? { outline: "1px solid var(--accent-forum)" } : undefined}
-              onClick={() =>
-                setViewMode((m) => {
-                  const next = m === "venn" ? "map" : "venn";
-                  history.replaceState(null, "", next === "venn" ? "#venn" : window.location.pathname);
-                  return next;
-                })
-              }
+              title="View as spacemap"
+              style={viewMode === "map" ? { outline: "1px solid var(--accent-forum)" } : undefined}
+              onClick={() => {
+                setViewMode("map");
+                history.replaceState(null, "", window.location.pathname);
+              }}
             >
-              View as constellation
+              <svg width="18" height="18" viewBox="0 0 256 256" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
+                <path d="M128,116a48,48,0,1,1,48-48A48.05436,48.05436,0,0,1,128,116Zm60,8a48,48,0,1,0,48,48A48.05436,48.05436,0,0,0,188,124ZM68,124a48,48,0,1,0,48,48A48.05436,48.05436,0,0,0,68,124Z" />
+              </svg>
+            </button>
+            <button
+              className="btn"
+              title="View as constellation"
+              style={viewMode === "venn" ? { outline: "1px solid var(--accent-forum)" } : undefined}
+              onClick={() => {
+                setViewMode("venn");
+                history.replaceState(null, "", "#venn");
+              }}
+            >
+              <svg width="18" height="18" viewBox="0 0 32 32" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
+                <path d="M27,5c-1.7,0-3,1.3-3,3c0,0.3,0,0.5,0.1,0.8l-5.4,3.8C18.2,12.2,17.6,12,17,12c-0.8,0-1.5,0.3-2.1,0.8L8,9.4 C8,9.2,8,9.1,8,9c0-1.7-1.3-3-3-3S2,7.3,2,9s1.3,3,3,3c0.8,0,1.5-0.3,2.1-0.8l7,3.5c0,0.1,0,0.2,0,0.4c0,0.9,0.4,1.7,1,2.2L12.2,24 c-0.1,0-0.1,0-0.2,0c-1.7,0-3,1.3-3,3s1.3,3,3,3s3-1.3,3-3c0-0.9-0.4-1.7-1-2.2l2.8-6.8c0.1,0,0.1,0,0.2,0c1.7,0,3-1.3,3-3 c0-0.3,0-0.5-0.1-0.8l5.4-3.8c0.5,0.4,1.1,0.6,1.7,0.6c1.7,0,3-1.3,3-3S28.7,5,27,5z" />
+              </svg>
             </button>
             <div style={{ display: "flex", alignItems: "center", gap: "0.3rem", background: "var(--bg-elevated)", padding: "0.2rem 0.5rem", borderRadius: "var(--radius)" }}>
               <label style={{ fontSize: "0.7rem", color: "var(--text-dim)" }} title="Lower this if the map feels laggy">
@@ -902,6 +934,12 @@ export function PlaylistSpaceMapPage() {
               <Link
                 key={a.id}
                 to={a.source === "official" ? `/album/${a.slug}` : `/community-album/${a.slug}`}
+                onClick={(e) => {
+                  if (!isPlayingAlbum) {
+                    e.preventDefault();
+                    void playAlbum(a);
+                  }
+                }}
                 style={{
                   position: "absolute",
                   left: `calc(50% + ${cameraRef.current.x + a.x}px)`,
@@ -991,7 +1029,8 @@ export function PlaylistSpaceMapPage() {
                     const isCross = l.kind === "cross-genre";
                     const lit = litTrackIds.has(l.trackId);
                     const hovered = hoveredTrackId === l.trackId || crosshairNearTrackId === l.trackId;
-                    const opacity = isCross ? (lit ? 0.95 : hovered ? 0.55 : 0) : 0.24;
+                    const lineGenreHidden = hiddenGenres.has(rootGenreByTrackId.get(l.trackId) ?? "");
+                    const opacity = lineGenreHidden ? 0 : isCross ? (lit ? 0.95 : hovered ? 0.55 : 0) : 0.24;
                     if (opacity === 0) return null;
                     const fromLive = starNodesRef.current.get(l.trackId);
                     const toLive = l.toTrackId !== null ? starNodesRef.current.get(l.toTrackId) : null;
@@ -1035,6 +1074,8 @@ export function PlaylistSpaceMapPage() {
                 const core = customHsl ? `hsl(${customHsl.h}, 45%, 96%)` : warmth > 0.5 ? "#fff8ec" : "#eaf3ff";
                 const mid = customHsl ? `hsl(${customHsl.h}, 75%, 78%)` : warmth > 0.5 ? "#ffe9c2" : "#cfe8ff";
                 const hasSpikes = brightness > 0.75;
+                const genreHidden = hiddenGenres.has(r.name);
+                const effBrightness = genreHidden ? brightness * 0.05 : brightness;
                 return (
                   <div key={r.name}>
                     {hasSpikes && (
@@ -1068,7 +1109,8 @@ export function PlaylistSpaceMapPage() {
                       </>
                     )}
                     <div
-                      title={`${r.name} - ${r.trackCount} track${r.trackCount === 1 ? "" : "s"}`}
+                      title={`${r.name} - ${r.trackCount} track${r.trackCount === 1 ? "" : "s"} (click to toggle)`}
+                      onClick={() => toggleGenreVisible(r.name)}
                       style={{
                         position: "absolute",
                         left: `calc(50% + ${cameraRef.current.x + r.x}px)`,
@@ -1077,14 +1119,16 @@ export function PlaylistSpaceMapPage() {
                         width: starSize,
                         height: starSize,
                         borderRadius: "50%",
-                        opacity: brightness,
+                        cursor: "pointer",
+                        opacity: effBrightness,
                         background: `radial-gradient(circle, ${core} 0%, ${mid} 35%, rgba(143, 184, 255, 0.15) 75%, transparent 100%)`,
-                        boxShadow: `0 0 ${starSize * 0.9}px ${starSize * 0.25}px rgba(180, 210, 255, ${0.35 * brightness})`,
+                        boxShadow: `0 0 ${starSize * 0.9}px ${starSize * 0.25}px rgba(180, 210, 255, ${0.35 * effBrightness})`,
                         zIndex: 2,
-                        pointerEvents: "none",
+                        pointerEvents: "auto",
                       }}
                     />
                     <div
+                      onClick={() => toggleGenreVisible(r.name)}
                       style={{
                         position: "absolute",
                         left: `calc(50% + ${cameraRef.current.x + r.x}px)`,
@@ -1094,9 +1138,11 @@ export function PlaylistSpaceMapPage() {
                         fontWeight: 600,
                         letterSpacing: "0.04em",
                         color: "#eaf6ff",
+                        opacity: genreHidden ? 0.3 : 1,
                         textShadow: "0 0 4px rgba(0,0,0,0.9), 0 0 10px rgba(0,0,0,0.6)",
                         zIndex: 2,
-                        pointerEvents: "none",
+                        cursor: "pointer",
+                        pointerEvents: "auto",
                         whiteSpace: "nowrap",
                         textTransform: "uppercase",
                       }}
@@ -1113,6 +1159,7 @@ export function PlaylistSpaceMapPage() {
                 const lit = litTrackIds.has(item.trackId);
                 const hovered = hoveredTrackId === item.trackId || crosshairNearTrackId === item.trackId;
                 const rootGenre = item.genres[0];
+                const genreHidden = hiddenGenres.has(rootGenre);
                 const customHex = vennUseCustomColors ? vennCustomColors[rootGenre] : undefined;
                 const customHsl = customHex ? hexToHsl(customHex) : null;
                 const hue = customHsl ? customHsl.h : controls.vennHueStart + ((controls.vennHueEnd - controls.vennHueStart) * (hashOf(item.title) % 100)) / 100;
@@ -1147,7 +1194,7 @@ export function PlaylistSpaceMapPage() {
                       border: "none",
                       cursor: "pointer",
                       zIndex: 3,
-                      opacity: lit || hovered ? 1 : trackBrightness,
+                      opacity: genreHidden ? 0.06 : lit || hovered ? 1 : trackBrightness,
                       background: lit ? `hsl(${hue}, ${litSatFinal}%, ${litLightFinal}%)` : `hsl(${hue}, ${sat}%, ${light}%)`,
                       boxShadow: lit
                         ? `0 0 10px 3px hsla(${hue}, ${litSatFinal}%, ${Math.max(0, litLightFinal - 2)}%, 0.8)`

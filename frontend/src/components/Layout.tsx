@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Link, Outlet, useNavigate } from "react-router-dom";
+import { Link, Outlet, useNavigate, useLocation } from "react-router-dom";
 import { isTypingTarget } from "../lib/isTypingTarget";
 import { underlineLetter } from "../lib/underlineLetter";
 import { api } from "../lib/api";
@@ -55,6 +55,7 @@ export function Layout() {
   const pipWindow = useChatPipStore((s) => s.pipWindow);
 
   const isDesktop = useIsDesktop();
+  const location = useLocation();
   const navigate = useNavigate();
 
   function openDonate() {
@@ -365,7 +366,9 @@ export function Layout() {
       <PlayerBar />
       <TrackPreloader />
       <ChatDock />
-      <div className="crt-overlay" />
+      {(isDesktop || location.pathname === "/" || location.pathname.startsWith("/playlist/") || location.pathname.startsWith("/discussion")) && (
+        <div className="crt-overlay" />
+      )}
       <Toast />
       {pipWindow && createPortal(<PopoutChatContent />, pipWindow.document.body)}
     </div>
