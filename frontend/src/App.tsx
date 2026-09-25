@@ -8,6 +8,7 @@ import { RequireAdmin } from "./components/RequireAdmin";
 import { HomePage } from "./pages/HomePage";
 import { MiniChatWindowPage } from "./pages/MiniChatWindowPage";
 import { EmbedPlaylistPage } from "./pages/EmbedPlaylistPage";
+import { EmbedMainSpacemapPage } from "./pages/EmbedMainSpacemapPage";
 import { LoginPage } from "./pages/LoginPage";
 import { JoinPage } from "./pages/JoinPage";
 import { WikiPage } from "./pages/WikiPage";
@@ -83,6 +84,7 @@ export default function App() {
             <Routes>
               <Route path="chat-window" element={<MiniChatWindowPage />} />
               <Route path="embed/playlist/:slug" element={<EmbedPlaylistPage />} />
+              <Route path="embed/main-spacemap" element={<EmbedMainSpacemapPage />} />
               <Route element={<Layout />}>
                 <Route index element={<HomePage />} />
                 <Route path="login" element={<LoginPage />} />

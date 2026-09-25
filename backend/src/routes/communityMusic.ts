@@ -5,6 +5,7 @@ import { requireAuth, requireAdmin, verifyToken } from "../lib/auth.js";
 import { saveCommunityTrackAudio, saveCommunityAlbumCover, deleteAttachmentAndReclaim } from "../lib/storage.js";
 import { resolvePlayableUrl } from "../lib/embeds.js";
 import { probeAudioDuration } from "../lib/audioProbe.js";
+import { regeneratePlaylistPreview } from "../lib/playlistPreview.js";
 
 async function uniqueCommunityAlbumSlug(title: string): Promise<string> {
   const base = title.toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") || "album";
@@ -479,6 +480,7 @@ export async function communityMusicRoutes(app: FastifyInstance): Promise<void> 
         title: true,
         description: true,
         createdAt: true,
+        previewImageUrl: true,
         owner: { select: { username: true } },
         items: {
           select: {
@@ -497,6 +499,7 @@ export async function communityMusicRoutes(app: FastifyInstance): Promise<void> 
         title: p.title,
         description: p.description,
         createdAt: p.createdAt,
+        previewImageUrl: p.previewImageUrl,
         owner: p.owner.username,
         trackCount: p.items.length,
         albumCount: albumKeys.size,
@@ -638,6 +641,7 @@ export async function communityMusicRoutes(app: FastifyInstance): Promise<void> 
       const item = await prisma.playlistItem.create({
         data: { playlistId: playlist.id, trackId: trackId ?? null, communityTrackId: communityTrackId ?? null, position },
       });
+      regeneratePlaylistPreview(playlist.id).catch((err) => req.log.warn({ err, playlistId: playlist.id }, "failed to regenerate playlist preview"));
       return reply.code(201).send(item);
     },
   );
@@ -647,6 +651,7 @@ export async function communityMusicRoutes(app: FastifyInstance): Promise<void> 
     if (!item) return reply.code(404).send({ error: "no such item" });
     if (!(await canEditPlaylist(item.playlist.id, req.user!.id, item.playlist.ownerId))) return reply.code(403).send({ error: "not your playlist" });
     await prisma.playlistItem.delete({ where: { id: item.id } });
+    regeneratePlaylistPreview(item.playlist.id).catch((err) => req.log.warn({ err, playlistId: item.playlist.id }, "failed to regenerate playlist preview"));
     return { status: "ok" };
   });
 

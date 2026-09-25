@@ -1012,6 +1012,7 @@ model Playlist {
   title       String
   description String?  @db.Text
   fxSettingsJson Json? // owner-customizable visual controls for this playlist's spacemap view - null means "use the same defaults as the main spacemap"
+  previewImageUrl String? // generated SVG snapshot of the whole spacemap, regenerated whenever tracks change
   createdAt   DateTime @default(now())
 
   items PlaylistItem[]
