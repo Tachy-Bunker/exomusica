@@ -364,10 +364,47 @@ export function PlaylistSpaceMapPage() {
   // else dims regardless of its own on/off state. Otherwise plain
   // on/off applies to the track's root genre alone.
   const anyGenreHighlighted = useMemo(() => Object.values(genreState).some((s) => s === "highlight"), [genreState]);
+  const focusGenres = useMemo(() => {
+    const set = new Set<string>(Object.entries(genreState).filter(([, s]) => s === "highlight").map(([g]) => g));
+    const hoverG = hoveredGenre ?? crosshairNearGenre;
+    if (hoverG) set.add(hoverG);
+    return set;
+  }, [genreState, hoveredGenre, crosshairNearGenre]);
   function trackDimmed(trackGenres: string[]): boolean {
     if (anyGenreHighlighted) return !trackGenres.some((g) => genreState[g] === "highlight");
     return genreState[trackGenres[0]] === "off";
   }
+
+  const highlightedGenresKey = useMemo(
+    () => Object.entries(genreState).filter(([, s]) => s === "highlight").map(([g]) => g).sort().join(","),
+    [genreState],
+  );
+  useEffect(() => {
+    if (!highlightedGenresKey || !playlist) return;
+    const highlighted = new Set(highlightedGenresKey.split(","));
+    const matchingItems = playlist.items.filter((i) => i.genres.some((g) => highlighted.has(g)));
+    if (matchingItems.length === 0) return;
+    const matchingTracks = matchingItems.map(playlistItemToPlayable);
+
+    const audioState = useAudioStore.getState();
+    const currentIsFromThisPlaylist = audioState.currentPlaylist?.slug === playlist.slug && !!audioState.currentTrack;
+    const currentMatches = currentIsFromThisPlaylist && matchingItems.some((i) => i.trackId === audioState.currentTrack!.id);
+
+    audioState.clearQueue();
+    audioState.setRepeatMode("all");
+    if (currentMatches) {
+      audioState.addToQueue(matchingTracks.filter((t) => t.id !== audioState.currentTrack!.id));
+    } else if (currentIsFromThisPlaylist) {
+      // Something else from this playlist is playing - let it finish, queue the highlighted set to follow.
+      audioState.addToQueue(matchingTracks);
+    } else {
+      const [first, ...rest] = matchingTracks;
+      audioState.setCurrentPlaylist({ slug: playlist.slug, title: playlist.title });
+      audioState.play(first);
+      audioState.addToQueue(rest);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [highlightedGenresKey]);
   const vennTracksRef = useRef(vennTracks);
   useEffect(() => {
     vennTracksRef.current = vennTracks;
@@ -534,8 +571,12 @@ export function PlaylistSpaceMapPage() {
 
   function playLocked() {
     const id = lockedIdRef.current;
-    if (id === null) return;
     if (viewModeRef.current === "venn") {
+      if (crosshairNearTrackIdRef.current === null && crosshairNearGenreRef.current !== null) {
+        cycleGenreState(crosshairNearGenreRef.current);
+        return;
+      }
+      if (id === null) return;
       const p = playlistRef.current;
       const item = p?.items.find((i) => i.trackId === id);
       if (item) {
@@ -544,6 +585,7 @@ export function PlaylistSpaceMapPage() {
       }
       return;
     }
+    if (id === null) return;
     if (id === -1) {
       playAllPlaylist();
       return;
@@ -793,6 +835,20 @@ export function PlaylistSpaceMapPage() {
       }
     }
   }
+
+  const vennCompassPoint = (() => {
+    if (!container || viewModeRef.current !== "venn" || !currentTrack) return null;
+    const live = starNodesRef.current.get(currentTrack.id);
+    if (!live) return null;
+    const w = container.clientWidth;
+    const h = container.clientHeight;
+    const screenX = w / 2 + cameraRef.current.x + live.x;
+    const screenY = h / 2 + cameraRef.current.y + live.y;
+    if (screenX < 0 || screenX > w || screenY < 0 || screenY > h) {
+      return { angle: Math.atan2(screenY - h / 2, screenX - w / 2) };
+    }
+    return null;
+  })();
 
   return (
     <div
@@ -1116,14 +1172,25 @@ export function PlaylistSpaceMapPage() {
                     const isRoot = l.kind === "root";
                     const lit = litTrackIds.has(l.trackId);
                     const hovered = hoveredTrackId === l.trackId || crosshairNearTrackId === l.trackId;
-                    const activeGenre = hoveredGenre ?? crosshairNearGenre;
-                    const genreHoverMatch = !!activeGenre && (genresByTrackId.get(l.trackId) ?? []).includes(activeGenre);
                     const dimmed = trackDimmed(genresByTrackId.get(l.trackId) ?? []) && !lit && !hovered;
                     let opacity: number;
-                    if (dimmed) opacity = 0;
-                    else if (isCross) opacity = lit ? 0.95 : hovered || genreHoverMatch ? 0.55 : 0;
-                    else if (isRoot) opacity = lit || hovered || genreHoverMatch ? 0.8 : 0.4;
-                    else opacity = lit || hovered || genreHoverMatch ? 0.55 : 0.24;
+                    if (dimmed) {
+                      opacity = 0;
+                    } else if (focusGenres.size > 0) {
+                      // 1-kin focus mode: only this line if it's the
+                      // one line actually reaching the focused
+                      // genre(s), or anything belonging to the
+                      // currently-playing track (never hidden).
+                      if (lit) opacity = isCross ? 0.95 : isRoot ? 0.8 : 0.55;
+                      else if ((isCross || isRoot) && focusGenres.has(l.toGenre)) opacity = isCross ? 0.75 : 0.85;
+                      else opacity = 0.04;
+                    } else if (isCross) {
+                      opacity = lit ? 0.95 : hovered ? 0.55 : 0;
+                    } else if (isRoot) {
+                      opacity = lit || hovered ? 0.8 : 0.4;
+                    } else {
+                      opacity = lit || hovered ? 0.55 : 0.24;
+                    }
                     if (opacity === 0) return null;
                     const fromLive = starNodesRef.current.get(l.trackId);
                     const toLive = l.toTrackId !== null ? starNodesRef.current.get(l.toTrackId) : null;
@@ -1321,6 +1388,24 @@ export function PlaylistSpaceMapPage() {
                     />
                   );
                 })()}
+              {vennCompassPoint && (
+                <div
+                  title="Now playing (off-screen)"
+                  style={{
+                    position: "absolute",
+                    left: `${50 + Math.cos(vennCompassPoint.angle) * 46}%`,
+                    top: `${50 + Math.sin(vennCompassPoint.angle) * 46}%`,
+                    transform: `translate(-50%, -50%) rotate(${vennCompassPoint.angle}rad)`,
+                    fontSize: "1.1rem",
+                    pointerEvents: "none",
+                    zIndex: 4,
+                    color: "#fff",
+                    textShadow: "0 0 6px #fff",
+                  }}
+                >
+                  ➤
+                </div>
+              )}
             </>
           )}
 

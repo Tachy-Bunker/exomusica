@@ -5,6 +5,17 @@ import { api } from "../lib/api";
 import { useCustomFont } from "../lib/useCustomFont";
 import { useGlobalPlayerShortcuts } from "../lib/useGlobalPlayerShortcuts";
 
+function darkenHex(hex: string, amount: number): string {
+  const m = hex.replace("#", "");
+  if (m.length !== 6) return hex;
+  const r = parseInt(m.slice(0, 2), 16);
+  const g = parseInt(m.slice(2, 4), 16);
+  const b = parseInt(m.slice(4, 6), 16);
+  const mix = (c: number) => Math.round(c * (1 - amount));
+  const toHex = (c: number) => c.toString(16).padStart(2, "0");
+  return `#${toHex(mix(r))}${toHex(mix(g))}${toHex(mix(b))}`;
+}
+
 export function EmbedPlaylistPage() {
   const [siteFont, setSiteFont] = useState<{ familyName: string; fileUrl: string; format: string } | null>(null);
   useCustomFont(siteFont); // @font-face injection side effect
@@ -22,7 +33,10 @@ export function EmbedPlaylistPage() {
       const root = document.documentElement.style;
       if (s.textColorPrimary) root.setProperty("--text", s.textColorPrimary);
       if (s.textColorSecondary) root.setProperty("--text-dim", s.textColorSecondary);
-      if (s.accentPrimaryColor) root.setProperty("--accent-forum", s.accentPrimaryColor);
+      if (s.accentPrimaryColor) {
+        root.setProperty("--accent-forum", s.accentPrimaryColor);
+        root.setProperty("--accent-forum-dim", darkenHex(s.accentPrimaryColor, 0.45));
+      }
     });
   }, []);
 

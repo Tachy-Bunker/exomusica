@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../lib/api";
 import { useDocumentTitle } from "../lib/useDocumentTitle";
+import { ContributeTimeline } from "../components/ContributeTimeline";
 
 interface ContributeBranch {
   slug: string;
@@ -29,6 +30,8 @@ export function ContributePage() {
       <p style={{ color: "var(--text-dim)" }}>
         Pick a branch, grab the brief and any curated sketches, and submit your own take when it's ready.
       </p>
+
+      <ContributeTimeline />
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: "1rem", marginTop: "1rem" }}>
         {branches.map((b) => (

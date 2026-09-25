@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { api } from "../../lib/api";
 import { useDocumentTitle } from "../../lib/useDocumentTitle";
 import { useToastStore } from "../../lib/toastStore";
+import { useAudioStore } from "../../lib/audioStore";
 
 interface TrackRow {
   id: number;
@@ -88,6 +89,41 @@ export function AllTracksAdminPage() {
     });
   }
 
+  const audioPlay = useAudioStore((s) => s.play);
+  const audioToggle = useAudioStore((s) => s.toggle);
+  const currentTrack = useAudioStore((s) => s.currentTrack);
+  const isPlayingRow = useAudioStore((s) => s.isPlaying);
+
+  function playRow(r: TrackRow) {
+    if (currentTrack?.id === r.id && currentTrack.source === r.kind) {
+      audioToggle();
+      return;
+    }
+    if (!r.fileUrl) return;
+    // Mirrors resolvePlayableUrl server-side: a local path is used
+    // directly, anything else needs to go through the audio proxy or
+    // it'll hit CORS trying to fetch an external host straight from
+    // the browser.
+    const playableUrl = r.fileUrl.startsWith("/") ? r.fileUrl : `/api/audio-proxy/${r.kind === "official" ? "track" : "community-track"}/${r.id}`;
+    audioPlay({
+      id: r.id,
+      title: r.title,
+      fileUrl: playableUrl,
+      format: r.format,
+      durationSeconds: r.durationSeconds,
+      position: r.position,
+      albumTitle: r.albumTitle,
+      albumSlug: r.albumSlug,
+      coverArtUrl: null,
+      composer: r.composer,
+      branchSlug: null,
+      bookmarks: [],
+      replayGainDb: null,
+      source: r.kind,
+      genres: r.genres,
+    });
+  }
+
   async function saveRow(r: TrackRow) {
     const draft = editDrafts[rowKey(r)];
     if (!draft) return;
@@ -134,6 +170,7 @@ export function AllTracksAdminPage() {
         <thead>
           <tr>
             <th />
+            <th />
             <th style={{ textAlign: "left" }}>Kind</th>
             <th style={{ textAlign: "left" }}>Title</th>
             <th style={{ textAlign: "left" }}>Composer</th>
@@ -152,6 +189,17 @@ export function AllTracksAdminPage() {
               <tr key={key} style={{ borderTop: "1px solid var(--border)" }}>
                 <td>
                   <input type="checkbox" checked={selected.has(key)} onChange={() => toggleSelected(key)} />
+                </td>
+                <td>
+                  <button
+                    className="btn"
+                    style={{ fontSize: "0.75rem", padding: "0 0.4rem" }}
+                    disabled={!r.fileUrl}
+                    onClick={() => playRow(r)}
+                    title={r.fileUrl ? "Play this track" : "No file to play"}
+                  >
+                    {currentTrack?.id === r.id && currentTrack.source === r.kind && isPlayingRow ? "⏸" : "▶"}
+                  </button>
                 </td>
                 <td>
                   {r.kind === "official" ? "official" : "community"}

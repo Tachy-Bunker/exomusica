@@ -13,6 +13,8 @@ import { JoinPage } from "./pages/JoinPage";
 import { WikiPage } from "./pages/WikiPage";
 import { StudiesIndexPage } from "./pages/StudiesIndexPage";
 import { ContributePage } from "./pages/ContributePage";
+import { ListenPage } from "./pages/ListenPage";
+import { ResearchPage } from "./pages/ResearchPage";
 import { SubmitWorkPage } from "./pages/SubmitWorkPage";
 import { StudyPage } from "./pages/StudyPage";
 import { NewsPage } from "./pages/NewsPage";
@@ -89,6 +91,8 @@ export default function App() {
             <Route path="wiki" element={<WikiPage />} />
             <Route path="studies" element={<StudiesIndexPage />} />
             <Route path="contribute" element={<ContributePage />} />
+            <Route path="listen" element={<ListenPage />} />
+            <Route path="research" element={<ResearchPage />} />
             <Route path="submit" element={<SubmitWorkPage />} />
             <Route path="study/:slug" element={<StudyPage />} />
             <Route path="wiki/:slug" element={<WikiPage />} />

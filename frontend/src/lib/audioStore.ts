@@ -27,6 +27,7 @@ interface AudioState {
   playPrevious: () => void;
   toggleShuffle: () => void;
   cycleRepeat: () => void;
+  setRepeatMode: (mode: RepeatMode) => void;
   toggle: () => void;
   seek: (time: number) => void;
   seekBy: (deltaSeconds: number) => void;
@@ -140,6 +141,7 @@ export const useAudioStore = create<AudioState>((set, get) => ({
 
   cycleRepeat: () =>
     set((s) => ({ repeatMode: s.repeatMode === "off" ? "all" : s.repeatMode === "all" ? "one" : "off" })),
+  setRepeatMode: (mode) => set({ repeatMode: mode }),
 
   toggle: () => {
     if (get().isPlaying) audioEl?.pause();
