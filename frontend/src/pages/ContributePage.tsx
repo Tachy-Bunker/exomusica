@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../lib/api";
 import { useDocumentTitle } from "../lib/useDocumentTitle";
-import { ContributeTimeline } from "../components/ContributeTimeline";
+import { ContributeTimeline, type ContributeStepKey } from "../components/ContributeTimeline";
 
 interface ContributeBranch {
   slug: string;
@@ -16,9 +16,12 @@ interface ContributeBranch {
   sketchCount: number;
 }
 
+const highlightStyle = { outline: "2px solid var(--accent-forum)", boxShadow: "0 0 10px var(--accent-forum)" } as const;
+
 export function ContributePage() {
   useDocumentTitle("Choose your next project");
   const [branches, setBranches] = useState<ContributeBranch[]>([]);
+  const [activeStep, setActiveStep] = useState<ContributeStepKey | null>(null);
 
   useEffect(() => {
     api<ContributeBranch[]>("/api/contribute/branches").then(setBranches);
@@ -31,11 +34,23 @@ export function ContributePage() {
         Pick a branch, grab the brief and any curated sketches, and submit your own take when it's ready.
       </p>
 
-      <ContributeTimeline />
+      <ContributeTimeline activeStep={activeStep} onStepChange={setActiveStep} />
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: "1rem", marginTop: "1rem" }}>
         {branches.map((b) => (
-          <div key={b.slug} style={{ border: "1px solid var(--border)", borderRadius: "var(--radius)", overflow: "hidden", display: "flex", flexDirection: "column", position: "relative" }}>
+          <div
+            key={b.slug}
+            style={{
+              border: "1px solid var(--border)",
+              borderRadius: "var(--radius)",
+              overflow: "hidden",
+              display: "flex",
+              flexDirection: "column",
+              position: "relative",
+              transition: "box-shadow 0.15s",
+              ...(activeStep === "feedback" ? { boxShadow: "0 0 0 1px var(--accent-forum-dim)" } : {}),
+            }}
+          >
             {b.backgroundUrl && (
               <div
                 style={{
@@ -50,34 +65,48 @@ export function ContributePage() {
               />
             )}
             <div style={{ position: "relative", zIndex: 1, display: "flex", flexDirection: "column", flex: 1 }}>
-            {b.coverArtUrl && <img src={b.coverArtUrl} alt="" style={{ width: "100%", aspectRatio: "16/9", objectFit: "cover" }} />}
-            <div style={{ padding: "0.7rem", display: "flex", flexDirection: "column", gap: "0.4rem", flex: 1 }}>
-              <h3 style={{ margin: 0 }}>{b.name}</h3>
-              {b.description && <p style={{ fontSize: "0.85rem", color: "var(--text-dim)", margin: 0 }}>{b.description}</p>}
+              {b.coverArtUrl && <img src={b.coverArtUrl} alt="" style={{ width: "100%", aspectRatio: "16/9", objectFit: "cover" }} />}
+              <div style={{ padding: "0.7rem", display: "flex", flexDirection: "column", gap: "0.4rem", flex: 1 }}>
+                <h3 style={{ margin: 0 }}>{b.name}</h3>
+                {b.description && <p style={{ fontSize: "0.85rem", color: "var(--text-dim)", margin: 0 }}>{b.description}</p>}
 
-              {b.previewUrl && (
-                <audio controls src={b.previewUrl} style={{ width: "100%", height: 32 }} />
-              )}
+                {b.previewUrl && <audio controls src={b.previewUrl} style={{ width: "100%", height: 32 }} />}
 
-              <div style={{ display: "flex", gap: "0.4rem", flexWrap: "wrap", marginTop: "auto" }}>
-                {b.hasBrief && (
-                  <a className="btn" href={`/api/contribute/branches/${b.slug}/brief`} style={{ fontSize: "0.78rem" }}>
-                    Download brief
-                  </a>
-                )}
-                {b.sketchCount > 0 && (
-                  <a className="btn" href={`/api/contribute/branches/${b.slug}/sketches.zip`} style={{ fontSize: "0.78rem" }}>
-                    Sketches ({b.sketchCount})
-                  </a>
-                )}
-                <Link className="btn" to={`/branch/${b.slug}`} style={{ fontSize: "0.78rem" }}>
-                  View branch
-                </Link>
-                <Link className="btn btn-primary" to={`/submit?branch=${b.slug}`} style={{ fontSize: "0.78rem" }}>
-                  Submit work
-                </Link>
+                <div style={{ display: "flex", gap: "0.4rem", flexWrap: "wrap", marginTop: "auto" }}>
+                  {b.hasBrief && (
+                    <a
+                      className="btn"
+                      href={`/api/contribute/branches/${b.slug}/brief`}
+                      style={{ fontSize: "0.78rem", ...(activeStep === "brief" ? highlightStyle : {}) }}
+                    >
+                      Download brief
+                    </a>
+                  )}
+                  {b.sketchCount > 0 && (
+                    <a
+                      className="btn"
+                      href={`/api/contribute/branches/${b.slug}/sketches.zip`}
+                      style={{ fontSize: "0.78rem", ...(activeStep === "sketches" ? highlightStyle : {}) }}
+                    >
+                      Sketches ({b.sketchCount})
+                    </a>
+                  )}
+                  <Link
+                    className="btn"
+                    to={`/branch/${b.slug}`}
+                    style={{ fontSize: "0.78rem", ...(activeStep === "official" ? highlightStyle : {}) }}
+                  >
+                    View branch
+                  </Link>
+                  <Link
+                    className="btn btn-primary"
+                    to={`/submit?branch=${b.slug}`}
+                    style={{ fontSize: "0.78rem", ...(activeStep === "submit" ? highlightStyle : {}) }}
+                  >
+                    Submit work
+                  </Link>
+                </div>
               </div>
-            </div>
             </div>
           </div>
         ))}

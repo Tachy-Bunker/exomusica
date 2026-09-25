@@ -1,23 +1,46 @@
-const STEPS = [
-  { label: "Brief", caption: "read the concept" },
-  { label: "Sketches", caption: "grab source material" },
-  { label: "Submit", caption: "upload, credit, done" },
-  { label: "Feedback", caption: "discuss with the team" },
-  { label: "Official", caption: "goes live on the branch" },
+export type ContributeStepKey = "brief" | "sketches" | "submit" | "feedback" | "official";
+
+const STEPS: { key: ContributeStepKey; label: string; caption: string }[] = [
+  { key: "brief", label: "Brief", caption: "read the concept" },
+  { key: "sketches", label: "Sketches", caption: "grab source material" },
+  { key: "submit", label: "Submit", caption: "upload, credit, done" },
+  { key: "feedback", label: "Feedback", caption: "discuss with the team" },
+  { key: "official", label: "Official", caption: "goes live on the branch" },
 ];
 
-export function ContributeTimeline() {
+interface Props {
+  activeStep: ContributeStepKey | null;
+  onStepChange: (key: ContributeStepKey | null) => void;
+}
+
+export function ContributeTimeline({ activeStep, onStepChange }: Props) {
   return (
     <div style={{ display: "flex", alignItems: "flex-start", marginBottom: "1.2rem", overflowX: "auto" }}>
       {STEPS.map((step, i) => (
-        <div key={step.label} style={{ display: "flex", alignItems: "flex-start", flex: i < STEPS.length - 1 ? 1 : "0 0 auto" }}>
-          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", minWidth: 84 }}>
+        <div key={step.key} style={{ display: "flex", alignItems: "flex-start", flex: i < STEPS.length - 1 ? 1 : "0 0 auto" }}>
+          <div
+            onMouseEnter={() => onStepChange(step.key)}
+            onMouseLeave={() => {
+              if (activeStep === step.key) onStepChange(null);
+            }}
+            onClick={() => onStepChange(activeStep === step.key ? null : step.key)}
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              minWidth: 84,
+              cursor: "pointer",
+              padding: "0.3rem",
+              borderRadius: "var(--radius)",
+              background: activeStep === step.key ? "var(--bg-elevated)" : "transparent",
+            }}
+          >
             <span
               style={{
                 width: 22,
                 height: 22,
                 borderRadius: "50%",
-                background: "var(--accent-forum-dim)",
+                background: activeStep === step.key ? "var(--accent-forum)" : "var(--accent-forum-dim)",
                 border: "1px solid var(--accent-forum)",
                 color: "var(--text)",
                 display: "flex",

@@ -491,6 +491,9 @@ export async function communityMusicRoutes(app: FastifyInstance): Promise<void> 
       },
       orderBy: { createdAt: "desc" },
     });
+    for (const p of playlists) {
+      if (!p.previewImageUrl) regeneratePlaylistPreview(p.id).catch(() => {});
+    }
     return playlists.map((p) => {
       const albumKeys = new Set(p.items.map((i) => (i.track ? `o:${i.track.albumId}` : `c:${i.communityTrack!.albumId}`)));
       return {

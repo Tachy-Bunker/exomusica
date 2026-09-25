@@ -49,6 +49,52 @@ export async function branchRoutes(app: FastifyInstance): Promise<void> {
     }));
   });
 
+  // On-demand SVG snapshot of the main branch tree, for lightweight
+  // previews (e.g. on the Listen page) that shouldn't need a live,
+  // fully-interactive embed just to look representative. Generated
+  // fresh per request rather than cached - branch positions change
+  // rarely and the generation itself is cheap.
+  app.get("/api/branches/preview.svg", async (_req, reply) => {
+    const branches = await prisma.branch.findMany({
+      where: { visibility: "VISIBLE" },
+      select: { id: true, name: true, posX: true, posY: true, crystalCount: true },
+    });
+    const points = branches.filter((b) => b.posX !== null && b.posY !== null).map((b) => ({ x: b.posX!, y: b.posY!, crystalCount: b.crystalCount }));
+    const maxR = points.length > 0 ? Math.max(...points.map((p) => Math.hypot(p.x, p.y))) : 0;
+    const nodeRadius = 22;
+    const pad = nodeRadius + 24;
+    const half = maxR + pad;
+    const size = Math.max(200, half * 2);
+
+    function hashOf(s: string): number {
+      let h = 0;
+      for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0;
+      return h;
+    }
+    const circles = branches
+      .filter((b) => b.posX !== null && b.posY !== null)
+      .map((b) => {
+        const r = nodeRadius * (0.7 + Math.min(0.5, Math.sqrt(Math.max(1, b.crystalCount)) * 0.1));
+        const hue = hashOf(b.name) % 360;
+        return `<circle cx="${b.posX!.toFixed(1)}" cy="${b.posY!.toFixed(1)}" r="${r.toFixed(1)}" fill="hsl(${hue}, 45%, 45%)" stroke="hsl(${hue}, 60%, 65%)" stroke-width="1.5" opacity="0.92" />`;
+      })
+      .join("\n    ");
+
+    const svg = `<svg viewBox="${-half} ${-half} ${size} ${size}" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <radialGradient id="bg" cx="50%" cy="50%" r="75%">
+      <stop offset="0%" stop-color="#151022" />
+      <stop offset="100%" stop-color="#070510" />
+    </radialGradient>
+  </defs>
+  <rect x="${-half}" y="${-half}" width="${size}" height="${size}" fill="url(#bg)" />
+  ${circles}
+</svg>`;
+    reply.header("Content-Type", "image/svg+xml");
+    reply.header("Cache-Control", "public, max-age=300");
+    return svg;
+  });
+
   // Admin sees everything, hidden included - needed to ever unhide something.
   app.get("/api/admin/branches", { preHandler: requireAdmin }, async () => {
     return prisma.branch.findMany({

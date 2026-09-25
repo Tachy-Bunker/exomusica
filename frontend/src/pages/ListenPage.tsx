@@ -37,13 +37,6 @@ export function ListenPage() {
       <div style={{ position: "relative", borderRadius: "var(--radius)", overflow: "hidden", border: "1px solid var(--border)", height: "min(70vh, 560px)" }}>
         {featured?.previewImageUrl ? (
           <img src={featured.previewImageUrl} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-        ) : featured ? (
-          <iframe
-            key={featured.slug}
-            src={`/embed/playlist/${featured.slug}?hideControls=1#venn`}
-            title="Live preview"
-            style={{ width: "100%", height: "100%", border: 0, pointerEvents: "none" }}
-          />
         ) : (
           <div style={{ width: "100%", height: "100%", background: "var(--bg-inset)" }} />
         )}
@@ -74,9 +67,8 @@ export function ListenPage() {
           <PreviewCard key={p.slug} playlist={p} onClick={() => navigate(`/playlist/${p.slug}#venn`)} />
         ))}
         <PreviewCard
-          playlist={{ slug: "__main__", title: "The main spacemap", description: null, owner: "Exomusica", createdAt: "" }}
+          playlist={{ slug: "__main__", title: "The main spacemap", description: null, owner: "Exomusica", createdAt: "", previewImageUrl: "/api/branches/preview.svg" }}
           onClick={() => navigate("/")}
-          isMainSpacemap
         />
         <button
           onClick={() => navigate(user ? "/my-music" : "/join")}
@@ -101,15 +93,7 @@ export function ListenPage() {
   );
 }
 
-function PreviewCard({
-  playlist,
-  onClick,
-  isMainSpacemap,
-}: {
-  playlist: PlaylistSummary;
-  onClick: () => void;
-  isMainSpacemap?: boolean;
-}) {
+function PreviewCard({ playlist, onClick }: { playlist: PlaylistSummary; onClick: () => void }) {
   return (
     <button
       onClick={onClick}
@@ -125,14 +109,8 @@ function PreviewCard({
         font: "inherit",
       }}
     >
-      <div style={{ height: 140, position: "relative" }}>
-        {isMainSpacemap ? (
-          <iframe src="/embed/main-spacemap" title={playlist.title} style={{ width: "100%", height: "100%", border: 0, pointerEvents: "none" }} />
-        ) : playlist.previewImageUrl ? (
-          <img src={playlist.previewImageUrl} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-        ) : (
-          <iframe src={`/embed/playlist/${playlist.slug}?hideControls=1`} title={playlist.title} style={{ width: "100%", height: "100%", border: 0, pointerEvents: "none" }} />
-        )}
+      <div style={{ height: 140, position: "relative", background: "var(--bg-inset)" }}>
+        {playlist.previewImageUrl && <img src={playlist.previewImageUrl} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />}
       </div>
       <div style={{ padding: "0.6rem" }}>
         <p style={{ margin: 0, fontWeight: 600, color: "var(--accent-forum)" }}>{playlist.title}</p>
