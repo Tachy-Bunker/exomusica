@@ -159,6 +159,19 @@ export function PlaylistSpaceMapPage() {
   useEffect(() => {
     isDesktopRef.current = isDesktop;
   }, [isDesktop]);
+  // The animated background art (two canvas renderers on their own rAF
+  // loop) is the single heaviest thing on this page, so it defaults OFF
+  // on phones and ON on desktop, and the choice sticks per device.
+  const [backgroundArt, setBackgroundArt] = useState<boolean>(() => {
+    const saved = localStorage.getItem("exomusica_bg_art");
+    return saved !== null ? saved === "1" : isDesktop;
+  });
+  function toggleBackgroundArt() {
+    setBackgroundArt((v) => {
+      localStorage.setItem("exomusica_bg_art", v ? "0" : "1");
+      return !v;
+    });
+  }
   const currentTrack = useAudioStore((s) => s.currentTrack);
   const play = useAudioStore((s) => s.play);
   const addToQueue = useAudioStore((s) => s.addToQueue);
@@ -279,7 +292,7 @@ export function PlaylistSpaceMapPage() {
     () => ({ ...FX_DEFAULTS, bgBright: controls.bgBright, bgSat: controls.bgSat, bgContrast: controls.bgContrast, rmsBrightnessAmount: controls.rmsBrightnessAmount }),
     [controls],
   );
-  const { containerRef: fieldContainerRef, fieldCanvasRef, wardenCanvasRef } = useSpacemapField(fxSettings);
+  const { containerRef: fieldContainerRef, fieldCanvasRef, wardenCanvasRef } = useSpacemapField(fxSettings, backgroundArt);
 
   // Scattered home positions, deterministic per album so revisits land the
   // same place - actual x/y then wander around that point each frame.
@@ -621,6 +634,16 @@ export function PlaylistSpaceMapPage() {
   useEffect(() => {
     let lastTime = performance.now();
     let lastMovingTime = performance.now();
+    // Which 1-3 orbs are currently allowed to drift, and when to pick again.
+    let activeIds = new Set<number>();
+    let nextRotateAt = 0;
+    // What was on screen at the last React render, so constellation mode
+    // can skip re-rendering entirely on frames where nothing visibly changed.
+    let lastRenderedCamX = Number.NaN;
+    let lastRenderedCamY = Number.NaN;
+    let lastRenderedLock = -1;
+    let lastRenderedW = -1;
+    let lastRenderedH = -1;
     let frameId: number;
     function frame(now: number) {
       const dt = Math.min((now - lastTime) / 1000, 0.05);
@@ -720,7 +743,23 @@ export function PlaylistSpaceMapPage() {
       const t = (now / 1000) * controlsRef.current.roamSpeed;
       const nodes = nodesRef.current;
       const repelRadius = REPEL_RADIUS * controlsRef.current.spacing;
-      for (const n of nodes) {
+      // Albums aren't drawn in constellation mode, so don't simulate them
+      // there. On mobile, after 3s with no camera/touch activity they
+      // settle back to their home points and stop being simulated at
+      // all (desktop keeps drifting forever, as before).
+      let albumsMoved = false;
+      const albumsIdle = !isDesktopRef.current && now - lastMovingTime > 3000;
+      for (const n of viewModeRef.current === "map" ? nodes : []) {
+        if (albumsIdle) {
+          const dxh = n.homeX - n.x;
+          const dyh = n.homeY - n.y;
+          if (dxh * dxh + dyh * dyh < 0.25) continue;
+          n.x += ((dxh * SPRING) / DAMPING) * dt;
+          n.y += ((dyh * SPRING) / DAMPING) * dt;
+          albumsMoved = true;
+          continue;
+        }
+        albumsMoved = true;
         const wanderX = Math.sin(t * 0.3 + n.wanderSeed) * 18;
         const wanderY = Math.cos(t * 0.25 + n.wanderSeed) * 18;
         const targetX = n.homeX + wanderX;
@@ -742,46 +781,67 @@ export function PlaylistSpaceMapPage() {
         n.y += (fy / DAMPING) * dt;
       }
 
-      // --- constellation stars: same wander-around-home + repel
-      // pattern as album covers. Two performance-driven freezes on top
-      // of the existing per-track hover freeze: hovering a star on
-      // desktop stops ALL star movement outright (the O(n^2) repel
-      // loop is the actual cost with many tracks, and it was running
-      // every frame regardless of hover before - this is what was
-      // causing the lag), and on mobile, 3s with no camera/touch
-      // activity eases every star back to its home point and then
-      // stops computing entirely once they arrive. ---
+      // --- constellation stars. Only 1-3 orbs drift at a time, chosen
+      // from the ones actually on screen and rotated every few seconds;
+      // everything else eases back to its home point and then costs
+      // nothing at all. That keeps the motion gentle and readable, and
+      // makes the per-frame work O(few x n) instead of O(n^2). On top of
+      // that: hovering a star on desktop stops all drifting outright,
+      // and on mobile 3s with no camera/touch activity stops it too. ---
+      let starsMoved = false;
       if (viewModeRef.current === "venn") {
         const starNodes = starNodesRef.current;
         const starHovered = hoveredGenreRef.current !== null || crosshairNearGenreRef.current !== null;
         const desktopFreeze = isDesktopRef.current && starHovered;
-        const idleMs = now - lastMovingTime;
-        const mobileIdle = !isDesktopRef.current && idleMs > 3000;
+        const mobileIdle = !isDesktopRef.current && now - lastMovingTime > 3000;
 
         if (!desktopFreeze) {
+          if (mobileIdle) {
+            activeIds.clear();
+          } else if (now >= nextRotateAt) {
+            const cont = containerRef.current;
+            const w = cont?.clientWidth ?? 0;
+            const h = cont?.clientHeight ?? 0;
+            const cam = cameraRef.current;
+            const onScreen: number[] = [];
+            for (const n of starNodes.values()) {
+              const sx = w / 2 + cam.x + n.x;
+              const sy = h / 2 + cam.y + n.y;
+              if (sx >= 0 && sx <= w && sy >= 0 && sy <= h) onScreen.push(n.trackId);
+            }
+            for (let i = onScreen.length - 1; i > 0; i--) {
+              const j = Math.floor(Math.random() * (i + 1));
+              [onScreen[i], onScreen[j]] = [onScreen[j], onScreen[i]];
+            }
+            activeIds = new Set(onScreen.slice(0, 1 + Math.floor(Math.random() * 3)));
+            nextRotateAt = now + 2500 + Math.random() * 2500;
+          }
+
           const frozenId = hoveredTrackIdRef.current ?? crosshairNearTrackIdRef.current;
           const starRepelRadius = 34 * controlsRef.current.vennRepelFactor;
           const trackOrbBase = 9 * (controlsRef.current.vennBlobSize / 1.2 + 0.4);
-          let anyMoved = false;
           for (const n of starNodes.values()) {
             if (n.trackId === frozenId) continue;
-            // Once settled at home during a mobile idle freeze, skip
-            // this star entirely rather than re-computing a wander
-            // target of (0,0) and a converged spring every frame.
-            if (mobileIdle) {
-              const settledDist = Math.hypot(n.x - n.homeX, n.y - n.homeY);
-              if (settledDist < 0.5) continue;
+
+            if (!activeIds.has(n.trackId)) {
+              // Not one of the drifters: ease back home if displaced,
+              // otherwise skip it entirely.
+              const dxh = n.homeX - n.x;
+              const dyh = n.homeY - n.y;
+              if (dxh * dxh + dyh * dyh < 0.25) continue;
+              n.x += ((dxh * SPRING) / DAMPING) * dt;
+              n.y += ((dyh * SPRING) / DAMPING) * dt;
+              starsMoved = true;
+              continue;
             }
-            const wanderX = mobileIdle ? 0 : Math.sin(t * 0.4 + n.wanderSeed) * 22;
-            const wanderY = mobileIdle ? 0 : Math.cos(t * 0.33 + n.wanderSeed) * 22;
-            const targetX = n.homeX + wanderX;
-            const targetY = n.homeY + wanderY;
-            let fx = (targetX - n.x) * SPRING;
-            let fy = (targetY - n.y) * SPRING;
+
+            const wanderX = Math.sin(t * 0.4 + n.wanderSeed) * 34;
+            const wanderY = Math.cos(t * 0.33 + n.wanderSeed) * 34;
+            let fx = (n.homeX + wanderX - n.x) * SPRING;
+            let fy = (n.homeY + wanderY - n.y) * SPRING;
             // Orbit, don't overlap: the region's own star can be quite
             // large (8x a track orb, growing with track count), so keep
-            // every track orb clear of it rather than letting them drift
-            // on top of it.
+            // every drifting orb clear of it.
             const regionStarRadius = (trackOrbBase * 8 * Math.pow(1.07, Math.max(0, n.regionTrackCount - 1))) / 2;
             const clearance = regionStarRadius + 14;
             const rdx = n.x - n.regionX;
@@ -792,7 +852,7 @@ export function PlaylistSpaceMapPage() {
               fx += (rdx / rdist) * push;
               fy += (rdy / rdist) * push;
             }
-            if (!mobileIdle && controlsRef.current.vennRepelFactor > 0) {
+            if (controlsRef.current.vennRepelFactor > 0) {
               for (const other of starNodes.values()) {
                 if (other === n) continue;
                 const dx = n.x - other.x;
@@ -807,13 +867,38 @@ export function PlaylistSpaceMapPage() {
             }
             n.x += (fx / DAMPING) * dt;
             n.y += (fy / DAMPING) * dt;
-            anyMoved = true;
+            starsMoved = true;
           }
-          if (anyMoved) vennTracksRef.current = [...starNodes.values()].map((n) => ({ trackId: n.trackId, x: n.x, y: n.y, genres: [] }));
+          if (starsMoved) vennTracksRef.current = [...starNodes.values()].map((n) => ({ trackId: n.trackId, x: n.x, y: n.y, genres: [] }));
         }
       }
 
-      forceRender((v) => (v + 1) % 1000000);
+      // Only re-render when something visible actually changed: the
+      // camera, a drifting album/star, the lock-on ring, or the container
+      // size. Desktop map mode always has drifting albums so it renders
+      // every frame as before; once mobile goes idle (or a constellation
+      // settles) this is zero React work per frame.
+      let shouldRender = true;
+      {
+        const camNow = cameraRef.current;
+        const contNow = containerRef.current;
+        const cw = contNow?.clientWidth ?? 0;
+        const ch = contNow?.clientHeight ?? 0;
+        shouldRender =
+          (viewModeRef.current === "venn" ? starsMoved : albumsMoved) ||
+          !(Math.abs(camNow.x - lastRenderedCamX) < 0.01 && Math.abs(camNow.y - lastRenderedCamY) < 0.01) ||
+          lockProgressRef.current !== lastRenderedLock ||
+          cw !== lastRenderedW ||
+          ch !== lastRenderedH;
+        if (shouldRender) {
+          lastRenderedCamX = camNow.x;
+          lastRenderedCamY = camNow.y;
+          lastRenderedLock = lockProgressRef.current;
+          lastRenderedW = cw;
+          lastRenderedH = ch;
+        }
+      }
+      if (shouldRender) forceRender((v) => (v + 1) % 1000000);
       frameId = requestAnimationFrame(frame);
     }
     frameId = requestAnimationFrame(frame);
@@ -870,10 +955,12 @@ export function PlaylistSpaceMapPage() {
         background: "var(--bg-inset)",
       }}
     >
-      <div ref={fieldContainerRef} className="space-map-entoptic-field">
-        <canvas ref={fieldCanvasRef} />
-        <canvas ref={wardenCanvasRef} />
-      </div>
+      {backgroundArt && (
+        <div ref={fieldContainerRef} className="space-map-entoptic-field">
+          <canvas ref={fieldCanvasRef} />
+          <canvas ref={wardenCanvasRef} />
+        </div>
+      )}
 
       {!playlist ? (
         <p style={{ position: "absolute", top: "50%", left: "50%", transform: "translate(-50%, -50%)", zIndex: 5 }}>Loading…</p>
@@ -917,6 +1004,14 @@ export function PlaylistSpaceMapPage() {
               <svg width="18" height="18" viewBox="0 0 32 32" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
                 <path d="M27,5c-1.7,0-3,1.3-3,3c0,0.3,0,0.5,0.1,0.8l-5.4,3.8C18.2,12.2,17.6,12,17,12c-0.8,0-1.5,0.3-2.1,0.8L8,9.4 C8,9.2,8,9.1,8,9c0-1.7-1.3-3-3-3S2,7.3,2,9s1.3,3,3,3c0.8,0,1.5-0.3,2.1-0.8l7,3.5c0,0.1,0,0.2,0,0.4c0,0.9,0.4,1.7,1,2.2L12.2,24 c-0.1,0-0.1,0-0.2,0c-1.7,0-3,1.3-3,3s1.3,3,3,3s3-1.3,3-3c0-0.9-0.4-1.7-1-2.2l2.8-6.8c0.1,0,0.1,0,0.2,0c1.7,0,3-1.3,3-3 c0-0.3,0-0.5-0.1-0.8l5.4-3.8c0.5,0.4,1.1,0.6,1.7,0.6c1.7,0,3-1.3,3-3S28.7,5,27,5z" />
               </svg>
+            </button>
+            <button
+              className="btn"
+              title="Toggle the animated background art (turn off if the map feels laggy)"
+              style={{ fontSize: "0.7rem", padding: "0.25rem 0.5rem", ...(backgroundArt ? { outline: "1px solid var(--accent-forum)" } : {}) }}
+              onClick={toggleBackgroundArt}
+            >
+              ✦ Art {backgroundArt ? "on" : "off"}
             </button>
             <div style={{ display: "flex", alignItems: "center", gap: "0.3rem", background: "var(--bg-elevated)", padding: "0.2rem 0.5rem", borderRadius: "var(--radius)" }}>
               <label style={{ fontSize: "0.7rem", color: "var(--text-dim)" }} title="Lower this if the map feels laggy">

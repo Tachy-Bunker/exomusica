@@ -61,7 +61,7 @@ export const wardenBridge: {
   setPlayingBranch: () => {},
 };
 
-export function useSpacemapField(settings: FxSettings = FX_DEFAULTS) {
+export function useSpacemapField(settings: FxSettings = FX_DEFAULTS, enabled = true) {
   const fieldCanvasRef = useRef<HTMLCanvasElement>(null);
   const wardenCanvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -69,6 +69,9 @@ export function useSpacemapField(settings: FxSettings = FX_DEFAULTS) {
   settingsRef.current = settings;
 
   useEffect(() => {
+    // Disabled = nothing is constructed at all: no renderers, no rAF
+    // loop, no observers. The caller also stops rendering the canvases.
+    if (!enabled) return;
     const fieldCanvas = fieldCanvasRef.current;
     const wardenCanvas = wardenCanvasRef.current;
     const container = containerRef.current;
@@ -171,7 +174,7 @@ export function useSpacemapField(settings: FxSettings = FX_DEFAULTS) {
       field.dispose();
       wardens.dispose();
     };
-  }, []);
+  }, [enabled]);
 
   return { containerRef, fieldCanvasRef, wardenCanvasRef };
 }

@@ -30,6 +30,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const cached = localStorage.getItem(USER_KEY);
     if (token && cached) setUser(JSON.parse(cached));
     setLoading(false);
+
+    function onSessionExpired() {
+      localStorage.removeItem(USER_KEY);
+      setUser(null);
+    }
+    window.addEventListener("exomusica:session-expired", onSessionExpired);
+    return () => window.removeEventListener("exomusica:session-expired", onSessionExpired);
   }, []);
 
   async function login(username: string, password: string) {

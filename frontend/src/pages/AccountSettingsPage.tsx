@@ -144,11 +144,26 @@ export function AccountSettingsPage() {
     }
   }
 
-  useEffect(() => {
-    api<Me>("/api/account/me").then(setMe);
-    api<SoundPref[]>("/api/account/sound-prefs").then(setSoundPrefs);
-    api<Sound[]>("/api/notification-sounds").then(setSounds);
-  }, []);
+  const [loadError, setLoadError] = useState<{ message: string; expired: boolean } | null>(null);
+
+  function loadAll() {
+    setLoadError(null);
+    api<Me>("/api/account/me")
+      .then(setMe)
+      .catch((err) => {
+        const expired = err instanceof ApiError && err.status === 401;
+        setLoadError({
+          expired,
+          message: expired ? "Your session has expired - please log in again." : err instanceof Error ? err.message : "Couldn't load your account.",
+        });
+      });
+    // Secondary data - the page works without it, so a failure here
+    // shouldn't block the whole page or surface as an unhandled rejection.
+    api<SoundPref[]>("/api/account/sound-prefs").then(setSoundPrefs).catch(() => {});
+    api<Sound[]>("/api/notification-sounds").then(setSounds).catch(() => {});
+  }
+
+  useEffect(loadAll, []);
 
   async function changeSoundPref(eventId: number, soundIdStr: string) {
     if (soundIdStr === "__default__") {
@@ -208,7 +223,25 @@ export function AccountSettingsPage() {
     navigate("/");
   }
 
-  if (!me) return <p>Loading…</p>;
+  if (!me) {
+    if (loadError) {
+      return (
+        <div style={{ maxWidth: 480 }}>
+          <p>{loadError.message}</p>
+          {loadError.expired ? (
+            <Link className="btn btn-primary" to="/login">
+              Log in
+            </Link>
+          ) : (
+            <button className="btn btn-primary" onClick={loadAll}>
+              Retry
+            </button>
+          )}
+        </div>
+      );
+    }
+    return <p>Loading…</p>;
+  }
 
   const checkbox = (key: NotifyKey, label: string) => (
     <div className="field">

@@ -33,6 +33,14 @@ export async function api<T>(path: string, options: RequestInit = {}): Promise<T
   const body = isJson ? await res.json() : undefined;
 
   if (!res.ok) {
+    if (res.status === 401 && token && body?.error === "invalid or expired token") {
+      // The token we sent was rejected (expired, or the server's secret
+      // changed). Leaving it in place would keep the UI showing a
+      // logged-in user whose every authenticated request silently
+      // fails - so clear it and let the auth provider reset.
+      setToken(null);
+      window.dispatchEvent(new Event("exomusica:session-expired"));
+    }
     throw new ApiError(res.status, body?.error ?? res.statusText);
   }
   return body as T;
