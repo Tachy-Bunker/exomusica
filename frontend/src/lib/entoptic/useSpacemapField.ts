@@ -61,6 +61,9 @@ export const wardenBridge: {
   setPlayingBranch: () => {},
 };
 
+// ~30fps (a little under 33.3ms so display jitter can't skip two in a row).
+const FIELD_MIN_FRAME_MS = 28;
+
 export function useSpacemapField(settings: FxSettings = FX_DEFAULTS, enabled = true) {
   const fieldCanvasRef = useRef<HTMLCanvasElement>(null);
   const wardenCanvasRef = useRef<HTMLCanvasElement>(null);
@@ -102,6 +105,7 @@ export function useSpacemapField(settings: FxSettings = FX_DEFAULTS, enabled = t
     let rafId: number;
     let last = performance.now();
     let paused = document.hidden;
+    let lastFieldDraw = 0;
 
     function handleVisibility() {
       paused = document.hidden;
@@ -125,6 +129,13 @@ export function useSpacemapField(settings: FxSettings = FX_DEFAULTS, enabled = t
       const fieldSources = wardens.getFieldSources(now);
       const fieldFlyers = wardens.getFieldFlyers();
 
+      // The field is a full-screen fragment shader - by far the most
+      // expensive thing on these pages - and it's a slow ambient pattern,
+      // so drawing it at ~30fps is visually indistinguishable while
+      // halving (or on 120Hz+ screens, quartering) its cost. A skipped
+      // frame simply leaves the previous one on the canvas.
+      if (now - lastFieldDraw >= FIELD_MIN_FRAME_MS) {
+        lastFieldDraw = now;
       field.render({
         pointerX: pointerRef.x,
         pointerY: pointerRef.y,
@@ -142,6 +153,7 @@ export function useSpacemapField(settings: FxSettings = FX_DEFAULTS, enabled = t
         ripples: [],
         flyers: fieldFlyers,
       });
+      }
 
       const containerW = container!.clientWidth || 1;
       const containerH = container!.clientHeight || 1;

@@ -218,6 +218,7 @@ export function PlaylistSpaceMapPage() {
   const joystickVectorRef = useRef({ x: 0, y: 0 });
   const crosshairOffsetRef = useRef({ x: 0, y: 0 });
   const reticleRef = useRef<HTMLDivElement>(null);
+  const reticleRingRef = useRef<HTMLDivElement>(null);
   const nodesRef = useRef<AlbumNode[]>([]);
   const lockedIdRef = useRef<number | null>(null);
   const lockProgressRef = useRef(0);
@@ -350,6 +351,12 @@ export function PlaylistSpaceMapPage() {
     }
     return list;
   }, []);
+  // The 500 <circle> elements never change, so build them once instead
+  // of re-creating them on every render.
+  const backgroundStarsLayer = useMemo(
+    () => backgroundStars.map((s, i) => <circle key={i} cx={s.x} cy={s.y} r={s.r} fill="#fff" opacity={s.o} />),
+    [backgroundStars],
+  );
   const vennTracks: TrackPoint[] = stars;
   const starByTrackId = useMemo(() => new Map(stars.map((s) => [s.trackId, s])), [stars]);
   const genresByTrackId = useMemo(() => new Map(stars.map((s) => [s.trackId, s.genres])), [stars]);
@@ -641,9 +648,33 @@ export function PlaylistSpaceMapPage() {
     // can skip re-rendering entirely on frames where nothing visibly changed.
     let lastRenderedCamX = Number.NaN;
     let lastRenderedCamY = Number.NaN;
-    let lastRenderedLock = -1;
     let lastRenderedW = -1;
     let lastRenderedH = -1;
+    let lastRenderTs = 0;
+    // The world moves with a single CSS transform written straight to
+    // the DOM here, so panning never needs a React render.
+    let lastAppliedCamX = Number.NaN;
+    let lastAppliedCamY = Number.NaN;
+    let lastRingProgress = -1;
+    // A drifting orb is moved straight in the DOM (its element plus the
+    // line endpoints attached to it) instead of re-rendering the whole
+    // constellation to move three dots. React re-syncs occasionally.
+    function applyStarDom(root: HTMLElement | null, n: { trackId: number; x: number; y: number }) {
+      if (!root) return;
+      const orb = root.querySelector<HTMLElement>(`[data-orb="${n.trackId}"]`);
+      if (orb) {
+        orb.style.left = `${n.x}px`;
+        orb.style.top = `${n.y}px`;
+      }
+      for (const ln of root.querySelectorAll(`line[data-from="${n.trackId}"]`)) {
+        ln.setAttribute("x1", String(n.x));
+        ln.setAttribute("y1", String(n.y));
+      }
+      for (const ln of root.querySelectorAll(`line[data-to="${n.trackId}"]`)) {
+        ln.setAttribute("x2", String(n.x));
+        ln.setAttribute("y2", String(n.y));
+      }
+    }
     let frameId: number;
     function frame(now: number) {
       const dt = Math.min((now - lastTime) / 1000, 0.05);
@@ -672,6 +703,13 @@ export function PlaylistSpaceMapPage() {
       }
       cam.x += cam.vx * dt;
       cam.y += cam.vy * dt;
+      if (cam.x !== lastAppliedCamX || cam.y !== lastAppliedCamY) {
+        lastAppliedCamX = cam.x;
+        lastAppliedCamY = cam.y;
+        const worldTransform = `translate3d(${cam.x}px, ${cam.y}px, 0)`;
+        const worldCont = containerRef.current;
+        if (worldCont) for (const el of worldCont.querySelectorAll<HTMLElement>(".space-world")) el.style.transform = worldTransform;
+      }
 
       // --- crosshair inertia ---
       {
@@ -737,6 +775,10 @@ export function PlaylistSpaceMapPage() {
           lockProgressRef.current = Math.min(1, lockProgressRef.current + dt / LOCK_TIME);
           if (lockProgressRef.current >= 1) setLockedId(nearestId);
         }
+        if (reticleRingRef.current && lockProgressRef.current !== lastRingProgress) {
+          lastRingProgress = lockProgressRef.current;
+          reticleRingRef.current.style.background = `conic-gradient(var(--accent-audio) ${lastRingProgress * 360}deg, transparent 0deg)`;
+        }
       }
 
       // --- album covers: wander around home + repel each other ---
@@ -785,17 +827,16 @@ export function PlaylistSpaceMapPage() {
       // from the ones actually on screen and rotated every few seconds;
       // everything else eases back to its home point and then costs
       // nothing at all. That keeps the motion gentle and readable, and
-      // makes the per-frame work O(few x n) instead of O(n^2). On top of
-      // that: hovering a star on desktop stops all drifting outright,
-      // and on mobile 3s with no camera/touch activity stops it too. ---
+      // makes the per-frame work O(few x n) instead of O(n^2) - cheap
+      // enough that nothing needs to freeze the whole field any more
+      // (the orb you're hovering/aiming at is still held still). On
+      // mobile, 3s with no camera/touch activity stops all drifting. ---
       let starsMoved = false;
       if (viewModeRef.current === "venn") {
         const starNodes = starNodesRef.current;
-        const starHovered = hoveredGenreRef.current !== null || crosshairNearGenreRef.current !== null;
-        const desktopFreeze = isDesktopRef.current && starHovered;
         const mobileIdle = !isDesktopRef.current && now - lastMovingTime > 3000;
 
-        if (!desktopFreeze) {
+        {
           if (mobileIdle) {
             activeIds.clear();
           } else if (now >= nextRotateAt) {
@@ -831,6 +872,7 @@ export function PlaylistSpaceMapPage() {
               if (dxh * dxh + dyh * dyh < 0.25) continue;
               n.x += ((dxh * SPRING) / DAMPING) * dt;
               n.y += ((dyh * SPRING) / DAMPING) * dt;
+              applyStarDom(containerRef.current, n);
               starsMoved = true;
               continue;
             }
@@ -867,35 +909,36 @@ export function PlaylistSpaceMapPage() {
             }
             n.x += (fx / DAMPING) * dt;
             n.y += (fy / DAMPING) * dt;
+            applyStarDom(containerRef.current, n);
             starsMoved = true;
           }
           if (starsMoved) vennTracksRef.current = [...starNodes.values()].map((n) => ({ trackId: n.trackId, x: n.x, y: n.y, genres: [] }));
         }
       }
 
-      // Only re-render when something visible actually changed: the
-      // camera, a drifting album/star, the lock-on ring, or the container
-      // size. Desktop map mode always has drifting albums so it renders
-      // every frame as before; once mobile goes idle (or a constellation
-      // settles) this is zero React work per frame.
+      // Only re-render when something visible actually changed. Camera
+      // movement is handled by the world transform above and the lock
+      // ring is written directly, so neither needs React. What's left:
+      // a drifting album/star, a container resize, and the camera-
+      // dependent off-screen arrows, which only need to refresh ~10x/s.
       let shouldRender = true;
       {
         const camNow = cameraRef.current;
         const contNow = containerRef.current;
         const cw = contNow?.clientWidth ?? 0;
         const ch = contNow?.clientHeight ?? 0;
+        const camMoved = !(Math.abs(camNow.x - lastRenderedCamX) < 0.01 && Math.abs(camNow.y - lastRenderedCamY) < 0.01);
         shouldRender =
-          (viewModeRef.current === "venn" ? starsMoved : albumsMoved) ||
-          !(Math.abs(camNow.x - lastRenderedCamX) < 0.01 && Math.abs(camNow.y - lastRenderedCamY) < 0.01) ||
-          lockProgressRef.current !== lastRenderedLock ||
+          (viewModeRef.current === "venn" ? starsMoved && now - lastRenderTs >= 250 : albumsMoved) ||
+          (camMoved && now - lastRenderTs >= 100) ||
           cw !== lastRenderedW ||
           ch !== lastRenderedH;
         if (shouldRender) {
           lastRenderedCamX = camNow.x;
           lastRenderedCamY = camNow.y;
-          lastRenderedLock = lockProgressRef.current;
           lastRenderedW = cw;
           lastRenderedH = ch;
+          lastRenderTs = now;
         }
       }
       if (shouldRender) forceRender((v) => (v + 1) % 1000000);
@@ -906,6 +949,19 @@ export function PlaylistSpaceMapPage() {
   }, []);
 
   // Off-screen compass arrows - same pattern as the main spacemap.
+  // Everything that lives in world space sits inside a .space-world
+  // wrapper anchored at the container's center and moved by ONE
+  // transform. (Also rewritten straight onto the DOM every frame by the
+  // rAF loop, so panning doesn't wait for a React render.)
+  const worldStyle = {
+    position: "absolute",
+    left: "50%",
+    top: "50%",
+    width: 0,
+    height: 0,
+    transform: `translate3d(${cameraRef.current.x}px, ${cameraRef.current.y}px, 0)`,
+    willChange: "transform",
+  } as const;
   const container = containerRef.current;
   const compassPoints: { angle: number; label: string; playing: boolean }[] = [];
   if (container) {
@@ -1164,6 +1220,7 @@ export function PlaylistSpaceMapPage() {
 
           {viewMode === "map" && (
             <>
+          <div className="space-world" style={{ ...worldStyle, zIndex: 3 }}>
           {nodesRef.current.map((a) => {
             const isPlayingAlbum = currentTrack?.albumSlug === a.slug;
             const size = isPlayingAlbum ? controls.coverSize * 1.3 : controls.coverSize;
@@ -1179,8 +1236,8 @@ export function PlaylistSpaceMapPage() {
                 }}
                 style={{
                   position: "absolute",
-                  left: `calc(50% + ${cameraRef.current.x + a.x}px)`,
-                  top: `calc(50% + ${cameraRef.current.y + a.y}px)`,
+                  left: a.x,
+                  top: a.y,
                   transform: "translate(-50%, -50%)",
                   zIndex: 3,
                   textAlign: "center",
@@ -1215,6 +1272,7 @@ export function PlaylistSpaceMapPage() {
               </Link>
             );
           })}
+          </div>
 
           {compassPoints.map((c, i) => (
             <div
@@ -1240,19 +1298,16 @@ export function PlaylistSpaceMapPage() {
 
           {viewMode === "venn" && (
             <>
+              <div className="space-world" style={{ ...worldStyle, zIndex: 3 }}>
               <svg
-                style={{ position: "absolute", left: "50%", top: "50%", overflow: "visible", zIndex: 0, pointerEvents: "none", width: 1, height: 1 }}
+                style={{ position: "absolute", left: 0, top: 0, overflow: "visible", zIndex: 0, pointerEvents: "none", width: 1, height: 1 }}
               >
-                <g transform={`translate(${cameraRef.current.x}, ${cameraRef.current.y})`}>
-                  {backgroundStars.map((s, i) => (
-                    <circle key={i} cx={s.x} cy={s.y} r={s.r} fill="#fff" opacity={s.o} />
-                  ))}
-                </g>
+                <g>{backgroundStarsLayer}</g>
               </svg>
               <svg
-                style={{ position: "absolute", left: "50%", top: "50%", overflow: "visible", zIndex: 1, pointerEvents: "none", width: 1, height: 1 }}
+                style={{ position: "absolute", left: 0, top: 0, overflow: "visible", zIndex: 1, pointerEvents: "none", width: 1, height: 1 }}
               >
-                <g transform={`translate(${cameraRef.current.x}, ${cameraRef.current.y})`}>
+                <g>
                   <defs>
                     <filter id="starGlow" x="-200%" y="-200%" width="500%" height="500%">
                       <feGaussianBlur stdDeviation="3" result="blur" />
@@ -1301,6 +1356,8 @@ export function PlaylistSpaceMapPage() {
                     return (
                       <line
                         key={i}
+                        data-from={l.trackId}
+                        data-to={l.toTrackId ?? ""}
                         x1={fromLive?.x ?? l.fromX}
                         y1={fromLive?.y ?? l.fromY}
                         x2={toLive?.x ?? l.toX}
@@ -1342,8 +1399,8 @@ export function PlaylistSpaceMapPage() {
                         <div
                           style={{
                             position: "absolute",
-                            left: `calc(50% + ${cameraRef.current.x + r.x}px)`,
-                            top: `calc(50% + ${cameraRef.current.y + r.y}px)`,
+                            left: r.x,
+                            top: r.y,
                             transform: "translate(-50%, -50%)",
                             width: starSize * 4.2,
                             height: 1.5,
@@ -1355,8 +1412,8 @@ export function PlaylistSpaceMapPage() {
                         <div
                           style={{
                             position: "absolute",
-                            left: `calc(50% + ${cameraRef.current.x + r.x}px)`,
-                            top: `calc(50% + ${cameraRef.current.y + r.y}px)`,
+                            left: r.x,
+                            top: r.y,
                             transform: "translate(-50%, -50%)",
                             width: 1.5,
                             height: starSize * 4.2,
@@ -1374,8 +1431,8 @@ export function PlaylistSpaceMapPage() {
                       onMouseLeave={() => setHoveredGenre((g) => (g === r.name ? null : g))}
                       style={{
                         position: "absolute",
-                        left: `calc(50% + ${cameraRef.current.x + r.x}px)`,
-                        top: `calc(50% + ${cameraRef.current.y + r.y}px)`,
+                        left: r.x,
+                        top: r.y,
                         transform: "translate(-50%, -50%)",
                         width: starSize,
                         height: starSize,
@@ -1392,8 +1449,8 @@ export function PlaylistSpaceMapPage() {
                       onClick={() => cycleGenreState(r.name)}
                       style={{
                         position: "absolute",
-                        left: `calc(50% + ${cameraRef.current.x + r.x}px)`,
-                        top: `calc(50% + ${cameraRef.current.y + r.y + starSize * 0.65 + 10}px)`,
+                        left: r.x,
+                        top: r.y + starSize * 0.65 + 10,
                         transform: "translate(-50%, -50%)",
                         fontSize: `${Math.max(0.6, Math.min(1.15, controls.vennBlobSize * (0.75 + Math.sqrt(r.trackCount) * 0.05)))}rem`,
                         fontWeight: 600,
@@ -1437,6 +1494,7 @@ export function PlaylistSpaceMapPage() {
                 return (
                   <button
                     key={item.id}
+                    data-orb={item.trackId}
                     title={item.title}
                     onMouseEnter={() => setHoveredTrackId(item.trackId)}
                     onMouseLeave={() => setHoveredTrackId((id) => (id === item.trackId ? null : id))}
@@ -1446,8 +1504,8 @@ export function PlaylistSpaceMapPage() {
                     }}
                     style={{
                       position: "absolute",
-                      left: `calc(50% + ${cameraRef.current.x + point.x}px)`,
-                      top: `calc(50% + ${cameraRef.current.y + point.y}px)`,
+                      left: point.x,
+                      top: point.y,
                       transform: "translate(-50%, -50%)",
                       width: size,
                       height: size,
@@ -1467,6 +1525,7 @@ export function PlaylistSpaceMapPage() {
                   />
                 );
               })}
+              </div>
 
               {scanPanelItemId &&
                 (() => {
@@ -1506,11 +1565,12 @@ export function PlaylistSpaceMapPage() {
 
           {/* Always-visible center "Play all" marker, anchored in world space at the origin like any album node - map mode only, since Venn mode has its own play entry points */}
           {viewMode === "map" && (
+          <div className="space-world" style={{ ...worldStyle, zIndex: 2 }}>
           <div
             style={{
               position: "absolute",
-              left: `calc(50% + ${cameraRef.current.x}px)`,
-              top: `calc(50% + ${cameraRef.current.y}px)`,
+              left: 0,
+              top: 0,
               transform: "translate(-50%, -50%)",
               zIndex: 2,
               textAlign: "center",
@@ -1537,9 +1597,11 @@ export function PlaylistSpaceMapPage() {
             </div>
             <div style={{ fontSize: Math.max(9, controls.coverSize * 0.11), marginTop: "0.15rem" }}>Play all</div>
           </div>
+          </div>
           )}
           <div className="space-reticle" ref={reticleRef}>
             <div
+              ref={reticleRingRef}
               className="space-reticle-ring"
               style={{ background: `conic-gradient(var(--accent-audio) ${lockProgressRef.current * 360}deg, transparent 0deg)` }}
             />
