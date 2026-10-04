@@ -2,7 +2,9 @@ import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { api } from "../lib/api";
 import { useAuth } from "../lib/auth";
-import { renderMarkdown } from "../lib/markdown";
+import { renderInlineMarkdown, renderMarkdown } from "../lib/markdown";
+import { noteDeletionMap, noteSwapMap, remapMarkers } from "../lib/footnotes";
+import { StudyEditor } from "../components/StudyEditor";
 import { useDocumentTitle } from "../lib/useDocumentTitle";
 import { useToastStore } from "../lib/toastStore";
 import { StudyChartView } from "../components/StudyChartView";
@@ -87,11 +89,25 @@ export function StudyPage() {
     navigate("/studies");
   }
 
-  async function addAnnotation() {
-    if (!study || !newAnnotation.trim()) return;
-    await api(`/api/studies/${study.slug}/annotations`, { method: "POST", body: JSON.stringify({ text: newAnnotation.trim() }) });
-    setNewAnnotation("");
+  async function addAnnotationText(text: string) {
+    if (!study || !text.trim()) return;
+    await api(`/api/studies/${study.slug}/annotations`, { method: "POST", body: JSON.stringify({ text: text.trim() }) });
     reload();
+  }
+
+  async function addAnnotation() {
+    await addAnnotationText(newAnnotation);
+    setNewAnnotation("");
+  }
+
+  // Footnote markers in the body are just numbers, so deleting or
+  // reordering notes would silently re-point every [n]. Rewrite them in
+  // step - both the saved body and, if open, the editor's draft.
+  async function remapBody(map: (n: number) => number | null) {
+    if (!study) return;
+    const nextSaved = remapMarkers(study.body, map);
+    if (nextSaved !== study.body) await api(`/api/studies/${study.slug}`, { method: "PATCH", body: JSON.stringify({ body: nextSaved }) });
+    if (editing) setDraftBody((d) => remapMarkers(d, map));
   }
 
   async function saveAnnotationEdit(id: number) {
@@ -102,7 +118,10 @@ export function StudyPage() {
   }
 
   async function deleteAnnotation(id: number) {
+    if (!study) return;
+    const index = study.annotations.findIndex((a) => a.id === id);
     await api(`/api/study-annotations/${id}`, { method: "DELETE" });
+    if (index !== -1) await remapBody(noteDeletionMap(index + 1, study.annotations.length));
     reload();
   }
 
@@ -113,6 +132,7 @@ export function StudyPage() {
     const reordered = [...study.annotations];
     [reordered[index], reordered[swapWith]] = [reordered[swapWith], reordered[index]];
     await api(`/api/studies/${study.slug}/annotations/reorder`, { method: "POST", body: JSON.stringify({ annotationIds: reordered.map((a) => a.id) }) });
+    await remapBody(noteSwapMap(index + 1, swapWith + 1, study.annotations.length));
     reload();
   }
 
@@ -166,10 +186,10 @@ export function StudyPage() {
   if (!study) return <p>Loading...</p>;
 
   return (
-    <div style={{ maxWidth: 720 }}>
+    <div style={{ maxWidth: editing ? 1280 : 720 }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "1rem" }}>
         {editing ? (
-          <input value={draftTitle} onChange={(e) => setDraftTitle(e.target.value)} style={{ fontSize: "1.4rem", flex: 1 }} />
+          <input value={draftTitle} onChange={(e) => setDraftTitle(e.target.value)} style={{ fontSize: "1.4rem", flex: 1, minWidth: 0 }} />
         ) : (
           <h1 style={{ margin: 0 }}>{study.title}</h1>
         )}
@@ -229,9 +249,11 @@ export function StudyPage() {
       )}
 
       {editing ? (
-        <textarea value={draftBody} onChange={(e) => setDraftBody(e.target.value)} rows={16} style={{ width: "100%", fontFamily: "var(--font-mono)" }} />
+        <StudyEditor body={draftBody} onBodyChange={setDraftBody} notes={study.annotations} onAddNote={addAnnotationText} onNavigate={(path) => navigate(path)} />
       ) : (
-        <div>{renderMarkdown(study.body, (path) => navigate(path))}</div>
+        <div className="study-body">
+          {renderMarkdown(study.body, (path) => navigate(path), { extended: true, notes: study.annotations.map((a) => a.text) })}
+        </div>
       )}
 
       {(study.charts.length > 0 || isOwner) && (
@@ -333,9 +355,9 @@ export function StudyPage() {
       {(study.annotations.length > 0 || isOwner) && (
         <div style={{ marginTop: "2rem", borderTop: "1px solid var(--border)", paddingTop: "1rem" }}>
           <h2 style={{ fontSize: "0.95rem" }}>Notes</h2>
-          <ol style={{ paddingLeft: "1.4rem", fontSize: "0.85rem" }}>
+          <ol style={{ paddingLeft: 0, listStyle: "none", fontSize: "0.85rem" }}>
             {study.annotations.map((a, i) => (
-              <li key={a.id} style={{ marginBottom: "0.4rem" }}>
+              <li key={a.id} id={`note-${i + 1}`} style={{ marginBottom: "0.4rem" }}>
                 {editingAnnotationId === a.id ? (
                   <div style={{ display: "flex", gap: "0.3rem" }}>
                     <input value={annotationDraft} onChange={(e) => setAnnotationDraft(e.target.value)} style={{ flex: 1, fontSize: "0.85rem" }} />
@@ -345,7 +367,7 @@ export function StudyPage() {
                   </div>
                 ) : (
                   <span>
-                    {a.text}
+                    <b style={{ color: "var(--accent-forum)" }}>[{i + 1}]</b> {renderInlineMarkdown(a.text, (path) => navigate(path))}
                     {isOwner && (
                       <span style={{ marginLeft: "0.5rem", fontSize: "0.75rem" }}>
                         <button className="btn" style={{ padding: "0 0.3rem" }} onClick={() => moveAnnotation(i, -1)}>

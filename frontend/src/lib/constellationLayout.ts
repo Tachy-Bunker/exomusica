@@ -238,3 +238,113 @@ export function buildConnectionLines(stars: Star[], regions: ConstellationRegion
 
   return lines;
 }
+
+export interface SettleNode {
+  x: number;
+  y: number;
+  homeX: number;
+  homeY: number;
+  regionX: number;
+  regionY: number;
+  regionTrackCount: number;
+}
+
+export interface SettleOptions {
+  /** Pairwise repel reach in px (0 disables the pairwise pass entirely). */
+  repelRadius: number;
+  /** Base size of one track orb; region stars are sized from it. */
+  trackOrbBase: number;
+  repelStrength: number;
+  spring: number;
+  damping: number;
+  maxIterations?: number;
+}
+
+/**
+ * Relaxes orbs into their de-cluttered resting positions in one go, with
+ * no animation: the same forces the live drift applies (spring to home,
+ * keep clear of the genre star, push apart from neighbours), iterated
+ * until they stop moving. Mutates x/y in place, starting from home.
+ *
+ * Doing this once up front is what lets the live simulation move only a
+ * few orbs at a time without the rest sitting in raw, clumpy layout spots.
+ * A spatial grid keeps each pass roughly O(n) so big playlists stay cheap.
+ */
+export function settleNodes(nodes: SettleNode[], o: SettleOptions): void {
+  const STEP = 0.05; // same cap the live loop puts on its time step
+  const maxIterations = o.maxIterations ?? 200;
+  for (const n of nodes) {
+    n.x = n.homeX;
+    n.y = n.homeY;
+  }
+  if (nodes.length === 0) return;
+
+  const usePairwise = o.repelRadius > 0;
+  const cell = Math.max(1, o.repelRadius);
+  const fx = new Float64Array(nodes.length);
+  const fy = new Float64Array(nodes.length);
+
+  for (let iter = 0; iter < maxIterations; iter++) {
+    const grid = new Map<number, number[]>();
+    if (usePairwise) {
+      for (let i = 0; i < nodes.length; i++) {
+        const key = Math.floor(nodes[i].x / cell) * 73856093 + Math.floor(nodes[i].y / cell) * 19349663;
+        const bucket = grid.get(key);
+        if (bucket) bucket.push(i);
+        else grid.set(key, [i]);
+      }
+    }
+
+    let maxMove = 0;
+    for (let i = 0; i < nodes.length; i++) {
+      const n = nodes[i];
+      let ax = (n.homeX - n.x) * o.spring;
+      let ay = (n.homeY - n.y) * o.spring;
+
+      const regionStarRadius = (o.trackOrbBase * 8 * Math.pow(1.07, Math.max(0, n.regionTrackCount - 1))) / 2;
+      const clearance = regionStarRadius + 14;
+      const rdx = n.x - n.regionX;
+      const rdy = n.y - n.regionY;
+      const rdist = Math.sqrt(rdx * rdx + rdy * rdy) || 0.001;
+      if (rdist < clearance) {
+        const push = ((clearance - rdist) / clearance) * o.repelStrength * 0.6;
+        ax += (rdx / rdist) * push;
+        ay += (rdy / rdist) * push;
+      }
+
+      if (usePairwise) {
+        const cx = Math.floor(n.x / cell);
+        const cy = Math.floor(n.y / cell);
+        for (let gx = cx - 1; gx <= cx + 1; gx++) {
+          for (let gy = cy - 1; gy <= cy + 1; gy++) {
+            const bucket = grid.get(gx * 73856093 + gy * 19349663);
+            if (!bucket) continue;
+            for (const j of bucket) {
+              if (j === i) continue;
+              const dx = n.x - nodes[j].x;
+              const dy = n.y - nodes[j].y;
+              const dist = Math.sqrt(dx * dx + dy * dy) || 0.001;
+              if (dist < o.repelRadius) {
+                const push = ((o.repelRadius - dist) / o.repelRadius) * o.repelStrength * 0.5;
+                ax += (dx / dist) * push;
+                ay += (dy / dist) * push;
+              }
+            }
+          }
+        }
+      }
+      fx[i] = ax;
+      fy[i] = ay;
+    }
+
+    // apply after all forces are computed, so the result doesn't depend on node order
+    for (let i = 0; i < nodes.length; i++) {
+      const mx = (fx[i] / o.damping) * STEP;
+      const my = (fy[i] / o.damping) * STEP;
+      nodes[i].x += mx;
+      nodes[i].y += my;
+      maxMove = Math.max(maxMove, Math.abs(mx), Math.abs(my));
+    }
+    if (maxMove < 0.01) break;
+  }
+}

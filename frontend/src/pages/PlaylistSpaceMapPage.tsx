@@ -10,7 +10,7 @@ import { useMapQualityStore } from "../lib/mapQualityStore";
 import { Joystick } from "../components/Joystick";
 import type { PlayableTrackDTO } from "../lib/types";
 import { spiralOrder, type TrackPoint } from "../lib/vennLayout";
-import { layoutConstellationRegions, layoutStars, buildConnectionLines, type ConstellationTrack } from "../lib/constellationLayout";
+import { layoutConstellationRegions, layoutStars, buildConnectionLines, settleNodes, type ConstellationTrack } from "../lib/constellationLayout";
 import { ConstellationScanPanel } from "../components/ConstellationScanPanel";
 import { VennCustomColorEditor } from "../components/VennCustomColorEditor";
 
@@ -435,8 +435,10 @@ export function PlaylistSpaceMapPage() {
   useEffect(() => {
     const regionByName = new Map(regions.map((r) => [r.name, r]));
     const next = new Map<number, StarNode>();
+    const isNew = new Set<number>();
     for (const s of stars) {
       const existing = starNodesRef.current.get(s.trackId);
+      if (!existing) isNew.add(s.trackId);
       const rand = seededRand(hashOf(`starwander:${s.trackId}`));
       const region = regionByName.get(s.rootGenre);
       next.set(s.trackId, {
@@ -451,8 +453,38 @@ export function PlaylistSpaceMapPage() {
         regionTrackCount: region?.trackCount ?? 1,
       });
     }
+
+    // Only a few orbs drift at a time now, so the de-cluttering that used
+    // to happen continuously across ALL orbs has to happen once up front:
+    // relax everything into its resting spot here (instantly, nothing to
+    // watch) and use that as the home position the drift orbits around.
+    // Orbs that already exist keep their current spot and simply glide
+    // there, which is what makes the de-clutter slider feel live.
+    const list = [...next.values()];
+    const settled = list.map((n) => ({ x: n.x, y: n.y, homeX: n.homeX, homeY: n.homeY, regionX: n.regionX, regionY: n.regionY, regionTrackCount: n.regionTrackCount }));
+    settleNodes(settled, {
+      repelRadius: 34 * controls.vennRepelFactor,
+      trackOrbBase: 9 * (controls.vennBlobSize / 1.2 + 0.4),
+      repelStrength: REPEL_STRENGTH,
+      spring: SPRING,
+      damping: DAMPING,
+    });
+    list.forEach((n, i) => {
+      n.homeX = settled[i].x;
+      n.homeY = settled[i].y;
+      if (isNew.has(n.trackId)) {
+        n.x = n.homeX;
+        n.y = n.homeY;
+      }
+    });
+
     starNodesRef.current = next;
-  }, [stars, regions]);
+    // keep crosshair lock-on in step with where the orbs really are, and
+    // redraw once so the settled positions show immediately
+    vennTracksRef.current = list.map((n) => ({ trackId: n.trackId, x: n.x, y: n.y, genres: [] }));
+    forceRender((v) => (v + 1) % 1000000);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [stars, regions, controls.vennRepelFactor, controls.vennBlobSize]);
 
   // Tracks are marked "lit" the moment they actually become the current
   // track while still playing from this playlist - covers a direct
