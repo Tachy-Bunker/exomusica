@@ -1,6 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import { prisma } from "../lib/prisma.js";
 import { requireAuth } from "../lib/auth.js";
+import { recordStudyRevision } from "../lib/studyRevisions.js";
 
 async function uniqueStudySlug(title: string): Promise<string> {
   const base = title.toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") || "study";
@@ -75,10 +76,85 @@ export async function studiesRoutes(app: FastifyInstance): Promise<void> {
       const study = await prisma.study.findUnique({ where: { slug: req.params.slug } });
       if (!study) return reply.code(404).send({ error: "no such study" });
       if (study.ownerId !== req.user!.id && !req.user!.isAdmin) return reply.code(403).send({ error: "not your study" });
-      const updated = await prisma.study.update({ where: { id: study.id }, data: req.body ?? {} });
+
+      // Only these fields may be changed through this route. (Passing the raw
+      // body through would let an owner rewrite ownerId, slug, channelId...)
+      const { title, body, status } = req.body ?? {};
+      const data: { title?: string; body?: string; status?: "IN_PROGRESS" | "COMPLETE" } = {};
+      if (typeof title === "string") {
+        if (!title.trim()) return reply.code(400).send({ error: "title can't be empty" });
+        data.title = title.trim();
+      }
+      if (typeof body === "string") data.body = body;
+      if (status === "IN_PROGRESS" || status === "COMPLETE") data.status = status;
+
+      const contentChanged = (data.title !== undefined && data.title !== study.title) || (data.body !== undefined && data.body !== study.body);
+
+      // History is best-effort: if recording fails the save must still go through.
+      if (contentChanged) {
+        try {
+          const existing = await prisma.studyRevision.count({ where: { studyId: study.id } });
+          if (existing === 0) {
+            // first edit ever - keep the pre-edit text so it can be restored
+            await prisma.studyRevision.create({ data: { studyId: study.id, authorId: study.ownerId, title: study.title, body: study.body, label: "Original" } });
+          }
+        } catch (err) {
+          req.log.warn({ err, studyId: study.id }, "failed to snapshot original study text");
+        }
+      }
+
+      const updated = await prisma.study.update({ where: { id: study.id }, data });
+
+      if (contentChanged) {
+        try {
+          await recordStudyRevision(prisma, study.id, { authorId: req.user!.id, title: updated.title, body: updated.body });
+        } catch (err) {
+          req.log.warn({ err, studyId: study.id }, "failed to record study revision");
+        }
+      }
       return updated;
     },
   );
+
+  // --- Revision history: owner/admin only ---
+
+  app.get<{ Params: { slug: string } }>("/api/studies/:slug/revisions", { preHandler: requireAuth }, async (req, reply) => {
+    const study = await prisma.study.findUnique({ where: { slug: req.params.slug } });
+    if (!study) return reply.code(404).send({ error: "no such study" });
+    if (study.ownerId !== req.user!.id && !req.user!.isAdmin) return reply.code(403).send({ error: "not your study" });
+    // metadata only - bodies can be large and there can be many revisions
+    return prisma.studyRevision.findMany({
+      where: { studyId: study.id },
+      orderBy: { createdAt: "desc" },
+      take: 100,
+      select: { id: true, label: true, title: true, createdAt: true, author: { select: { username: true } } },
+    });
+  });
+
+  app.get<{ Params: { id: string } }>("/api/study-revisions/:id", { preHandler: requireAuth }, async (req, reply) => {
+    const revision = await prisma.studyRevision.findUnique({
+      where: { id: Number(req.params.id) },
+      include: { study: true, author: { select: { username: true } } },
+    });
+    if (!revision) return reply.code(404).send({ error: "no such revision" });
+    if (revision.study.ownerId !== req.user!.id && !req.user!.isAdmin) return reply.code(403).send({ error: "not your study" });
+    return { id: revision.id, title: revision.title, body: revision.body, label: revision.label, createdAt: revision.createdAt, author: revision.author };
+  });
+
+  app.post<{ Params: { id: string } }>("/api/study-revisions/:id/restore", { preHandler: requireAuth }, async (req, reply) => {
+    const revision = await prisma.studyRevision.findUnique({ where: { id: Number(req.params.id) }, include: { study: true } });
+    if (!revision) return reply.code(404).send({ error: "no such revision" });
+    const study = revision.study;
+    if (study.ownerId !== req.user!.id && !req.user!.isAdmin) return reply.code(403).send({ error: "not your study" });
+
+    // Snapshot where things stand first, so a restore itself can be undone.
+    // (Skipped automatically if the newest snapshot already matches.)
+    await recordStudyRevision(prisma, study.id, { authorId: req.user!.id, title: study.title, body: study.body, label: "Before restore" });
+    const updated = await prisma.study.update({ where: { id: study.id }, data: { title: revision.title, body: revision.body } });
+    const when = revision.createdAt.toISOString().slice(0, 16).replace("T", " ");
+    await recordStudyRevision(prisma, study.id, { authorId: req.user!.id, title: updated.title, body: updated.body, label: `Restored from ${when} UTC` });
+    return updated;
+  });
 
   app.delete<{ Params: { slug: string } }>("/api/studies/:slug", { preHandler: requireAuth }, async (req, reply) => {
     const study = await prisma.study.findUnique({ where: { slug: req.params.slug } });
@@ -142,31 +218,41 @@ export async function studiesRoutes(app: FastifyInstance): Promise<void> {
 
   // --- Charts/data tables: author-only, positioned within the study ---
 
-  app.post<{ Params: { slug: string }; Body: { title: string; kind: "LINE" | "BAR" | "SCATTER" | "TABLE"; xLabel?: string; yLabel?: string; dataCsv: string } }>(
+  app.post<{ Params: { slug: string }; Body: { title: string; kind: "LINE" | "BAR" | "SCATTER" | "TABLE"; xLabel?: string; yLabel?: string; xLog?: boolean; yLog?: boolean; dataCsv: string } }>(
     "/api/studies/:slug/charts",
     { preHandler: requireAuth },
     async (req, reply) => {
       const study = await prisma.study.findUnique({ where: { slug: req.params.slug }, include: { charts: true } });
       if (!study) return reply.code(404).send({ error: "no such study" });
       if (study.ownerId !== req.user!.id && !req.user!.isAdmin) return reply.code(403).send({ error: "not your study" });
-      const { title, kind, xLabel, yLabel, dataCsv } = req.body ?? {};
+      const { title, kind, xLabel, yLabel, xLog, yLog, dataCsv } = req.body ?? {};
       if (!title?.trim() || !dataCsv?.trim()) return reply.code(400).send({ error: "title and dataCsv are required" });
       const nextPosition = study.charts.length + 1;
       const chart = await prisma.studyChart.create({
-        data: { studyId: study.id, position: nextPosition, title: title.trim(), kind: kind ?? "LINE", xLabel: xLabel?.trim() || null, yLabel: yLabel?.trim() || null, dataCsv },
+        data: { studyId: study.id, position: nextPosition, title: title.trim(), kind: kind ?? "LINE", xLabel: xLabel?.trim() || null, yLabel: yLabel?.trim() || null, xLog: xLog === true, yLog: yLog === true, dataCsv },
       });
       return reply.code(201).send(chart);
     },
   );
 
-  app.patch<{ Params: { id: string }; Body: Partial<{ title: string; kind: "LINE" | "BAR" | "SCATTER" | "TABLE"; xLabel: string | null; yLabel: string | null; dataCsv: string }> }>(
+  app.patch<{ Params: { id: string }; Body: Partial<{ title: string; kind: "LINE" | "BAR" | "SCATTER" | "TABLE"; xLabel: string | null; yLabel: string | null; xLog: boolean; yLog: boolean; dataCsv: string }> }>(
     "/api/study-charts/:id",
     { preHandler: requireAuth },
     async (req, reply) => {
       const chart = await prisma.studyChart.findUnique({ where: { id: Number(req.params.id) }, include: { study: true } });
       if (!chart) return reply.code(404).send({ error: "no such chart" });
       if (chart.study.ownerId !== req.user!.id && !req.user!.isAdmin) return reply.code(403).send({ error: "not your study" });
-      return prisma.studyChart.update({ where: { id: chart.id }, data: req.body ?? {} });
+      // whitelist: the raw body could otherwise move a chart to another study (studyId) or change its position
+      const { title, kind, xLabel, yLabel, xLog, yLog, dataCsv } = req.body ?? {};
+      const data: Record<string, unknown> = {};
+      if (typeof title === "string" && title.trim()) data.title = title.trim();
+      if (kind === "LINE" || kind === "BAR" || kind === "SCATTER" || kind === "TABLE") data.kind = kind;
+      if (xLabel === null || typeof xLabel === "string") data.xLabel = xLabel?.trim() || null;
+      if (yLabel === null || typeof yLabel === "string") data.yLabel = yLabel?.trim() || null;
+      if (typeof xLog === "boolean") data.xLog = xLog;
+      if (typeof yLog === "boolean") data.yLog = yLog;
+      if (typeof dataCsv === "string" && dataCsv.trim()) data.dataCsv = dataCsv;
+      return prisma.studyChart.update({ where: { id: chart.id }, data });
     },
   );
 

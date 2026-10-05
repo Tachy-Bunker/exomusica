@@ -91,6 +91,7 @@ model User {
   playlistCollaborations PlaylistCollaborator[]
   sampleBankItems SampleBankItem[]
   studies         Study[]
+  studyRevisions  StudyRevision[] @relation("StudyRevisionAuthor")
   challengeSubmissions ChallengeSubmission[]
   questionsAsked ForumChannel[]
   bookmarks        Bookmark[]
@@ -788,6 +789,24 @@ model Study {
   annotations StudyAnnotation[]
   mapNode     ForumMapNode?
   charts      StudyChart[]
+  revisions   StudyRevision[]
+}
+
+// A snapshot of a study's title and body taken on save, so earlier drafts
+// of a paper can be compared and restored. Saves by the same author within
+// a couple of minutes are folded into one snapshot (see studyRevisionRules).
+model StudyRevision {
+  id        Int      @id @default(autoincrement())
+  studyId   Int
+  study     Study    @relation(fields: [studyId], references: [id], onDelete: Cascade)
+  authorId  Int?
+  author    User?    @relation("StudyRevisionAuthor", fields: [authorId], references: [id], onDelete: SetNull)
+  title     String
+  body      String   @db.Text
+  label     String? // "Original", "Restored from ..." - labelled snapshots are never folded into or pruned
+  createdAt DateTime @default(now())
+
+  @@index([studyId, createdAt])
 }
 
 enum StudyChartKind {
@@ -810,6 +829,8 @@ model StudyChart {
   kind     StudyChartKind @default(LINE)
   xLabel   String?
   yLabel   String?
+  xLog     Boolean        @default(false) // logarithmic axes, e.g. frequency in Hz
+  yLog     Boolean        @default(false)
   dataCsv  String         @db.Text
 }
 

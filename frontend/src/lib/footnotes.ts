@@ -11,6 +11,7 @@
 export const WORD_RE = /[\p{L}\p{N}][\p{L}\p{N}'’-]*/gu;
 const WORD_CHAR = /[\p{L}\p{N}'’-]/u;
 const MARKER_RE = /\[(\d+)\](?!\()/g; // [3] but not the start of a [text](url) link
+const FIGURE_REF_RE = /\{(fig|tab):(\d+)\}/g; // {fig:2} / {tab:1}
 
 export interface Token {
   text: string;
@@ -62,8 +63,8 @@ function hiddenRanges(source: string): Range2[] {
       else fenceInner.push([fenceInnerStart, offset]);
       inFence = !inFence;
     } else if (!inFence) {
-      if (/^(!\[.*?\]\(\S+\)|@audio\(\S+\)|@video\(\S+\))$/.test(line)) {
-        ranges.push([offset, end]); // image/audio/video embeds render no text
+      if (/^(!\[.*?\]\(\S+\)|@audio\(\S+\)|@video\(\S+\)|\{(?:fig|tab):\d+\})$/.test(line)) {
+        ranges.push([offset, end]); // image/audio/video/figure embeds render no word-text we can cite
       } else {
         const file = line.match(/^@file\(\S+?\)/);
         if (file) ranges.push([offset, offset + file[0].length]);
@@ -76,6 +77,10 @@ function hiddenRanges(source: string): Range2[] {
   if (inFence) fenceInner.push([fenceInnerStart, source.length]);
   for (const m of source.matchAll(/\]\((https?:\/\/[^\s)]+)\)/g)) {
     if (m.index !== undefined && !inAny(fenceInner, m.index)) ranges.push([m.index + 1, m.index + m[0].length]);
+  }
+  const code = codeRanges(source); // {fig:1} inside code is literal text, so it stays citable
+  for (const m of source.matchAll(FIGURE_REF_RE)) {
+    if (m.index !== undefined && !inAny(code, m.index)) ranges.push([m.index, m.index + m[0].length]);
   }
   return ranges;
 }
@@ -162,11 +167,17 @@ export interface DomToken extends Token {
   node: Text;
 }
 
+/** Figures and "Figure 2" links carry data-nocite: their words don't exist in the source text. */
+function isUncitable(node: Node): boolean {
+  return !!node.parentElement?.closest("[data-nocite]");
+}
+
 /** Words of the rendered preview, per text node, in document order. */
 export function previewTokens(root: HTMLElement): DomToken[] {
   const out: DomToken[] = [];
   const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
   for (let node = walker.nextNode() as Text | null; node; node = walker.nextNode() as Text | null) {
+    if (isUncitable(node)) continue;
     for (const m of node.data.matchAll(WORD_RE)) {
       if (m.index === undefined) continue;
       out.push({ text: m[0], start: m.index, end: m.index + m[0].length, node });
@@ -191,7 +202,7 @@ function caretFromPoint(x: number, y: number): { node: Node; offset: number } | 
 /** The preview word actually under the pointer (not merely the nearest text). */
 export function wordAtPoint(root: HTMLElement, x: number, y: number): { token: DomToken; range: Range } | null {
   const caret = caretFromPoint(x, y);
-  if (!caret || caret.node.nodeType !== Node.TEXT_NODE || !root.contains(caret.node)) return null;
+  if (!caret || caret.node.nodeType !== Node.TEXT_NODE || !root.contains(caret.node) || isUncitable(caret.node)) return null;
   const node = caret.node as Text;
   for (const m of node.data.matchAll(WORD_RE)) {
     if (m.index === undefined) continue;
@@ -218,4 +229,66 @@ export function sourceOffsetForPreviewWord(root: HTMLElement, source: string, hi
   let occurrence = 0;
   for (let i = 0; i < idx; i++) if (toks[i].text === hit.text) occurrence++;
   return sourceInsertOffset(source, hit.text, occurrence);
+}
+
+// ------------------------------------------------------------------ figures
+
+export type FigureKind = "fig" | "tab";
+
+/** Rewrite {fig:N}/{tab:N} references (outside code). Return null to remove one. */
+export function remapFigureRefs(body: string, map: (kind: FigureKind, n: number) => { kind: FigureKind; n: number } | null): string {
+  const code = codeRanges(body);
+  return body.replace(FIGURE_REF_RE, (match, kind: FigureKind, digits: string, offset: number) => {
+    if (inAny(code, offset)) return match;
+    const to = map(kind, Number(digits));
+    return to === null ? "" : `{${to.kind}:${to.n}}`;
+  });
+}
+
+/** Which figures/tables are placed inline, as "fig:2" / "tab:1" (only block-level placements count). */
+export function findPlacedFigures(body: string): Set<string> {
+  const placed = new Set<string>();
+  let inFence = false;
+  for (const line of body.split("\n")) {
+    if (/^```/.test(line)) {
+      inFence = !inFence;
+      continue;
+    }
+    if (inFence) continue;
+    const m = line.match(/^\{(fig|tab):(\d+)\}$/);
+    if (m) placed.add(`${m[1]}:${Number(m[2])}`);
+  }
+  return placed;
+}
+
+/**
+ * Inserts a figure token on its own paragraph - after the line containing
+ * `offset`, with a blank line either side, which is what the renderer needs
+ * to treat it as a block.
+ */
+export function insertFigureBlock(body: string, offset: number, token: string): string {
+  const nl = body.indexOf("\n", offset);
+  const j = nl === -1 ? body.length : nl;
+  let head = body.slice(0, j);
+  let tail = body.slice(j);
+  if (head.length > 0) {
+    const trailing = head.match(/\n*$/)![0].length;
+    head += "\n".repeat(Math.max(0, 2 - trailing)); // need a blank line before the figure
+  }
+  if (tail.length === 0) tail = "\n";
+  else {
+    const lead = tail.match(/^\n*/)![0].length;
+    if (lead < 2) tail = "\n".repeat(2 - lead) + tail;
+  }
+  return head + token + tail;
+}
+
+/** A figure token dropped natively into the textarea mid-text: move it onto its own paragraph. */
+export function snapDroppedBlock(oldBody: string, newBody: string, token: string): string | null {
+  if (newBody.length !== oldBody.length + token.length) return null;
+  let i = 0;
+  while (i < oldBody.length && oldBody[i] === newBody[i]) i++;
+  if (newBody.slice(i, i + token.length) !== token) return null;
+  if (newBody.slice(0, i) + newBody.slice(i + token.length) !== oldBody) return null;
+  return insertFigureBlock(oldBody, i, token);
 }

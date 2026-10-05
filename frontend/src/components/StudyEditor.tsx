@@ -1,9 +1,13 @@
 import { useDeferredValue, useEffect, useRef, useState, type ChangeEvent, type DragEvent, type KeyboardEvent as ReactKeyboardEvent } from "react";
 import { renderInlineMarkdown, renderMarkdown } from "../lib/markdown";
-import { insertMarker, snapDroppedMarker, sourceOffsetForPreviewWord, wordAtPoint } from "../lib/footnotes";
+import { insertFigureBlock, insertMarker, snapDroppedBlock, snapDroppedMarker, sourceOffsetForPreviewWord, wordAtPoint } from "../lib/footnotes";
+import { useFigures, type FigureChart } from "./StudyFigure";
+import { extractHeadings, figureBlockOffsets, type Heading } from "../lib/outline";
+import { mapScroll, normalizeAnchors, textareaOffsetTop, type Anchor } from "../lib/scrollSync";
 import { useToastStore } from "../lib/toastStore";
 
 const NOTE_MIME = "application/x-exo-note";
+const FIGURE_MIME = "application/x-exo-fig";
 const HIGHLIGHT_NAME = "exo-drop-word";
 
 // The CSS Custom Highlight API paints a range of text without touching the
@@ -20,6 +24,9 @@ function setHighlight(range: Range | null) {
 function isNoteDrag(e: DragEvent): boolean {
   return Array.from(e.dataTransfer.types).includes(NOTE_MIME);
 }
+function isFigureDrag(e: DragEvent): boolean {
+  return Array.from(e.dataTransfer.types).includes(FIGURE_MIME);
+}
 
 function commonPrefixLength(a: string, b: string): number {
   let i = 0;
@@ -33,20 +40,86 @@ interface Props {
   body: string;
   onBodyChange: (next: string) => void;
   notes: { id: number; text: string }[];
+  charts: FigureChart[];
   onAddNote: (text: string) => Promise<void>;
   onNavigate: (path: string) => void;
 }
 
-export function StudyEditor({ body, onBodyChange, notes, onAddNote, onNavigate }: Props) {
+export function StudyEditor({ body, onBodyChange, notes, charts, onAddNote, onNavigate }: Props) {
   const taRef = useRef<HTMLTextAreaElement>(null);
   const previewRef = useRef<HTMLDivElement>(null);
   const deferredBody = useDeferredValue(body); // keeps typing snappy on slow devices; the preview catches up
   const [armed, setArmed] = useState<number | null>(null);
   const [newNote, setNewNote] = useState("");
-  const pendingDrop = useRef<{ marker: string; before: string } | null>(null);
+  const pendingDrop = useRef<{ marker: string; before: string; block?: boolean } | null>(null);
   const noteTexts = notes.map((n) => n.text);
+  const figures = useFigures(charts);
+  const headings = extractHeadings(deferredBody);
+  const [syncScroll, setSyncScroll] = useState(true);
+  const anchorsRef = useRef<Anchor[] | null>(null);
+  // When we scroll one pane ourselves, ignore the scroll event that causes in it (and only it).
+  const ignoreScroll = useRef<{ pane: "ta" | "pv"; until: number }>({ pane: "ta", until: 0 });
 
   useEffect(() => () => setHighlight(null), []);
+  // Landmark positions are measured lazily (on the next scroll), not on every keystroke - measuring
+  // lays text out, which is the sort of work a weak device shouldn't do while you type.
+  useEffect(() => {
+    anchorsRef.current = null;
+  }, [deferredBody, charts]);
+  useEffect(() => {
+    const invalidate = () => (anchorsRef.current = null);
+    window.addEventListener("resize", invalidate);
+    return () => window.removeEventListener("resize", invalidate);
+  }, []);
+
+  function getAnchors(): Anchor[] {
+    if (anchorsRef.current) return anchorsRef.current;
+    const ta = taRef.current;
+    const pv = previewRef.current;
+    if (!ta || !pv) return [];
+    const taPad = parseFloat(getComputedStyle(ta).paddingTop) || 0;
+    const pvPad = parseFloat(getComputedStyle(pv).paddingTop) || 0;
+    const pvTop = pv.getBoundingClientRect().top;
+    const list: Anchor[] = [{ a: 0, b: 0 }];
+    const add = (sourceIndex: number, el: Element | null) => {
+      if (!el) return;
+      list.push({ a: textareaOffsetTop(ta, sourceIndex) - taPad, b: el.getBoundingClientRect().top - pvTop + pv.scrollTop - pvPad });
+    };
+    for (const h of extractHeadings(deferredBody)) add(h.index, pv.querySelector(`#sec-${h.ordinal}`));
+    for (const f of figureBlockOffsets(deferredBody)) add(f.index, pv.querySelector(`#${f.kind}-${f.n}`));
+    list.push({ a: Math.max(0, ta.scrollHeight - ta.clientHeight), b: Math.max(0, pv.scrollHeight - pv.clientHeight) });
+    anchorsRef.current = normalizeAnchors(list);
+    return anchorsRef.current;
+  }
+
+  function onPaneScroll(from: "ta" | "pv") {
+    if (!syncScroll) return;
+    const ign = ignoreScroll.current;
+    if (ign.pane === from && performance.now() < ign.until) return;
+    const ta = taRef.current;
+    const pv = previewRef.current;
+    if (!ta || !pv) return;
+    const target = from === "ta" ? pv : ta;
+    ignoreScroll.current = { pane: from === "ta" ? "pv" : "ta", until: performance.now() + 100 };
+    target.scrollTop = mapScroll(from === "ta" ? ta.scrollTop : pv.scrollTop, getAnchors(), from === "ta" ? "a" : "b");
+  }
+
+  function jumpToHeading(h: Heading) {
+    const ta = taRef.current;
+    const pv = previewRef.current;
+    ignoreScroll.current = { pane: "ta", until: performance.now() + 150 };
+    if (ta) {
+      ta.focus({ preventScroll: true });
+      ta.setSelectionRange(h.index, h.index);
+      ta.scrollTop = Math.max(0, textareaOffsetTop(ta, h.index) - (parseFloat(getComputedStyle(ta).paddingTop) || 0));
+    }
+    const el = pv?.querySelector(`#sec-${h.ordinal}`);
+    if (pv && el) {
+      ignoreScroll.current = { pane: "pv", until: performance.now() + 150 };
+      pv.scrollTop = el.getBoundingClientRect().top - pv.getBoundingClientRect().top + pv.scrollTop - (parseFloat(getComputedStyle(pv).paddingTop) || 0);
+    }
+  }
+
   useEffect(() => {
     if (armed === null) return;
     const onKey = (e: KeyboardEvent) => {
@@ -63,26 +136,53 @@ export function StudyEditor({ body, onBodyChange, notes, onAddNote, onNavigate }
     useToastStore.getState().showToast(message);
   }
 
-  // ------------------------------------------------ placing a note on a word
-  function placeNote(n: number, x: number, y: number): boolean {
+  // -------------------------------- placing notes and figures at a word
+  /** Source offset just after the preview word under (x, y), with a toast explaining any failure. */
+  function dropOffset(x: number, y: number): number | null {
     const root = previewRef.current;
-    if (!root) return false;
+    if (!root) return null;
     if (deferredBody !== body) {
       toast("The preview is still updating - try again in a moment");
-      return false;
+      return null;
     }
     const hit = wordAtPoint(root, x, y);
     if (!hit) {
       toast("Drop it right on a word");
-      return false;
+      return null;
     }
     const offset = sourceOffsetForPreviewWord(root, body, hit.token);
     if (offset === null) {
       toast("Couldn't match that word back to the text - try dropping it in the writing box instead");
-      return false;
+      return null;
     }
+    return offset;
+  }
+
+  function placeNote(n: number, x: number, y: number): boolean {
+    const offset = dropOffset(x, y);
+    if (offset === null) return false;
     onBodyChange(insertMarker(body, offset, n));
     return true;
+  }
+
+  function placeFigure(token: string, x: number, y: number): boolean {
+    const offset = dropOffset(x, y);
+    if (offset === null) return false;
+    onBodyChange(insertFigureBlock(body, offset, token)); // the figure goes after the paragraph the word is in
+    return true;
+  }
+
+  function insertFigureAtCaret(token: string) {
+    const ta = taRef.current;
+    const offset = ta ? ta.selectionEnd : body.length;
+    const next = insertFigureBlock(body, offset, token);
+    const caret = next.indexOf(token, Math.max(0, offset - 1)) + token.length;
+    onBodyChange(next);
+    requestAnimationFrame(() => {
+      if (!ta) return;
+      ta.focus();
+      ta.setSelectionRange(caret, caret);
+    });
   }
 
   function updateHover(x: number, y: number) {
@@ -98,11 +198,11 @@ export function StudyEditor({ body, onBodyChange, notes, onAddNote, onNavigate }
     if (pending) {
       // A note was just dropped here natively, at whatever caret position
       // was under the pointer - nudge it to the end of that word.
-      const snapped = snapDroppedMarker(pending.before, next, pending.marker);
+      const snapped = pending.block ? snapDroppedBlock(pending.before, next, pending.marker) : snapDroppedMarker(pending.before, next, pending.marker);
       if (snapped !== null && snapped !== next) {
         const ta = taRef.current;
         const scrollTop = ta?.scrollTop ?? 0;
-        const caret = commonPrefixLength(pending.before, snapped) + pending.marker.length;
+        const caret = pending.block ? snapped.indexOf(pending.marker, Math.max(0, commonPrefixLength(pending.before, snapped) - 1)) + pending.marker.length : commonPrefixLength(pending.before, snapped) + pending.marker.length;
         onBodyChange(snapped);
         requestAnimationFrame(() => {
           if (!ta) return;
@@ -277,6 +377,46 @@ export function StudyEditor({ body, onBodyChange, notes, onAddNote, onNavigate }
         {newNote.trim() && <div className="note-add-preview">{renderInlineMarkdown(newNote)}</div>}
       </div>
 
+      {figures.numbered.length > 0 && (
+        <div className="study-notes-tray">
+          <span className="study-tray-label">Figures</span>
+          {figures.numbered.map((c) => {
+            const chart = charts.find((x) => x.id === c.id);
+            const token = `{${c.kind}:${c.n}}`;
+            const label = c.kind === "fig" ? "Figure" : "Table";
+            return (
+              <span
+                key={c.id}
+                role="button"
+                tabIndex={0}
+                draggable
+                className="note-chip"
+                title={`${label} ${c.n}: ${chart?.title ?? ""}\n\nClick to insert at the cursor, or drag onto the preview`}
+                onDragStart={(e) => {
+                  e.dataTransfer.setData(FIGURE_MIME, `${c.kind}:${c.n}`);
+                  e.dataTransfer.setData("text/plain", token);
+                  e.dataTransfer.effectAllowed = "copy";
+                }}
+                onDragEnd={() => setHighlight(null)}
+                onClick={() => insertFigureAtCaret(token)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    insertFigureAtCaret(token);
+                  }
+                }}
+              >
+                <b>
+                  {label} {c.n}
+                </b>{" "}
+                {(chart?.title ?? "").length > 24 ? (chart?.title ?? "").slice(0, 24) + "…" : chart?.title}
+              </span>
+            );
+          })}
+          <span className="study-tray-empty">Place with {"{fig:N}"} on its own line, refer to it inline with {"{fig:N}"} in a sentence.</span>
+        </div>
+      )}
+
       {armed !== null && (
         <div className="study-armed-hint">
           Click a word in the preview to place <b>[{armed}]</b>{" "}
@@ -303,7 +443,13 @@ export function StudyEditor({ body, onBodyChange, notes, onAddNote, onNavigate }
             value={body}
             onChange={handleTextareaChange}
             onKeyDown={handleTextareaKeyDown}
+            onScroll={() => onPaneScroll("ta")}
             onDrop={(e) => {
+              if (isFigureDrag(e)) {
+                pendingDrop.current = { marker: `{${e.dataTransfer.getData(FIGURE_MIME)}}`, before: body, block: true };
+                setTimeout(() => (pendingDrop.current = null), 150);
+                return;
+              }
               if (!isNoteDrag(e)) return;
               pendingDrop.current = { marker: `[${e.dataTransfer.getData(NOTE_MIME)}]`, before: body };
               setTimeout(() => (pendingDrop.current = null), 150); // if the browser declined the drop, don't let it linger
@@ -315,12 +461,16 @@ export function StudyEditor({ body, onBodyChange, notes, onAddNote, onNavigate }
         <div className="study-editor-pane">
           <div className="study-pane-head">
             <span>Preview</span>
+            <label className="study-sync-toggle" title="Keep the writing box and preview scrolled to the same place">
+              <input type="checkbox" checked={syncScroll} onChange={(e) => setSyncScroll(e.target.checked)} /> sync scroll
+            </label>
           </div>
           <div
             ref={previewRef}
             className={`study-preview${armed !== null ? " armed" : ""}`}
+            onScroll={() => onPaneScroll("pv")}
             onDragOver={(e) => {
-              if (!isNoteDrag(e)) return;
+              if (!isNoteDrag(e) && !isFigureDrag(e)) return;
               e.preventDefault();
               e.dataTransfer.dropEffect = "copy";
               updateHover(e.clientX, e.clientY);
@@ -329,9 +479,14 @@ export function StudyEditor({ body, onBodyChange, notes, onAddNote, onNavigate }
               if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setHighlight(null);
             }}
             onDrop={(e) => {
-              if (!isNoteDrag(e)) return;
+              const fig = isFigureDrag(e) ? e.dataTransfer.getData(FIGURE_MIME) : "";
+              if (!fig && !isNoteDrag(e)) return;
               e.preventDefault();
               setHighlight(null);
+              if (fig) {
+                placeFigure(`{${fig}}`, e.clientX, e.clientY);
+                return;
+              }
               const n = Number(e.dataTransfer.getData(NOTE_MIME));
               if (n) placeNote(n, e.clientX, e.clientY);
             }}
@@ -350,10 +505,25 @@ export function StudyEditor({ body, onBodyChange, notes, onAddNote, onNavigate }
               }
             }}
           >
-            {renderMarkdown(deferredBody, onNavigate, { extended: true, notes: noteTexts })}
+            {renderMarkdown(deferredBody, onNavigate, { extended: true, notes: noteTexts, figures: figures.render, figureCounts: figures.counts })}
           </div>
         </div>
       </div>
+
+      {headings.length > 0 && (
+        <details className="study-outline">
+          <summary>Outline ({headings.length})</summary>
+          <ul>
+            {headings.map((h) => (
+              <li key={h.ordinal} style={{ paddingLeft: `${(h.level - 1) * 0.9}rem` }}>
+                <button type="button" onClick={() => jumpToHeading(h)}>
+                  {h.text}
+                </button>
+              </li>
+            ))}
+          </ul>
+        </details>
+      )}
 
       <details className="study-md-help">
         <summary>Markdown help</summary>

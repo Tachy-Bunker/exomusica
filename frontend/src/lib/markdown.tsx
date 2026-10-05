@@ -21,12 +21,19 @@ export interface MarkdownOptions {
   extended?: boolean;
   /** Note texts, so [n] renders as a superscript link to note n. */
   notes?: string[];
+  /** Renders the content of a figure/table placed with {fig:N} / {tab:N} on its own line. */
+  figures?: (kind: "fig" | "tab", n: number) => ReactNode | null;
+  /** How many figures/tables exist, so references to missing ones stay plain text. */
+  figureCounts?: { fig: number; tab: number };
 }
 
-const BASE_INLINE = /\*\*(.+?)\*\*|\*(.+?)\*|\[(.+?)\]\((https?:\/\/[^\s)]+)\)/g;
+const FIGURE_LABEL = { fig: "Figure", tab: "Table" } as const;
+
+const BASE_INLINE = /\*\*(?<bold>.+?)\*\*|\*(?<italic>.+?)\*|\[(?<linkText>.+?)\]\((?<linkUrl>https?:\/\/[^\s)]+)\)/g;
 // code first, so asterisks and brackets inside `code` stay literal; [n] last,
 // so [1](https://...) is still a link.
-const EXTENDED_INLINE = /`([^`\n]+)`|\*\*(.+?)\*\*|\*(.+?)\*|\[(.+?)\]\((https?:\/\/[^\s)]+)\)|\[(\d+)\]/g;
+const EXTENDED_INLINE =
+  /`(?<code>[^`\n]+)`|\*\*(?<bold>.+?)\*\*|\*(?<italic>.+?)\*|\[(?<linkText>.+?)\]\((?<linkUrl>https?:\/\/[^\s)]+)\)|\[(?<note>\d+)\]|\{(?<figKind>fig|tab):(?<figNum>\d+)\}/g;
 
 function renderInline(text: string, onLinkClick?: (path: string) => void, options?: MarkdownOptions): ReactNode[] {
   const ext = !!options?.extended;
@@ -36,16 +43,30 @@ function renderInline(text: string, onLinkClick?: (path: string) => void, option
   for (const match of text.matchAll(ext ? EXTENDED_INLINE : BASE_INLINE)) {
     if (match.index === undefined) continue;
     if (match.index > lastIndex) nodes.push(text.slice(lastIndex, match.index));
-    let code: string | undefined;
-    let bold: string | undefined;
-    let italic: string | undefined;
-    let linkText: string | undefined;
-    let linkUrl: string | undefined;
-    let noteNumber: string | undefined;
-    if (ext) [, code, bold, italic, linkText, linkUrl, noteNumber] = match;
-    else [, bold, italic, linkText, linkUrl] = match;
+    const { code, bold, italic, linkText, linkUrl, note: noteNumber, figKind, figNum } = match.groups ?? {};
     const key = `i-${i++}`;
-    if (code !== undefined) nodes.push(<code key={key}>{code}</code>);
+    if (figKind !== undefined) {
+      const kind = figKind as "fig" | "tab";
+      const n = Number(figNum);
+      const exists = n >= 1 && n <= (options?.figureCounts?.[kind] ?? 0);
+      if (!exists) nodes.push(match[0]); // a reference to a figure that doesn't exist is just text
+      else
+        nodes.push(
+          // data-nocite: "Figure 2" isn't words from the source, so footnote placement skips it
+          <a
+            key={key}
+            className="fig-ref"
+            data-nocite=""
+            href={`#${kind}-${n}`}
+            onClick={(e) => {
+              e.preventDefault();
+              document.getElementById(`${kind}-${n}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
+            }}
+          >
+            {FIGURE_LABEL[kind]} {n}
+          </a>,
+        );
+    } else if (code !== undefined) nodes.push(<code key={key}>{code}</code>);
     else if (bold !== undefined) nodes.push(<strong key={key}>{bold}</strong>);
     else if (italic !== undefined) nodes.push(<em key={key}>{italic}</em>);
     else if (noteNumber !== undefined) {
@@ -97,6 +118,7 @@ const VIDEO_LINE = /^@video\((\S+)\)$/;
 const FILE_LINE = /^@file\((\S+)\)(?:\[(.*?)\])?$/;
 const ORDERED_LINE = /^\d+[.)]\s(.*)$/;
 const RULE_LINE = /^(-{3,}|\*{3,})$/;
+const FIGURE_LINE = /^\{(fig|tab):(\d+)\}$/;
 
 export function renderMarkdown(markdown: string, onLinkClick?: (path: string) => void, options?: MarkdownOptions): ReactNode {
   const ext = !!options?.extended;
@@ -107,6 +129,7 @@ export function renderMarkdown(markdown: string, onLinkClick?: (path: string) =>
   let quoteBuffer: string[] = [];
   let fenceBuffer: string[] | null = null;
   let key = 0;
+  let headingOrdinal = 0; // gives each heading a stable id (sec-N) for the outline and scroll sync
 
   function flushList() {
     if (listBuffer.length > 0) {
@@ -171,16 +194,45 @@ export function renderMarkdown(markdown: string, onLinkClick?: (path: string) =>
     const video = line.match(VIDEO_LINE);
     const file = line.match(FILE_LINE);
     const ordered = ext ? line.match(ORDERED_LINE) : null;
+    const figureLine = ext ? line.match(FIGURE_LINE) : null;
 
-    if (line.startsWith("# ")) {
+    if (figureLine) {
       flushList();
-      blocks.push(<h1 key={key++}>{renderInline(line.slice(2), onLinkClick, options)}</h1>);
+      const kind = figureLine[1] as "fig" | "tab";
+      const n = Number(figureLine[2]);
+      const content = options?.figures?.(kind, n) ?? null;
+      blocks.push(
+        content ? (
+          <figure key={key++} id={`${kind}-${n}`} className="study-figure" data-nocite="">
+            {content}
+          </figure>
+        ) : (
+          <p key={key++} className="fig-missing" data-nocite="">
+            [{FIGURE_LABEL[kind]} {n} doesn't exist]
+          </p>
+        ),
+      );
+    } else if (line.startsWith("# ")) {
+      flushList();
+      blocks.push(
+        <h1 key={key++} id={ext ? `sec-${headingOrdinal++}` : undefined}>
+          {renderInline(line.slice(2), onLinkClick, options)}
+        </h1>,
+      );
     } else if (line.startsWith("## ")) {
       flushList();
-      blocks.push(<h2 key={key++}>{renderInline(line.slice(3), onLinkClick, options)}</h2>);
+      blocks.push(
+        <h2 key={key++} id={ext ? `sec-${headingOrdinal++}` : undefined}>
+          {renderInline(line.slice(3), onLinkClick, options)}
+        </h2>,
+      );
     } else if (line.startsWith("### ")) {
       flushList();
-      blocks.push(<h3 key={key++}>{renderInline(line.slice(4), onLinkClick, options)}</h3>);
+      blocks.push(
+        <h3 key={key++} id={ext ? `sec-${headingOrdinal++}` : undefined}>
+          {renderInline(line.slice(4), onLinkClick, options)}
+        </h3>,
+      );
     } else if (line.startsWith("- ")) {
       if (ext && (orderedBuffer.length > 0 || quoteBuffer.length > 0)) flushList();
       listBuffer.push(line.slice(2));

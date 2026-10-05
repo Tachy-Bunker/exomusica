@@ -3,8 +3,13 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import { api } from "../lib/api";
 import { useAuth } from "../lib/auth";
 import { renderInlineMarkdown, renderMarkdown } from "../lib/markdown";
-import { noteDeletionMap, noteSwapMap, remapMarkers } from "../lib/footnotes";
+import { findPlacedFigures, noteDeletionMap, noteSwapMap, remapFigureRefs, remapMarkers } from "../lib/footnotes";
+import { figureRefRemap, numberCharts } from "../lib/figures";
+import { extractHeadings } from "../lib/outline";
+import { clearDraft, differsFromSaved, loadDraft, saveDraft, type StudyDraft } from "../lib/studyDraft";
 import { StudyEditor } from "../components/StudyEditor";
+import { StudyHistory } from "../components/StudyHistory";
+import { useFigures } from "../components/StudyFigure";
 import { useDocumentTitle } from "../lib/useDocumentTitle";
 import { useToastStore } from "../lib/toastStore";
 import { StudyChartView } from "../components/StudyChartView";
@@ -22,8 +27,12 @@ interface Chart {
   kind: "LINE" | "BAR" | "SCATTER" | "TABLE";
   xLabel: string | null;
   yLabel: string | null;
+  xLog?: boolean;
+  yLog?: boolean;
   dataCsv: string;
 }
+
+const NO_CHARTS: Chart[] = []; // stable identity so the figure memo doesn't churn before the study loads
 
 interface StudyDetail {
   id: number;
@@ -49,10 +58,13 @@ export function StudyPage() {
   const [editingAnnotationId, setEditingAnnotationId] = useState<number | null>(null);
   const [annotationDraft, setAnnotationDraft] = useState("");
   const [addingChart, setAddingChart] = useState(false);
-  const [chartForm, setChartForm] = useState({ title: "", kind: "LINE" as Chart["kind"], xLabel: "", yLabel: "", dataCsv: "" });
+  const [chartForm, setChartForm] = useState({ title: "", kind: "LINE" as Chart["kind"], xLabel: "", yLabel: "", xLog: false, yLog: false, dataCsv: "" });
+  const [pendingDraft, setPendingDraft] = useState<StudyDraft | null>(null);
+  const [showHistory, setShowHistory] = useState(false);
   const [editingChartId, setEditingChartId] = useState<number | null>(null);
 
   useDocumentTitle(study?.title ?? "Study");
+  const figs = useFigures(study?.charts ?? NO_CHARTS);
 
   function reload() {
     if (!slug) return;
@@ -62,16 +74,59 @@ export function StudyPage() {
 
   const isOwner = !!(user && study && (user.id === study.owner.id || user.isAdmin));
 
-  function startEdit() {
+  const isDirty = !!study && editing && differsFromSaved({ title: draftTitle.trim(), body: draftBody }, study);
+
+  // A draft left behind by a closed tab or a crash: offer to pick it back up.
+  useEffect(() => {
+    if (!study || editing || !isOwner) return;
+    const d = loadDraft(study.slug);
+    setPendingDraft(d && differsFromSaved(d, study) ? d : null);
+  }, [study, editing, isOwner]);
+
+  // Keep a local copy of unsaved edits as they happen.
+  useEffect(() => {
+    if (!editing || !study) return;
+    const t = setTimeout(() => {
+      if (differsFromSaved({ title: draftTitle.trim(), body: draftBody }, study)) saveDraft(study.slug, { title: draftTitle, body: draftBody, base: study.body, savedAt: Date.now() });
+      else clearDraft(study.slug);
+    }, 400);
+    return () => clearTimeout(t);
+  }, [editing, draftTitle, draftBody, study]);
+
+  // Leaving the page with unsaved edits asks first. (The local draft still survives, but the prompt is cheap insurance.)
+  useEffect(() => {
+    if (!isDirty) return;
+    const warn = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = "";
+    };
+    window.addEventListener("beforeunload", warn);
+    return () => window.removeEventListener("beforeunload", warn);
+  }, [isDirty]);
+
+  function startEdit(fromDraft?: StudyDraft) {
     if (!study) return;
-    setDraftTitle(study.title);
-    setDraftBody(study.body);
+    setDraftTitle(fromDraft?.title ?? study.title);
+    setDraftBody(fromDraft?.body ?? study.body);
+    setPendingDraft(null);
+    setShowHistory(false);
     setEditing(true);
+  }
+
+  function cancelEdit() {
+    if (study && isDirty && !confirm("Discard your unsaved changes?")) return;
+    if (study) clearDraft(study.slug);
+    setEditing(false);
   }
 
   async function saveEdit() {
     if (!study) return;
+    if (!draftTitle.trim()) {
+      useToastStore.getState().showToast("Give the study a title first");
+      return;
+    }
     await api(`/api/studies/${study.slug}`, { method: "PATCH", body: JSON.stringify({ title: draftTitle.trim(), body: draftBody }) });
+    clearDraft(study.slug);
     setEditing(false);
     useToastStore.getState().showToast("Saved ✓");
     reload();
@@ -103,11 +158,21 @@ export function StudyPage() {
   // Footnote markers in the body are just numbers, so deleting or
   // reordering notes would silently re-point every [n]. Rewrite them in
   // step - both the saved body and, if open, the editor's draft.
-  async function remapBody(map: (n: number) => number | null) {
+  async function rewriteBody(rewrite: (body: string) => string) {
     if (!study) return;
-    const nextSaved = remapMarkers(study.body, map);
+    const nextSaved = rewrite(study.body);
     if (nextSaved !== study.body) await api(`/api/studies/${study.slug}`, { method: "PATCH", body: JSON.stringify({ body: nextSaved }) });
-    if (editing) setDraftBody((d) => remapMarkers(d, map));
+    if (editing) setDraftBody((d) => rewrite(d));
+  }
+  async function remapBody(map: (n: number) => number | null) {
+    await rewriteBody((b) => remapMarkers(b, map));
+  }
+  // Figure/table numbers are positional too: reordering, deleting, or switching a
+  // chart to a table renumbers things, so every {fig:N} in the text follows.
+  async function renumberFigures(afterCharts: Chart[]) {
+    if (!study) return;
+    const remap = figureRefRemap(numberCharts(study.charts), numberCharts(afterCharts));
+    await rewriteBody((b) => remapFigureRefs(b, remap));
   }
 
   async function saveAnnotationEdit(id: number) {
@@ -137,13 +202,13 @@ export function StudyPage() {
   }
 
   function startAddChart() {
-    setChartForm({ title: "", kind: "LINE", xLabel: "", yLabel: "", dataCsv: "x,y\n1,2\n2,4\n3,3" });
+    setChartForm({ title: "", kind: "LINE", xLabel: "", yLabel: "", xLog: false, yLog: false, dataCsv: "x,y\n1,2\n2,4\n3,3" });
     setEditingChartId(null);
     setAddingChart(true);
   }
 
   function startEditChart(c: Chart) {
-    setChartForm({ title: c.title, kind: c.kind, xLabel: c.xLabel ?? "", yLabel: c.yLabel ?? "", dataCsv: c.dataCsv });
+    setChartForm({ title: c.title, kind: c.kind, xLabel: c.xLabel ?? "", yLabel: c.yLabel ?? "", xLog: !!c.xLog, yLog: !!c.yLog, dataCsv: c.dataCsv });
     setEditingChartId(c.id);
     setAddingChart(true);
   }
@@ -155,10 +220,13 @@ export function StudyPage() {
       kind: chartForm.kind,
       xLabel: chartForm.xLabel.trim() || null,
       yLabel: chartForm.yLabel.trim() || null,
+      xLog: chartForm.xLog,
+      yLog: chartForm.yLog,
       dataCsv: chartForm.dataCsv,
     });
     if (editingChartId) {
       await api(`/api/study-charts/${editingChartId}`, { method: "PATCH", body });
+      await renumberFigures(study.charts.map((c) => (c.id === editingChartId ? { ...c, kind: chartForm.kind } : c)));
     } else {
       await api(`/api/studies/${study.slug}/charts`, { method: "POST", body });
     }
@@ -170,6 +238,7 @@ export function StudyPage() {
   async function deleteChart(id: number) {
     if (!confirm("Delete this chart?")) return;
     await api(`/api/study-charts/${id}`, { method: "DELETE" });
+    if (study) await renumberFigures(study.charts.filter((c) => c.id !== id));
     reload();
   }
 
@@ -180,6 +249,7 @@ export function StudyPage() {
     const reordered = [...study.charts];
     [reordered[index], reordered[swapWith]] = [reordered[swapWith], reordered[index]];
     await api(`/api/studies/${study.slug}/charts/reorder`, { method: "POST", body: JSON.stringify({ chartIds: reordered.map((c) => c.id) }) });
+    await renumberFigures(reordered);
     reload();
   }
 
@@ -230,14 +300,19 @@ export function StudyPage() {
               <button className="btn btn-primary" onClick={saveEdit}>
                 Save
               </button>
-              <button className="btn" onClick={() => setEditing(false)}>
+              <button className="btn" onClick={cancelEdit}>
                 Cancel
               </button>
             </>
           ) : (
-            <button className="btn" onClick={startEdit}>
-              Edit
-            </button>
+            <>
+              <button className="btn" onClick={() => startEdit()}>
+                Edit
+              </button>
+              <button className="btn" onClick={() => setShowHistory((v) => !v)}>
+                History
+              </button>
+            </>
           )}
           <button className="btn" onClick={toggleStatus}>
             Mark as {study.status === "IN_PROGRESS" ? "complete" : "in progress"}
@@ -248,12 +323,61 @@ export function StudyPage() {
         </div>
       )}
 
-      {editing ? (
-        <StudyEditor body={draftBody} onBodyChange={setDraftBody} notes={study.annotations} onAddNote={addAnnotationText} onNavigate={(path) => navigate(path)} />
-      ) : (
-        <div className="study-body">
-          {renderMarkdown(study.body, (path) => navigate(path), { extended: true, notes: study.annotations.map((a) => a.text) })}
+      {isOwner && !editing && pendingDraft && (
+        <div className="study-draft-banner">
+          You have unsaved changes from {new Date(pendingDraft.savedAt).toLocaleString()}
+          {pendingDraft.base !== study.body && " - note the saved version has changed since"}.{" "}
+          <button className="btn btn-primary" onClick={() => startEdit(pendingDraft)}>
+            Resume editing
+          </button>{" "}
+          <button
+            className="btn"
+            onClick={() => {
+              clearDraft(study.slug);
+              setPendingDraft(null);
+            }}
+          >
+            Discard
+          </button>
         </div>
+      )}
+
+      {isOwner && !editing && showHistory && (
+        <StudyHistory
+          slug={study.slug}
+          currentTitle={study.title}
+          currentBody={study.body}
+          onRestored={() => {
+            clearDraft(study.slug);
+            setShowHistory(false);
+            useToastStore.getState().showToast("Version restored ✓");
+            reload();
+          }}
+        />
+      )}
+
+      {editing ? (
+        <StudyEditor body={draftBody} onBodyChange={setDraftBody} notes={study.annotations} charts={study.charts} onAddNote={addAnnotationText} onNavigate={(path) => navigate(path)} />
+      ) : (
+        <>
+        {extractHeadings(study.body).length >= 3 && (
+          <details className="study-outline study-toc">
+            <summary>Contents</summary>
+            <ul>
+              {extractHeadings(study.body).map((h) => (
+                <li key={h.ordinal} style={{ paddingLeft: `${(h.level - 1) * 0.9}rem` }}>
+                  <button type="button" onClick={() => document.getElementById(`sec-${h.ordinal}`)?.scrollIntoView({ behavior: "smooth", block: "start" })}>
+                    {h.text}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </details>
+        )}
+        <div className="study-body">
+          {renderMarkdown(study.body, (path) => navigate(path), { extended: true, notes: study.annotations.map((a) => a.text), figures: figs.render, figureCounts: figs.counts })}
+        </div>
+        </>
       )}
 
       {(study.charts.length > 0 || isOwner) && (
@@ -267,10 +391,18 @@ export function StudyPage() {
             )}
           </div>
 
-          {study.charts.map((c, i) => (
+          {study.charts.map((c, i) => {
+            const num = figs.numbered[i];
+            const label = num ? `${num.kind === "fig" ? "Figure" : "Table"} ${num.n}` : "";
+            const placedInText = !!num && findPlacedFigures(study.body).has(`${num.kind}:${num.n}`);
+            if (placedInText && !isOwner) return null; // readers see it in the text, not twice
+            return (
             <div key={c.id} style={{ margin: "1rem 0" }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
-                <h3 style={{ fontSize: "0.85rem", margin: 0 }}>{c.title}</h3>
+                <h3 style={{ fontSize: "0.85rem", margin: 0 }}>
+                  <span style={{ color: "var(--accent-forum)" }}>{label}</span> · {c.title}
+                  {placedInText && <span style={{ color: "var(--text-dim)", fontWeight: 400 }}> - shown in the text</span>}
+                </h3>
                 {isOwner && (
                   <span style={{ fontSize: "0.72rem" }}>
                     <button className="btn" style={{ padding: "0 0.3rem" }} onClick={() => moveChart(i, -1)}>
@@ -288,9 +420,10 @@ export function StudyPage() {
                   </span>
                 )}
               </div>
-              <StudyChartView kind={c.kind} xLabel={c.xLabel} yLabel={c.yLabel} dataCsv={c.dataCsv} />
+              {!placedInText && <StudyChartView kind={c.kind} xLabel={c.xLabel} yLabel={c.yLabel} xLog={c.xLog} yLog={c.yLog} dataCsv={c.dataCsv} />}
             </div>
-          ))}
+            );
+          })}
 
           {addingChart && (
             <div style={{ border: "1px solid var(--border)", borderRadius: "var(--radius)", padding: "0.6rem", marginTop: "0.5rem" }}>
@@ -321,11 +454,21 @@ export function StudyPage() {
                       placeholder="Y axis label (optional)"
                       style={{ fontSize: "0.85rem" }}
                     />
+                    {chartForm.kind !== "BAR" && (
+                      <label style={{ fontSize: "0.8rem", display: "flex", alignItems: "center", gap: "0.3rem" }}>
+                        <input type="checkbox" checked={chartForm.xLog} onChange={(e) => setChartForm((f) => ({ ...f, xLog: e.target.checked }))} />
+                        Log X
+                      </label>
+                    )}
+                    <label style={{ fontSize: "0.8rem", display: "flex", alignItems: "center", gap: "0.3rem" }}>
+                      <input type="checkbox" checked={chartForm.yLog} onChange={(e) => setChartForm((f) => ({ ...f, yLog: e.target.checked }))} />
+                      Log Y
+                    </label>
                   </>
                 )}
               </div>
               <p style={{ fontSize: "0.72rem", color: "var(--text-dim)", margin: "0 0 0.2rem" }}>
-                CSV - first row is headers. First column is X (or the row label for a table); every other column is its own data series.
+                CSV - first row is headers. First column is X (or the row label for a table); every other column is its own data series. Add a column named <code>gain_err</code> (or <code>gain±</code>) next to <code>gain</code> for error bars.
               </p>
               <textarea
                 value={chartForm.dataCsv}
@@ -336,7 +479,7 @@ export function StudyPage() {
               {chartForm.dataCsv.trim() && (
                 <div style={{ marginTop: "0.5rem", border: "1px solid var(--border)", borderRadius: "var(--radius)", padding: "0.5rem" }}>
                   <p style={{ fontSize: "0.7rem", color: "var(--text-dim)", margin: "0 0 0.3rem" }}>Preview</p>
-                  <StudyChartView kind={chartForm.kind} xLabel={chartForm.xLabel || null} yLabel={chartForm.yLabel || null} dataCsv={chartForm.dataCsv} />
+                  <StudyChartView kind={chartForm.kind} xLabel={chartForm.xLabel || null} yLabel={chartForm.yLabel || null} xLog={chartForm.xLog} yLog={chartForm.yLog} dataCsv={chartForm.dataCsv} />
                 </div>
               )}
               <div style={{ marginTop: "0.4rem" }}>
