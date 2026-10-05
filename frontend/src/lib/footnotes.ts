@@ -8,6 +8,8 @@
 // list numbers, fence lines, embed lines) excluded. The Kth "foo" in the
 // preview is then the Kth "foo" in the source.
 
+import { CLIP_RE_GLOBAL } from "./clips";
+
 export const WORD_RE = /[\p{L}\p{N}][\p{L}\p{N}'’-]*/gu;
 const WORD_CHAR = /[\p{L}\p{N}'’-]/u;
 const MARKER_RE = /\[(\d+)\](?!\()/g; // [3] but not the start of a [text](url) link
@@ -80,6 +82,10 @@ function hiddenRanges(source: string): Range2[] {
   }
   const code = codeRanges(source); // {fig:1} inside code is literal text, so it stays citable
   for (const m of source.matchAll(FIGURE_REF_RE)) {
+    if (m.index !== undefined && !inAny(code, m.index)) ranges.push([m.index, m.index + m[0].length]);
+  }
+  for (const m of source.matchAll(CLIP_RE_GLOBAL)) {
+    // {clip:...} renders as a play button (data-nocite), so its characters aren't citable words
     if (m.index !== undefined && !inAny(code, m.index)) ranges.push([m.index, m.index + m[0].length]);
   }
   return ranges;

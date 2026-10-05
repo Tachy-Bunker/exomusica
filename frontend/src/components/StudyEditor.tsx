@@ -1,10 +1,12 @@
-import { useDeferredValue, useEffect, useRef, useState, type ChangeEvent, type DragEvent, type KeyboardEvent as ReactKeyboardEvent } from "react";
+import { useDeferredValue, useEffect, useRef, useState, type ChangeEvent, type DragEvent, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from "react";
 import { renderInlineMarkdown, renderMarkdown } from "../lib/markdown";
 import { insertFigureBlock, insertMarker, snapDroppedBlock, snapDroppedMarker, sourceOffsetForPreviewWord, wordAtPoint } from "../lib/footnotes";
 import { useFigures, type FigureChart } from "./StudyFigure";
 import { extractHeadings, figureBlockOffsets, type Heading } from "../lib/outline";
 import { mapScroll, normalizeAnchors, textareaOffsetTop, type Anchor } from "../lib/scrollSync";
 import { useToastStore } from "../lib/toastStore";
+import { parseClip, stripClip } from "../lib/clips";
+import { uploadAttachment } from "../lib/uploadAttachment";
 
 const NOTE_MIME = "application/x-exo-note";
 const FIGURE_MIME = "application/x-exo-fig";
@@ -41,18 +43,23 @@ interface Props {
   onBodyChange: (next: string) => void;
   notes: { id: number; text: string }[];
   charts: FigureChart[];
+  /** Draws an @audio(url) block (waveform and clip tools). */
+  renderAudio: (url: string) => ReactNode;
   onAddNote: (text: string) => Promise<void>;
   onNavigate: (path: string) => void;
 }
 
-export function StudyEditor({ body, onBodyChange, notes, charts, onAddNote, onNavigate }: Props) {
+export function StudyEditor({ body, onBodyChange, notes, charts, renderAudio, onAddNote, onNavigate }: Props) {
   const taRef = useRef<HTMLTextAreaElement>(null);
   const previewRef = useRef<HTMLDivElement>(null);
   const deferredBody = useDeferredValue(body); // keeps typing snappy on slow devices; the preview catches up
   const [armed, setArmed] = useState<number | null>(null);
   const [newNote, setNewNote] = useState("");
+  const [audioOpen, setAudioOpen] = useState(false);
+  const [audioUrl, setAudioUrl] = useState("");
+  const [uploadingAudio, setUploadingAudio] = useState(false);
   const pendingDrop = useRef<{ marker: string; before: string; block?: boolean } | null>(null);
-  const noteTexts = notes.map((n) => n.text);
+  const noteTexts = notes.map((n) => n.text); // full text, so footnotes know which notes carry a clip
   const figures = useFigures(charts);
   const headings = extractHeadings(deferredBody);
   const [syncScroll, setSyncScroll] = useState(true);
@@ -304,6 +311,28 @@ export function StudyEditor({ body, onBodyChange, notes, charts, onAddNote, onNa
     }
   }
 
+  function insertAudio(url: string) {
+    const clean = url.trim();
+    if (!/^(\/|https?:\/\/)\S+$/.test(clean)) {
+      toast("Enter a link starting with https:// (or upload a file)");
+      return;
+    }
+    insertFigureAtCaret(`@audio(${clean})`);
+    setAudioUrl("");
+    setAudioOpen(false);
+  }
+
+  async function uploadAndInsertAudio(file: File) {
+    setUploadingAudio(true);
+    try {
+      insertAudio(await uploadAttachment(file, file.name));
+    } catch (e) {
+      toast(e instanceof Error ? e.message : "Upload failed");
+    } finally {
+      setUploadingAudio(false);
+    }
+  }
+
   async function submitNote() {
     const text = newNote.trim();
     if (!text) return;
@@ -336,7 +365,7 @@ export function StudyEditor({ body, onBodyChange, notes, charts, onAddNote, onNa
             tabIndex={0}
             draggable
             className={`note-chip${armed === i + 1 ? " armed" : ""}`}
-            title={`${n.text}\n\nDrag onto a word, or click then click a word`}
+            title={`${stripClip(n.text)}\n\nDrag onto a word, or click then click a word`}
             onDragStart={(e) => {
               e.dataTransfer.setData(NOTE_MIME, String(i + 1));
               e.dataTransfer.setData("text/plain", `[${i + 1}]`);
@@ -355,7 +384,8 @@ export function StudyEditor({ body, onBodyChange, notes, charts, onAddNote, onNa
               }
             }}
           >
-            <b>[{i + 1}]</b> {n.text.length > 28 ? n.text.slice(0, 28) + "…" : n.text}
+            <b>[{i + 1}]</b>
+            {parseClip(n.text) && " ♪"} {stripClip(n.text).length > 28 ? stripClip(n.text).slice(0, 28) + "…" : stripClip(n.text)}
           </span>
         ))}
         <span className="note-add">
@@ -431,6 +461,9 @@ export function StudyEditor({ body, onBodyChange, notes, charts, onAddNote, onNa
           <div className="study-pane-head">
             <span>Write</span>
             <span className="study-toolbar">
+              <button type="button" className={`btn${audioOpen ? " active" : ""}`} title="Add an audio recording" onMouseDown={(e) => e.preventDefault()} onClick={() => setAudioOpen((v) => !v)}>
+                ♪ Audio
+              </button>
               {tools.map((t) => (
                 <button key={t.format} type="button" className="btn" title={t.title} onMouseDown={(e) => e.preventDefault()} onClick={() => applyFormat(t.format)}>
                   {t.label}
@@ -438,6 +471,18 @@ export function StudyEditor({ body, onBodyChange, notes, charts, onAddNote, onNa
               ))}
             </span>
           </div>
+          {audioOpen && (
+            <div className="audio-insert">
+              <input value={audioUrl} onChange={(e) => setAudioUrl(e.target.value)} placeholder="Audio link (https://…)" onKeyDown={(e) => e.key === "Enter" && insertAudio(audioUrl)} />
+              <button type="button" className="btn" onClick={() => insertAudio(audioUrl)} disabled={!audioUrl.trim()}>
+                Insert
+              </button>
+              <label className="btn" style={{ cursor: uploadingAudio ? "wait" : "pointer" }}>
+                {uploadingAudio ? "Uploading…" : "Upload file…"}
+                <input type="file" accept="audio/*" hidden disabled={uploadingAudio} onChange={(e) => e.target.files?.[0] && void uploadAndInsertAudio(e.target.files[0])} />
+              </label>
+            </div>
+          )}
           <textarea
             ref={taRef}
             value={body}
@@ -505,7 +550,7 @@ export function StudyEditor({ body, onBodyChange, notes, charts, onAddNote, onNa
               }
             }}
           >
-            {renderMarkdown(deferredBody, onNavigate, { extended: true, notes: noteTexts, figures: figures.render, figureCounts: figures.counts })}
+            {renderMarkdown(deferredBody, onNavigate, { extended: true, notes: noteTexts, figures: figures.render, figureCounts: figures.counts, audio: renderAudio })}
           </div>
         </div>
       </div>

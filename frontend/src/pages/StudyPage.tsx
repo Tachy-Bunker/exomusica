@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { api } from "../lib/api";
 import { useAuth } from "../lib/auth";
@@ -10,6 +10,9 @@ import { clearDraft, differsFromSaved, loadDraft, saveDraft, type StudyDraft } f
 import { StudyEditor } from "../components/StudyEditor";
 import { StudyHistory } from "../components/StudyHistory";
 import { useFigures } from "../components/StudyFigure";
+import { AudioEvidence, type EvidenceClip } from "../components/AudioEvidence";
+import { formatClip, parseClip, stripClip, type Clip } from "../lib/clips";
+import { stopClip } from "../lib/clipPlayer";
 import { useDocumentTitle } from "../lib/useDocumentTitle";
 import { useToastStore } from "../lib/toastStore";
 import { StudyChartView } from "../components/StudyChartView";
@@ -73,6 +76,32 @@ export function StudyPage() {
   useEffect(reload, [slug]);
 
   const isOwner = !!(user && study && (user.id === study.owner.id || user.isAdmin));
+
+  // Clips cited by notes, grouped by the recording they slice. Audio blocks use them to mark
+  // regions on the waveform (authors) or list clip buttons (readers).
+  const clipsByUrl = useMemo(() => {
+    const map = new Map<string, EvidenceClip[]>();
+    (study?.annotations ?? []).forEach((a, i) => {
+      const clip = parseClip(a.text);
+      if (!clip) return;
+      const list = map.get(clip.url) ?? [];
+      list.push({ n: i + 1, clip, label: stripClip(a.text) });
+      map.set(clip.url, list);
+    });
+    return map;
+  }, [study?.annotations]);
+  const addClipNote = useCallback(
+    async (clip: Clip, label: string) => {
+      await addAnnotationText(`${label} ${formatClip(clip)}`);
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [study?.slug],
+  );
+  const renderAudio = useCallback(
+    (url: string) => <AudioEvidence url={url} canCite={isOwner} clips={clipsByUrl.get(url) ?? []} onCite={addClipNote} />,
+    [isOwner, clipsByUrl, addClipNote],
+  );
+  useEffect(() => stopClip, []); // leaving the page silences any clip that's playing
 
   const isDirty = !!study && editing && differsFromSaved({ title: draftTitle.trim(), body: draftBody }, study);
 
@@ -357,7 +386,7 @@ export function StudyPage() {
       )}
 
       {editing ? (
-        <StudyEditor body={draftBody} onBodyChange={setDraftBody} notes={study.annotations} charts={study.charts} onAddNote={addAnnotationText} onNavigate={(path) => navigate(path)} />
+        <StudyEditor body={draftBody} onBodyChange={setDraftBody} notes={study.annotations} charts={study.charts} renderAudio={renderAudio} onAddNote={addAnnotationText} onNavigate={(path) => navigate(path)} />
       ) : (
         <>
         {extractHeadings(study.body).length >= 3 && (
@@ -375,7 +404,7 @@ export function StudyPage() {
           </details>
         )}
         <div className="study-body">
-          {renderMarkdown(study.body, (path) => navigate(path), { extended: true, notes: study.annotations.map((a) => a.text), figures: figs.render, figureCounts: figs.counts })}
+          {renderMarkdown(study.body, (path) => navigate(path), { extended: true, notes: study.annotations.map((a) => a.text), figures: figs.render, figureCounts: figs.counts, audio: renderAudio })}
         </div>
         </>
       )}
@@ -511,6 +540,11 @@ export function StudyPage() {
                 ) : (
                   <span>
                     <b style={{ color: "var(--accent-forum)" }}>[{i + 1}]</b> {renderInlineMarkdown(a.text, (path) => navigate(path))}
+                    {parseClip(a.text)?.img && (
+                      <a href={parseClip(a.text)!.img!} target="_blank" rel="noreferrer">
+                        <img className="clip-spectrogram" src={parseClip(a.text)!.img!} alt="Spectrogram of the cited passage" loading="lazy" />
+                      </a>
+                    )}
                     {isOwner && (
                       <span style={{ marginLeft: "0.5rem", fontSize: "0.75rem" }}>
                         <button className="btn" style={{ padding: "0 0.3rem" }} onClick={() => moveAnnotation(i, -1)}>

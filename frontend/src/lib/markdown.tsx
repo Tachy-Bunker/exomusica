@@ -1,4 +1,6 @@
 import type { ReactNode } from "react";
+import { ClipButton } from "../components/ClipButton";
+import { parseClip, stripClip } from "./clips";
 
 function internalPathOf(url: string): string | null {
   if (url.startsWith("/") && !url.startsWith("//")) return url;
@@ -25,6 +27,8 @@ export interface MarkdownOptions {
   figures?: (kind: "fig" | "tab", n: number) => ReactNode | null;
   /** How many figures/tables exist, so references to missing ones stay plain text. */
   figureCounts?: { fig: number; tab: number };
+  /** Renders an @audio(url) line as audio evidence (waveform, clips). Without it the line is a plain player. */
+  audio?: (url: string) => ReactNode;
 }
 
 const FIGURE_LABEL = { fig: "Figure", tab: "Table" } as const;
@@ -33,7 +37,7 @@ const BASE_INLINE = /\*\*(?<bold>.+?)\*\*|\*(?<italic>.+?)\*|\[(?<linkText>.+?)\
 // code first, so asterisks and brackets inside `code` stay literal; [n] last,
 // so [1](https://...) is still a link.
 const EXTENDED_INLINE =
-  /`(?<code>[^`\n]+)`|\*\*(?<bold>.+?)\*\*|\*(?<italic>.+?)\*|\[(?<linkText>.+?)\]\((?<linkUrl>https?:\/\/[^\s)]+)\)|\[(?<note>\d+)\]|\{(?<figKind>fig|tab):(?<figNum>\d+)\}/g;
+  /`(?<code>[^`\n]+)`|\*\*(?<bold>.+?)\*\*|\*(?<italic>.+?)\*|\[(?<linkText>.+?)\]\((?<linkUrl>https?:\/\/[^\s)]+)\)|\[(?<note>\d+)\]|\{(?<figKind>fig|tab):(?<figNum>\d+)\}|\{clip:(?<clipStart>\d+(?:\.\d+)?)-(?<clipEnd>\d+(?:\.\d+)?) (?<clipUrl>\S+?)(?: img=(?<clipImg>\S+?))?\}/g;
 
 function renderInline(text: string, onLinkClick?: (path: string) => void, options?: MarkdownOptions): ReactNode[] {
   const ext = !!options?.extended;
@@ -43,13 +47,18 @@ function renderInline(text: string, onLinkClick?: (path: string) => void, option
   for (const match of text.matchAll(ext ? EXTENDED_INLINE : BASE_INLINE)) {
     if (match.index === undefined) continue;
     if (match.index > lastIndex) nodes.push(text.slice(lastIndex, match.index));
-    const { code, bold, italic, linkText, linkUrl, note: noteNumber, figKind, figNum } = match.groups ?? {};
+    const { code, bold, italic, linkText, linkUrl, note: noteNumber, figKind, figNum, clipStart, clipEnd, clipUrl, clipImg } = match.groups ?? {};
     const key = `i-${i++}`;
-    if (figKind !== undefined) {
+    if (clipUrl !== undefined) {
+      const start = Number(clipStart);
+      const end = Number(clipEnd);
+      if (end > start) nodes.push(<ClipButton key={key} clip={{ start, end, url: clipUrl, img: clipImg ?? null }} />);
+      else nodes.push(<span key={key} data-nocite="">{match[0]}</span>); // malformed: shown as typed, but not citable text
+    } else if (figKind !== undefined) {
       const kind = figKind as "fig" | "tab";
       const n = Number(figNum);
       const exists = n >= 1 && n <= (options?.figureCounts?.[kind] ?? 0);
-      if (!exists) nodes.push(match[0]); // a reference to a figure that doesn't exist is just text
+      if (!exists) nodes.push(<span key={key} data-nocite="">{match[0]}</span>); // a reference to a figure that doesn't exist is shown as typed, but isn't citable text
       else
         nodes.push(
           // data-nocite: "Figure 2" isn't words from the source, so footnote placement skips it
@@ -73,12 +82,13 @@ function renderInline(text: string, onLinkClick?: (path: string) => void, option
       const n = Number(noteNumber);
       const noteText = options?.notes?.[n - 1];
       if (noteText === undefined) nodes.push(match[0]); // [7] with no 7th note is just text
-      else
+      else {
+        const noteClip = parseClip(noteText);
         nodes.push(
           <sup key={key} className="footnote-ref">
             <a
               href={`#note-${n}`}
-              title={noteText}
+              title={stripClip(noteText)}
               onClick={(e) => {
                 e.preventDefault();
                 document.getElementById(`note-${n}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
@@ -88,6 +98,9 @@ function renderInline(text: string, onLinkClick?: (path: string) => void, option
             </a>
           </sup>,
         );
+        // a note that cites a slice of audio gets a play button right beside its number
+        if (noteClip) nodes.push(<ClipButton key={`${key}-clip`} clip={noteClip} compact />);
+      }
     } else if (linkText !== undefined) {
       const internalPath = linkUrl ? internalPathOf(linkUrl) : null;
       const clickHandler =
@@ -250,7 +263,15 @@ export function renderMarkdown(markdown: string, onLinkClick?: (path: string) =>
       blocks.push(<img key={key++} src={image[2]} alt={image[1]} style={{ maxWidth: "100%", borderRadius: "var(--radius)" }} />);
     } else if (audio) {
       flushList();
-      blocks.push(<audio key={key++} controls src={audio[1]} style={{ display: "block", maxWidth: 400 }} />);
+      if (ext && options?.audio) {
+        blocks.push(
+          <div key={key++} className="study-audio" data-nocite="">
+            {options.audio(audio[1])}
+          </div>,
+        );
+      } else {
+        blocks.push(<audio key={key++} controls src={audio[1]} style={{ display: "block", maxWidth: 400 }} />);
+      }
     } else if (video) {
       flushList();
       blocks.push(<video key={key++} controls src={video[1]} style={{ display: "block", maxWidth: 480, borderRadius: "var(--radius)" }} />);

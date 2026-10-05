@@ -1961,3 +1961,116 @@ th {
   font-size: 0.72rem;
   cursor: pointer;
 }
+
+/* ------------------------------------------------------- audio evidence */
+.study-audio {
+  margin: 1rem 0;
+}
+.audio-tools,
+.audio-reader {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+.audio-reader audio {
+  width: 100%;
+  max-width: 480px;
+}
+.audio-wave {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: #07070f;
+  cursor: crosshair;
+  user-select: none;
+}
+.audio-wave-note {
+  display: flex;
+  align-items: center;
+  height: 100%;
+  padding: 0 0.8rem;
+  font-size: 0.78rem;
+  color: var(--text-dim);
+}
+.audio-playhead {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: #fff;
+  box-shadow: 0 0 6px #fff;
+  pointer-events: none;
+}
+.audio-controls,
+.audio-cite-form,
+.audio-insert {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+}
+.audio-time {
+  font-size: 0.78rem;
+  color: var(--text-dim);
+}
+.audio-cite-form input,
+.audio-insert input {
+  flex: 1 1 200px;
+  min-width: 0;
+  font-size: 0.82rem;
+}
+.audio-insert {
+  margin-bottom: 0.4rem;
+}
+.audio-clip-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 0.82rem;
+}
+.audio-clip-list li {
+  margin: 0.2rem 0;
+}
+.clip-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  padding: 0 0.45rem;
+  font: inherit;
+  font-size: 0.78rem;
+  color: var(--text);
+  border: 1px solid #4fd4c4;
+  border-radius: 999px;
+  background: rgba(79, 212, 196, 0.1);
+  cursor: pointer;
+}
+.clip-btn:hover,
+.clip-btn.playing {
+  background: rgba(79, 212, 196, 0.3);
+}
+.clip-btn-compact {
+  margin-left: 0.15rem;
+  padding: 0 0.3rem;
+  font-size: 0.6rem;
+  vertical-align: super;
+}
+.clip-spectrogram {
+  display: block;
+  width: 100%;
+  max-width: 460px;
+  margin-top: 0.3rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+.btn.active {
+  border-color: var(--accent-forum);
+}
+
+.audio-range {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.78rem;
+  color: var(--text-dim);
+}
