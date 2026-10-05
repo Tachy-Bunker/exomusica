@@ -98,10 +98,17 @@ export function StudyPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [study?.slug],
   );
+  const addClipNotes = useCallback(
+    async (items: { clip: Clip; label: string }[]) => {
+      await addAnnotationsBatch(items.map((i) => `${i.label} ${formatClip(i.clip)}`));
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [study?.slug],
+  );
   const uploadFile = useCallback((blob: Blob, filename: string) => uploadStudyFile(study?.slug ?? "", blob, filename), [study?.slug]);
   const renderAudio = useCallback(
-    (url: string) => <AudioEvidence url={url} canCite={isOwner} clips={clipsByUrl.get(url) ?? []} onCite={addClipNote} uploadFile={uploadFile} />,
-    [isOwner, clipsByUrl, addClipNote, uploadFile],
+    (url: string) => <AudioEvidence url={url} canCite={isOwner} clips={clipsByUrl.get(url) ?? []} onCite={addClipNote} onCiteMany={addClipNotes} uploadFile={uploadFile} />,
+    [isOwner, clipsByUrl, addClipNote, addClipNotes, uploadFile],
   );
   useEffect(() => stopClip, []); // leaving the page silences any clip that's playing
 
@@ -178,6 +185,13 @@ export function StudyPage() {
   async function addAnnotationText(text: string) {
     if (!study || !text.trim()) return;
     await api(`/api/studies/${study.slug}/annotations`, { method: "POST", body: JSON.stringify({ text: text.trim() }) });
+    reload();
+  }
+
+  // Several notes at once (label import): posted in order, one refresh at the end instead of one per note.
+  async function addAnnotationsBatch(texts: string[]) {
+    if (!study) return;
+    for (const text of texts) await api(`/api/studies/${study.slug}/annotations`, { method: "POST", body: JSON.stringify({ text }) });
     reload();
   }
 

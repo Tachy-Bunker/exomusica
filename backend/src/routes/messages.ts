@@ -1,3 +1,4 @@
+import { deleteMessageAttachments } from "../lib/attachmentCleanup.js";
 import type { FastifyInstance } from "fastify";
 import { prisma } from "../lib/prisma.js";
 import { requireAuth } from "../lib/auth.js";
@@ -320,6 +321,13 @@ export async function messageRoutes(app: FastifyInstance): Promise<void> {
         return reply.code(403).send({ error: "not your message" });
       }
       await prisma.message.update({ where: { id }, data: { isDeleted: true } });
+      try {
+        // the message is hidden for good, so its files go too - otherwise they'd pile up on disk, count against the
+        // uploader's quota forever, and get dragged along into every archive.org backup
+        await deleteMessageAttachments(prisma, id);
+      } catch (err) {
+        req.log.warn({ err, messageId: id }, "failed to delete a deleted message's attachments");
+      }
       if (!isOwnMessage) {
         await prisma.auditLog.create({
           data: { actorId: req.user!.id, action: "message.moderate_delete", targetType: "Message", targetId: id },

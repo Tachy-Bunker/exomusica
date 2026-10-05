@@ -2090,3 +2090,60 @@ th {
   border-radius: var(--radius);
   background: rgba(212, 177, 63, 0.1);
 }
+
+.audio-import {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  padding: 0.6rem;
+  border: 1px solid var(--accent-forum-dim);
+  border-radius: var(--radius);
+  background: var(--bg-elevated);
+}
+.audio-import-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.6rem;
+  font-size: 0.85rem;
+}
+.audio-import-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.8rem;
+  font-size: 0.8rem;
+  color: var(--text-dim);
+}
+.audio-import-note {
+  margin: 0;
+  font-size: 0.75rem;
+  color: var(--text-dim);
+}
+.audio-import-list {
+  max-height: 11rem;
+  margin: 0;
+  padding: 0 0 0 1.1rem;
+  overflow-y: auto;
+  font-size: 0.8rem;
+}
+.audio-import-skipped {
+  color: var(--text-dim);
+  font-style: italic;
+}
+
+/* The note/figure trays stay in view while you scroll a long paper (desktop; phones use tap-to-place). */
+.study-trays {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+@media (min-width: 900px) {
+  .study-trays {
+    position: sticky;
+    top: var(--nav-height, 3.6rem);
+    z-index: 6;
+    padding: 0.3rem 0;
+    background: var(--bg);
+    box-shadow: 0 6px 8px -6px rgba(0, 0, 0, 0.6);
+  }
+}

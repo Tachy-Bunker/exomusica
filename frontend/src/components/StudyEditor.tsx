@@ -356,6 +356,8 @@ export function StudyEditor({ body, onBodyChange, notes, charts, renderAudio, up
 
   return (
     <div className="study-editor">
+      {/* pinned under the nav on desktop, so a note or figure can be dragged to a word however far down the paper it is */}
+      <div className="study-trays">
       <div className="study-notes-tray">
         <span className="study-tray-label">Notes</span>
         {notes.length === 0 && <span className="study-tray-empty">Add a note, then drag its [n] onto a word in the preview.</span>}
@@ -456,6 +458,7 @@ export function StudyEditor({ body, onBodyChange, notes, charts, renderAudio, up
           </button>
         </div>
       )}
+      </div>
 
       <div className="study-editor-panes">
         <div className="study-editor-pane">

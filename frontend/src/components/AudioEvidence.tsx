@@ -1,6 +1,7 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { canvasToPng, computePeaks, decodeToMono, renderSpectrogramCanvas, type DecodedAudio } from "../lib/audioAnalysis";
 import { formatTime, type Clip } from "../lib/clips";
+import { decodeTextFile, parseLabels, planClips, type ParsedLabels } from "../lib/labelImport";
 import { onClipPosition, playClip, stopClip, useClipPlayer } from "../lib/clipPlayer";
 import { useAudioStore } from "../lib/audioStore";
 import { useToastStore } from "../lib/toastStore";
@@ -17,6 +18,8 @@ interface Props {
   canCite: boolean;
   clips: EvidenceClip[];
   onCite?: (clip: Clip, label: string) => Promise<void>;
+  /** Adds many clip notes at once (label import), with a single refresh at the end. */
+  onCiteMany?: (items: { clip: Clip; label: string }[]) => Promise<void>;
   /** Uploads a generated file (the spectrogram) into the study, returning its URL. */
   uploadFile?: (blob: Blob, filename: string) => Promise<string>;
 }
@@ -59,7 +62,7 @@ function ReaderAudio({ url, clips }: Props) {
 
 type LoadState = { status: "idle" | "loading" | "ready" } | { status: "error"; message: string };
 
-function AudioTools({ url, clips, onCite, uploadFile }: Props) {
+function AudioTools({ url, clips, onCite, onCiteMany, uploadFile }: Props) {
   const wrapRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const playheadRef = useRef<HTMLDivElement>(null);
@@ -75,6 +78,13 @@ function AudioTools({ url, clips, onCite, uploadFile }: Props) {
   const [busy, setBusy] = useState(false);
   const [maxHz, setMaxHz] = useState<"auto" | number>("auto");
   const playing = useClipPlayer((s) => s.playing?.url === url);
+  const fileRef = useRef<HTMLInputElement>(null);
+  const cancelImport = useRef(false);
+  const [imp, setImp] = useState<{ fileName: string; text: string; parsed: ParsedLabels } | null>(null);
+  const [pointMode, setPointMode] = useState<"next" | number>("next");
+  const [withSpectrograms, setWithSpectrograms] = useState(true);
+  const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
+  const plan = useMemo(() => (imp && duration ? planClips(imp.parsed.labels, duration, pointMode) : null), [imp, duration, pointMode]);
 
   // Decode only once the block is near the screen - a page with several recordings shouldn't decode them all on load.
   useEffect(() => {
@@ -200,6 +210,54 @@ function AudioTools({ url, clips, onCite, uploadFile }: Props) {
     }
   }
 
+  async function openLabelFile(file: File) {
+    const text = decodeTextFile(await file.arrayBuffer());
+    const parsed = parseLabels(text);
+    if (!parsed || parsed.labels.length === 0) {
+      useToastStore.getState().showToast(parsed?.warnings[0] ?? "Couldn't find any labels in that file");
+      return;
+    }
+    setWithSpectrograms(parsed.labels.length <= 30); // a spectrogram per clip is lovely, but 80 of them is a lot to render and upload
+    setPointMode("next");
+    setImp({ fileName: file.name, text, parsed });
+  }
+
+  async function runImport() {
+    const decoded = decodedRef.current;
+    if (!decoded || !plan || !onCiteMany || plan.clips.length === 0) return;
+    cancelImport.current = false;
+    setProgress({ done: 0, total: plan.clips.length });
+    const items: { clip: Clip; label: string }[] = [];
+    let spectrogramsFailed = 0;
+    for (let i = 0; i < plan.clips.length; i++) {
+      if (cancelImport.current) {
+        setProgress(null);
+        return;
+      }
+      const c = plan.clips[i];
+      let img: string | null = null;
+      if (withSpectrograms && uploadFile) {
+        try {
+          img = await uploadFile(await canvasToPng(renderSpectrogramCanvas(decoded, c.start, c.end)), `spectrogram-${c.start.toFixed(2)}-${c.end.toFixed(2)}.png`);
+        } catch {
+          spectrogramsFailed++; // the clip is still worth adding without its picture
+        }
+      }
+      items.push({ clip: { start: c.start, end: c.end, url, img }, label: c.text });
+      setProgress({ done: i + 1, total: plan.clips.length });
+      await new Promise((r) => setTimeout(r, 0)); // let the screen update between clips on slower devices
+    }
+    try {
+      await onCiteMany(items);
+      useToastStore.getState().showToast(`Added ${items.length} clip${items.length === 1 ? "" : "s"} as notes${spectrogramsFailed ? ` (${spectrogramsFailed} spectrogram${spectrogramsFailed === 1 ? "" : "s"} couldn't be uploaded)` : ""}`);
+      setImp(null);
+    } catch {
+      useToastStore.getState().showToast("Couldn't add the notes");
+    } finally {
+      setProgress(null);
+    }
+  }
+
   const ready = load.status === "ready";
   const selLen = selection ? selection.end - selection.start : 0;
 
@@ -252,11 +310,111 @@ function AudioTools({ url, clips, onCite, uploadFile }: Props) {
           <span className="audio-time">
             {selection ? `${formatTime(selection.start)} – ${formatTime(selection.end)} (${selLen.toFixed(2)} s)` : ready ? `Drag on the waveform to select a passage to cite · ${formatTime(duration)}` : ""}
           </span>
+          {ready && onCiteMany && (
+            <>
+              <button type="button" className="btn" title="Import clips from an Audacity label track, REAPER/Audition markers, a CSV, or a Praat TextGrid" onClick={() => fileRef.current?.click()}>
+                ⇪ Import labels…
+              </button>
+              <input
+                ref={fileRef}
+                type="file"
+                accept=".txt,.csv,.tsv,.textgrid,.TextGrid,text/plain,text/csv"
+                hidden
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  e.target.value = ""; // so choosing the same file again works
+                  if (f) void openLabelFile(f);
+                }}
+              />
+            </>
+          )}
           {selection && selLen >= 0.1 && !citing && (
             <button type="button" className="btn btn-primary" onClick={() => setCiting(true)}>
               ＋ Cite this passage
             </button>
           )}
+        </div>
+      )}
+
+      {imp && plan && (
+        <div className="audio-import">
+          <div className="audio-import-head">
+            <b>{imp.fileName}</b>
+            <span className="audio-time">
+              {imp.parsed.format === "audacity" ? "Audacity labels" : imp.parsed.format === "textgrid" ? "Praat TextGrid" : "marker table"} · {plan.clips.length} clip{plan.clips.length === 1 ? "" : "s"} to add
+              {plan.skipped.length > 0 && `, ${plan.skipped.length} skipped`}
+            </span>
+          </div>
+          <div className="audio-import-options">
+            {imp.parsed.tiers.length > 1 && (
+              <label>
+                Tier{" "}
+                <select
+                  value={imp.parsed.tier ?? ""}
+                  disabled={!!progress}
+                  onChange={(e) => {
+                    const parsed = parseLabels(imp.text, { tier: e.target.value });
+                    if (parsed) setImp({ ...imp, parsed });
+                  }}
+                >
+                  {imp.parsed.tiers.map((t) => (
+                    <option key={t} value={t}>
+                      {t}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )}
+            {imp.parsed.labels.some((l) => l.end === null) && (
+              <label title="Markers have a position but no length">
+                Markers play{" "}
+                <select value={String(pointMode)} disabled={!!progress} onChange={(e) => setPointMode(e.target.value === "next" ? "next" : Number(e.target.value))}>
+                  <option value="next">until the next marker</option>
+                  <option value="1">1 second</option>
+                  <option value="2">2 seconds</option>
+                  <option value="5">5 seconds</option>
+                </select>
+              </label>
+            )}
+            <label>
+              <input type="checkbox" checked={withSpectrograms} disabled={!!progress} onChange={(e) => setWithSpectrograms(e.target.checked)} /> a spectrogram for each clip
+            </label>
+          </div>
+          {imp.parsed.warnings.map((w) => (
+            <p key={w} className="audio-import-note">
+              {w}
+            </p>
+          ))}
+          <ul className="audio-import-list">
+            {plan.clips.map((c, i) => (
+              <li key={i}>
+                <span className="audio-time">
+                  {formatTime(c.start)}–{formatTime(c.end)}
+                </span>{" "}
+                {c.text}
+              </li>
+            ))}
+            {plan.skipped.map((s, i) => (
+              <li key={`s${i}`} className="audio-import-skipped">
+                <span className="audio-time">{formatTime(s.label.start)}</span> {s.label.text || "(no text)"} - skipped: {s.reason}
+              </li>
+            ))}
+          </ul>
+          <div className="audio-controls">
+            <button type="button" className="btn btn-primary" disabled={!!progress || plan.clips.length === 0} onClick={() => void runImport()}>
+              {progress ? `Adding ${progress.done} / ${progress.total}…` : `Add ${plan.clips.length} note${plan.clips.length === 1 ? "" : "s"}`}
+            </button>
+            <button
+              type="button"
+              className="btn"
+              onClick={() => {
+                cancelImport.current = true;
+                if (!progress) setImp(null);
+              }}
+            >
+              {progress ? "Stop" : "Cancel"}
+            </button>
+          </div>
         </div>
       )}
 
