@@ -305,6 +305,13 @@ model Attachment {
   communityAlbumCover CommunityAlbum?
   branchPreviewFor    Branch?       @relation("BranchPreview")
   branchSketchFor     BranchSketch? @relation("BranchSketchAttachment")
+  // Set for files uploaded into a study (audio recordings, spectrograms). Lets the study find - and clean
+  // up - exactly its own files. SetNull rather than Cascade so that if a study is ever removed some other
+  // way, the rows survive for the admin storage tools instead of silently orphaning files on disk.
+  studyId             Int?
+  study               Study?        @relation("StudyFiles", fields: [studyId], references: [id], onDelete: SetNull)
+
+  @@index([studyId])
 }
 
 model Album {
@@ -790,6 +797,7 @@ model Study {
   mapNode     ForumMapNode?
   charts      StudyChart[]
   revisions   StudyRevision[]
+  files       Attachment[]      @relation("StudyFiles")
 }
 
 // A snapshot of a study's title and body taken on save, so earlier drafts

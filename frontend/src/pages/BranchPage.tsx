@@ -97,7 +97,7 @@ export function BranchPage() {
   const albumTextScale = isDesktop ? coverTextScale : coverTextScale * 2.2;
 
   return (
-    <div style={{ fontFamily, ...(isDesktop ? {} : { display: "flex", flexDirection: "column", height: "calc(100dvh - var(--nav-height, 3.6rem) - 3rem - var(--player-height, 0px))", marginTop: "-0.6rem" }) }}>
+    <div className={isDesktop ? "page-column" : undefined} style={{ fontFamily, ...(isDesktop ? { maxWidth: 1000 } : { display: "flex", flexDirection: "column", height: "calc(100dvh - var(--nav-height, 3.6rem) - 3rem - var(--player-height, 0px))", marginTop: "-0.6rem" }) }}>
       <div style={isDesktop ? {} : { flexShrink: 0, overflowY: "auto" }}>
         <p style={{ marginBottom: "0.5rem" }}>
           <Link to="/">{isDesktop ? "← back to Exo-Lands (R)" : "← Back to Exo-Lands"}</Link>

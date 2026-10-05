@@ -66,7 +66,7 @@ export function CommunityAlbumPage() {
   if (!album) return <p>Loading…</p>;
 
   return (
-    <div style={{ maxWidth: 720 }}>
+    <div className="page-column" style={{ maxWidth: 720 }}>
       <div
         style={{
           background: "var(--bg-elevated)",

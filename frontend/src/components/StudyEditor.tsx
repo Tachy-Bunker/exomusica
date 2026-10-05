@@ -6,7 +6,6 @@ import { extractHeadings, figureBlockOffsets, type Heading } from "../lib/outlin
 import { mapScroll, normalizeAnchors, textareaOffsetTop, type Anchor } from "../lib/scrollSync";
 import { useToastStore } from "../lib/toastStore";
 import { parseClip, stripClip } from "../lib/clips";
-import { uploadAttachment } from "../lib/uploadAttachment";
 
 const NOTE_MIME = "application/x-exo-note";
 const FIGURE_MIME = "application/x-exo-fig";
@@ -45,11 +44,13 @@ interface Props {
   charts: FigureChart[];
   /** Draws an @audio(url) block (waveform and clip tools). */
   renderAudio: (url: string) => ReactNode;
+  /** Uploads a file into this study (so the server can clean it up with the study). */
+  uploadFile: (blob: Blob, filename: string) => Promise<string>;
   onAddNote: (text: string) => Promise<void>;
   onNavigate: (path: string) => void;
 }
 
-export function StudyEditor({ body, onBodyChange, notes, charts, renderAudio, onAddNote, onNavigate }: Props) {
+export function StudyEditor({ body, onBodyChange, notes, charts, renderAudio, uploadFile, onAddNote, onNavigate }: Props) {
   const taRef = useRef<HTMLTextAreaElement>(null);
   const previewRef = useRef<HTMLDivElement>(null);
   const deferredBody = useDeferredValue(body); // keeps typing snappy on slow devices; the preview catches up
@@ -325,7 +326,7 @@ export function StudyEditor({ body, onBodyChange, notes, charts, renderAudio, on
   async function uploadAndInsertAudio(file: File) {
     setUploadingAudio(true);
     try {
-      insertAudio(await uploadAttachment(file, file.name));
+      insertAudio(await uploadFile(file, file.name));
     } catch (e) {
       toast(e instanceof Error ? e.message : "Upload failed");
     } finally {

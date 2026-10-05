@@ -5,7 +5,7 @@ import { requireAuth, requireAdmin, verifyToken } from "../lib/auth.js";
 import { saveCommunityTrackAudio, saveCommunityAlbumCover, deleteAttachmentAndReclaim } from "../lib/storage.js";
 import { resolvePlayableUrl } from "../lib/embeds.js";
 import { probeAudioDuration } from "../lib/audioProbe.js";
-import { regeneratePlaylistPreview } from "../lib/playlistPreview.js";
+import { deletePlaylistPreview, regeneratePlaylistPreview } from "../lib/playlistPreview.js";
 
 async function uniqueCommunityAlbumSlug(title: string): Promise<string> {
   const base = title.toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") || "album";
@@ -628,6 +628,7 @@ export async function communityMusicRoutes(app: FastifyInstance): Promise<void> 
     if (!playlist) return reply.code(404).send({ error: "no such playlist" });
     if (playlist.ownerId !== req.user!.id) return reply.code(403).send({ error: "not your playlist" });
     await prisma.playlist.delete({ where: { id: playlist.id } });
+    await deletePlaylistPreview(playlist.slug); // its generated preview image goes with it
     return { status: "ok" };
   });
 

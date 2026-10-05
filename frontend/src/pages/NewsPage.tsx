@@ -90,7 +90,7 @@ export function NewsPage() {
 
   if (slug) {
     return (
-      <div style={{ maxWidth: 640, fontFamily, fontSize: `${scale}rem` }}>
+      <div className="page-column" style={{ maxWidth: 640, fontFamily, fontSize: `${scale}rem` }}>
         <Link to="/news" style={{ fontSize: `${0.85 * scale}rem` }}>
           ← News
         </Link>
@@ -109,7 +109,7 @@ export function NewsPage() {
   }
 
   return (
-    <div style={{ fontSize: `${scale}rem` }}>
+    <div className="page-column" style={{ maxWidth: 640, fontSize: `${scale}rem` }}>
       <h1>
         News{isDesktop && <span style={{ opacity: 0.4, fontWeight: "normal", fontSize: "0.6em" }}> (use ↑↓)</span>}
       </h1>

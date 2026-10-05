@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { api, ApiError } from "../lib/api";
 import { diffStats, diffText, type DiffSegment } from "../lib/diff";
+import { findMissingFiles, uploadedFileUrls } from "../lib/studyFiles";
 
 interface RevisionSummary {
   id: number;
@@ -51,6 +52,7 @@ export function StudyHistory({ slug, currentTitle, currentBody, onRestored }: Pr
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [selected, setSelected] = useState<RevisionFull | null>(null);
   const [restoring, setRestoring] = useState(false);
+  const [missingFiles, setMissingFiles] = useState<string[]>([]);
 
   useEffect(() => {
     api<RevisionSummary[]>(`/api/studies/${slug}/revisions`)
@@ -71,6 +73,17 @@ export function StudyHistory({ slug, currentTitle, currentBody, onRestored }: Pr
       cancelled = true;
     };
   }, [selectedId]);
+
+  // Files are cleaned up when whatever used them is removed, so an old version can point at audio or images that no longer exist.
+  useEffect(() => {
+    setMissingFiles([]);
+    if (!selected) return;
+    let cancelled = false;
+    void findMissingFiles(uploadedFileUrls(selected.body)).then((m) => !cancelled && setMissingFiles(m));
+    return () => {
+      cancelled = true;
+    };
+  }, [selected]);
 
   // Diff FROM the current text TO the chosen version: what you'd see change if you restored it.
   const segments = useMemo(() => (selected ? diffText(currentBody, selected.body) : []), [selected, currentBody]);
@@ -125,6 +138,12 @@ export function StudyHistory({ slug, currentTitle, currentBody, onRestored }: Pr
                 {restoring ? "Restoring…" : "Restore this version"}
               </button>
             </div>
+            {missingFiles.length > 0 && (
+              <p className="history-warning">
+                ⚠ This version refers to {missingFiles.length} file{missingFiles.length === 1 ? "" : "s"} (audio or images) that {missingFiles.length === 1 ? "was" : "were"} deleted when{" "}
+                {missingFiles.length === 1 ? "it" : "they"} stopped being used. Restoring brings the text back, but {missingFiles.length === 1 ? "that file" : "those files"} will show as missing.
+              </p>
+            )}
             <pre className="history-diff">
               {shown.map((s) =>
                 s.type === "add" ? (

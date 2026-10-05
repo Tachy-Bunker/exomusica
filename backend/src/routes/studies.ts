@@ -2,6 +2,9 @@ import type { FastifyInstance } from "fastify";
 import { prisma } from "../lib/prisma.js";
 import { requireAuth } from "../lib/auth.js";
 import { recordStudyRevision } from "../lib/studyRevisions.js";
+import { deleteAttachmentAndReclaim, saveMessageAttachment } from "../lib/storage.js";
+import { deleteAllStudyFiles, releaseStudyFiles, sweepAbandonedStudyFiles, type FileOps } from "../lib/studyFiles.js";
+import { removedFileNames, safeStudyUploadName, uploadedFileNames } from "../lib/studyFileRules.js";
 
 async function uniqueStudySlug(title: string): Promise<string> {
   const base = title.toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") || "study";
@@ -23,6 +26,9 @@ async function uniqueChannelSlug(title: string): Promise<string> {
 }
 
 export async function studiesRoutes(app: FastifyInstance): Promise<void> {
+  // File cleanup is best-effort housekeeping: it logs failures but never makes the user's own action fail.
+  const filesFor = (req: { log: { warn: (o: object, m: string) => void } }): FileOps => ({ db: prisma, warn: (o, m) => req.log.warn(o, m) });
+
   app.get("/api/studies", async () => {
     const studies = await prisma.study.findMany({
       select: { slug: true, title: true, status: true, createdAt: true, updatedAt: true, owner: { select: { username: true } }, channel: { select: { slug: true } } },
@@ -112,9 +118,49 @@ export async function studiesRoutes(app: FastifyInstance): Promise<void> {
           req.log.warn({ err, studyId: study.id }, "failed to record study revision");
         }
       }
+
+      // An audio block or image removed from the text no longer needs its file; and uploads that never made it
+      // into the study (started an edit, uploaded, walked away) get swept once they're old enough.
+      if (data.body !== undefined && data.body !== study.body) {
+        try {
+          await releaseStudyFiles(filesFor(req), study.id, removedFileNames(study.body, data.body));
+          await sweepAbandonedStudyFiles(filesFor(req), study.id);
+        } catch (err) {
+          req.log.warn({ err, studyId: study.id }, "study file cleanup after save failed");
+        }
+      }
       return updated;
     },
   );
+
+  // --- Files (audio recordings, spectrograms) uploaded into a study ---
+
+  app.post<{ Params: { slug: string } }>("/api/studies/:slug/files", { preHandler: requireAuth }, async (req, reply) => {
+    const study = await prisma.study.findUnique({ where: { slug: req.params.slug } });
+    if (!study) return reply.code(404).send({ error: "no such study" });
+    if (study.ownerId !== req.user!.id && !req.user!.isAdmin) return reply.code(403).send({ error: "not your study" });
+    const file = await req.file();
+    if (!file) return reply.code(400).send({ error: "no file uploaded" });
+    const name = safeStudyUploadName(file.filename, file.mimetype);
+    if (!name) {
+      file.file.resume();
+      return reply.code(400).send({ error: "only audio files and PNG, JPEG or WebP images can be added to a study" });
+    }
+    const buffer = await file.toBuffer();
+    let attachment;
+    try {
+      attachment = await saveMessageAttachment(req.user!.id, name, file.mimetype, buffer); // counts toward the uploader's storage quota like any attachment
+    } catch (err) {
+      return reply.code(400).send({ error: err instanceof Error ? err.message : "upload failed" });
+    }
+    try {
+      await prisma.attachment.update({ where: { id: attachment.id }, data: { studyId: study.id } });
+    } catch (err) {
+      await deleteAttachmentAndReclaim(attachment.id).catch(() => undefined); // never leave an untagged, untrackable file behind
+      throw err;
+    }
+    return reply.code(201).send({ id: attachment.id, url: attachment.storagePath, filename: attachment.filename, sizeBytes: Number(attachment.sizeBytes) });
+  });
 
   // --- Revision history: owner/admin only ---
 
@@ -160,6 +206,11 @@ export async function studiesRoutes(app: FastifyInstance): Promise<void> {
     const study = await prisma.study.findUnique({ where: { slug: req.params.slug } });
     if (!study) return reply.code(404).send({ error: "no such study" });
     if (study.ownerId !== req.user!.id && !req.user!.isAdmin) return reply.code(403).send({ error: "not your study" });
+    try {
+      await deleteAllStudyFiles(filesFor(req), study.id); // before the study row goes, while we can still find its files
+    } catch (err) {
+      req.log.warn({ err, studyId: study.id }, "failed to delete a study's files");
+    }
     await prisma.study.delete({ where: { id: study.id } });
     return reply.code(204).send();
   });
@@ -183,7 +234,13 @@ export async function studiesRoutes(app: FastifyInstance): Promise<void> {
     if (annotation.study.ownerId !== req.user!.id && !req.user!.isAdmin) return reply.code(403).send({ error: "not your study" });
     const text = req.body?.text?.trim();
     if (!text) return reply.code(400).send({ error: "text is required" });
-    return prisma.studyAnnotation.update({ where: { id: annotation.id }, data: { text } });
+    const updated = await prisma.studyAnnotation.update({ where: { id: annotation.id }, data: { text } });
+    try {
+      await releaseStudyFiles(filesFor(req), annotation.studyId, removedFileNames(annotation.text, text)); // e.g. the clip was edited out of the note
+    } catch (err) {
+      req.log.warn({ err, annotationId: annotation.id }, "note file cleanup failed");
+    }
+    return updated;
   });
 
   app.delete<{ Params: { id: string } }>("/api/study-annotations/:id", { preHandler: requireAuth }, async (req, reply) => {
@@ -191,6 +248,12 @@ export async function studiesRoutes(app: FastifyInstance): Promise<void> {
     if (!annotation) return reply.code(404).send({ error: "no such annotation" });
     if (annotation.study.ownerId !== req.user!.id && !req.user!.isAdmin) return reply.code(403).send({ error: "not your study" });
     await prisma.studyAnnotation.delete({ where: { id: annotation.id } });
+    try {
+      // the note's spectrogram goes with it; its audio file stays if the text or another note still uses it
+      await releaseStudyFiles(filesFor(req), annotation.studyId, uploadedFileNames(annotation.text));
+    } catch (err) {
+      req.log.warn({ err, annotationId: annotation.id }, "note file cleanup failed");
+    }
     // Renumber the remaining annotations so positions stay contiguous
     // (1, 2, 3...) after a deletion in the middle, keeping the [n]
     // numbering the author sees consistent with what's actually there.

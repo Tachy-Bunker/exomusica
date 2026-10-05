@@ -59,7 +59,7 @@ export function AlbumPage() {
   if (!album) return <p>Loading…</p>;
 
   return (
-    <div style={{ maxWidth: 720 }}>
+    <div className="page-column" style={{ maxWidth: 720 }}>
       <Link to={`/branch/${album.branch.slug}`} style={{ fontSize: "0.85rem" }}>
         ← {album.branch.name}
         {isDesktop && " (R)"}

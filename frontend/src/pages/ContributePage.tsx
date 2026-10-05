@@ -28,7 +28,7 @@ export function ContributePage() {
   }, []);
 
   return (
-    <div style={{ maxWidth: 900 }}>
+    <div className="page-column" style={{ maxWidth: 900 }}>
       <h1>Choose your next project</h1>
       <p style={{ color: "var(--text-dim)" }}>
         Pick a branch, grab the brief and any curated sketches, and submit your own take when it's ready.

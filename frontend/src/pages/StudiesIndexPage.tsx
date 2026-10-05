@@ -33,7 +33,7 @@ export function StudiesIndexPage() {
   const complete = studies.filter((s) => s.status === "COMPLETE");
 
   return (
-    <div style={{ maxWidth: 720 }}>
+    <div className="page-column" style={{ maxWidth: 720 }}>
       <h1>Studies</h1>
       <p style={{ color: "var(--text-dim)" }}>
         Documented phenomena and experiments for the Exomusica ecosystem to use - each study gets its own

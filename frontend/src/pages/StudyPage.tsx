@@ -13,6 +13,7 @@ import { useFigures } from "../components/StudyFigure";
 import { AudioEvidence, type EvidenceClip } from "../components/AudioEvidence";
 import { formatClip, parseClip, stripClip, type Clip } from "../lib/clips";
 import { stopClip } from "../lib/clipPlayer";
+import { uploadStudyFile } from "../lib/uploadAttachment";
 import { useDocumentTitle } from "../lib/useDocumentTitle";
 import { useToastStore } from "../lib/toastStore";
 import { StudyChartView } from "../components/StudyChartView";
@@ -97,9 +98,10 @@ export function StudyPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [study?.slug],
   );
+  const uploadFile = useCallback((blob: Blob, filename: string) => uploadStudyFile(study?.slug ?? "", blob, filename), [study?.slug]);
   const renderAudio = useCallback(
-    (url: string) => <AudioEvidence url={url} canCite={isOwner} clips={clipsByUrl.get(url) ?? []} onCite={addClipNote} />,
-    [isOwner, clipsByUrl, addClipNote],
+    (url: string) => <AudioEvidence url={url} canCite={isOwner} clips={clipsByUrl.get(url) ?? []} onCite={addClipNote} uploadFile={uploadFile} />,
+    [isOwner, clipsByUrl, addClipNote, uploadFile],
   );
   useEffect(() => stopClip, []); // leaving the page silences any clip that's playing
 
@@ -285,7 +287,7 @@ export function StudyPage() {
   if (!study) return <p>Loading...</p>;
 
   return (
-    <div style={{ maxWidth: editing ? 1280 : 720 }}>
+    <div className="page-column" style={{ maxWidth: editing ? 1280 : 720 }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "1rem" }}>
         {editing ? (
           <input value={draftTitle} onChange={(e) => setDraftTitle(e.target.value)} style={{ fontSize: "1.4rem", flex: 1, minWidth: 0 }} />
@@ -386,7 +388,7 @@ export function StudyPage() {
       )}
 
       {editing ? (
-        <StudyEditor body={draftBody} onBodyChange={setDraftBody} notes={study.annotations} charts={study.charts} renderAudio={renderAudio} onAddNote={addAnnotationText} onNavigate={(path) => navigate(path)} />
+        <StudyEditor body={draftBody} onBodyChange={setDraftBody} notes={study.annotations} charts={study.charts} renderAudio={renderAudio} uploadFile={uploadFile} onAddNote={addAnnotationText} onNavigate={(path) => navigate(path)} />
       ) : (
         <>
         {extractHeadings(study.body).length >= 3 && (

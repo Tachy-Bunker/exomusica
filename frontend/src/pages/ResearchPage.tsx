@@ -50,7 +50,7 @@ export function ResearchPage() {
   }
 
   return (
-    <div style={{ maxWidth: 900 }}>
+    <div className="page-column" style={{ maxWidth: 900 }}>
       <h1>Study sound. Share what you find.</h1>
       <p style={{ color: "var(--text-dim)" }}>This is the lab, not the stage - document phenomena and build the ecosystem's shared knowledge.</p>
 

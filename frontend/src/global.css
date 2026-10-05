@@ -170,6 +170,13 @@ button {
   padding-bottom: calc(1.5rem + var(--player-height, 0px));
 }
 
+/* Long-form pages sit in a centered column instead of hugging the left edge
+   (each page keeps its own max-width; this only centers it). */
+.page-column {
+  margin-left: auto;
+  margin-right: auto;
+}
+
 /* --- Buttons & forms -------------------------------------------------- */
 
 .btn {
@@ -2073,4 +2080,13 @@ th {
   gap: 0.3rem;
   font-size: 0.78rem;
   color: var(--text-dim);
+}
+
+.history-warning {
+  margin: 0 0 0.5rem;
+  padding: 0.4rem 0.6rem;
+  font-size: 0.8rem;
+  border: 1px solid #d4b13f;
+  border-radius: var(--radius);
+  background: rgba(212, 177, 63, 0.1);
 }

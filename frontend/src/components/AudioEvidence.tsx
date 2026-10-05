@@ -2,7 +2,6 @@ import { useEffect, useRef, useState } from "react";
 import { canvasToPng, computePeaks, decodeToMono, renderSpectrogramCanvas, type DecodedAudio } from "../lib/audioAnalysis";
 import { formatTime, type Clip } from "../lib/clips";
 import { onClipPosition, playClip, stopClip, useClipPlayer } from "../lib/clipPlayer";
-import { uploadAttachment } from "../lib/uploadAttachment";
 import { useAudioStore } from "../lib/audioStore";
 import { useToastStore } from "../lib/toastStore";
 import { ClipButton } from "./ClipButton";
@@ -18,6 +17,8 @@ interface Props {
   canCite: boolean;
   clips: EvidenceClip[];
   onCite?: (clip: Clip, label: string) => Promise<void>;
+  /** Uploads a generated file (the spectrogram) into the study, returning its URL. */
+  uploadFile?: (blob: Blob, filename: string) => Promise<string>;
 }
 
 const WAVE_HEIGHT = 96;
@@ -58,7 +59,7 @@ function ReaderAudio({ url, clips }: Props) {
 
 type LoadState = { status: "idle" | "loading" | "ready" } | { status: "error"; message: string };
 
-function AudioTools({ url, clips, onCite }: Props) {
+function AudioTools({ url, clips, onCite, uploadFile }: Props) {
   const wrapRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const playheadRef = useRef<HTMLDivElement>(null);
@@ -184,7 +185,8 @@ function AudioTools({ url, clips, onCite }: Props) {
     let img: string | null = null;
     try {
       const png = await canvasToPng(renderSpectrogramCanvas(decoded, selection.start, selection.end, maxHz));
-      img = await uploadAttachment(png, `spectrogram-${selection.start.toFixed(2)}-${selection.end.toFixed(2)}.png`);
+      if (!uploadFile) throw new Error("no upload target");
+      img = await uploadFile(png, `spectrogram-${selection.start.toFixed(2)}-${selection.end.toFixed(2)}.png`);
     } catch {
       useToastStore.getState().showToast("Couldn't upload the spectrogram - adding the clip without one");
     }

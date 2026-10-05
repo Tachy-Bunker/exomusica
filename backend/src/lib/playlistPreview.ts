@@ -1,4 +1,4 @@
-import { mkdir, writeFile } from "node:fs/promises";
+import { mkdir, unlink, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { prisma } from "./prisma.js";
 
@@ -87,4 +87,17 @@ export async function regeneratePlaylistPreview(playlistId: number): Promise<voi
 
   const publicUrl = `/uploads/playlist-previews/${playlist.slug}.svg?v=${Date.now()}`; // cache-bust on every regeneration
   await prisma.playlist.update({ where: { id: playlistId }, data: { previewImageUrl: publicUrl } });
+}
+
+/**
+ * Removes a playlist's generated preview image, for when the playlist is deleted. Without this the
+ * file would sit in uploads/ forever. A slug that isn't a plain filename can never reach outside the folder.
+ */
+export async function deletePlaylistPreview(slug: string): Promise<void> {
+  if (!slug || path.basename(slug) !== slug) return;
+  try {
+    await unlink(path.join(PREVIEWS_DIR, `${slug}.svg`));
+  } catch {
+    // never generated, or already gone - nothing to clean up
+  }
 }
