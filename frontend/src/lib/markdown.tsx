@@ -143,6 +143,14 @@ export function renderMarkdown(markdown: string, onLinkClick?: (path: string) =>
   let fenceBuffer: string[] | null = null;
   let key = 0;
   let headingOrdinal = 0; // gives each heading a stable id (sec-N) for the outline and scroll sync
+  // Blocks that hold state (an audio tool with a selection, a loaded waveform) are keyed by WHAT they are, not by
+  // position: otherwise adding a paragraph above one shifts every later key and React throws the component away.
+  const seen = new Map<string, number>();
+  const stableKey = (what: string) => {
+    const n = (seen.get(what) ?? 0) + 1;
+    seen.set(what, n);
+    return `${what}#${n}`;
+  };
 
   function flushList() {
     if (listBuffer.length > 0) {
@@ -216,7 +224,7 @@ export function renderMarkdown(markdown: string, onLinkClick?: (path: string) =>
       const content = options?.figures?.(kind, n) ?? null;
       blocks.push(
         content ? (
-          <figure key={key++} id={`${kind}-${n}`} className="study-figure" data-nocite="">
+          <figure key={stableKey(`${kind}-${n}`)} id={`${kind}-${n}`} className="study-figure" data-nocite="">
             {content}
           </figure>
         ) : (
@@ -265,7 +273,7 @@ export function renderMarkdown(markdown: string, onLinkClick?: (path: string) =>
       flushList();
       if (ext && options?.audio) {
         blocks.push(
-          <div key={key++} className="study-audio" data-nocite="">
+          <div key={stableKey(`audio:${audio[1]}`)} className="study-audio" data-nocite="">
             {options.audio(audio[1])}
           </div>,
         );

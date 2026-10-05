@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { canvasToPng, computePeaks, decodeToMono, renderSpectrogramCanvas, type DecodedAudio } from "../lib/audioAnalysis";
 import { formatTime, type Clip } from "../lib/clips";
 import { decodeTextFile, parseLabels, planClips, type ParsedLabels } from "../lib/labelImport";
+import { ANALYSIS_LABELS, buildAnalysisChart, type AnalysisChart, type AnalysisKind } from "../lib/analysisCharts";
 import { onClipPosition, playClip, stopClip, useClipPlayer } from "../lib/clipPlayer";
 import { useAudioStore } from "../lib/audioStore";
 import { useToastStore } from "../lib/toastStore";
@@ -20,11 +21,19 @@ interface Props {
   onCite?: (clip: Clip, label: string) => Promise<void>;
   /** Adds many clip notes at once (label import), with a single refresh at the end. */
   onCiteMany?: (items: { clip: Clip; label: string }[]) => Promise<void>;
+  /** Adds a measured figure to the study; resolves with its name ("Figure 3"). */
+  onAnalysisChart?: (chart: AnalysisChart) => Promise<string>;
   /** Uploads a generated file (the spectrogram) into the study, returning its URL. */
   uploadFile?: (blob: Blob, filename: string) => Promise<string>;
 }
 
 const WAVE_HEIGHT = 96;
+/** Pitch search ranges: restricting the range is what keeps the tracker from locking onto the wrong thing. */
+const PITCH_RANGES: [string, number, number][] = [
+  ["Voice, most instruments", 70, 800],
+  ["Bass, low voices", 30, 400],
+  ["High instruments, whistles", 200, 2000],
+];
 const PEAK_BUCKETS = 1200;
 
 export function AudioEvidence(props: Props) {
@@ -62,7 +71,7 @@ function ReaderAudio({ url, clips }: Props) {
 
 type LoadState = { status: "idle" | "loading" | "ready" } | { status: "error"; message: string };
 
-function AudioTools({ url, clips, onCite, onCiteMany, uploadFile }: Props) {
+function AudioTools({ url, clips, onCite, onCiteMany, onAnalysisChart, uploadFile }: Props) {
   const wrapRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const playheadRef = useRef<HTMLDivElement>(null);
@@ -78,6 +87,9 @@ function AudioTools({ url, clips, onCite, onCiteMany, uploadFile }: Props) {
   const [busy, setBusy] = useState(false);
   const [maxHz, setMaxHz] = useState<"auto" | number>("auto");
   const playing = useClipPlayer((s) => s.playing?.url === url);
+  const [analysisOpen, setAnalysisOpen] = useState(false);
+  const [analyzing, setAnalyzing] = useState<AnalysisKind | null>(null);
+  const [pitchRange, setPitchRange] = useState(0);
   const fileRef = useRef<HTMLInputElement>(null);
   const cancelImport = useRef(false);
   const [imp, setImp] = useState<{ fileName: string; text: string; parsed: ParsedLabels } | null>(null);
@@ -210,6 +222,29 @@ function AudioTools({ url, clips, onCite, onCiteMany, uploadFile }: Props) {
     }
   }
 
+  async function analyze(kind: AnalysisKind) {
+    const decoded = decodedRef.current;
+    if (!decoded || !onAnalysisChart) return;
+    const toast = useToastStore.getState().showToast;
+    const [, fMin, fMax] = PITCH_RANGES[pitchRange];
+    setAnalyzing(kind);
+    await new Promise((r) => setTimeout(r, 30)); // let "Analyzing…" appear before the (brief) number-crunching
+    try {
+      const result = buildAnalysisChart(kind, decoded.samples, decoded.sampleRate, selection?.start ?? 0, selection?.end ?? decoded.duration, { fMin, fMax });
+      if ("reason" in result) {
+        toast(result.reason);
+        return;
+      }
+      const name = await onAnalysisChart(result.chart);
+      toast(`Added ${name}: ${result.chart.title}. Put it in the text from the Figures tray.`);
+      setAnalysisOpen(false);
+    } catch {
+      toast("The analysis couldn't be added");
+    } finally {
+      setAnalyzing(null);
+    }
+  }
+
   async function openLabelFile(file: File) {
     const text = decodeTextFile(await file.arrayBuffer());
     const parsed = parseLabels(text);
@@ -310,6 +345,11 @@ function AudioTools({ url, clips, onCite, onCiteMany, uploadFile }: Props) {
           <span className="audio-time">
             {selection ? `${formatTime(selection.start)} – ${formatTime(selection.end)} (${selLen.toFixed(2)} s)` : ready ? `Drag on the waveform to select a passage to cite · ${formatTime(duration)}` : ""}
           </span>
+          {ready && onAnalysisChart && (
+            <button type="button" className={`btn${analysisOpen ? " active" : ""}`} title="Measure pitch, loudness, brightness or onsets and add the result as a figure" onClick={() => setAnalysisOpen((v) => !v)}>
+              ∿ Analyze ▾
+            </button>
+          )}
           {ready && onCiteMany && (
             <>
               <button type="button" className="btn" title="Import clips from an Audacity label track, REAPER/Audition markers, a CSV, or a Praat TextGrid" onClick={() => fileRef.current?.click()}>
@@ -333,6 +373,32 @@ function AudioTools({ url, clips, onCite, onCiteMany, uploadFile }: Props) {
               ＋ Cite this passage
             </button>
           )}
+        </div>
+      )}
+
+      {analysisOpen && ready && (
+        <div className="audio-analyze">
+          <div className="audio-import-head">
+            <b>Analyze {selection ? `${formatTime(selection.start)}–${formatTime(selection.end)}` : "the whole recording"}</b>
+            <span className="audio-time">The result is added as a figure, with its settings in the title.</span>
+          </div>
+          <div className="audio-analyze-buttons">
+            {(Object.keys(ANALYSIS_LABELS) as AnalysisKind[]).map((k) => (
+              <button key={k} type="button" className="btn" disabled={!!analyzing} onClick={() => void analyze(k)}>
+                {analyzing === k ? "Analyzing…" : ANALYSIS_LABELS[k]}
+              </button>
+            ))}
+          </div>
+          <label className="audio-range">
+            Pitch range
+            <select value={pitchRange} disabled={!!analyzing} onChange={(e) => setPitchRange(Number(e.target.value))}>
+              {PITCH_RANGES.map(([name, lo, hi], i) => (
+                <option key={name} value={i}>
+                  {name} ({lo}–{hi} Hz)
+                </option>
+              ))}
+            </select>
+          </label>
         </div>
       )}
 

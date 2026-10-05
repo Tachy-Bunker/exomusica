@@ -12,8 +12,11 @@ import { StudyHistory } from "../components/StudyHistory";
 import { useFigures } from "../components/StudyFigure";
 import { AudioEvidence, type EvidenceClip } from "../components/AudioEvidence";
 import { formatClip, parseClip, stripClip, type Clip } from "../lib/clips";
+import type { AnalysisChart } from "../lib/analysisCharts";
 import { stopClip } from "../lib/clipPlayer";
 import { uploadStudyFile } from "../lib/uploadAttachment";
+import { QrModal } from "../components/QrModal";
+import { uploadedFileUrls } from "../lib/studyFiles";
 import { useDocumentTitle } from "../lib/useDocumentTitle";
 import { useToastStore } from "../lib/toastStore";
 import { StudyChartView } from "../components/StudyChartView";
@@ -65,6 +68,7 @@ export function StudyPage() {
   const [chartForm, setChartForm] = useState({ title: "", kind: "LINE" as Chart["kind"], xLabel: "", yLabel: "", xLog: false, yLog: false, dataCsv: "" });
   const [pendingDraft, setPendingDraft] = useState<StudyDraft | null>(null);
   const [showHistory, setShowHistory] = useState(false);
+  const [showQr, setShowQr] = useState(false);
   const [editingChartId, setEditingChartId] = useState<number | null>(null);
 
   useDocumentTitle(study?.title ?? "Study");
@@ -105,10 +109,23 @@ export function StudyPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [study?.slug],
   );
+  // A measured figure from the audio tools: added as a chart, and named the way the Figures tray will name it.
+  const addAnalysisChart = useCallback(
+    async (chart: AnalysisChart): Promise<string> => {
+      if (!study) throw new Error("study not loaded");
+      const numbered = numberCharts([...study.charts, { id: -1, kind: chart.kind }]);
+      const last = numbered[numbered.length - 1];
+      await api(`/api/studies/${study.slug}/charts`, { method: "POST", body: JSON.stringify(chart) });
+      reload();
+      return `${last.kind === "fig" ? "Figure" : "Table"} ${last.n}`;
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [study?.slug, study?.charts],
+  );
   const uploadFile = useCallback((blob: Blob, filename: string) => uploadStudyFile(study?.slug ?? "", blob, filename), [study?.slug]);
   const renderAudio = useCallback(
-    (url: string) => <AudioEvidence url={url} canCite={isOwner} clips={clipsByUrl.get(url) ?? []} onCite={addClipNote} onCiteMany={addClipNotes} uploadFile={uploadFile} />,
-    [isOwner, clipsByUrl, addClipNote, addClipNotes, uploadFile],
+    (url: string) => <AudioEvidence url={url} canCite={isOwner} clips={clipsByUrl.get(url) ?? []} onCite={addClipNote} onCiteMany={addClipNotes} onAnalysisChart={addAnalysisChart} uploadFile={uploadFile} />,
+    [isOwner, clipsByUrl, addClipNote, addClipNotes, addAnalysisChart, uploadFile],
   );
   useEffect(() => stopClip, []); // leaving the page silences any clip that's playing
 
@@ -300,6 +317,12 @@ export function StudyPage() {
 
   if (!study) return <p>Loading...</p>;
 
+  const qrButton = (
+    <button className="btn" title="A QR code that opens this study - for sharing or printing" onClick={() => setShowQr(true)}>
+      QR
+    </button>
+  );
+
   return (
     <div className="page-column" style={{ maxWidth: editing ? 1280 : 720 }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "1rem" }}>
@@ -338,6 +361,8 @@ export function StudyPage() {
         )}
       </p>
 
+      {!isOwner && <div style={{ display: "flex", gap: "0.4rem", marginBottom: "1rem" }}>{qrButton}</div>}
+
       {isOwner && (
         <div style={{ display: "flex", gap: "0.4rem", marginBottom: "1rem" }}>
           {editing ? (
@@ -359,6 +384,7 @@ export function StudyPage() {
               </button>
             </>
           )}
+          {!editing && qrButton}
           <button className="btn" onClick={toggleStatus}>
             Mark as {study.status === "IN_PROGRESS" ? "complete" : "in progress"}
           </button>
@@ -385,6 +411,15 @@ export function StudyPage() {
             Discard
           </button>
         </div>
+      )}
+
+      {showQr && (
+        <QrModal
+          url={`${window.location.origin}/study/${study.slug}`}
+          title={study.title}
+          candidateImages={uploadedFileUrls(`${study.body}\n${study.annotations.map((a) => a.text).join("\n")}`).filter((u) => /\.(png|jpe?g|webp)$/i.test(u))}
+          onClose={() => setShowQr(false)}
+        />
       )}
 
       {isOwner && !editing && showHistory && (

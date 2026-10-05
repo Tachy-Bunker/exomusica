@@ -105,6 +105,14 @@ export function StudyChartView({ kind, xLabel, yLabel, dataCsv, xLog = false, yL
     if (kind === "BAR") {
       lo = Math.min(0, lo);
       hi = Math.max(0, hi);
+    } else {
+      // Don't magnify noise: a steady 440.4 Hz that wobbles by 0.1 Hz is a flat line, not a dramatic zigzag.
+      const mag = Math.max(Math.abs(lo), Math.abs(hi));
+      if (hi - lo < mag * 0.002) {
+        const pad = mag > 0 ? mag * 0.01 : 1;
+        lo -= pad;
+        hi += pad;
+      }
     }
     const ls = linearTicks(lo, hi, 5);
     yMin = ls.min;

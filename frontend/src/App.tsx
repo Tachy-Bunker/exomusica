@@ -13,6 +13,7 @@ import { LoginPage } from "./pages/LoginPage";
 import { JoinPage } from "./pages/JoinPage";
 import { WikiPage } from "./pages/WikiPage";
 import { StudiesIndexPage } from "./pages/StudiesIndexPage";
+import { VoiceLabPage } from "./pages/VoiceLabPage";
 import { ContributePage } from "./pages/ContributePage";
 import { ListenPage } from "./pages/ListenPage";
 import { ResearchPage } from "./pages/ResearchPage";
@@ -92,6 +93,7 @@ export default function App() {
             <Route path="about" element={<Navigate to="/wiki" replace />} />
             <Route path="wiki" element={<WikiPage />} />
             <Route path="studies" element={<StudiesIndexPage />} />
+            <Route path="lab/voice" element={<VoiceLabPage />} />
             <Route path="contribute" element={<ContributePage />} />
             <Route path="listen" element={<ListenPage />} />
             <Route path="research" element={<ResearchPage />} />

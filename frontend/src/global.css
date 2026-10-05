@@ -2147,3 +2147,18 @@ th {
     box-shadow: 0 6px 8px -6px rgba(0, 0, 0, 0.6);
   }
 }
+
+.audio-analyze {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0.6rem;
+  border: 1px solid var(--accent-forum-dim);
+  border-radius: var(--radius);
+  background: var(--bg-elevated);
+}
+.audio-analyze-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
