@@ -23,6 +23,8 @@ import { prisma } from "./lib/prisma.js";
 import { UPLOADS_DIR } from "./lib/storage.js";
 import { authRoutes } from "./routes/auth.js";
 import { joinRoutes } from "./routes/join.js";
+import { homeRoutes } from "./routes/home.js";
+import { conversationRoutes } from "./routes/conversations.js";
 import { branchRoutes } from "./routes/branches.js";
 import { channelRoutes } from "./routes/channels.js";
 import { messageRoutes } from "./routes/messages.js";
@@ -90,6 +92,8 @@ app.get("/health", async () => {
 
 await app.register(authRoutes);
 await app.register(joinRoutes);
+await app.register(homeRoutes);
+await app.register(conversationRoutes);
 await app.register(branchRoutes);
 await app.register(channelRoutes);
 await app.register(messageRoutes);

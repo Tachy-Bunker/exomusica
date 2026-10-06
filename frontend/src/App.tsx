@@ -7,6 +7,10 @@ import { Layout } from "./components/Layout";
 import { RequireAdmin } from "./components/RequireAdmin";
 import { HomePage } from "./pages/HomePage";
 import { MiniChatWindowPage } from "./pages/MiniChatWindowPage";
+import { SoundbayPage } from "./pages/SoundbayPage";
+import { TelemetryPage } from "./pages/TelemetryPage";
+import { ConversationsPage } from "./pages/ConversationsPage";
+import { MembersPage } from "./pages/MembersPage";
 import { EmbedPlaylistPage } from "./pages/EmbedPlaylistPage";
 import { EmbedMainSpacemapPage } from "./pages/EmbedMainSpacemapPage";
 import { LoginPage } from "./pages/LoginPage";
@@ -96,7 +100,13 @@ export default function App() {
             <Route path="lab/voice" element={<VoiceLabPage />} />
             <Route path="contribute" element={<ContributePage />} />
             <Route path="listen" element={<ListenPage />} />
-            <Route path="research" element={<ResearchPage />} />
+              <Route path="xenolab" element={<ResearchPage />} />
+              <Route path="research" element={<Navigate to="/xenolab" replace />} />
+              <Route path="soundbay" element={<SoundbayPage />} />
+              <Route path="telemetry" element={<TelemetryPage />} />
+              <Route path="conversations" element={<ConversationsPage />} />
+              <Route path="members" element={<MembersPage />} />
+              <Route path="log" element={<Navigate to="/wiki" replace />} />
             <Route path="submit" element={<SubmitWorkPage />} />
             <Route path="study/:slug" element={<StudyPage />} />
             <Route path="wiki/:slug" element={<WikiPage />} />

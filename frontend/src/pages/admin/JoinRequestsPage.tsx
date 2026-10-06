@@ -8,6 +8,7 @@ interface JoinRequest {
   bio: string | null;
   reason: string;
   createdAt: string;
+  duplicateIds?: number[]; // other pending requests from the same person (same name or email)
 }
 
 export function JoinRequestsPage() {
@@ -97,6 +98,11 @@ export function JoinRequestsPage() {
             </span>
           </div>
           <div style={{ fontSize: "0.85rem", color: "var(--text-dim)" }}>{r.email}</div>
+          {r.duplicateIds && r.duplicateIds.length > 0 && (
+            <div data-testid="join-duplicate-note" style={{ fontSize: "0.8rem", color: "var(--accent-danger)", margin: "0.2rem 0" }}>
+              Also submitted as {r.duplicateIds.map((id) => `#${id}`).join(", ")}. Approving one clears the others.
+            </div>
+          )}
           {r.bio && <p style={{ fontSize: "0.85rem" }}>{r.bio}</p>}
           <p style={{ fontSize: "0.85rem" }}>
             <em>{r.reason}</em>

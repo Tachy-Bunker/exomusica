@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Link, Outlet, useNavigate, useLocation } from "react-router-dom";
 import { isTypingTarget } from "../lib/isTypingTarget";
 import { underlineLetter } from "../lib/underlineLetter";
+import { sectionOf, type Section } from "../lib/navSections";
 import { api } from "../lib/api";
 import { useAuth } from "../lib/auth";
 import { useCustomFont } from "../lib/useCustomFont";
@@ -48,6 +49,13 @@ import { TrackPreloader } from "./TrackPreloader";
 import { resumeSharedContextIfNeeded } from "../lib/oneShotSfx";
 import { resumeAnalyserContextIfNeeded } from "../lib/audioAnalyser";
 
+const NAV_SECTIONS: { section: Section; label: string; to: string; letter: string }[] = [
+  { section: "soundbay", label: "Soundbay", to: "/soundbay", letter: "s" },
+  { section: "xenolab", label: "XenoLab", to: "/xenolab", letter: "x" },
+  { section: "telemetry", label: "Telemetry", to: "/telemetry", letter: "r" },
+  { section: "log", label: "Log", to: "/wiki", letter: "l" },
+];
+
 export function Layout() {
   const { user } = useAuth();
   const loadEmojis = useEmojiStore((s) => s.load);
@@ -57,6 +65,7 @@ export function Layout() {
   const isDesktop = useIsDesktop();
   const location = useLocation();
   const navigate = useNavigate();
+  const activeSection = sectionOf(location.pathname);
 
   function openDonate() {
     window.open("https://paypal.me/tachybunker", "_blank", "popup=1,width=460,height=640");
@@ -91,7 +100,17 @@ export function Layout() {
         case "c":
           navigate("/");
           break;
-        case "k":
+        case "s":
+          navigate("/soundbay");
+          break;
+        case "x":
+          navigate("/xenolab");
+          break;
+        case "r":
+          navigate("/telemetry");
+          break;
+        case "l":
+        case "k": // the old Wiki letter still works
           navigate("/wiki");
           break;
         case "n":
@@ -307,56 +326,74 @@ export function Layout() {
       style={{ "--dock-offset": `${dockOffset}px` } as React.CSSProperties}
     >
       <header className="top-nav" ref={navRef}>
+        <div className="nav-side nav-left">
+          {user && isDesktop && <OnlineOrbs />}
+          <nav className="nav-pair" aria-label="Primary">
+            {NAV_SECTIONS.slice(0, 2).map((n) => (
+              <Link key={n.section} to={n.to} className="nav-link" aria-current={activeSection === n.section ? "page" : undefined}>
+                {isDesktop ? underlineLetter(n.label, n.letter) : n.label}
+              </Link>
+            ))}
+          </nav>
+        </div>
         <Link to="/" className="brand">
-          {isDesktop ? <>⩽ {underlineLetter("Exomusica", "c")} ⪖</> : "⩽Exomusica⪖"}
+          {isDesktop ? <>⩽ {underlineLetter("EXOMUSICA", "c")} ⪖</> : "⩽EXOMUSICA⪖"}
         </Link>
-        <nav>
-          <Link to="/wiki">{isDesktop ? underlineLetter("Wiki", "k") : "Wiki"}</Link>
-          <Link to="/news">{isDesktop ? underlineLetter("News", "n") : "News"}</Link>
-          <Link to="/discussion/map">{isDesktop ? underlineLetter("Forums", "m") : "Forums"}</Link>
-          {isDesktop && <Link to="/cult">{underlineLetter("Cult Activities", "u")}</Link>}
-        </nav>
-        <div className="spacer" />
-        {user && isDesktop && <OnlineOrbs />}
-        {isDesktop ? (
-          user ? (
-            <>
-              {user.isAdmin && <Link to="/admin">Admin</Link>}
-              <NotificationWidget inline offsetRight={dockOffset} />
-              <Link
-                to="/pms"
-                style={{ position: "relative", display: "inline-flex", color: "var(--accent-forum)" }}
-                title="Messages"
-              >
-                {hasUnreadPms ? <MailNotificationIcon /> : <MailIcon />}
+        <div className="nav-side nav-right">
+          <nav className="nav-pair" aria-label="Secondary">
+            {NAV_SECTIONS.slice(2).map((n) => (
+              <Link key={n.section} to={n.to} className="nav-link" aria-current={activeSection === n.section ? "page" : undefined}>
+                {isDesktop ? underlineLetter(n.label, n.letter) : n.label}
               </Link>
-              <Link to="/account" title={user.username}>
-                <Avatar url={avatarUrl} />
-              </Link>
-              <button className="btn" onClick={openDonate}>
-                💛 Donate
-              </button>
-            </>
-          ) : (
-            <>
-              <NotificationWidget inline offsetRight={dockOffset} />
-              <Link to="/login">Log in</Link>
-              <button className="btn" onClick={openDonate}>
-                💛 Donate
-              </button>
-            </>
-          )
-        ) : user ? (
-          <>
-            <NotificationWidget inline />
-            <MobileAccountHook loggedIn avatarUrl={avatarUrl} hasUnreadPms={hasUnreadPms} username={user.username} isAdmin={user.isAdmin} />
-          </>
-        ) : (
-          <>
-            <NotificationWidget inline />
-            <MobileAccountHook loggedIn={false} />
-          </>
-        )}
+            ))}
+          </nav>
+          <div className="nav-tools">
+            {isDesktop ? (
+              user ? (
+                <>
+                  {user.isAdmin && (
+                    <Link to="/admin" className="nav-admin" title="Admin" aria-label="Admin">
+                      <span className="nav-admin-label">Admin</span>
+                      <span className="nav-admin-icon" aria-hidden="true">⚙</span>
+                    </Link>
+                  )}
+                  <NotificationWidget inline offsetRight={dockOffset} />
+                  <Link
+                    to="/pms"
+                    style={{ position: "relative", display: "inline-flex", color: "var(--accent-forum)" }}
+                    title="Messages"
+                  >
+                    {hasUnreadPms ? <MailNotificationIcon /> : <MailIcon />}
+                  </Link>
+                  <Link to="/account" title={user.username}>
+                    <Avatar url={avatarUrl} />
+                  </Link>
+                  <button className="btn nav-donate" onClick={openDonate} title="Donate">
+                    💛<span className="nav-donate-label"> Donate</span>
+                  </button>
+                </>
+              ) : (
+                <>
+                  <NotificationWidget inline offsetRight={dockOffset} />
+                  <Link to="/login">Log in</Link>
+                  <button className="btn nav-donate" onClick={openDonate} title="Donate">
+                    💛<span className="nav-donate-label"> Donate</span>
+                  </button>
+                </>
+              )
+            ) : user ? (
+              <>
+                <NotificationWidget inline />
+                <MobileAccountHook loggedIn avatarUrl={avatarUrl} hasUnreadPms={hasUnreadPms} username={user.username} isAdmin={user.isAdmin} />
+              </>
+            ) : (
+              <>
+                <NotificationWidget inline />
+                <MobileAccountHook loggedIn={false} />
+              </>
+            )}
+          </div>
+        </div>
       </header>
 
       <main className="main-content" style={{ marginRight: dockOffset }}>

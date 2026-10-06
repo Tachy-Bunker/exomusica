@@ -1,3 +1,4 @@
+import { LogTabs } from "../components/LogTabs";
 import { useEffect, useState, type FormEvent } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import { api, ApiError } from "../lib/api";
@@ -110,6 +111,7 @@ export function NewsPage() {
 
   return (
     <div className="page-column" style={{ maxWidth: 640, fontSize: `${scale}rem` }}>
+      <LogTabs active="news" />
       <h1>
         News{isDesktop && <span style={{ opacity: 0.4, fontWeight: "normal", fontSize: "0.6em" }}> (use ↑↓)</span>}
       </h1>

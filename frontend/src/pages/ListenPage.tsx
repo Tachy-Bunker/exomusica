@@ -68,7 +68,7 @@ export function ListenPage() {
         ))}
         <PreviewCard
           playlist={{ slug: "__main__", title: "The main spacemap", description: null, owner: "Exomusica", createdAt: "", previewImageUrl: "/api/branches/preview.svg" }}
-          onClick={() => navigate("/")}
+          onClick={() => navigate("/?map=full")}
         />
         <button
           onClick={() => navigate(user ? "/my-music" : "/join")}

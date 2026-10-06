@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from "react";
+import { useRef, useState, type FormEvent } from "react";
 import { api, ApiError } from "../lib/api";
 
 export function JoinPage() {
@@ -10,15 +10,24 @@ export function JoinPage() {
     setForm((f) => ({ ...f, [key]: value }));
   }
 
+  const inFlight = useRef(false);
+  const [submitting, setSubmitting] = useState(false);
+
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
+    if (inFlight.current) return; // a double click or a second Enter must not send a second request
+    inFlight.current = true;
+    setSubmitting(true);
     setError(null);
     try {
-      await api("/api/join", { method: "POST", body: JSON.stringify(form) });
+      await api("/api/join", { method: "POST", body: JSON.stringify({ ...form, username: form.username.trim(), email: form.email.trim() }) });
       setStatus("sent");
     } catch (err) {
       setStatus("error");
       setError(err instanceof ApiError ? err.message : "Something went wrong");
+    } finally {
+      inFlight.current = false;
+      setSubmitting(false);
     }
   }
 
@@ -48,7 +57,7 @@ export function JoinPage() {
             pattern="[a-zA-Z0-9_.\-]{3,32}"
             title="3-32 characters: letters, numbers, underscore, hyphen, or period - no spaces"
             value={form.username}
-            onChange={(e) => update("username", e.target.value)}
+            onChange={(e) => update("username", e.target.value.replace(/\s/g, ""))}
           />
           <span style={{ fontSize: "0.75rem", color: "var(--text-dim)" }}>
             Letters, numbers, underscore, hyphen, or period only - no spaces.
@@ -61,7 +70,7 @@ export function JoinPage() {
             type="email"
             required
             value={form.email}
-            onChange={(e) => update("email", e.target.value)}
+            onChange={(e) => update("email", e.target.value.replace(/\s/g, ""))}
           />
         </div>
         <div className="field">
@@ -89,8 +98,8 @@ export function JoinPage() {
           />
         </div>
         {error && <p style={{ color: "var(--accent-danger)" }}>{error}</p>}
-        <button className="btn btn-primary" type="submit">
-          Submit
+        <button className="btn btn-primary" type="submit" disabled={submitting} data-testid="join-submit">
+          {submitting ? "Sending…" : "Submit"}
         </button>
       </form>
     </div>

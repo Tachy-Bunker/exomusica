@@ -1,3 +1,4 @@
+import { LogTabs } from "../components/LogTabs";
 import { useEffect, useState } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import { api } from "../lib/api";
@@ -140,6 +141,7 @@ export function WikiPage() {
     // end, not a sidebar (there's no horizontal room for one on mobile).
     return (
       <div style={{ fontSize: `${scale}rem` }}>
+        <LogTabs active="pages" />
         {article}
         <hr style={{ margin: "2rem 0", border: "none", borderTop: "1px solid var(--border)" }} />
         {pagesNav}
@@ -148,9 +150,12 @@ export function WikiPage() {
   }
 
   return (
-    <div style={{ display: "grid", gridTemplateColumns: "200px 1fr", gap: "2rem", fontSize: `${scale}rem` }}>
-      {pagesNav}
-      {article}
+    <div>
+      <LogTabs active="pages" />
+      <div style={{ display: "grid", gridTemplateColumns: "200px 1fr", gap: "2rem", fontSize: `${scale}rem` }}>
+        {pagesNav}
+        {article}
+      </div>
     </div>
   );
 }

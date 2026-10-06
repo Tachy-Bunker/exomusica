@@ -18,7 +18,7 @@ interface StudyDetail {
 const SAMPLE_CSV = "frequency,amplitude\n100,0.4\n250,0.9\n500,0.6\n1000,1.0\n2000,0.5\n4000,0.2";
 
 export function ResearchPage() {
-  useDocumentTitle("Research");
+  useDocumentTitle("XenoLab");
   const navigate = useNavigate();
   const [studies, setStudies] = useState<StudySummary[]>([]);
   const [demoCsv, setDemoCsv] = useState(SAMPLE_CSV);
@@ -31,16 +31,17 @@ export function ResearchPage() {
       setStudies(data);
       const mostRecent = data[0];
       if (mostRecent) {
+        // The live demo is a nicety: if that study can't be loaded, the page just shows the built-in example.
         api<StudyDetail>(`/api/studies/${mostRecent.slug}`).then((detail) => {
-          const chart = detail.charts.find((c) => c.kind !== "TABLE");
+          const chart = detail.charts?.find((c) => c.kind !== "TABLE");
           if (chart) {
             setDemoCsv(chart.dataCsv);
             setDemoKind(chart.kind as "LINE" | "BAR" | "SCATTER");
             setUsingRealData(true);
           }
-        });
+        }).catch(() => {});
       }
-    });
+    }).catch(() => {});
   }, []);
 
   async function startStudy() {
@@ -95,6 +96,19 @@ export function ResearchPage() {
             {s.title} <span style={{ color: "var(--text-dim)", fontSize: "0.8rem" }}>by {s.owner}</span>
           </Link>
         ))}
+      </div>
+      <p style={{ margin: "0.6rem 0 0" }}><Link to="/studies" style={{ color: "var(--text-dim)" }}>All studies</Link></p>
+
+      <h2 style={{ fontSize: "1rem", marginTop: "1.5rem" }}>Tools and reference</h2>
+      <div className="home-grid" data-testid="xenolab-tools">
+        <Link className="home-card" to="/lab/voice">
+          <span className="home-card-title">Voice lab</span>
+          <span className="home-dim home-card-meta">Clean up and level a voice recording</span>
+        </Link>
+        <Link className="home-card" to="/wiki">
+          <span className="home-card-title">Log</span>
+          <span className="home-dim home-card-meta">The wiki and the news</span>
+        </Link>
       </div>
     </div>
   );
