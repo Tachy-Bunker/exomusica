@@ -29,7 +29,7 @@ static std::vector<Stage> build(float sr, unsigned seed = 1, const char *only = 
     {"AverMatrix", mk<airwinconsolidated::AverMatrix::AverMatrix>, {{0,0.2786579f},{1,0.1130552f},{2,0.6449095f}}},
     {"FathomFive", mk<airwinconsolidated::FathomFive::FathomFive>, {{0,0.785035f},{1,0.0f},{2,0.810504f},{3,0.111477f}}},
     {"Pressure5",  mk<airwinconsolidated::Pressure5::Pressure5>,   {{0,0.291397f},{1,0.0f},{2,0.0f},{3,1.0f},{4,0.5f},{5,1.0f}}},
-    {"Galactic3",  mk<airwinconsolidated::Galactic3::Galactic3>,   {{0,0.765918f},{1,0.625794f},{2,0.5f},{3,1.0f},{4,0.164025f},{5,0.058931f}}},
+    {"Galactic3",  mk<airwinconsolidated::Galactic3::Galactic3>,   {{0,0.765918f},{1,0.625794f},{2,0.5f},{3,1.0f},{4,0.164025f},{5,0.02f}}},
   };
   std::vector<Stage> c; int i = 0;
   for (const auto &sp : specs) {

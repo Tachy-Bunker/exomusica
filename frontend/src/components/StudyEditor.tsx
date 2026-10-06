@@ -6,6 +6,10 @@ import { extractHeadings, figureBlockOffsets, type Heading } from "../lib/outlin
 import { mapScroll, normalizeAnchors, textareaOffsetTop, type Anchor } from "../lib/scrollSync";
 import { useToastStore } from "../lib/toastStore";
 import { parseClip, stripClip } from "../lib/clips";
+import { alignmentAt, indent, setAlignment, type Align } from "../lib/textEdit";
+import { imageLine, replaceLine, setImageAttrs, uploadingFileLine, uploadingLine } from "../lib/images";
+import { isImageFile } from "../lib/fileKinds";
+import type { UploadedStudyFile } from "../lib/uploadAttachment";
 
 const NOTE_MIME = "application/x-exo-note";
 const FIGURE_MIME = "application/x-exo-fig";
@@ -46,12 +50,35 @@ interface Props {
   renderAudio: (url: string) => ReactNode;
   /** Uploads a file into this study (so the server can clean it up with the study). */
   uploadFile: (blob: Blob, filename: string) => Promise<string>;
+  /** The same upload, returning the file's name, type and size too (for pictures and attachments). */
+  uploadFileInfo: (blob: Blob, filename: string) => Promise<UploadedStudyFile>;
+  /** Draws an @file(...) line as a file card. */
+  renderFile: (url: string, label: string | undefined) => ReactNode;
   onAddNote: (text: string) => Promise<void>;
   onNavigate: (path: string) => void;
 }
 
-export function StudyEditor({ body, onBodyChange, notes, charts, renderAudio, uploadFile, onAddNote, onNavigate }: Props) {
+const ALIGN_GLYPH: Record<Align, string> = { left: "⇤", center: "↔", right: "⇥" };
+const hasFiles = (e: { dataTransfer: DataTransfer | null }) => !!e.dataTransfer && Array.from(e.dataTransfer.types).includes("Files");
+const altFor = (f: File) => f.name.replace(/\.[^.]+$/, "").replace(/[\[\]\n]/g, " ").trim() || "image";
+
+export function StudyEditor({ body, onBodyChange, notes, charts, renderAudio, uploadFile, uploadFileInfo, renderFile, onAddNote, onNavigate }: Props) {
   const taRef = useRef<HTMLTextAreaElement>(null);
+  // The latest text, kept current even between renders: uploads finish at unpredictable moments and must edit what is there NOW.
+  const bodyRef = useRef(body);
+  useEffect(() => {
+    bodyRef.current = body;
+  }, [body]);
+  const commit = (next: string) => {
+    bodyRef.current = next;
+    onBodyChange(next);
+  };
+  const uploadSeq = useRef(0);
+  const [uploads, setUploads] = useState(0);
+  const tabEscape = useRef(false); // Esc was just pressed, so the next Tab moves on instead of indenting
+  const imageInput = useRef<HTMLInputElement>(null);
+  const fileInput = useRef<HTMLInputElement>(null);
+  const [alignActive, setAlignActive] = useState<Align>("left");
   const previewRef = useRef<HTMLDivElement>(null);
   const deferredBody = useDeferredValue(body); // keeps typing snappy on slow devices; the preview catches up
   const [armed, setArmed] = useState<number | null>(null);
@@ -223,6 +250,71 @@ export function StudyEditor({ body, onBodyChange, notes, charts, renderAudio, up
     onBodyChange(next);
   }
 
+  // ------------------------------------------------------- pictures and files
+  /** Puts a block of text at the cursor on its own lines (like a figure), against the CURRENT text. */
+  function insertBlock(token: string) {
+    const ta = taRef.current;
+    const offset = ta ? ta.selectionEnd : bodyRef.current.length;
+    const next = insertFigureBlock(bodyRef.current, offset, token);
+    const caret = next.indexOf(token, Math.max(0, offset - 1)) + token.length;
+    commit(next);
+    requestAnimationFrame(() => {
+      if (!ta) return;
+      ta.focus();
+      ta.setSelectionRange(caret, caret);
+    });
+  }
+
+  /** Adds pictures (shown in the text) and any other files (shown as downloadable cards). A stand-in line appears at once and is settled as each upload finishes. */
+  async function attach(files: File[]) {
+    const list = files.slice(0, 20);
+    if (list.length === 0) return;
+    const items = list.map((f) => ({ f, id: ++uploadSeq.current, image: isImageFile(f) }));
+    const standIn = (it: (typeof items)[number]) => (it.image ? uploadingLine(it.id) : uploadingFileLine(it.id, it.f.name || "file"));
+    insertBlock(items.map(standIn).join("\n\n"));
+    setUploads((n) => n + items.length);
+    await Promise.all(
+      items.map(async (it) => {
+        try {
+          const info = await uploadFileInfo(it.f, it.f.name || (it.image ? "pasted-image.png" : "file"));
+          commit(replaceLine(bodyRef.current, standIn(it), it.image ? imageLine(altFor(it.f), info.url) : `@file(${info.url})`));
+        } catch (e) {
+          commit(replaceLine(bodyRef.current, standIn(it), null));
+          toast(`${it.f.name || "That file"} couldn't be added: ${e instanceof Error ? e.message : "upload failed"}`);
+        } finally {
+          setUploads((n) => n - 1);
+        }
+      }),
+    );
+  }
+
+  // a file dropped slightly off target would otherwise make the browser leave the page and open it, losing what was being written
+  useEffect(() => {
+    const stop = (e: globalThis.DragEvent) => {
+      if (e.dataTransfer && Array.from(e.dataTransfer.types).includes("Files")) e.preventDefault();
+    };
+    window.addEventListener("dragover", stop);
+    window.addEventListener("drop", stop);
+    return () => {
+      window.removeEventListener("dragover", stop);
+      window.removeEventListener("drop", stop);
+    };
+  }, []);
+
+  function applyAlign(a: Align) {
+    const ta = taRef.current;
+    if (!ta) return;
+    const edit = setAlignment(bodyRef.current, ta.selectionStart, ta.selectionEnd, a);
+    const scrollTop = ta.scrollTop;
+    commit(edit.text);
+    setAlignActive(a);
+    requestAnimationFrame(() => {
+      ta.focus();
+      ta.scrollTop = scrollTop;
+      ta.setSelectionRange(edit.start, edit.end);
+    });
+  }
+
   // ------------------------------------------------------------- toolbar
   function applyFormat(format: Format) {
     const ta = taRef.current;
@@ -303,6 +395,28 @@ export function StudyEditor({ body, onBodyChange, notes, charts, renderAudio, up
   }
 
   function handleTextareaKeyDown(e: ReactKeyboardEvent<HTMLTextAreaElement>) {
+    if (e.key === "Escape") {
+      tabEscape.current = true; // Esc, then Tab, moves focus on: a writing box that traps the keyboard would be a trap
+      return;
+    }
+    if (e.key === "Tab" && !e.ctrlKey && !e.metaKey && !e.altKey) {
+      if (tabEscape.current) {
+        tabEscape.current = false;
+        return;
+      }
+      const ta = taRef.current;
+      if (!ta) return;
+      e.preventDefault();
+      const edit = indent(bodyRef.current, ta.selectionStart, ta.selectionEnd, e.shiftKey);
+      const scrollTop = ta.scrollTop;
+      commit(edit.text);
+      requestAnimationFrame(() => {
+        ta.scrollTop = scrollTop;
+        ta.setSelectionRange(edit.start, edit.end);
+      });
+      return;
+    }
+    if (e.key !== "Shift") tabEscape.current = false;
     if (!(e.ctrlKey || e.metaKey) || e.altKey) return;
     const map: Record<string, Format> = { b: "bold", i: "italic", k: "link" };
     const format = map[e.key.toLowerCase()];
@@ -463,11 +577,35 @@ export function StudyEditor({ body, onBodyChange, notes, charts, renderAudio, up
       <div className="study-editor-panes">
         <div className="study-editor-pane">
           <div className="study-pane-head">
-            <span>Write</span>
+            <span>
+              Write{" "}
+              <span className="study-hint" title="Tab indents the line (Shift+Tab takes the indent back). Press Esc and then Tab to leave the box with the keyboard.">
+                Tab indents · Esc then Tab leaves the box
+              </span>
+              {uploads > 0 && (
+                <span className="study-hint" role="status" data-testid="editor-uploading">
+                  {" "}
+                  · uploading {uploads}…
+                </span>
+              )}
+            </span>
             <span className="study-toolbar">
               <button type="button" className={`btn${audioOpen ? " active" : ""}`} title="Add an audio recording" onMouseDown={(e) => e.preventDefault()} onClick={() => setAudioOpen((v) => !v)}>
                 ♪ Audio
               </button>
+              <button type="button" className="btn" title="Add a picture. You can also paste one, or drop image files into the writing box." onMouseDown={(e) => e.preventDefault()} onClick={() => imageInput.current?.click()} data-testid="editor-add-image">
+                🖼 Image
+              </button>
+              <button type="button" className="btn" title="Attach any file: readers can download it, and text files can be previewed" onMouseDown={(e) => e.preventDefault()} onClick={() => fileInput.current?.click()} data-testid="editor-add-file">
+                📎 File
+              </button>
+              <input ref={imageInput} type="file" accept="image/png,image/jpeg,image/webp,image/gif" multiple hidden data-testid="editor-image-input" onChange={(e) => { const f = Array.from(e.target.files ?? []); e.target.value = ""; void attach(f); }} />
+              <input ref={fileInput} type="file" multiple hidden data-testid="editor-file-input" onChange={(e) => { const f = Array.from(e.target.files ?? []); e.target.value = ""; void attach(f); }} />
+              {(["left", "center", "right"] as Align[]).map((a) => (
+                <button key={a} type="button" className={`btn${alignActive === a ? " active" : ""}`} aria-pressed={alignActive === a} title={`Align text ${a}`} aria-label={`Align text ${a}`} onMouseDown={(e) => e.preventDefault()} onClick={() => applyAlign(a)} data-testid={`editor-align-${a}`}>
+                  {ALIGN_GLYPH[a]}
+                </button>
+              ))}
               {tools.map((t) => (
                 <button key={t.format} type="button" className="btn" title={t.title} onMouseDown={(e) => e.preventDefault()} onClick={() => applyFormat(t.format)}>
                   {t.label}
@@ -493,7 +631,22 @@ export function StudyEditor({ body, onBodyChange, notes, charts, renderAudio, up
             onChange={handleTextareaChange}
             onKeyDown={handleTextareaKeyDown}
             onScroll={() => onPaneScroll("ta")}
+            onSelect={(e) => setAlignActive(alignmentAt(bodyRef.current, e.currentTarget.selectionStart))}
+            onPaste={(e) => {
+              const files = Array.from(e.clipboardData.files);
+              if (files.length === 0 || e.clipboardData.getData("text/plain")) return; // text (even beside a picture, as when copying from a web page) pastes as normal
+              e.preventDefault();
+              void attach(files);
+            }}
+            onDragOver={(e) => {
+              if (hasFiles(e)) e.preventDefault();
+            }}
             onDrop={(e) => {
+              if (hasFiles(e) && !isNoteDrag(e) && !isFigureDrag(e)) {
+                e.preventDefault();
+                void attach(Array.from(e.dataTransfer.files));
+                return;
+              }
               if (isFigureDrag(e)) {
                 pendingDrop.current = { marker: `{${e.dataTransfer.getData(FIGURE_MIME)}}`, before: body, block: true };
                 setTimeout(() => (pendingDrop.current = null), 150);
@@ -519,6 +672,10 @@ export function StudyEditor({ body, onBodyChange, notes, charts, renderAudio, up
             className={`study-preview${armed !== null ? " armed" : ""}`}
             onScroll={() => onPaneScroll("pv")}
             onDragOver={(e) => {
+              if (hasFiles(e)) {
+                e.preventDefault();
+                return;
+              }
               if (!isNoteDrag(e) && !isFigureDrag(e)) return;
               e.preventDefault();
               e.dataTransfer.dropEffect = "copy";
@@ -528,6 +685,11 @@ export function StudyEditor({ body, onBodyChange, notes, charts, renderAudio, up
               if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setHighlight(null);
             }}
             onDrop={(e) => {
+              if (hasFiles(e) && !isNoteDrag(e) && !isFigureDrag(e)) {
+                e.preventDefault();
+                void attach(Array.from(e.dataTransfer.files));
+                return;
+              }
               const fig = isFigureDrag(e) ? e.dataTransfer.getData(FIGURE_MIME) : "";
               if (!fig && !isNoteDrag(e)) return;
               e.preventDefault();
@@ -554,7 +716,7 @@ export function StudyEditor({ body, onBodyChange, notes, charts, renderAudio, up
               }
             }}
           >
-            {renderMarkdown(deferredBody, onNavigate, { extended: true, notes: noteTexts, figures: figures.render, figureCounts: figures.counts, audio: renderAudio })}
+            {renderMarkdown(deferredBody, onNavigate, { extended: true, notes: noteTexts, figures: figures.render, figureCounts: figures.counts, audio: renderAudio, images: { editable: true, onChange: (index, attrs) => commit(setImageAttrs(bodyRef.current, index, attrs)) }, file: renderFile })}
           </div>
         </div>
       </div>

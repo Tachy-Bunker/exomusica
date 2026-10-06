@@ -18,6 +18,7 @@ import cors from "@fastify/cors";
 import websocketPlugin from "@fastify/websocket";
 import multipart from "@fastify/multipart";
 import fastifyStatic from "@fastify/static";
+import { uploadHeaders } from "./lib/uploadHeaders.js";
 import { prisma } from "./lib/prisma.js";
 import { UPLOADS_DIR } from "./lib/storage.js";
 import { authRoutes } from "./routes/auth.js";
@@ -72,7 +73,15 @@ const app = Fastify({ logger: true, bodyLimit: 105 * 1024 * 1024, ignoreTrailing
 await app.register(cors, { origin: true });
 await app.register(websocketPlugin);
 await app.register(multipart);
-await app.register(fastifyStatic, { root: UPLOADS_DIR, prefix: "/uploads/" });
+await app.register(fastifyStatic, {
+  root: UPLOADS_DIR,
+  prefix: "/uploads/",
+  // uploads are user-supplied and served from our own origin, so they must not be able to run as web pages
+  setHeaders: (res, filePath) => {
+    const target = res as unknown as { setHeader?: (n: string, v: string) => void; header?: (n: string, v: string) => void };
+    for (const [name, value] of Object.entries(uploadHeaders(filePath))) (target.setHeader ?? target.header)!.call(target, name, value);
+  },
+});
 
 app.get("/health", async () => {
   const rows = await prisma.$queryRaw<{ now: Date }[]>`SELECT now()`;

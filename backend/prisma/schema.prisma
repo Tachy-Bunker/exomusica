@@ -206,7 +206,7 @@ model ForumChannel {
   messages Message[]
   mapNode  ForumMapNode?
   follows  ChannelFollow[]
-  study    Study?
+  studies  Study[]
   submissionFor CommunityAlbum?
 }
 
@@ -789,7 +789,7 @@ model Study {
   title       String
   body        String            @db.Text
   status      StudyStatus       @default(IN_PROGRESS)
-  channelId   Int?              @unique // auto-created discussion channel, findable from the study page and the forum map
+  channelId   Int?              // the study's discussion chat: its own auto-created one, or any existing branch/topic chat the owner picked. Several studies may share one chat.
   channel     ForumChannel?     @relation(fields: [channelId], references: [id], onDelete: SetNull)
   createdAt   DateTime          @default(now())
   updatedAt   DateTime          @updatedAt

@@ -59,20 +59,23 @@ const AUDIO_EXT: Record<string, string> = {
   "audio/webm": ".webm",
   "audio/opus": ".opus",
 };
-const IMAGE_EXT: Record<string, string> = { "image/png": ".png", "image/jpeg": ".jpg", "image/webp": ".webp" };
+const IMAGE_EXT: Record<string, string> = { "image/png": ".png", "image/jpeg": ".jpg", "image/webp": ".webp", "image/gif": ".gif" };
 
 /**
- * A safe filename (with a clean extension) for a file being added to a study, or null if its type isn't
- * allowed. Only audio and PNG/JPEG/WebP images may be added - this isn't a general file host.
+ * A safe filename (with a clean extension) for a file being added to a study. Any kind of file may be added, so this only makes the name
+ * safe. What keeps arbitrary files harmless is how they are served: anything that isn't plain media is sent as a download, never opened
+ * as a web page (see lib/uploadHeaders.ts and the study file download route).
  */
 export function safeStudyUploadName(filename: string, mimeType: string): string | null {
-  let ext = IMAGE_EXT[mimeType] ?? AUDIO_EXT[mimeType];
-  if (!ext && mimeType.startsWith("audio/")) {
-    const fromName = filename.match(/\.[A-Za-z0-9]{2,5}$/)?.[0]?.toLowerCase();
-    if (fromName) ext = fromName; // an audio type we don't have in the table, with a plain extension
+  let ext = IMAGE_EXT[mimeType] ?? AUDIO_EXT[mimeType] ?? "";
+  if (!ext) {
+    const fromName = filename.match(/\.[A-Za-z0-9]{1,10}$/)?.[0]?.toLowerCase();
+    if (fromName) ext = fromName; // a plain extension taken from the name (never from anything else)
   }
-  if (!ext) return null;
   const dot = filename.lastIndexOf(".");
-  const base = (dot > 0 ? filename.slice(0, dot) : dot === 0 ? "" : filename).replace(/[^A-Za-z0-9._ -]/g, "_").replace(/^\.+/, "").trim().slice(0, 60);
+  // The file is stored on disk under a random name, so the name shown to people can keep its own language: only characters that are
+  // dangerous are replaced - control characters, path separators, quotes and similar, and the invisible right-to-left overrides
+  // that are used to make "photo\u202Egpj.exe" look like "photo.jpg".
+  const base = Array.from((dot > 0 ? filename.slice(0, dot) : dot === 0 ? "" : filename).replace(/[\u0000-\u001f\u007f<>:"/\\|?*\u200e\u200f\u202a-\u202e\u2066-\u2069]/g, "_").replace(/^\.+/, "").trim()).slice(0, 100).join("");
   return `${base || "file"}${ext}`;
 }

@@ -14,8 +14,11 @@ import { AudioEvidence, type EvidenceClip } from "../components/AudioEvidence";
 import { formatClip, parseClip, stripClip, type Clip } from "../lib/clips";
 import type { AnalysisChart } from "../lib/analysisCharts";
 import { stopClip } from "../lib/clipPlayer";
-import { uploadStudyFile } from "../lib/uploadAttachment";
+import { uploadStudyFile, uploadStudyFileInfo, type UploadedStudyFile } from "../lib/uploadAttachment";
+import { StudyFile, type StudyFileInfo } from "../components/StudyFile";
+import { ChannelPicker } from "../components/ChannelPicker";
 import { QrModal } from "../components/QrModal";
+import { VoiceNoteRecorder, type FinishedVoiceNote } from "../components/VoiceNoteRecorder";
 import { uploadedFileUrls } from "../lib/studyFiles";
 import { useDocumentTitle } from "../lib/useDocumentTitle";
 import { useToastStore } from "../lib/toastStore";
@@ -48,7 +51,8 @@ interface StudyDetail {
   body: string;
   status: "IN_PROGRESS" | "COMPLETE";
   owner: { id: number; username: string };
-  channel: { slug: string } | null;
+  channel: { slug: string; name: string; kind: "BRANCH" | "DISCUSSION"; branch: { slug: string } | null } | null;
+  files: (StudyFileInfo & { url: string })[];
   annotations: Annotation[];
   charts: Chart[];
 }
@@ -69,6 +73,9 @@ export function StudyPage() {
   const [pendingDraft, setPendingDraft] = useState<StudyDraft | null>(null);
   const [showHistory, setShowHistory] = useState(false);
   const [showQr, setShowQr] = useState(false);
+  const [showVoice, setShowVoice] = useState(false);
+  const [showChatPicker, setShowChatPicker] = useState(false);
+  const [sessionFiles, setSessionFiles] = useState<UploadedStudyFile[]>([]); // files added since the page loaded, so their cards can show a name and size straight away
   const [editingChartId, setEditingChartId] = useState<number | null>(null);
 
   useDocumentTitle(study?.title ?? "Study");
@@ -317,6 +324,38 @@ export function StudyPage() {
 
   if (!study) return <p>Loading...</p>;
 
+  // A voice note becomes a dated entry in the study: its file is attached to the study and a heading plus audio block are added to the end.
+  async function addVoiceNote(note: FinishedVoiceNote) {
+    if (!study) return;
+    const url = await uploadStudyFile(study.slug, note.blob, "voice-note.m4a");
+    const stamp = note.recordedAt.toLocaleString(undefined, { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" }); // when it was recorded, not when processing finished
+    const entry = `### Voice note · ${stamp}\n\n@audio(${url})\n`;
+    const body = study.body.trim() ? `${study.body.replace(/\s+$/, "")}\n\n${entry}` : entry;
+    await api(`/api/studies/${study.slug}`, { method: "PATCH", body: JSON.stringify({ title: study.title, body }) });
+    reload();
+    setShowVoice(false);
+    useToastStore.getState().showToast("Voice note added to the study");
+  }
+
+  // Files attached to the study: a card with name, size, download and (for text files) a preview.
+  const fileInfo = (url: string): StudyFileInfo | null => study?.files?.find((f) => f.url === url) ?? sessionFiles.find((f) => f.url === url) ?? null;
+  const renderFile = (url: string, label: string | undefined) => <StudyFile url={url} label={label} info={fileInfo(url)} />;
+  const uploadFileInfo = async (blob: Blob, filename: string) => {
+    const info = await uploadStudyFileInfo(study?.slug ?? "", blob, filename);
+    setSessionFiles((f) => [...f, info]);
+    return info;
+  };
+
+  // Which chat the study is connected to. Switching never deletes anything: the chat it leaves keeps its messages.
+  async function changeChat(change: { channelSlug?: string | null; newChat?: boolean }) {
+    if (!study) return;
+    await api(`/api/studies/${study.slug}`, { method: "PATCH", body: JSON.stringify(change) });
+    reload();
+    setShowChatPicker(false);
+    useToastStore.getState().showToast(change.newChat ? "Created a new chat for this study" : change.channelSlug === null ? "This study no longer has a chat" : "This study's chat has been changed");
+  }
+  const chatPath = (c: NonNullable<StudyDetail["channel"]>) => (c.kind === "BRANCH" && c.branch ? `/branch/${c.branch.slug}` : `/topic/${c.slug}`);
+
   const qrButton = (
     <button className="btn" title="A QR code that opens this study - for sharing or printing" onClick={() => setShowQr(true)}>
       QR
@@ -347,10 +386,19 @@ export function StudyPage() {
       </div>
       <p style={{ fontSize: "0.8rem", color: "var(--text-dim)" }}>
         by {study.owner.username}
+        {isOwner && (
+          <>
+            {" · "}
+            <button type="button" className="link-btn" onClick={() => setShowChatPicker(true)} data-testid="study-change-chat">
+              {study.channel ? "change chat" : "connect a chat"}
+            </button>
+          </>
+        )}
         {study.channel && (
           <>
             {" · "}
-            <Link to={`/topic/${study.channel.slug}`}>discuss this study</Link>
+            <Link to={chatPath(study.channel)} data-testid="study-chat-link">discuss this study</Link>
+            <span className="study-chat-name" data-testid="study-chat-name"> ({study.channel.name})</span>
             {user?.isAdmin && (
               <>
                 {" · "}
@@ -381,6 +429,9 @@ export function StudyPage() {
               </button>
               <button className="btn" onClick={() => setShowHistory((v) => !v)}>
                 History
+              </button>
+              <button className="btn" title="Record a voice note and add it to this study as a dated entry" onClick={() => setShowVoice((v) => !v)} data-testid="study-voice-note">
+                🎙 Voice note
               </button>
             </>
           )}
@@ -413,6 +464,16 @@ export function StudyPage() {
         </div>
       )}
 
+      {showChatPicker && study && (
+        <ChannelPicker
+          currentSlug={study.channel?.slug ?? null}
+          onPick={(slug) => changeChat({ channelSlug: slug })}
+          onNewChat={() => changeChat({ newChat: true })}
+          onDisconnect={() => changeChat({ channelSlug: null })}
+          onClose={() => setShowChatPicker(false)}
+        />
+      )}
+
       {showQr && (
         <QrModal
           url={`${window.location.origin}/study/${study.slug}`}
@@ -421,6 +482,8 @@ export function StudyPage() {
           onClose={() => setShowQr(false)}
         />
       )}
+
+      {isOwner && !editing && showVoice && <VoiceNoteRecorder doneLabel="Add to study" onDone={addVoiceNote} onCancel={() => setShowVoice(false)} />}
 
       {isOwner && !editing && showHistory && (
         <StudyHistory
@@ -437,7 +500,7 @@ export function StudyPage() {
       )}
 
       {editing ? (
-        <StudyEditor body={draftBody} onBodyChange={setDraftBody} notes={study.annotations} charts={study.charts} renderAudio={renderAudio} uploadFile={uploadFile} onAddNote={addAnnotationText} onNavigate={(path) => navigate(path)} />
+        <StudyEditor body={draftBody} onBodyChange={setDraftBody} notes={study.annotations} charts={study.charts} renderAudio={renderAudio} uploadFile={uploadFile} uploadFileInfo={uploadFileInfo} renderFile={renderFile} onAddNote={addAnnotationText} onNavigate={(path) => navigate(path)} />
       ) : (
         <>
         {extractHeadings(study.body).length >= 3 && (
@@ -455,7 +518,7 @@ export function StudyPage() {
           </details>
         )}
         <div className="study-body">
-          {renderMarkdown(study.body, (path) => navigate(path), { extended: true, notes: study.annotations.map((a) => a.text), figures: figs.render, figureCounts: figs.counts, audio: renderAudio })}
+          {renderMarkdown(study.body, (path) => navigate(path), { extended: true, notes: study.annotations.map((a) => a.text), figures: figs.render, figureCounts: figs.counts, audio: renderAudio, images: { editable: false }, file: renderFile })}
         </div>
         </>
       )}

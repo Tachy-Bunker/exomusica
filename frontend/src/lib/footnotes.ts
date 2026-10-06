@@ -65,11 +65,9 @@ function hiddenRanges(source: string): Range2[] {
       else fenceInner.push([fenceInnerStart, offset]);
       inFence = !inFence;
     } else if (!inFence) {
-      if (/^(!\[.*?\]\(\S+\)|@audio\(\S+\)|@video\(\S+\)|\{(?:fig|tab):\d+\})$/.test(line)) {
-        ranges.push([offset, end]); // image/audio/video/figure embeds render no word-text we can cite
+      if (/^(!\[.*?\]\(\S+\)(?:\{[^{}]*\})?|@audio\(\S+\)|@video\(\S+\)|@file\(\S+\)(?:\[.*?\])?|:::(?:left|center|right)?|\{(?:fig|tab):\d+\})$/.test(line)) {
+        ranges.push([offset, end]); // image/audio/video/file/figure embeds and :::alignment markers render no word-text we can cite
       } else {
-        const file = line.match(/^@file\(\S+?\)/);
-        if (file) ranges.push([offset, offset + file[0].length]);
         const ordered = line.match(/^\d+[.)]\s/);
         if (ordered) ranges.push([offset, offset + ordered[0].length]); // "1. " is list numbering, drawn by CSS
       }

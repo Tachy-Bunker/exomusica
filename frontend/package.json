@@ -9,10 +9,13 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@mediabunny/aac-encoder": "^1.61.3",
+    "mediabunny": "^1.61.3",
     "qrcode-generator": "^2.0.4",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
     "react-router-dom": "^7.18.3",
+    "wasm-media-encoders": "^0.7.0",
     "zustand": "^5.0.15"
   },
   "devDependencies": {

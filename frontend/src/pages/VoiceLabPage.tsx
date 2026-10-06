@@ -1,9 +1,12 @@
 import { useEffect, useRef, useState } from "react";
 import { CHAIN_PRESETS } from "../lib/dsp/voiceChain";
-import { encodeWav16 } from "../lib/dsp/wav";
+import { EXPORT_FORMATS, type ExportFormat } from "../lib/dsp/encode";
 import { useToastStore } from "../lib/toastStore";
+import { VoiceNoteRecorder } from "../components/VoiceNoteRecorder";
 
 type Which = "original" | "processed";
+
+const FORMATS = Object.keys(EXPORT_FORMATS) as ExportFormat[];
 
 const peakDb = (b: AudioBuffer) => {
   let m = 0;
@@ -12,6 +15,8 @@ const peakDb = (b: AudioBuffer) => {
 };
 const fmtDb = (d: number) => (Number.isFinite(d) ? `${d.toFixed(1)} dBFS` : "silent");
 const fmtTime = (s: number) => `${Math.floor(s / 60)}:${(s % 60).toFixed(1).padStart(4, "0")}`;
+const AUDIO_EXT = /\.(wav|mp3|m4a|aac|ogg|oga|opus|flac|webm|mp4|aif|aiff|caf)$/i;
+const looksLikeAudio = (f: File) => f.type.startsWith("audio/") || AUDIO_EXT.test(f.name);
 
 export function VoiceLabPage() {
   const [source, setSource] = useState<{ name: string; buffer: AudioBuffer } | null>(null);
@@ -23,13 +28,19 @@ export function VoiceLabPage() {
   const [playing, setPlaying] = useState(false);
   const [position, setPosition] = useState(0);
   const [error, setError] = useState<string | null>(null);
+  const [dragging, setDragging] = useState(false);
+  const [converting, setConverting] = useState<{ format: ExportFormat; progress: number } | null>(null);
+  const [tryNote, setTryNote] = useState(false);
 
   const ctxRef = useRef<AudioContext | null>(null);
   const workerRef = useRef<Worker | null>(null);
+  const encoderRef = useRef<Worker | null>(null);
   const jobRef = useRef(0);
   const srcNodeRef = useRef<AudioBufferSourceNode | null>(null);
   const startedAtRef = useRef(0); // context time at which position 0 would have started
   const recRef = useRef<{ recorder: MediaRecorder; stream: MediaStream; chunks: Blob[] } | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const dragDepth = useRef(0);
 
   const ctx = () => (ctxRef.current ??= new AudioContext());
   const buffers = { original: source?.buffer ?? null, processed };
@@ -85,10 +96,22 @@ export function VoiceLabPage() {
     return () => cancelAnimationFrame(raf);
   }, [playing]);
 
+  // A file dropped slightly off target would otherwise make the browser leave the page and open it.
+  useEffect(() => {
+    const stop = (e: DragEvent) => e.preventDefault();
+    window.addEventListener("dragover", stop);
+    window.addEventListener("drop", stop);
+    return () => {
+      window.removeEventListener("dragover", stop);
+      window.removeEventListener("drop", stop);
+    };
+  }, []);
+
   useEffect(
     () => () => {
       stopPlayback();
       workerRef.current?.terminate();
+      encoderRef.current?.terminate();
       recRef.current?.stream.getTracks().forEach((t) => t.stop());
       void ctxRef.current?.close();
     },
@@ -109,6 +132,13 @@ export function VoiceLabPage() {
     }
   }
 
+  function loadFiles(files: FileList | File[] | null | undefined) {
+    const list = Array.from(files ?? []);
+    if (list.length === 0) return;
+    const f = list.find(looksLikeAudio) ?? list[0]; // if several were dropped, use the first one that is audio
+    void loadBlob(f, f.name);
+  }
+
   async function toggleRecording() {
     if (recording) {
       recRef.current?.recorder.stop();
@@ -116,7 +146,7 @@ export function VoiceLabPage() {
     }
     setError(null);
     try {
-      // the browser's own voice processing is switched off: the chain should get the raw voice
+      // the browser's own voice processing is switched off: the effect should get the raw voice
       const stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false } });
       const recorder = new MediaRecorder(stream);
       const chunks: Blob[] = [];
@@ -178,45 +208,94 @@ export function VoiceLabPage() {
     startPlayback(current, position >= current.duration - 0.05 ? 0 : position);
   }
 
-  function download() {
-    if (!processed) return;
-    const wav = encodeWav16(processed.getChannelData(0), processed.getChannelData(1), processed.sampleRate);
-    const a = document.createElement("a");
-    a.href = URL.createObjectURL(new Blob([wav], { type: "audio/wav" }));
-    a.download = `${(source?.name ?? "voice").replace(/\.[^.]+$/, "")}-processed.wav`;
-    a.click();
-    setTimeout(() => URL.revokeObjectURL(a.href), 2000);
-    useToastStore.getState().showToast("Saved as a 16-bit WAV");
+  /** Converts the processed audio to the chosen format (in a background worker) and saves it. */
+  function exportAs(format: ExportFormat) {
+    if (!processed || converting) return;
+    const worker = (encoderRef.current ??= new Worker(new URL("../workers/encode.worker.ts", import.meta.url), { type: "module" }));
+    const id = ++jobRef.current;
+    setConverting({ format, progress: 0 });
+    worker.onmessage = (e: MessageEvent<{ id: number; progress?: number; blob?: Blob; error?: string }>) => {
+      if (e.data.id !== id) return;
+      if (e.data.progress !== undefined) {
+        setConverting({ format, progress: e.data.progress });
+        return;
+      }
+      setConverting(null);
+      if (e.data.error || !e.data.blob) {
+        setError(`Couldn't convert to ${format}: ${e.data.error ?? "unknown error"}`);
+        return;
+      }
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(e.data.blob);
+      a.download = `${(source?.name ?? "voice").replace(/\.[^.]+$/, "").toLowerCase()}-enhanced.${EXPORT_FORMATS[format].ext}`;
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+      useToastStore.getState().showToast(`Saved as ${format}`);
+    };
+    // copies, so the processed audio stays available for the next format
+    worker.postMessage({ id, format, sampleRate: processed.sampleRate, left: processed.getChannelData(0).slice(), right: processed.getChannelData(1).slice() });
   }
 
   const chain = CHAIN_PRESETS.find((p) => p.id === chainId)!;
+  const total = (current ?? source?.buffer)?.duration ?? 0;
+  const needsProcessing = !!source && !processed && progress === null;
 
   return (
     <div className="page-column" style={{ maxWidth: 720 }}>
       <h1>Voice lab</h1>
-      <p style={{ color: "var(--text-dim)" }}>
-        Experimental. Record your voice or load an audio file, run it through a chain of Airwindows plugins, and compare the result with the original while it plays. This is the original Airwindows code, running in your browser;
-        nothing is uploaded.
-      </p>
+      <p style={{ color: "var(--text-dim)" }}>Record or load audio to process through our curated effects</p>
 
-      <section style={{ display: "flex", gap: "0.6rem", flexWrap: "wrap", alignItems: "center", marginBottom: "1rem" }}>
-        <button className={`btn${recording ? " btn-primary" : ""}`} onClick={() => void toggleRecording()} data-testid="voice-record">
-          {recording ? "■ Stop recording" : "● Record"}
-        </button>
-        <label className="btn" style={{ cursor: "pointer" }}>
-          Choose an audio file…
+      <section style={{ display: "flex", gap: "0.8rem", flexWrap: "wrap", alignItems: "stretch", marginBottom: "1rem" }}>
+        <div
+          role="button"
+          tabIndex={0}
+          aria-label="Drop an audio file here, or press to choose one"
+          data-testid="voice-dropzone"
+          className={`dropzone${dragging ? " dropzone-active" : ""}${source ? " dropzone-compact" : ""}`}
+          onClick={() => fileInputRef.current?.click()}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              fileInputRef.current?.click();
+            }
+          }}
+          onDragEnter={(e) => {
+            e.preventDefault();
+            dragDepth.current++;
+            setDragging(true);
+          }}
+          onDragOver={(e) => {
+            e.preventDefault();
+            e.dataTransfer.dropEffect = "copy";
+          }}
+          onDragLeave={() => {
+            dragDepth.current = Math.max(0, dragDepth.current - 1);
+            if (dragDepth.current === 0) setDragging(false);
+          }}
+          onDrop={(e) => {
+            e.preventDefault();
+            dragDepth.current = 0;
+            setDragging(false);
+            loadFiles(e.dataTransfer.files);
+          }}
+        >
+          {dragging ? "Drop it here" : source ? "Drop another audio file, or click to choose" : "Drag an audio file here, or click to choose"}
           <input
+            ref={fileInputRef}
             type="file"
             accept="audio/*"
             hidden
             data-testid="voice-file"
+            onClick={(e) => e.stopPropagation()} // the input lives inside the zone: without this its click bubbles up and clicks it again
             onChange={(e) => {
-              const f = e.target.files?.[0];
+              loadFiles(e.target.files);
               e.target.value = "";
-              if (f) void loadBlob(f, f.name);
             }}
           />
-        </label>
+        </div>
+        <button className={`btn${recording ? " btn-primary" : ""}`} onClick={() => void toggleRecording()} data-testid="voice-record" style={{ alignSelf: "center" }}>
+          {recording ? "■ Stop recording" : "● Record"}
+        </button>
       </section>
 
       {error && <p style={{ color: "var(--accent-forum)" }}>{error}</p>}
@@ -228,8 +307,8 @@ export function VoiceLabPage() {
           </p>
           <section style={{ display: "flex", gap: "0.6rem", flexWrap: "wrap", alignItems: "center", marginBottom: "1rem" }}>
             <label>
-              Chain{" "}
-              <select value={chainId} onChange={(e) => setChainId(e.target.value)} disabled={progress !== null}>
+              Effect{" "}
+              <select value={chainId} onChange={(e) => setChainId(e.target.value)} disabled={progress !== null} data-testid="voice-chain">
                 {CHAIN_PRESETS.map((p) => (
                   <option key={p.id} value={p.id}>
                     {p.name}
@@ -237,56 +316,91 @@ export function VoiceLabPage() {
                 ))}
               </select>
             </label>
-            <button className="btn btn-primary" onClick={process} disabled={progress !== null} data-testid="voice-process">
-              {progress !== null ? `Processing… ${Math.round(progress * 100)}%` : processed ? "Process again" : "Process"}
+            <button className={`btn ${needsProcessing ? "btn-primary btn-attention" : ""}`} onClick={process} disabled={progress !== null} data-testid="voice-process">
+              {progress !== null ? `Processing… ${Math.round(progress * 100)}%` : processed ? "Process again" : `Process with ${chain.name}`}
             </button>
           </section>
-          <p style={{ color: "var(--text-dim)", fontSize: "0.85rem" }}>
-            {chain.description}
-            <br />
-            {chain.plugins.map((p) => `${p.plugin} (${p.role})`).join(" → ")}
-          </p>
+
+          <section style={{ border: "1px solid var(--border)", borderRadius: "var(--radius)", padding: "0.8rem" }}>
+            <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap", alignItems: "center" }}>
+              <button className={`btn${processed ? " btn-primary" : ""}`} onClick={togglePlay} data-testid="voice-play">
+                {playing ? "❚❚ Pause" : "▶ Play"}
+              </button>
+              {processed && (
+                <>
+                  <button className={`btn${which === "original" ? " active" : ""}`} aria-pressed={which === "original"} onClick={() => switchTo("original")} data-testid="voice-ab-original">
+                    Original
+                  </button>
+                  <button className={`btn${which === "processed" ? " active" : ""}`} aria-pressed={which === "processed"} onClick={() => switchTo("processed")} data-testid="voice-ab-processed">
+                    Processed
+                  </button>
+                </>
+              )}
+              <span data-testid="voice-position" style={{ fontVariantNumeric: "tabular-nums" }}>
+                {fmtTime(position)} / {fmtTime(total)}
+              </span>
+            </div>
+            <input
+              type="range"
+              min={0}
+              max={total}
+              step={0.05}
+              value={Math.min(position, total)}
+              style={{ width: "100%", marginTop: "0.6rem" }}
+              aria-label="Position"
+              onChange={(e) => {
+                const t = Number(e.target.value);
+                setPosition(t);
+                if (playing && current) startPlayback(current, t);
+              }}
+            />
+            <p data-testid="voice-peaks" style={{ color: "var(--text-dim)", fontSize: "0.85rem", margin: "0.4rem 0 0" }}>
+              Loudest point: original {fmtDb(peakDb(source.buffer))}
+              {processed && <> · processed {fmtDb(peakDb(processed))}</>}
+            </p>
+          </section>
+
+          {processed && (
+            <p data-testid="voice-formats" style={{ marginTop: "1rem", display: "flex", gap: "1.6rem", alignItems: "baseline", flexWrap: "wrap" }}>
+              <span style={{ color: "var(--text-dim)" }}>Download</span>
+              {FORMATS.map((f) => (
+                <button
+                  key={f}
+                  type="button"
+                  className="link-btn"
+                  disabled={!!converting}
+                  title={`${EXPORT_FORMATS[f].label} · ${EXPORT_FORMATS[f].detail}`}
+                  aria-label={`Download as ${EXPORT_FORMATS[f].label}, ${EXPORT_FORMATS[f].detail}`}
+                  data-testid={`voice-dl-${f}`}
+                  onClick={() => exportAs(f)}
+                >
+                  {converting?.format === f ? `${f} ${Math.round(converting.progress * 100)}%` : f}
+                </button>
+              ))}
+            </p>
+          )}
         </>
       )}
 
-      {source && (
-        <section style={{ border: "1px solid var(--border)", borderRadius: "var(--radius)", padding: "0.8rem" }}>
-          <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap", alignItems: "center" }}>
-            <button className="btn btn-primary" onClick={togglePlay} data-testid="voice-play">
-              {playing ? "❚❚ Pause" : "▶ Play"}
-            </button>
-            <button className={`btn${which === "original" ? " active" : ""}`} aria-pressed={which === "original"} onClick={() => switchTo("original")} data-testid="voice-ab-original">
-              Original
-            </button>
-            <button className={`btn${which === "processed" ? " active" : ""}`} aria-pressed={which === "processed"} disabled={!processed} onClick={() => switchTo("processed")} data-testid="voice-ab-processed">
-              Processed
-            </button>
-            <span data-testid="voice-position" style={{ fontVariantNumeric: "tabular-nums" }}>
-              {fmtTime(position)} / {fmtTime((current ?? source.buffer).duration)}
-            </span>
-            <button className="btn" onClick={download} disabled={!processed} data-testid="voice-download" style={{ marginLeft: "auto" }}>
-              Download WAV
-            </button>
-          </div>
-          <input
-            type="range"
-            min={0}
-            max={(current ?? source.buffer).duration}
-            step={0.05}
-            value={Math.min(position, (current ?? source.buffer).duration)}
-            style={{ width: "100%", marginTop: "0.6rem" }}
-            aria-label="Position"
-            onChange={(e) => {
-              const t = Number(e.target.value);
-              setPosition(t);
-              if (playing && current) startPlayback(current, t);
-            }}
-          />
-          <p data-testid="voice-peaks" style={{ color: "var(--text-dim)", fontSize: "0.85rem", marginBottom: 0 }}>
-            Loudest point: original {fmtDb(peakDb(source.buffer))}
-            {processed && <> · processed {fmtDb(peakDb(processed))}</>}
-          </p>
-        </section>
+      <h2 style={{ fontSize: "1.1rem", marginTop: "2rem" }}>Voice notes</h2>
+      <p style={{ color: "var(--text-dim)", fontSize: "0.9rem" }}>Hear exactly what a voice note will sound like: enhanced, levelled to the same loudness as the songs, mono, with a short fade-out.</p>
+      {tryNote ? (
+        <VoiceNoteRecorder
+          doneLabel="Download .m4a"
+          onCancel={() => setTryNote(false)}
+          onDone={async ({ blob }) => {
+            const a = document.createElement("a");
+            a.href = URL.createObjectURL(blob);
+            a.download = "voice-note.m4a";
+            a.click();
+            setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+            setTryNote(false);
+          }}
+        />
+      ) : (
+        <button className="btn" onClick={() => setTryNote(true)} data-testid="lab-try-note">
+          🎙 Try a voice note
+        </button>
       )}
     </div>
   );

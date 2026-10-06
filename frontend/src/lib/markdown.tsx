@@ -1,3 +1,6 @@
+import { IMAGE_LINE, parseImageAttrs, isUploadingUrl, type ImageAttrs } from "./images";
+import { ALIGN_OPEN, ALIGN_CLOSE } from "./textEdit";
+import { StudyImage } from "../components/StudyImage";
 import type { ReactNode } from "react";
 import { ClipButton } from "../components/ClipButton";
 import { parseClip, stripClip } from "./clips";
@@ -29,6 +32,10 @@ export interface MarkdownOptions {
   figureCounts?: { fig: number; tab: number };
   /** Renders an @audio(url) line as audio evidence (waveform, clips). Without it the line is a plain player. */
   audio?: (url: string) => ReactNode;
+  /** Study images: their size and alignment are drawn, and (when editable) they can be dragged to resize. */
+  images?: { editable?: boolean; onChange?: (index: number, attrs: ImageAttrs) => void };
+  /** Draws an @file(url)[label] line as a file card. Without it the line is a plain download button. */
+  file?: (url: string, label: string | undefined) => ReactNode;
 }
 
 const FIGURE_LABEL = { fig: "Figure", tab: "Table" } as const;
@@ -41,12 +48,13 @@ const EXTENDED_INLINE =
 
 function renderInline(text: string, onLinkClick?: (path: string) => void, options?: MarkdownOptions): ReactNode[] {
   const ext = !!options?.extended;
+  const gap = (t: string) => (ext ? t.replace(/\t/g, "\u2003\u2003") : t); // a tab in the middle of a line is a visible gap (two em spaces)
   const nodes: ReactNode[] = [];
   let lastIndex = 0;
   let i = 0;
   for (const match of text.matchAll(ext ? EXTENDED_INLINE : BASE_INLINE)) {
     if (match.index === undefined) continue;
-    if (match.index > lastIndex) nodes.push(text.slice(lastIndex, match.index));
+    if (match.index > lastIndex) nodes.push(gap(text.slice(lastIndex, match.index)));
     const { code, bold, italic, linkText, linkUrl, note: noteNumber, figKind, figNum, clipStart, clipEnd, clipUrl, clipImg } = match.groups ?? {};
     const key = `i-${i++}`;
     if (clipUrl !== undefined) {
@@ -118,14 +126,13 @@ function renderInline(text: string, onLinkClick?: (path: string) => void, option
     }
     lastIndex = match.index + match[0].length;
   }
-  if (lastIndex < text.length) nodes.push(text.slice(lastIndex));
+  if (lastIndex < text.length) nodes.push(gap(text.slice(lastIndex)));
   return nodes;
 }
 
 // Embeds are block-level - each must be alone on its own line. Images use
 // standard markdown syntax; audio/video/generic-file have no standard
 // markdown equivalent, so they get simple custom tags instead.
-const IMAGE_LINE = /^!\[(.*?)\]\((\S+)\)$/;
 const AUDIO_LINE = /^@audio\((\S+)\)$/;
 const VIDEO_LINE = /^@video\((\S+)\)$/;
 const FILE_LINE = /^@file\((\S+)\)(?:\[(.*?)\])?$/;
@@ -143,6 +150,8 @@ export function renderMarkdown(markdown: string, onLinkClick?: (path: string) =>
   let fenceBuffer: string[] | null = null;
   let key = 0;
   let headingOrdinal = 0; // gives each heading a stable id (sec-N) for the outline and scroll sync
+  let imageIndex = 0; // the position of each image among the images of the text, which is how a resize finds its line in the source
+  let alignStart: { kind: string; from: number } | null = null; // an open :::center / :::right / :::left block
   // Blocks that hold state (an audio tool with a selection, a loaded waveform) are keyed by WHAT they are, not by
   // position: otherwise adding a paragraph above one shifts every later key and React throws the component away.
   const seen = new Map<string, number>();
@@ -185,6 +194,19 @@ export function renderMarkdown(markdown: string, onLinkClick?: (path: string) =>
     }
   }
 
+  /** Wraps everything drawn since an alignment block opened in one aligned container. */
+  function closeAlign() {
+    if (!alignStart) return;
+    const { kind, from } = alignStart;
+    alignStart = null;
+    const inner = blocks.splice(from);
+    blocks.push(
+      <div key={`align-${key++}`} className={`md-align md-align-${kind}`} style={{ textAlign: kind as "left" | "center" | "right" }}>
+        {inner}
+      </div>,
+    );
+  }
+
   function flushFence() {
     if (fenceBuffer === null) return;
     blocks.push(
@@ -206,6 +228,21 @@ export function renderMarkdown(markdown: string, onLinkClick?: (path: string) =>
       if (line.startsWith("```")) {
         flushList();
         fenceBuffer = [];
+        continue;
+      }
+    }
+
+    if (ext) {
+      const open = line.match(ALIGN_OPEN);
+      if (open) {
+        flushList();
+        closeAlign(); // a new opener ends one left open
+        alignStart = { kind: open[1], from: blocks.length };
+        continue;
+      }
+      if (ALIGN_CLOSE.test(line) && alignStart) {
+        flushList();
+        closeAlign();
         continue;
       }
     }
@@ -268,7 +305,20 @@ export function renderMarkdown(markdown: string, onLinkClick?: (path: string) =>
       blocks.push(<hr key={key++} />);
     } else if (image) {
       flushList();
-      blocks.push(<img key={key++} src={image[2]} alt={image[1]} style={{ maxWidth: "100%", borderRadius: "var(--radius)" }} />);
+      const index = imageIndex++;
+      const [, alt, src, rawAttrs] = image;
+      if (isUploadingUrl(src)) {
+        blocks.push(
+          <div key={key++} className="img-uploading" data-nocite="">
+            Uploading image…
+          </div>,
+        );
+      } else if (ext) {
+        const change = options?.images?.onChange;
+        blocks.push(<StudyImage key={stableKey(`img:${src}`)} src={src} alt={alt} attrs={parseImageAttrs(rawAttrs)} editable={!!options?.images?.editable} onChange={change ? (a) => change(index, a) : undefined} />);
+      } else {
+        blocks.push(<img key={key++} src={src} alt={alt} style={{ maxWidth: "100%", borderRadius: "var(--radius)" }} />);
+      }
     } else if (audio) {
       flushList();
       if (ext && options?.audio) {
@@ -286,6 +336,14 @@ export function renderMarkdown(markdown: string, onLinkClick?: (path: string) =>
     } else if (file) {
       flushList();
       const [, url, label] = file;
+      if (ext && options?.file) {
+        blocks.push(
+          <div key={stableKey(`file:${url}`)} className="study-file-wrap" data-nocite="">
+            {options.file(url, label)}
+          </div>,
+        );
+        continue;
+      }
       blocks.push(
         <a key={key++} className="btn" href={url} target="_blank" rel="noreferrer" style={{ display: "inline-block", textDecoration: "none" }}>
           📎 {label || url}
@@ -295,11 +353,18 @@ export function renderMarkdown(markdown: string, onLinkClick?: (path: string) =>
       flushList();
     } else {
       flushList();
-      blocks.push(<p key={key++}>{renderInline(line, onLinkClick, options)}</p>);
+      // a tab at the start of a line indents the first line of that paragraph (extended mode)
+      const tabs = ext ? (line.match(/^\t+/)?.[0].length ?? 0) : 0;
+      blocks.push(
+        <p key={key++} style={tabs ? { textIndent: `${tabs * 2}em` } : undefined}>
+          {renderInline(tabs ? line.slice(tabs) : line, onLinkClick, options)}
+        </p>,
+      );
     }
   }
   flushList();
   flushFence(); // an unclosed fence still shows as code, which is what you want mid-typing
+  closeAlign(); // an alignment block left open while typing still applies
   return <>{blocks}</>;
 }
 

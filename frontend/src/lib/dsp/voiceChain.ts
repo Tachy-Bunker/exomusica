@@ -12,18 +12,21 @@ export interface ChainPreset {
   plugins: { plugin: string; role: string; raw: number[]; shown: string[] }[];
 }
 
-/** Tachy's voice chain, in the order it sits on the mixer insert. Applied before loudness normalisation. */
+/**
+ * The "Enhancer": a voice chain, in the order it sits on the mixer insert it was designed on. Applied before loudness
+ * normalisation. Plugin names stay in the data (not in the interface). Galactic3's Dry/Wet was lowered from 0.058931 to 0.02.
+ */
 export const VOICE_CHAIN: ChainPreset = {
-  id: "tachy-voice",
-  name: "Tachy voice",
-  description: "Energy2 → SlewSonic → AverMatrix → FathomFive → Pressure5 → Galactic3, as set up in FL Studio",
+  id: "enhancer",
+  name: "Enhancer",
+  description: "Voice enhancement",
   plugins: [
     { plugin: "Energy2", role: "controlled electrifier", raw: [0.749996, 0.8805665, 0.38854, 0.358285, 0.5, 0.38376, 0.5, 0.5, 1.0], shown: ["0.499992", "0.761133", "-0.22292", "-0.28343", "0.000000", "-0.23248", "0.000000", "0.000000", "1.000000"] },
     { plugin: "SlewSonic", role: "glitter solo", raw: [0.928337, 0.0207], shown: ["23.56674 kHz", "0.020700"] },
     { plugin: "AverMatrix", role: "organic eq", raw: [0.2786579, 0.1130552, 0.6449095], shown: ["3.507921 taps", "2.017497 poles", "0.289819"] },
     { plugin: "FathomFive", role: "analog bass control", raw: [0.785035, 0.0, 0.810504, 0.111477], shown: ["0.785035", "0.000000", "0.810504", "0.111477"] },
     { plugin: "Pressure5", role: "super squisher", raw: [0.291397, 0.0, 0.0, 1.0, 0.5, 1.0], shown: ["0.291397", "0.000000", "0.000000", "1.000000", "0.500000", "1.000000"] },
-    { plugin: "Galactic3", role: "muzak mall verb", raw: [0.765918, 0.625794, 0.5, 1.0, 0.164025, 0.058931], shown: ["0.765918", "0.625794", "0.500000", "1.000000", "0.164025", "0.058931"] },
+    { plugin: "Galactic3", role: "muzak mall verb", raw: [0.765918, 0.625794, 0.5, 1.0, 0.164025, 0.02], shown: ["0.765918", "0.625794", "0.500000", "1.000000", "0.164025", "0.020000"] },
   ],
 };
 
@@ -34,6 +37,8 @@ export interface RunOptions {
   block?: number;
   /** Seeds the plugins' output dither, so a render is repeatable. */
   seed?: number;
+  /** Process the arrays given instead of copies (the caller no longer needs the originals): saves memory on long recordings. */
+  inPlace?: boolean;
   /** Called between blocks with 0-1, so a UI can show progress and stay responsive. */
   onProgress?: (done: number) => void;
 }
@@ -66,8 +71,8 @@ export class Chain {
  */
 export function runChain(engine: AirwindowsEngine, preset: ChainPreset, sampleRate: number, left: Float32Array, right: Float32Array | null = null, opts: RunOptions = {}): { left: Float32Array; right: Float32Array } {
   const block = opts.block ?? 512;
-  const l = Float32Array.from(left);
-  const r = Float32Array.from(right ?? left);
+  const l = opts.inPlace ? left : Float32Array.from(left);
+  const r = right ? (opts.inPlace ? right : Float32Array.from(right)) : Float32Array.from(left);
   const chain = new Chain(engine, preset, sampleRate, opts.seed ?? 1);
   try {
     for (let pos = 0; pos < l.length; pos += block) {
