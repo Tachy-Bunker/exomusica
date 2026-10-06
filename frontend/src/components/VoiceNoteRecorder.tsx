@@ -222,10 +222,10 @@ export function VoiceNoteRecorder({ doneLabel, onDone, onCancel }: Props) {
     <div className="voice-note" data-testid="voice-note" data-spool={spool}>
       {phase === "idle" && (
         <div className="voice-note-row">
-          <button className="btn btn-primary" onClick={() => void start()} data-testid="vn-record">
+          <button type="button" className="btn btn-primary" onClick={() => void start()} data-testid="vn-record">
             ● Record a voice note
           </button>
-          <button className="btn" onClick={onCancel} data-testid="vn-discard">
+          <button type="button" className="btn" onClick={onCancel} data-testid="vn-discard">
             Cancel
           </button>
           <span className="voice-note-hint">There's no time limit. Your voice is enhanced and levelled automatically.</span>
@@ -234,7 +234,7 @@ export function VoiceNoteRecorder({ doneLabel, onDone, onCancel }: Props) {
       {phase === "recording" && (
         <div>
           <div className="voice-note-row">
-            <button className="btn btn-primary" onClick={stop} data-testid="vn-stop">
+            <button type="button" className="btn btn-primary" onClick={stop} data-testid="vn-stop">
               ■ Stop
             </button>
             <span className="voice-note-live" aria-live="polite">
@@ -262,7 +262,7 @@ export function VoiceNoteRecorder({ doneLabel, onDone, onCancel }: Props) {
           <span className="voice-note-bar">
             <span style={{ width: `${Math.round(progress * 100)}%` }} data-testid="vn-progress" />
           </span>
-          <button className="btn" onClick={cancelProcessing} data-testid="vn-cancel-processing">
+          <button type="button" className="btn" onClick={cancelProcessing} data-testid="vn-cancel-processing">
             Cancel
           </button>
         </div>
@@ -276,13 +276,13 @@ export function VoiceNoteRecorder({ doneLabel, onDone, onCancel }: Props) {
           {s.tooQuiet && <p className="voice-note-warn">That recording is silent. Check that the right microphone is selected.</p>}
           {s.gainCapped && !s.tooQuiet && <p className="voice-note-warn">That was very quiet, so it has been boosted as far as it can be. Try speaking closer to the microphone.</p>}
           <div className="voice-note-row">
-            <button className="btn btn-primary" onClick={() => void keep()} disabled={phase === "saving" || s.tooQuiet} data-testid="vn-done">
+            <button type="button" className="btn btn-primary" onClick={() => void keep()} disabled={phase === "saving" || s.tooQuiet} data-testid="vn-done">
               {phase === "saving" ? "Saving…" : doneLabel}
             </button>
-            <button className="btn" onClick={again} disabled={phase === "saving"} data-testid="vn-again">
+            <button type="button" className="btn" onClick={again} disabled={phase === "saving"} data-testid="vn-again">
               Record again
             </button>
-            <button className="btn" onClick={onCancel} disabled={phase === "saving"} data-testid="vn-discard">
+            <button type="button" className="btn" onClick={onCancel} disabled={phase === "saving"} data-testid="vn-discard">
               Discard
             </button>
           </div>

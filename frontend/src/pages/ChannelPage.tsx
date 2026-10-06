@@ -1,3 +1,5 @@
+import { VoiceNoteRecorder, type FinishedVoiceNote } from "../components/VoiceNoteRecorder";
+import { uploadChatAttachment, voiceNoteFilename } from "../lib/voiceNoteUpload";
 import { useEffect, useRef, useState, useCallback, useContext, createContext, type ChangeEvent, type ClipboardEvent, type DragEvent, type FormEvent } from "react";
 import { Link, useParams, useSearchParams, useNavigate } from "react-router-dom";
 import { api } from "../lib/api";
@@ -364,6 +366,8 @@ export function ChannelPage({ channelSlug, fillHeight, parentControlsHeight }: {
   const fontFamily = useCustomFont(channelFont);
   const [replyTarget, setReplyTarget] = useState<ReplyTarget | null>(null);
   const [pendingAttachments, setPendingAttachments] = useState<{ id: number; filename: string }[]>([]);
+  const [showVoice, setShowVoice] = useState(false);
+  const voiceUpload = useRef<{ blob: Blob; att: { id: number } } | null>(null);
   const [isDraggingFile, setIsDraggingFile] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [pendingScrollTo, setPendingScrollTo] = useState<number | null>(null);
@@ -646,14 +650,14 @@ export function ChannelPage({ channelSlug, fillHeight, parentControlsHeight }: {
     return () => clearInterval(interval);
   }, []);
 
-  async function sendMessage() {
-    if ((!draft.trim() && pendingAttachments.length === 0) || !slug) return;
+  async function sendMessage(extraAttachmentIds: number[] = []) {
+    if ((!draft.trim() && pendingAttachments.length === 0 && extraAttachmentIds.length === 0) || !slug) return;
     const dto = await api<MessageDTO>(`/api/channels/${slug}/messages`, {
       method: "POST",
       body: JSON.stringify({
         contentRaw: draft,
         replyToId: replyTarget?.id,
-        attachmentIds: pendingAttachments.map((a) => a.id),
+        attachmentIds: [...pendingAttachments.map((a) => a.id), ...extraAttachmentIds],
       }),
     });
     setMessages((prev) => upsertMessage(prev, dto)); // in case the WS event is delayed/missed
@@ -662,6 +666,15 @@ export function ChannelPage({ channelSlug, fillHeight, parentControlsHeight }: {
     setReplyTarget(null);
     setPendingAttachments([]);
     setFollowing(true); // posting auto-follows server-side; keep the button in sync without a refetch
+  }
+
+  // A voice note is sent as its own message (with whatever is typed as its caption, and any files already attached). If the upload
+  // works but the message then fails, a retry reuses the uploaded file instead of uploading it a second time.
+  async function sendVoiceNote(note: FinishedVoiceNote) {
+    if (!voiceUpload.current || voiceUpload.current.blob !== note.blob) voiceUpload.current = { blob: note.blob, att: await uploadChatAttachment(note.blob, voiceNoteFilename()) };
+    await sendMessage([voiceUpload.current.att.id]);
+    voiceUpload.current = null;
+    setShowVoice(false);
   }
 
   async function uploadFiles(fileList: FileList | File[]) {
@@ -946,6 +959,8 @@ export function ChannelPage({ channelSlug, fillHeight, parentControlsHeight }: {
         </div>
       )}
       {user && mode === "live" && (
+        <>
+        {showVoice && <VoiceNoteRecorder doneLabel="Send" onDone={sendVoiceNote} onCancel={() => setShowVoice(false)} />}
         <form
           onSubmit={handleSend}
           onDragOver={(e) => {
@@ -1022,6 +1037,9 @@ export function ChannelPage({ channelSlug, fillHeight, parentControlsHeight }: {
             <button type="button" className="btn" onClick={() => fileInputRef.current?.click()} title="Attach a file">
               📎
             </button>
+            <button type="button" className={`btn${showVoice ? " active" : ""}`} onClick={() => setShowVoice((v) => !v)} title="Record a voice note" aria-label="Record a voice note" aria-pressed={showVoice} data-testid="chat-voice-button">
+              🎙
+            </button>
             <div style={{ position: "relative", flex: 1 }}>
               <textarea
                 ref={textareaRef}
@@ -1070,6 +1088,7 @@ export function ChannelPage({ channelSlug, fillHeight, parentControlsHeight }: {
             </button>
           </div>
         </form>
+        </>
       )}
 
     </div>

@@ -1,3 +1,5 @@
+import { isVoiceNoteName } from "../lib/voiceNoteUpload";
+
 interface AttachmentInfo {
   id: number;
   filename: string;
@@ -37,10 +39,11 @@ export function AttachmentPreview({ attachment }: { attachment: AttachmentInfo }
     );
   }
   if (kind === "audio") {
+    const voice = isVoiceNoteName(attachment.filename);
     return (
-      <div>
-        {filenameLabel}
-        <audio controls src={attachment.url} style={{ display: "block", maxWidth: 320 }} />
+      <div data-testid={voice ? "voice-note-message" : undefined}>
+        {voice ? <div style={{ fontSize: "0.75rem", color: "var(--text-dim)", marginTop: "0.3rem" }}>🎙 Voice note</div> : filenameLabel}
+        <audio controls src={attachment.url} style={{ display: "block", width: "100%", maxWidth: 320 }} />
       </div>
     );
   }

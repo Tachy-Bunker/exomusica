@@ -10,7 +10,8 @@ export function setToken(token: string | null): void {
 }
 
 export class ApiError extends Error {
-  constructor(public status: number, message: string) {
+  /** `body` is the server's whole reply, for callers that need more than the short message (e.g. an upload's per-file reasons). */
+  constructor(public status: number, message: string, public body?: unknown) {
     super(message);
   }
 }
@@ -41,7 +42,7 @@ export async function api<T>(path: string, options: RequestInit = {}): Promise<T
       setToken(null);
       window.dispatchEvent(new Event("exomusica:session-expired"));
     }
-    throw new ApiError(res.status, body?.error ?? res.statusText);
+    throw new ApiError(res.status, body?.error ?? res.statusText, body);
   }
   return body as T;
 }

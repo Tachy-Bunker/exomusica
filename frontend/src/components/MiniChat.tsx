@@ -1,3 +1,5 @@
+import { VoiceNoteRecorder, type FinishedVoiceNote } from "./VoiceNoteRecorder";
+import { uploadChatAttachment, voiceNoteFilename } from "../lib/voiceNoteUpload";
 import { useEffect, useRef, useState, type ChangeEvent, type ClipboardEvent, type DragEvent, type FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import { api } from "../lib/api";
@@ -21,6 +23,8 @@ export function MiniChat({ slug, channelName }: { slug: string; channelName: str
   const [messages, setMessages] = useState<MessageDTO[]>([]);
   const [draft, setDraft] = useState("");
   const [pendingAttachments, setPendingAttachments] = useState<{ id: number; filename: string }[]>([]);
+  const [showVoice, setShowVoice] = useState(false);
+  const voiceUpload = useRef<{ blob: Blob; att: { id: number } } | null>(null);
   const [isDraggingFile, setIsDraggingFile] = useState(false);
   const listRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -81,15 +85,27 @@ export function MiniChat({ slug, channelName }: { slug: string; channelName: str
     if (e.dataTransfer.files.length > 0) void uploadFiles(e.dataTransfer.files);
   }
 
-  async function handleSend(e: FormEvent) {
-    e.preventDefault();
-    if (!draft.trim() && pendingAttachments.length === 0) return;
+  async function send(extraAttachmentIds: number[] = []) {
+    if (!draft.trim() && pendingAttachments.length === 0 && extraAttachmentIds.length === 0) return;
     await api(`/api/channels/${slug}/messages`, {
       method: "POST",
-      body: JSON.stringify({ contentRaw: draft, attachmentIds: pendingAttachments.map((a) => a.id) }),
+      body: JSON.stringify({ contentRaw: draft, attachmentIds: [...pendingAttachments.map((a) => a.id), ...extraAttachmentIds] }),
     });
     setDraft("");
     setPendingAttachments([]);
+  }
+
+  async function handleSend(e: FormEvent) {
+    e.preventDefault();
+    await send();
+  }
+
+  // A voice note is sent as its own message. If the upload works but the message fails, a retry reuses the uploaded file.
+  async function sendVoiceNote(note: FinishedVoiceNote) {
+    if (!voiceUpload.current || voiceUpload.current.blob !== note.blob) voiceUpload.current = { blob: note.blob, att: await uploadChatAttachment(note.blob, voiceNoteFilename()) };
+    await send([voiceUpload.current.att.id]);
+    voiceUpload.current = null;
+    setShowVoice(false);
   }
 
   return (
@@ -111,6 +127,11 @@ export function MiniChat({ slug, channelName }: { slug: string; channelName: str
           </div>
         ))}
       </div>
+      {showVoice && (
+        <div style={{ padding: "0 0.5rem" }}>
+          <VoiceNoteRecorder doneLabel="Send" onDone={sendVoiceNote} onCancel={() => setShowVoice(false)} />
+        </div>
+      )}
       <form
         onSubmit={handleSend}
         onDragOver={(e) => {
@@ -144,6 +165,9 @@ export function MiniChat({ slug, channelName }: { slug: string; channelName: str
           <input ref={fileInputRef} type="file" multiple onChange={handleFileSelect} style={{ display: "none" }} />
           <button type="button" className="btn" onClick={() => fileInputRef.current?.click()} title="Attach a file">
             📎
+          </button>
+          <button type="button" className={`btn${showVoice ? " active" : ""}`} onClick={() => setShowVoice((v) => !v)} title="Record a voice note" aria-label="Record a voice note" aria-pressed={showVoice} data-testid="chat-voice-button">
+            🎙
           </button>
           <input
             value={draft}
