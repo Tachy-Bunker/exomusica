@@ -1,9 +1,10 @@
+import { shapeTrackHits, titleFromFilename } from "../lib/trackSearch.js";
 import type { FastifyInstance } from "fastify";
 import { prisma } from "../lib/prisma.js";
 import { requireAdmin } from "../lib/auth.js";
 import { trackToDTO } from "../lib/embeds.js";
-import { saveSiteImage, saveGalleryFile } from "../lib/storage.js";
-import { probeAudioDuration } from "../lib/audioProbe.js";
+import { saveSiteImage, saveGalleryFile, saveTrackFile } from "../lib/storage.js";
+import { probeAudioDuration, probeAudioDurationOfBuffer } from "../lib/audioProbe.js";
 
 export async function albumRoutes(app: FastifyInstance): Promise<void> {
   // Every track site-wide, shuffled server-side - powers the homepage's
@@ -248,6 +249,32 @@ export async function albumRoutes(app: FastifyInstance): Promise<void> {
   });
 
   // --- Tracks -------------------------------------------------------------
+  // Upload an audio file from the admin's own computer (for when an external host such as Archive.org doesn't work).
+  app.post("/api/admin/track-upload", { preHandler: requireAdmin }, async (req, reply) => {
+    const file = await req.file();
+    if (!file) return reply.code(400).send({ error: "no file uploaded" });
+    const buffer = await file.toBuffer();
+    try {
+      const { url, format } = await saveTrackFile(file.filename, file.mimetype, buffer);
+      const durationSeconds = await probeAudioDurationOfBuffer(buffer);
+      return reply.code(201).send({ url, format, title: titleFromFilename(file.filename), durationSeconds: durationSeconds ?? null });
+    } catch (err) {
+      return reply.code(400).send({ error: err instanceof Error ? err.message : "upload failed" });
+    }
+  });
+
+  // Find a track that is already on the server: on another album, an uploaded attachment, or a community track.
+  app.get<{ Querystring: { q?: string } }>("/api/admin/track-search", { preHandler: requireAdmin }, async (req) => {
+    const q = (req.query.q ?? "").trim();
+    if (q.length < 2) return [];
+    const [tracks, attachments, community] = await Promise.all([
+      prisma.track.findMany({ where: { title: { contains: q, mode: "insensitive" } }, take: 15, orderBy: { id: "desc" }, select: { title: true, fileUrl: true, format: true, durationSeconds: true, album: { select: { title: true } } } }),
+      prisma.attachment.findMany({ where: { filename: { contains: q, mode: "insensitive" }, mimeType: { startsWith: "audio/" } }, take: 15, orderBy: { id: "desc" }, select: { filename: true, storagePath: true, mimeType: true } }),
+      prisma.communityTrack.findMany({ where: { title: { contains: q, mode: "insensitive" } }, take: 15, orderBy: { id: "desc" }, select: { title: true, externalUrl: true, attachment: { select: { storagePath: true, filename: true } }, album: { select: { title: true } } } }),
+    ]);
+    return shapeTrackHits({ tracks, attachments, community });
+  });
+
   app.post<{
     Params: { id: string };
     Body: { title: string; fileUrl: string; format: string; durationSeconds?: number; position?: number };

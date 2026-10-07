@@ -1,3 +1,4 @@
+import { isHexColor } from "../lib/branchIdentity.js";
 import type { FastifyInstance } from "fastify";
 import { prisma } from "../lib/prisma.js";
 import { requireAdmin } from "../lib/auth.js";
@@ -19,6 +20,7 @@ export async function siteSettingsRoutes(app: FastifyInstance): Promise<void> {
         textColorPrimary: true,
         textColorSecondary: true,
         chatTitleColor: true,
+        usernameColor: true,
         accentPrimaryColor: true,
         contentTextScaleDesktop: true,
         contentTextScaleMobile: true,
@@ -93,6 +95,7 @@ export async function siteSettingsRoutes(app: FastifyInstance): Promise<void> {
         textColorPrimary: null,
         textColorSecondary: null,
         chatTitleColor: null,
+        usernameColor: null,
         accentPrimaryColor: null,
         contentTextScaleDesktop: 2.0,
         contentTextScaleMobile: 1.6,
@@ -216,6 +219,7 @@ export async function siteSettingsRoutes(app: FastifyInstance): Promise<void> {
       textColorPrimary: string | null;
       textColorSecondary: string | null;
       chatTitleColor: string | null;
+      usernameColor: string | null;
       accentPrimaryColor: string | null;
       contentTextScaleDesktop: number;
       contentTextScaleMobile: number;
@@ -265,15 +269,19 @@ export async function siteSettingsRoutes(app: FastifyInstance): Promise<void> {
       spotlightCommunityTrackId: number | null;
       cultActivitiesChannelId: number | null;
     }>;
-  }>("/api/admin/site-settings", { preHandler: requireAdmin }, async (req) => {
+  }>("/api/admin/site-settings", { preHandler: requireAdmin }, async (req, reply) => {
     const data: Record<string, unknown> = {};
     const body = req.body ?? {};
+    if (body.usernameColor !== undefined && body.usernameColor !== null && !isHexColor(body.usernameColor)) {
+      return reply.code(400).send({ error: "usernameColor must be a colour like #e8b86f" });
+    }
     for (const key of [
       "defaultFontId",
       "defaultWikiPageId",
       "textColorPrimary",
       "textColorSecondary",
       "chatTitleColor",
+      "usernameColor",
       "accentPrimaryColor",
       "contentTextScaleDesktop",
       "contentTextScaleMobile",

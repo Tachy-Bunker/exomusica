@@ -13,6 +13,9 @@ import { spiralOrder, type TrackPoint } from "../lib/vennLayout";
 import { layoutConstellationRegions, layoutStars, buildConnectionLines, settleNodes, type ConstellationTrack } from "../lib/constellationLayout";
 import { ConstellationScanPanel } from "../components/ConstellationScanPanel";
 import { VennCustomColorEditor } from "../components/VennCustomColorEditor";
+import { ShareAutoplay } from "../components/ShareAutoplay";
+import { ShareModal } from "../components/ShareModal";
+import { genreStateFromShare, parseAutoplay, parseMapShare } from "../lib/shareState";
 
 interface PlaylistAlbum {
   slug: string;
@@ -174,6 +177,7 @@ export function PlaylistSpaceMapPage() {
   }
   const currentTrack = useAudioStore((s) => s.currentTrack);
   const play = useAudioStore((s) => s.play);
+  const playAt = useAudioStore((s) => s.playAt);
   const addToQueue = useAudioStore((s) => s.addToQueue);
   const clearQueue = useAudioStore((s) => s.clearQueue);
   const setCurrentPlaylist = useAudioStore((s) => s.setCurrentPlaylist);
@@ -204,7 +208,19 @@ export function PlaylistSpaceMapPage() {
   const setMapQuality = useMapQualityStore((s) => s.setQuality);
   const softwareRendererName = useMapQualityStore((s) => s.softwareRendererName);
   const [dismissedSwNotice, setDismissedSwNotice] = useState(false);
-  const [viewMode, setViewMode] = useState<"map" | "venn">(() => (window.location.hash === "#venn" ? "venn" : "map"));
+  const [viewMode, setViewMode] = useState<"map" | "venn">(() => parseMapShare(new URLSearchParams(window.location.search), window.location.hash).view); // from a link: ?view=venn, or the older #venn
+  const [shareOpen, setShareOpen] = useState(false);
+  const shareAppliedRef = useRef(false);
+  /** A solo that came from a link must not start the music: only the link's own play=1 does (soloing by hand still plays that genre, as before). */
+  const suppressSoloPlayRef = useRef(false);
+  /** Changes the address to match the view without losing the rest of a link (the genre switches, the song, the time). */
+  function showView(v: "map" | "venn") {
+    setViewMode(v);
+    const u = new URL(window.location.href);
+    u.hash = "";
+    if (v === "venn") u.searchParams.set("view", "venn"); else u.searchParams.delete("view");
+    history.replaceState(null, "", u);
+  }
   // Persists while playback keeps coming from this playlist - cleared
   // the moment the player switches away, per the explicit requirement
   // that colors survive a requeue from the same playlist but not a
@@ -255,6 +271,16 @@ export function PlaylistSpaceMapPage() {
       });
       setVennUseCustomColors(p.fxSettings?.vennUseCustomColors ?? false);
       setVennCustomColors(p.fxSettings?.vennCustomColors ?? {});
+      // A shared link may say which genres are soloed or off: applied once, when the playlist first arrives (never again on a reload after an edit)
+      if (!shareAppliedRef.current) {
+        shareAppliedRef.current = true;
+        const fromLink = parseMapShare(new URLSearchParams(window.location.search), window.location.hash);
+        if (fromLink.solo.length || fromLink.off.length) {
+          const applied = genreStateFromShare(fromLink, p.items.flatMap((i) => i.genres));
+          suppressSoloPlayRef.current = Object.values(applied).includes("highlight");
+          setGenreState(applied);
+        }
+      }
     });
   }
   useEffect(reload, [slug]);
@@ -401,6 +427,7 @@ export function PlaylistSpaceMapPage() {
   );
   useEffect(() => {
     if (!highlightedGenresKey || !playlist) return;
+    if (suppressSoloPlayRef.current) { suppressSoloPlayRef.current = false; return; }
     const highlighted = new Set(highlightedGenresKey.split(","));
     const matchingItems = playlist.items.filter((i) => i.genres.some((g) => highlighted.has(g)));
     if (matchingItems.length === 0) return;
@@ -1071,10 +1098,7 @@ export function PlaylistSpaceMapPage() {
               className="btn"
               title="View as spacemap"
               style={viewMode === "map" ? { outline: "1px solid var(--accent-forum)" } : undefined}
-              onClick={() => {
-                setViewMode("map");
-                history.replaceState(null, "", window.location.pathname);
-              }}
+              onClick={() => showView("map")}
             >
               <svg width="18" height="18" viewBox="0 0 256 256" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
                 <path d="M128,116a48,48,0,1,1,48-48A48.05436,48.05436,0,0,1,128,116Zm60,8a48,48,0,1,0,48,48A48.05436,48.05436,0,0,0,188,124ZM68,124a48,48,0,1,0,48,48A48.05436,48.05436,0,0,0,68,124Z" />
@@ -1084,14 +1108,14 @@ export function PlaylistSpaceMapPage() {
               className="btn"
               title="View as constellation"
               style={viewMode === "venn" ? { outline: "1px solid var(--accent-forum)" } : undefined}
-              onClick={() => {
-                setViewMode("venn");
-                history.replaceState(null, "", "#venn");
-              }}
+              onClick={() => showView("venn")}
             >
               <svg width="18" height="18" viewBox="0 0 32 32" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
                 <path d="M27,5c-1.7,0-3,1.3-3,3c0,0.3,0,0.5,0.1,0.8l-5.4,3.8C18.2,12.2,17.6,12,17,12c-0.8,0-1.5,0.3-2.1,0.8L8,9.4 C8,9.2,8,9.1,8,9c0-1.7-1.3-3-3-3S2,7.3,2,9s1.3,3,3,3c0.8,0,1.5-0.3,2.1-0.8l7,3.5c0,0.1,0,0.2,0,0.4c0,0.9,0.4,1.7,1,2.2L12.2,24 c-0.1,0-0.1,0-0.2,0c-1.7,0-3,1.3-3,3s1.3,3,3,3s3-1.3,3-3c0-0.9-0.4-1.7-1-2.2l2.8-6.8c0.1,0,0.1,0,0.2,0c1.7,0,3-1.3,3-3 c0-0.3,0-0.5-0.1-0.8l5.4-3.8c0.5,0.4,1.1,0.6,1.7,0.6c1.7,0,3-1.3,3-3S28.7,5,27,5z" />
               </svg>
+            </button>
+            <button className="btn" title="Share this view, or embed it in another page" aria-label="Share or embed this view" onClick={() => setShareOpen(true)} data-testid="share-open-btn">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="18" cy="5" r="3" /><circle cx="6" cy="12" r="3" /><circle cx="18" cy="19" r="3" /><path d="M8.6 10.6l6.8-4.2M8.6 13.4l6.8 4.2" /></svg>
             </button>
             <button
               className="btn"
@@ -1670,6 +1694,38 @@ export function PlaylistSpaceMapPage() {
             </div>
           )}
         </>
+      )}
+      {playlist && (
+        <ShareAutoplay
+          ready
+          tracks={playlist.items.map((i) => ({ id: i.trackId, source: i.source, title: i.title, composer: i.composer }))}
+          request={parseAutoplay(searchParams)}
+          start={(index, t) => {
+            const item = playlist.items[index];
+            if (!item) return;
+            playAt(playlistItemToPlayable(item), t);
+            clearQueue();
+            setCurrentPlaylist({ slug: playlist.slug, title: playlist.title });
+            vennOriginTrackIdRef.current = item.trackId;
+            // With genres soloed in the link, the rest of those genres follows the song, as it would after soloing them by hand
+            const soloed = Object.entries(genreState).filter(([, st]) => st === "highlight").map(([g]) => g);
+            if (soloed.length) {
+              useAudioStore.getState().setRepeatMode("all");
+              addToQueue(playlist.items.filter((i) => !(i.trackId === item.trackId && i.source === item.source) && i.genres.some((g) => soloed.includes(g))).map(playlistItemToPlayable));
+            }
+          }}
+        />
+      )}
+      {shareOpen && playlist && (
+        <ShareModal
+          title="Share or embed this view"
+          pathname={`/playlist/${playlist.slug}`}
+          embedPath={`/embed/playlist/${playlist.slug}`}
+          tracks={playlist.items.map((i) => ({ id: i.trackId, source: i.source, title: i.title, composer: i.composer }))}
+          genreState={genreState}
+          view={viewMode}
+          onClose={() => setShareOpen(false)}
+        />
       )}
     </div>
   );

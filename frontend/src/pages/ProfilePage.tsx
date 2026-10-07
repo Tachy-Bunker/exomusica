@@ -27,7 +27,7 @@ export function ProfilePage() {
   if (!profile) return <p>Loading…</p>;
 
   return (
-    <div style={{ maxWidth: 480 }}>
+    <div className="page-column" style={{ maxWidth: 480 }}>
       <div
         style={{
           width: 64,

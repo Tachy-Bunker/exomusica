@@ -66,6 +66,11 @@ export function ChallengeIcon({ size = 16, className }: IconProps) {
   ));
 }
 
+/** A folded map (supplied icon); its coordinates are the original sheet's, hence the offset viewBox. */
+export function MapIcon({ size = 16, className }: IconProps) {
+  return svg("206 413 32 32", size, className, <path d="M232,430 C232,430.553 231.552,431 231,431 C230.448,431 230,430.553 230,430 L230,422 C230,421.448 230.448,421 231,421 C231.552,421 232,421.448 232,422 L232,430 L232,430 Z M224,433 C224,433.553 223.552,434 223,434 C222.448,434 222,433.553 222,433 L222,427 C222,426.448 222.448,426 223,426 C223.552,426 224,426.448 224,427 L224,433 L224,433 Z M216,434 C216,434.553 215.552,435 215,435 C214.448,435 214,434.553 214,434 L214,424 C214,423.448 214.448,423 215,423 C215.552,423 216,423.448 216,424 L216,434 L216,434 Z M230,413 L222,419 L214,416 L206,421 L206,445 L214,440 L222,443 L230,437 L238,443 L238,419 L230,413 L230,413 Z" />);
+}
+
 /** One icon per kind of thing in "Happening now". */
 export const ACTIVITY_ICON: Record<HomeActivity["kind"], (p: IconProps) => ReactNode> = {
   chat: ChatIcon, album: AlbumIcon, study: StudyIcon, update: NewsIcon, challenge: ChallengeIcon, member: MemberAddIcon,

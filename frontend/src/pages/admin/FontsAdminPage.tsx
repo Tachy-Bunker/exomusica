@@ -46,6 +46,7 @@ export function FontsAdminPage() {
   const [textColorPrimary, setTextColorPrimary] = useState("#eef1fb");
   const [textColorSecondary, setTextColorSecondary] = useState("#a89ec2");
   const [chatTitleColor, setChatTitleColor] = useState("#eef1fb");
+  const [usernameColor, setUsernameColor] = useState<string | null>(null);
   const [accentPrimaryColor, setAccentPrimaryColor] = useState("#e2703f");
   const [contentTextScaleDesktop, setContentTextScaleDesktop] = useState(2.0);
   const [contentTextScaleMobile, setContentTextScaleMobile] = useState(1.6);
@@ -160,6 +161,7 @@ export function FontsAdminPage() {
       textColorPrimary: string | null;
       textColorSecondary: string | null;
       chatTitleColor: string | null;
+      usernameColor: string | null;
       accentPrimaryColor: string | null;
       contentTextScaleDesktop: number;
       contentTextScaleMobile: number;
@@ -185,6 +187,7 @@ export function FontsAdminPage() {
       if (s.textColorPrimary) setTextColorPrimary(s.textColorPrimary);
       if (s.textColorSecondary) setTextColorSecondary(s.textColorSecondary);
       if (s.chatTitleColor) setChatTitleColor(s.chatTitleColor);
+      setUsernameColor(s.usernameColor ?? null);
       if (s.accentPrimaryColor) setAccentPrimaryColor(s.accentPrimaryColor);
       setContentTextScaleDesktop(s.contentTextScaleDesktop);
       setContentTextScaleMobile(s.contentTextScaleMobile);
@@ -205,7 +208,7 @@ export function FontsAdminPage() {
   async function saveColors() {
     await api("/api/admin/site-settings", {
       method: "PATCH",
-      body: JSON.stringify({ textColorPrimary, textColorSecondary, chatTitleColor, accentPrimaryColor }),
+      body: JSON.stringify({ textColorPrimary, textColorSecondary, chatTitleColor, usernameColor, accentPrimaryColor }),
     });
   }
 
@@ -518,6 +521,11 @@ export function FontsAdminPage() {
         <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.4rem" }}>
           <input type="color" value={chatTitleColor} onChange={(e) => setChatTitleColor(e.target.value)} />
           <span style={{ fontSize: "0.8rem" }}>Chat branch title</span>
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.4rem" }}>
+          <input type="color" value={usernameColor ?? "#e8b86f"} onChange={(e) => setUsernameColor(e.target.value)} aria-label="Username colour" data-testid="username-color" />
+          <span style={{ fontSize: "0.8rem" }}>Usernames (everywhere except inside chats; they link to the member's page)</span>
+          {usernameColor && <button type="button" className="btn" onClick={() => setUsernameColor(null)} data-testid="username-color-clear">Use the default</button>}
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.4rem" }}>
           <input type="color" value={accentPrimaryColor} onChange={(e) => setAccentPrimaryColor(e.target.value)} />

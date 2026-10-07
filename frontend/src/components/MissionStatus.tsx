@@ -11,8 +11,8 @@ export function MissionStatus({ data, hereNow, now }: { data: ConversationsData;
   const status = statusOf(data.totals.day, data.trace);
   return (
     <section className="mstat" aria-label="Mission status" data-testid="inst-status">
-      <span className={`inst-lamp inst-lamp-${status.word.toLowerCase()}`} data-testid="inst-lamp" title="The last 24 hours compared with the daily average of the 13 days before">
-        <i aria-hidden="true" /> {status.word}
+      <span className={`inst-lamp inst-lamp-${status.word.toLowerCase()}`} data-testid="inst-lamp" title={`${status.word}: the last 24 hours compared with the daily average of the 13 days before`}>
+        <i aria-hidden="true" /><span className="sr-only">{status.word}</span>
       </span>
       <div className="mstat-readouts">
         <Readout testid="ro-channels" label="Channels" value={String(data.totals.conversations)} />

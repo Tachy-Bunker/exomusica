@@ -46,6 +46,11 @@ function snapshot() {
   return { onlineCount: onlineUserIds.size + discordOnlineCount, viewers };
 }
 
+/** How many members (and Discord users) are online right now: what a guest may see. */
+export function onlineNow(): number {
+  return snapshot().onlineCount;
+}
+
 function broadcastSnapshot(): void {
   const payload = JSON.stringify(snapshot());
   for (const e of entries) {

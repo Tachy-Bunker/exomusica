@@ -1,3 +1,4 @@
+import { branchHref } from "../lib/branchLinks";
 import { useRef } from "react";
 import { createPortal } from "react-dom";
 import type { MouseEvent as ReactMouseEvent } from "react";
@@ -83,7 +84,7 @@ export function ChatDock() {
       >
         <span>
           {openBranchSlug ? (
-            <Link to={`/branch/${openBranchSlug}`} style={{ color: "inherit", textDecoration: "none" }} title="Open branch page">
+            <Link to={branchHref(openBranchSlug)} style={{ color: "inherit", textDecoration: "none" }} title="Open in Soundbay">
               {openChannelName}
             </Link>
           ) : (

@@ -1,3 +1,4 @@
+import { branchHref } from "../lib/branchLinks";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { ContributeTimeline, type ContributeStepKey } from "../components/ContributeTimeline";
@@ -93,7 +94,7 @@ export function ContributePage() {
       </section>
 
       <section aria-labelledby="ct-sample"><h3 id="ct-sample" className="ct-h3">Hear a sample</h3>
-        {selected.previewUrl ? <audio controls preload="none" src={selected.previewUrl} aria-label={`Sample from ${selected.name}`} style={{ width: "100%" }} /> : <p className="home-dim">No sample audio for this branch yet. <Link to={`/branch/${selected.slug}`}>Its albums</Link> are the best way to hear it.</p>}
+        {selected.previewUrl ? <audio controls preload="none" src={selected.previewUrl} aria-label={`Sample from ${selected.name}`} style={{ width: "100%" }} /> : <p className="home-dim">No sample audio for this branch yet. <Link to={branchHref(selected.slug)}>Its albums</Link> are the best way to hear it.</p>}
       </section>
 
       <section aria-labelledby="ct-sketches"><h3 id="ct-sketches" className={`ct-h3${mark("sketches")}`}>Source material</h3>
@@ -109,7 +110,7 @@ export function ContributePage() {
       )}
 
       <div className="ct-actions ct-panel-actions">
-        <Link className={`btn${mark("official")}`} to={`/branch/${selected.slug}`}>View the branch</Link>
+        <Link className={`btn${mark("official")}`} to={branchHref(selected.slug)}>View the branch</Link>
         <Link className="btn" to={`/conversations`}>Conversations</Link>
       </div>
     </div>

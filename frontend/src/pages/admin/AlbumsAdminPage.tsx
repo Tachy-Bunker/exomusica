@@ -1,3 +1,4 @@
+import { TrackSource } from "../../components/admin/TrackSource";
 import { useEffect, useRef, useState, type FormEvent, type ChangeEvent } from "react";
 import { api, ApiError } from "../../lib/api";
 import type { Branch } from "../../lib/types";
@@ -682,6 +683,7 @@ export function AlbumsAdminPage() {
           <div className="field">
             <input placeholder="track title" required value={trackForm.title} onChange={(e) => setTrackForm((f) => ({ ...f, title: e.target.value }))} />
           </div>
+          <TrackSource onPick={(t) => setTrackForm((f) => ({ ...f, title: f.title || t.title, fileUrl: t.fileUrl, format: t.format }))} />
           <div className="field">
             <input placeholder="file URL" required value={trackForm.fileUrl} onChange={(e) => setTrackForm((f) => ({ ...f, fileUrl: e.target.value }))} />
           </div>

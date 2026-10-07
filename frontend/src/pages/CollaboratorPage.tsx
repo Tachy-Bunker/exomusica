@@ -86,7 +86,7 @@ export function CollaboratorPage() {
   }
 
   return (
-    <div style={{ maxWidth: 720 }}>
+    <div className="page-column" style={{ maxWidth: 720 }}>
       <Link to={`/collaborator/${collaborator.slug}/spacemap`} className="btn" style={{ marginBottom: "0.8rem", display: "inline-block" }}>
         View discography on Spacemap
       </Link>

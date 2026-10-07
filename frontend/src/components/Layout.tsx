@@ -44,6 +44,7 @@ import { useIsDesktop } from "../lib/useIsDesktop";
 import { ChatDock } from "./ChatDock";
 import { NotificationWidget } from "./NotificationWidget";
 import { OnlineOrbs } from "./OnlineOrbs";
+import { useGuestOnline } from "../lib/useGuestOnline";
 import { PlayerBar } from "./PlayerBar";
 import { TrackPreloader } from "./TrackPreloader";
 import { resumeSharedContextIfNeeded } from "../lib/oneShotSfx";
@@ -58,6 +59,7 @@ const NAV_SECTIONS: { section: Section; label: string; to: string; letter: strin
 
 export function Layout() {
   const { user } = useAuth();
+  useGuestOnline(!user);
   const loadEmojis = useEmojiStore((s) => s.load);
   useGlobalPlayerShortcuts();
   const pipWindow = useChatPipStore((s) => s.pipWindow);
@@ -248,6 +250,7 @@ export function Layout() {
       moireWaveform: "sine" | "triangle";
       moireRotationSpeed: number;
       faviconUrl: string | null;
+      usernameColor: string | null;
     }>("/api/site-settings").then((s) => {
       setSiteFont(s.defaultFont);
       useAmbienceStore.getState().setUrl(s.ambienceUrl);
@@ -264,6 +267,7 @@ export function Layout() {
       if (s.textColorPrimary) root.setProperty("--text", s.textColorPrimary);
       if (s.textColorSecondary) root.setProperty("--text-dim", s.textColorSecondary);
       if (s.chatTitleColor) root.setProperty("--chat-title-color", s.chatTitleColor);
+      if (s.usernameColor) root.setProperty("--username-color", s.usernameColor);
       if (s.accentPrimaryColor) {
         root.setProperty("--accent-forum", s.accentPrimaryColor);
         root.setProperty("--accent-forum-dim", darkenHex(s.accentPrimaryColor, 0.45));
@@ -320,7 +324,7 @@ export function Layout() {
     >
       <header className="top-nav" ref={navRef}>
         <div className="nav-side nav-left">
-          {user && isDesktop && <OnlineOrbs />}
+          {isDesktop && <OnlineOrbs />}
           <nav className="nav-pair" aria-label="Primary">
             {NAV_SECTIONS.slice(0, 2).map((n) => (
               <Link key={n.section} to={n.to} className="nav-link" aria-current={activeSection === n.section ? "page" : undefined}>

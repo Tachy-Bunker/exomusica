@@ -2,6 +2,7 @@ import type { FastifyInstance } from "fastify";
 import { prisma } from "../lib/prisma.js";
 import { requireAdmin } from "../lib/auth.js";
 import { identityProblem, normalizeColor } from "../lib/branchIdentity.js";
+import { collectBranchImages } from "../lib/branchImages.js";
 import { trackToDTO } from "../lib/embeds.js";
 
 interface CreateBranchBody {
@@ -33,6 +34,7 @@ export async function branchRoutes(app: FastifyInstance): Promise<void> {
         identityColor: true,
         identityGlyph: true,
         identityImageUrl: true,
+        identitySecondaryImageUrl: true,
         channel: { select: { id: true, slug: true } },
       },
       orderBy: { id: "asc" },
@@ -126,6 +128,7 @@ export async function branchRoutes(app: FastifyInstance): Promise<void> {
     const albums = await prisma.album.findMany({
       where: { branchId: branch.id },
       include: {
+        _count: { select: { tracks: true } },
         tracks: {
           include: { album: { include: { branch: true } }, bookmarks: true, collaborators: { include: { collaborator: true } } },
           orderBy: { position: "asc" },
@@ -141,8 +144,21 @@ export async function branchRoutes(app: FastifyInstance): Promise<void> {
       title: a.title,
       composer: a.composer,
       coverArtUrl: a.coverArtUrl,
+      trackCount: a._count.tracks,
       previewTrack: a.tracks[0] ? trackToDTO(a.tracks[0]) : null,
     }));
+  });
+
+  // Every picture a branch has, so an admin can choose a main and a secondary image and the homepage can show the ones not yet used.
+  app.get<{ Params: { slug: string } }>("/api/branches/:slug/images", async (req, reply) => {
+    const branch = await prisma.branch.findUnique({ where: { slug: req.params.slug }, select: { id: true, name: true, coverArtUrl: true } });
+    if (!branch) return reply.code(404).send({ error: "no such branch" });
+    const albums = await prisma.album.findMany({
+      where: { branchId: branch.id },
+      orderBy: { createdAt: "desc" },
+      select: { slug: true, title: true, coverArtUrl: true, galleryImages: { orderBy: { position: "asc" }, select: { url: true } } },
+    });
+    return collectBranchImages({ name: branch.name, coverArtUrl: branch.coverArtUrl }, albums);
   });
 
   // Creating a branch also creates its one ForumChannel in the same
@@ -198,6 +214,7 @@ export async function branchRoutes(app: FastifyInstance): Promise<void> {
       identityColor: string | null;
       identityGlyph: string | null;
       identityImageUrl: string | null;
+      identitySecondaryImageUrl: string | null;
     }>;
   }>("/api/admin/branches/:id", { preHandler: requireAdmin }, async (req, reply) => {
     const problem = identityProblem(req.body ?? {});

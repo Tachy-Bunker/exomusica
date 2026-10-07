@@ -7,12 +7,12 @@ const CACHE_MS = 30_000;
 const NOT_HIDDEN = { visibility: { not: "HIDDEN" as const } };
 
 async function buildHome() {
-  const [branchRows, recentMessages, albums, studies, post, challenge, newMembers, members, tracks, studyCount] = await Promise.all([
+  const [branchRows, recentMessages, albums, studies, post, challenge, newMembers, members, tracks, studyCount, albumTracks] = await Promise.all([
     prisma.branch.findMany({
       where: NOT_HIDDEN,
       select: {
-        slug: true, name: true, description: true, coverArtUrl: true, posX: true, posY: true, visibility: true, isAnchor: true,
-        identityColor: true, identityGlyph: true, identityImageUrl: true,
+        id: true, slug: true, name: true, description: true, coverArtUrl: true, posX: true, posY: true, visibility: true, isAnchor: true,
+        identityColor: true, identityGlyph: true, identityImageUrl: true, identitySecondaryImageUrl: true,
         parent: { select: { slug: true } },
         channel: { select: { id: true, slug: true } },
         albums: { select: { createdAt: true }, orderBy: { createdAt: "desc" }, take: 1 },
@@ -43,6 +43,7 @@ async function buildHome() {
     prisma.user.count({ where: { isGhost: false, deletedAt: null } }),
     prisma.track.count({ where: { album: { branch: NOT_HIDDEN } } }),
     prisma.study.count(),
+    prisma.album.findMany({ where: { branch: NOT_HIDDEN }, select: { branchId: true, _count: { select: { tracks: true } } } }),
   ]);
 
   // When each branch's chat last had a message (one query for all of them).
@@ -52,6 +53,8 @@ async function buildHome() {
     : [];
   const lastMessageByChannel = new Map(lastMessages.map((m) => [m.channelId, m._max.createdAt]));
 
+  const tracksByBranch = new Map<number, number>();
+  for (const a of albumTracks) tracksByBranch.set(a.branchId, (tracksByBranch.get(a.branchId) ?? 0) + a._count.tracks);
   const branches = branchRows.map((b) => ({
     slug: b.slug,
     name: b.name,
@@ -65,7 +68,9 @@ async function buildHome() {
     color: b.identityColor,
     glyph: b.identityGlyph,
     image: b.identityImageUrl,
+    secondaryImage: b.identitySecondaryImageUrl,
     albums: b._count.albums,
+    tracks: tracksByBranch.get(b.id) ?? 0,
     chatSlug: b.channel?.slug ?? null,
     lastActiveAt: lastActiveAt(b.albums[0]?.createdAt, b.channel ? lastMessageByChannel.get(b.channel.id) : null),
   }));
@@ -84,20 +89,23 @@ async function buildHome() {
       .filter((m) => m.text),
   ).map<ActivityItem>((m) => ({
     kind: "chat",
-    label: `Chat · ${m.channelName}`,
-    title: m.text.startsWith("sent ") || m.text.startsWith("shared ") ? `${m.author} ${m.text}` : `${m.author}: ${m.text}`,
+    label: "Chat",
+    title: m.channelName,
+    by: m.author,
+    text: m.text,
     detail: "",
-    href: m.branchSlug ? `/branch/${m.branchSlug}` : `/topic/${m.channelSlug}`,
+    href: m.branchSlug ? `/soundbay?open=${m.branchSlug}` : `/topic/${m.channelSlug}`,
     at: m.at,
   }));
 
+  const none = { by: null, text: "" } as const;
   const items: ActivityItem[] = [
     ...chatItems,
-    ...albums.map<ActivityItem>((a) => ({ kind: "album", label: "New album", title: a.title, detail: `${a.branch.name} · ${a._count.tracks} track${a._count.tracks === 1 ? "" : "s"}`, href: `/album/${a.slug}`, at: a.createdAt.getTime() })),
-    ...studies.map<ActivityItem>((s) => ({ kind: "study", label: studyLabel(s.createdAt.getTime(), s.updatedAt.getTime()), title: s.title, detail: `by ${s.owner.username}`, href: `/study/${s.slug}`, at: s.updatedAt.getTime() })),
-    ...(post?.publishedAt ? [{ kind: "update" as const, label: "Update", title: post.title, detail: "Log", href: `/news/${post.slug}`, at: post.publishedAt.getTime() }] : []),
-    ...(challenge ? [{ kind: "challenge" as const, label: "Challenge", title: challenge.title, detail: `${challenge._count.submissions} ${challenge._count.submissions === 1 ? "entry" : "entries"}`, href: "/challenges", at: challenge.createdAt.getTime() }] : []),
-    ...newMembers.map<ActivityItem>((u) => ({ kind: "member", label: "New member", title: `${u.username} joined`, detail: plainExcerpt(u.bio ?? "", 60), href: `/u/${encodeURIComponent(u.username)}`, at: u.createdAt.getTime() })),
+    ...albums.map<ActivityItem>((a) => ({ ...none, kind: "album", label: "New album", title: a.title, detail: `${a.branch.name} · ${a._count.tracks} track${a._count.tracks === 1 ? "" : "s"}`, href: `/album/${a.slug}`, at: a.createdAt.getTime() })),
+    ...studies.map<ActivityItem>((s) => ({ kind: "study", label: studyLabel(s.createdAt.getTime(), s.updatedAt.getTime()), title: s.title, by: s.owner.username, text: "", detail: "", href: `/study/${s.slug}`, at: s.updatedAt.getTime() })),
+    ...(post?.publishedAt ? [{ ...none, kind: "update" as const, label: "Update", title: post.title, detail: "", href: `/news/${post.slug}`, at: post.publishedAt.getTime() }] : []),
+    ...(challenge ? [{ ...none, kind: "challenge" as const, label: "Challenge", title: challenge.title, detail: `${challenge._count.submissions} ${challenge._count.submissions === 1 ? "entry" : "entries"}`, href: "/challenges", at: challenge.createdAt.getTime() }] : []),
+    ...newMembers.map<ActivityItem>((u) => ({ kind: "member", label: "New member", title: u.username, by: u.username, text: "", detail: plainExcerpt(u.bio ?? "", 60), href: `/u/${encodeURIComponent(u.username)}`, at: u.createdAt.getTime() })),
   ];
 
   return {

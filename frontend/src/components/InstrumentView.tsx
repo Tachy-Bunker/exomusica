@@ -1,5 +1,7 @@
+import { Username } from "./Username";
 import type { MouseEvent } from "react";
 import { Link } from "react-router-dom";
+import { RefreshIcon } from "./Icons";
 import { SignalBars, SpaceGlyph } from "./SpaceGlyph";
 import { timeAgo } from "../lib/relativeTime";
 import { KIND_LABEL, SIGNAL_LABEL, type Conversation, type ConversationsData } from "../lib/spaceHubs";
@@ -10,18 +12,17 @@ const BOARD_ROWS = 12;
 type Opener = (e: MouseEvent, chat: { slug: string; name: string; branchSlug?: string | null }) => void;
 
 /** The instrument view of Conversations: a trace per channel and the live feed. (The status sits beside the page title; the scope is in the List view.) */
-export function InstrumentView({ data, rows, live, onToggleLive, updatedAt, showAll, onShowAll, now, onOpen }: {
-  data: ConversationsData; rows: Conversation[]; live: boolean; onToggleLive: () => void; updatedAt: number; showAll: boolean; onShowAll: () => void; now: number; onOpen: Opener;
+export function InstrumentView({ data, rows, onRefresh, refreshing, showAll, onShowAll, now, onOpen }: {
+  data: ConversationsData; rows: Conversation[]; onRefresh: () => void; refreshing: boolean; showAll: boolean; onShowAll: () => void; now: number; onOpen: Opener;
 }) {
   const shown = showAll ? rows : rows.slice(0, BOARD_ROWS);
   return (
     <div className="inst" data-testid="instrument">
       <div className="inst-main">
         <section className="inst-panel" aria-labelledby="inst-board-h" data-testid="inst-board">
-          <header className="inst-head"><h2 id="inst-board-h" className="inst-title">Channels <span className="inst-dim">{rows.length} shown</span></h2></header>
-          {rows.length === 0 ? <p className="inst-dim" data-testid="conv-empty">{data.conversations.length === 0 ? "No conversations yet." : "No signals match. Try fewer words, or clear the filter."}</p> : (
+          {rows.length === 0 ? <p className="inst-dim" data-testid="conv-empty"><span id="inst-board-h" className="sr-only">Channels</span>{data.conversations.length === 0 ? "No conversations yet." : "No signals match. Try fewer words, or clear the filter."}</p> : (
             <>
-              <div className="inst-cols inst-dim" aria-hidden="true"><span /><span>Channel</span><span>14-day trace</span><span className="inst-cols-num">This week</span><span>Last signal</span></div>
+              <div className="inst-cols inst-dim"><span aria-hidden="true" /><h2 id="inst-board-h" className="inst-cols-title" data-testid="inst-board-title">Channel <span>({rows.length})</span></h2><span aria-hidden="true">Signals</span><span className="inst-cols-num" aria-hidden="true">This week</span><span aria-hidden="true">Last signal</span></div>
               <ul className="inst-rows" data-testid="conv-list">
                 {shown.map((c) => (
                   <li key={c.slug} className="inst-row sig-card" data-kind={c.kind} data-slug={c.slug}>
@@ -45,15 +46,14 @@ export function InstrumentView({ data, rows, live, onToggleLive, updatedAt, show
       <aside className="inst-panel inst-feed" aria-labelledby="inst-feed-h" data-testid="inst-feed">
         <header className="inst-head">
           <h2 id="inst-feed-h" className="inst-title">Live activity</h2>
-          <button type="button" className="inst-live" aria-pressed={live} onClick={onToggleLive} data-testid="live-toggle"><i aria-hidden="true" className={live ? "on" : ""} /> {live ? "Live" : "Paused"}</button>
+          <button type="button" className={`inst-refresh${refreshing ? " spinning" : ""}`} onClick={onRefresh} aria-label="Refresh now" title="Refresh now (it also refreshes by itself every 15 seconds)" data-testid="live-refresh"><RefreshIcon size={16} /></button>
         </header>
-        <p className="inst-dim inst-updated" data-testid="feed-updated">{live ? "Refreshes about every 30 seconds. " : "Not refreshing. "}Updated {timeAgo(updatedAt, now)}.</p>
         {data.recent.length === 0 ? <p className="inst-dim">Nothing yet.</p> : (
           <ol className="inst-feed-list" data-testid="feed-list">
             {data.recent.map((m) => (
               <li key={m.id}>
                 <span className="inst-feed-time inst-dim">{timeAgo(m.at, now)}</span>
-                <span className="inst-feed-text"><Link to={m.href} className="inst-feed-chan" onClick={(e) => onOpen(e, { slug: m.channelSlug, name: m.channelName, branchSlug: m.branchSlug })}>{m.channelName}</Link> <b>{m.author}</b> {m.text}</span>
+                <span className="inst-feed-text"><Link to={m.href} className="inst-feed-chan" onClick={(e) => onOpen(e, { slug: m.channelSlug, name: m.channelName, branchSlug: m.branchSlug })}>{m.channelName}</Link> <Username name={m.author} /> {m.text}</span>
               </li>
             ))}
           </ol>

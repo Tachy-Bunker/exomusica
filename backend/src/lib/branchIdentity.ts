@@ -11,10 +11,11 @@ export const isGlyph = (s: unknown): s is BranchGlyph => typeof s === "string" &
 export const isImageUrl = (s: unknown): s is string => typeof s === "string" && s.length <= 500 && /^(\/uploads\/|https:\/\/)[^\s"'<>()\\]+$/.test(s);
 
 /** null = fine; otherwise what is wrong. `null` values are allowed (they clear the choice). */
-export function identityProblem(body: { identityColor?: unknown; identityGlyph?: unknown; identityImageUrl?: unknown }): string | null {
+export function identityProblem(body: { identityColor?: unknown; identityGlyph?: unknown; identityImageUrl?: unknown; identitySecondaryImageUrl?: unknown }): string | null {
   if (body.identityColor !== undefined && body.identityColor !== null && !isHexColor(body.identityColor)) return "identityColor must be a colour like #4fa8e0";
   if (body.identityGlyph !== undefined && body.identityGlyph !== null && !isGlyph(body.identityGlyph)) return `identityGlyph must be one of: ${BRANCH_GLYPHS.join(", ")}`;
   if (body.identityImageUrl !== undefined && body.identityImageUrl !== null && !isImageUrl(body.identityImageUrl)) return "identityImageUrl must be an uploaded image or an https address";
+  if (body.identitySecondaryImageUrl !== undefined && body.identitySecondaryImageUrl !== null && !isImageUrl(body.identitySecondaryImageUrl)) return "identitySecondaryImageUrl must be an uploaded image or an https address";
   return null;
 }
 

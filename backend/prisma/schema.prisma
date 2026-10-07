@@ -160,7 +160,8 @@ model Branch {
   contributeBackgroundOpacity Float   @default(0.3)
   identityColor       String?     // admin-chosen accent colour, #rrggbb: gives the branch a recognisable look in lists and on the map
   identityGlyph       String?     // admin-chosen emblem, one of a fixed set (see lib/branchIdentity.ts)
-  identityImageUrl    String?     // admin-chosen picture used instead of the emblem: an uploaded image or one of the branch's own covers
+  identityImageUrl    String?     // the branch's MAIN image: shown in place of the emblem (an album cover or gallery picture, or an upload)
+  identitySecondaryImageUrl String? // the branch's SECONDARY image: the soft background of its tile and of the homepage module when it is chosen
   previewAttachmentId Int?        @unique
   previewAttachment   Attachment? @relation("BranchPreview", fields: [previewAttachmentId], references: [id])
   sketches            BranchSketch[]
@@ -659,6 +660,7 @@ model SiteSettings {
   scanSfxUrl     String? // spacemap text-reveal loop (branch lock-on + F/E/T hint)
   defaultWikiPageId Int?
   defaultWikiPage   WikiPage? @relation(fields: [defaultWikiPageId], references: [id])
+  usernameColor      String? // the colour every username is shown in outside chat (and the link to their page)
   textColorPrimary   String? // overrides --text site-wide
   textColorSecondary String? // overrides --text-dim site-wide
   chatTitleColor     String? // chat dock branch title specifically

@@ -19,6 +19,8 @@ interface AudioState {
   currentPlaylist: { slug: string; title: string } | null; // which playlist the currently playing track was launched from, if any
 
   play: (track: PlayableTrackDTO) => void;
+  /** Play a track starting `startAt` seconds in (for links that name a moment). */
+  playAt: (track: PlayableTrackDTO, startAt: number | null) => void;
   playQueueIndex: (index: number) => void;
   setCurrentPlaylist: (playlist: { slug: string; title: string } | null) => void;
   addToQueue: (tracks: PlayableTrackDTO[]) => void;
@@ -87,6 +89,21 @@ export const useAudioStore = create<AudioState>((set, get) => ({
       set({ isPlaying: false });
     });
     useAmbienceStore.getState().setEnabled(false);
+  },
+
+  playAt: (track, startAt) => {
+    get().play(track);
+    if (!startAt || startAt <= 0) return;
+    const el = audioEl;
+    set({ currentTime: startAt });
+    if (!el) return;
+    // Seek once the file knows its length (so a position past its end can be held just inside it); at once if it already does.
+    const apply = () => {
+      const length = Number.isFinite(el.duration) && el.duration > 0 ? el.duration : Infinity;
+      try { el.currentTime = Math.min(startAt, Math.max(0, length - 0.25)); } catch { /* not seekable yet: the loadedmetadata hook below tries again */ }
+    };
+    if (el.readyState >= 1) apply();
+    else el.addEventListener("loadedmetadata", apply, { once: true });
   },
 
   playQueueIndex: (index) => {

@@ -1,3 +1,4 @@
+import { branchHref } from "../lib/branchLinks";
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import type { Branch } from "../lib/types";
@@ -245,7 +246,7 @@ export function SpaceMap({
   function viewLockedDetails() {
     const node = lockedNodeRef.current;
     if (!node || node.id === -1) return;
-    navigate(`/branch/${node.slug}`);
+    navigate(branchHref(node.slug));
   }
 
   function openLockedChat() {
@@ -253,7 +254,7 @@ export function SpaceMap({
     if (!node || node.id === -1) return;
     playLinkClickSound();
     if (!isDesktop) {
-      navigate(`/branch/${node.slug}`);
+      navigate(branchHref(node.slug));
       return;
     }
     const branch = branchesRef.current.find((b) => b.slug === node.slug);
@@ -710,7 +711,7 @@ export function SpaceMap({
                 hoveredIdRef.current = null;
                 setHoveredId(null);
               }}
-              onClick={() => { playLinkClickSound(); navigate(`/branch/${n.slug}`); }}
+              onClick={() => { playLinkClickSound(); navigate(branchHref(n.slug)); }}
             >
               {n.name}
               {hoveredId === n.id && <span className="space-node-frozen-dot" />}
@@ -730,7 +731,7 @@ export function SpaceMap({
                 else crystalElRefs.current.delete(n.id);
               }}
               className="space-node-crystal"
-              onClick={() => { playLinkClickSound(); navigate(`/branch/${n.slug}`); }}
+              onClick={() => { playLinkClickSound(); navigate(branchHref(n.slug)); }}
             >
               <svg viewBox="0 0 80 80" className="space-node-crystal-svg">
                 {generateCrystalShards(n.crystalCount, n.id).map((points, i) => (

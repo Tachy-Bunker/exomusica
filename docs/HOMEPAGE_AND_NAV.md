@@ -78,3 +78,35 @@ Guided: six clickable steps (Choose, Brief, Sketches, Submit, Review, If approve
 
 ## Keyboard
 The global player shortcuts (Space, arrows) now step aside when focus is on a control that uses those keys itself (buttons, checkboxes, dropdowns, radio groups, sliders), so Space presses a focused button.
+
+## Shareable links and embeds
+Everything a link can say lives in the address, in one format read by the normal pages and the embeds alike (`lib/shareState.ts`).
+
+| Part | Written as | Meaning |
+|---|---|---|
+| Song | `track=12` (official) or `track=c12` (community) | the two sets number their tracks separately, so community songs carry a `c` |
+| Time | `t=1:23` | also read: `83`, `83s`, `1m23s`, `1h2m3s`, `1:02:03`; whole seconds, at most a day; a time past the end of a song is held just inside it |
+| Start playing | `play=1` | without it a song and time are only information: nothing starts |
+| View | `view=venn` | the playlist map's constellation (the spacemap is the default); the older `#venn` still works |
+| Genres | `solo=Ambient&solo=Drone&off=Noise` | soloed and switched-off genres (repeated parameters, so names with commas or `&` are safe); a genre both soloed and off is soloed; names the playlist doesn't have are ignored |
+| Controls | `hideControls=1` | the embed shows only the picture and the player |
+| Open branches | `open=a,b,c` | Soundbay, several at once (plain names only, at most 20) |
+| Album | `album=slug&play=1` | Soundbay starts that album (add `track` and `t` for a song in it) |
+
+**Where it applies:** the playlist map (`/playlist/:slug`, and `/embed/playlist/:slug`), the playlist list view (`/playlist/:slug/list`), branch albums (`/album/:slug`), community albums (`/community-album/:slug`) and Soundbay. Every one of those pages (except Soundbay, which has a copy-link button) has a **Share** button opening `components/ShareModal.tsx`: choose a song, a time, whether to start playing; on the map also the view and whether to keep the genre switches; the dialog gives the link and, for the playlist maps, the embed code (size, hide-controls). A genre soloed *by a link* does not start the music (soloing by hand still does); a linked song with soloed genres plays that song and queues the rest of those genres after it.
+
+**Starting to play** (`components/ShareAutoplay.tsx`): browsers allow sound only after the visitor has acted. If they already have (they followed an in-site link) the song starts at once, from the right moment (`playAt` in the audio store seeks when the file's length is known). A visitor arriving from outside gets a one-tap **Play** prompt naming the song and moment; the same prompt appears if the browser refuses after all. Seeking into a song needs the server to answer byte-range requests (`@fastify/static` does by default; the external-media proxy passes them through).
+
+**Soundbay:** which branches are expanded is kept in the address (`open=`), so any view can be copied; `?open=` also shows a branch the "Has albums" default would hide, and scrolls to the first one.
+
+## Live refresh
+Conversations refreshes its data every 15 seconds, but only while the module is showing live data (not in the Map view), the tab is visible, the browser is online and the visitor has moved, typed or scrolled in the last 10 minutes (`lib/livePoll.ts`). Coming back (tab visible again, activity after being away, switching to a live view) refreshes at once if the data is stale. The refresh button refreshes now and restarts the 15 seconds. The server computes nothing in the background: `/api/conversations` is built on request and one copy is shared for 15 seconds.
+
+## Usernames
+Outside chat a member's name is a `Username` (`components/Username.tsx`): in the colour chosen in the admin under Fonts & Misc, linking to their page, dimmed along with dimmed text. The colour is `SiteSettings.usernameColor`, applied as `--username-color`.
+
+## Branch images (admin)
+`/admin/branches/:id/identity`: a **main image** (shown instead of the emblem; the branch's colour becomes its average) and a **secondary image** (the soft background of its tile and, at 17%, of the homepage Explore module while it is chosen), chosen from the branch's own pictures (`GET /api/branches/:slug/images`: its cover, its albums' covers and gallery images) or uploaded (main only). Columns: `Branch.identityImageUrl`, `identitySecondaryImageUrl`. Adding a track to an album can also search what is already on the server or upload a file (`/api/admin/track-search`, `/api/admin/track-upload`).
+
+## Discord bridge
+Posting a website message to Discord (`lib/discordBot.ts`): the member's Discord picture is found through `lib/discordLookup.ts` (own id, captured id, a linked import account's id, then Discord username; a targeted member search, cached 30 minutes, retried once, an older picture used if Discord fails). `@name` becomes `<@id>` for mentioned members whose Discord account can be found (`lib/mentions.ts`), and the post may ping only those members (`lib/discordPayload.ts`: never @everyone, @here or a role).

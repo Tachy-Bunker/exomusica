@@ -1,3 +1,4 @@
+import { Username } from "../components/Username";
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { api } from "../lib/api";
@@ -113,7 +114,7 @@ export function CommunityPage() {
             <div style={{ fontSize: "0.7rem", color: "var(--accent-forum)", textTransform: "uppercase" }}>Spotlight</div>
             <div style={{ fontFamily: "var(--font-display)" }}>{spotlight.title}</div>
             <div style={{ fontSize: "0.8rem", color: "var(--text-dim)" }}>
-              {spotlight.albumTitle} - {spotlight.owner}
+              {spotlight.albumTitle} - <Username name={spotlight.owner} />
             </div>
           </div>
         </Link>
@@ -124,7 +125,7 @@ export function CommunityPage() {
       ) : (
         [...byOwner.entries()].map(([owner, list]) => (
           <div key={owner} style={{ marginBottom: "1.5rem" }}>
-            <h2 style={{ fontSize: "1rem", color: "var(--accent-forum)" }}>{owner}</h2>
+            <h2 style={{ fontSize: "1rem" }}><Username name={owner} /></h2>
             <div style={{ display: "flex", flexDirection: "column", gap: "0.4rem" }}>
               {list.map((p) => (
                 <Link

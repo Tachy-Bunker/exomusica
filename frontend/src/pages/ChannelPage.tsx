@@ -324,7 +324,7 @@ export function ChannelPage({ channelSlug, fillHeight, parentControlsHeight }: {
   }
   const [mode, setMode] = useState<ViewMode>("live");
   const [displayMode, setDisplayMode] = useState<DisplayMode>(
-    () => (localStorage.getItem("exomusica_display_mode") as DisplayMode) ?? "standard",
+    () => (localStorage.getItem("exomusica_display_mode") as DisplayMode) ?? "grouped",
   );
   const [messageFontSize, setMessageFontSize] = useState<number>(
     () => Number(localStorage.getItem("exomusica_message_font_size")) || 100,

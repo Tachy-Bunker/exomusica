@@ -1,3 +1,4 @@
+import { branchHref } from "../lib/branchLinks";
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../lib/api";
@@ -105,7 +106,7 @@ export function DiscussionIndexPage() {
           .filter((b) => b.visibility !== "BABY_CRYSTALS")
           .map((b) => (
             <li key={b.id} style={{ marginBottom: "0.5rem" }}>
-              <Link to={`/branch/${b.slug}`}>{b.name}</Link>{" "}
+              <Link to={branchHref(b.slug)}>{b.name}</Link>{" "}
               {b.channel && (
                 <button className="export-icon-btn" onClick={() => exportChatHistory(b.channel!.slug)} title="Download this branch's chat history">
                   <ExportIcon size={16} />
@@ -123,7 +124,7 @@ export function DiscussionIndexPage() {
               .filter((b) => b.visibility === "BABY_CRYSTALS")
               .map((b) => (
                 <li key={b.id} style={{ marginBottom: "0.5rem" }}>
-                  <Link to={`/branch/${b.slug}`}>{b.name}</Link>{" "}
+                  <Link to={branchHref(b.slug)}>{b.name}</Link>{" "}
                   {b.channel && (
                     <button className="export-icon-btn" onClick={() => exportChatHistory(b.channel!.slug)} title="Download this branch's chat history">
                       <ExportIcon size={16} />

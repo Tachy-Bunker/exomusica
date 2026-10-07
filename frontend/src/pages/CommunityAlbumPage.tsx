@@ -1,9 +1,13 @@
+import { Username } from "../components/Username";
 import { useEffect, useState } from "react";
-import { useParams, Link } from "react-router-dom";
+import { useParams, Link, useSearchParams } from "react-router-dom";
 import { api } from "../lib/api";
 import { useAudioStore } from "../lib/audioStore";
 import { useDocumentTitle } from "../lib/useDocumentTitle";
 import { AddToPlaylistControl } from "../components/AddToPlaylistControl";
+import { ShareAutoplay } from "../components/ShareAutoplay";
+import { ShareModal } from "../components/ShareModal";
+import { parseAutoplay } from "../lib/shareState";
 import type { PlayableTrackDTO } from "../lib/types";
 
 interface CommunityTrackPlayable extends PlayableTrackDTO {
@@ -30,6 +34,9 @@ export function CommunityAlbumPage() {
   const [album, setAlbum] = useState<CommunityAlbumDetail | null>(null);
   const [expandedLyrics, setExpandedLyrics] = useState<Set<number>>(new Set());
   const play = useAudioStore((s) => s.play);
+  const playAt = useAudioStore((s) => s.playAt);
+  const [searchParams] = useSearchParams();
+  const [shareOpen, setShareOpen] = useState(false);
   const addToQueue = useAudioStore((s) => s.addToQueue);
   const clearQueue = useAudioStore((s) => s.clearQueue);
   const setCurrentPlaylist = useAudioStore((s) => s.setCurrentPlaylist);
@@ -97,7 +104,7 @@ export function CommunityAlbumPage() {
         <div style={{ minWidth: 0, flex: 1 }}>
           <h1 style={{ marginBottom: "0.1rem", overflowWrap: "break-word" }}>{album.title}</h1>
           <p style={{ color: "var(--text-dim)", marginTop: 0 }}>{album.composer}</p>
-          <p style={{ fontSize: "0.8rem", color: "var(--text-dim)" }}>Uploaded by {album.owner.username}</p>
+          <p style={{ fontSize: "0.8rem", color: "var(--text-dim)" }}>Uploaded by <Username name={album.owner.username} /></p>
         </div>
       </div>
 
@@ -110,7 +117,30 @@ export function CommunityAlbumPage() {
             Add all to queue
           </button>
         )}
+        <button className="btn" onClick={() => setShareOpen(true)} data-testid="share-open-btn" title="Share a link to this album, or to a song in it and a moment of that song">Share</button>
       </div>
+      <ShareAutoplay
+        ready
+        tracks={album.tracks.map((t) => ({ id: t.id, source: t.source, title: t.title, composer: t.composer }))}
+        request={parseAutoplay(searchParams)}
+        start={(index, t) => {
+          const [first, ...rest] = album.tracks.slice(index);
+          if (!first) return;
+          playAt(first, t);
+          clearQueue();
+          addToQueue(rest);
+          setCurrentPlaylist(null);
+        }}
+      />
+      {shareOpen && (
+        <ShareModal
+          title="Share this album"
+          pathname={`/community-album/${slug}`}
+          tracks={album.tracks.map((t) => ({ id: t.id, source: t.source, title: t.title, composer: t.composer }))}
+          onClose={() => setShareOpen(false)}
+        />
+      )}
+
       <div style={{ display: "flex", flexDirection: "column", gap: "0.4rem" }}>
         {album.tracks.length === 0 ? (
           <p style={{ color: "var(--text-dim)" }}>No tracks yet.</p>

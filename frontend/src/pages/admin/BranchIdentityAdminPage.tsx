@@ -3,9 +3,11 @@ import { Link, useParams } from "react-router-dom";
 import { BranchEmblem } from "../../components/BranchEmblem";
 import { api, ApiError, getToken } from "../../lib/api";
 import { GLYPHS, GLYPH_LABEL, PALETTE, derivedColor, identityOf, isHexColor, type Glyph } from "../../lib/branchIdentity";
+import type { BranchPicture } from "../../lib/home";
+import { colorFromImageUrl } from "../../lib/imageColor";
 import type { Branch } from "../../lib/types";
 
-/** Choose how a branch looks around the site: an accent colour and an emblem. Leaving either on "Automatic" keeps a default derived from the name. */
+/** Choose how a branch looks around the site: an accent colour, an emblem or a main image (its colour then follows the image), and a secondary image for backgrounds. */
 export function BranchIdentityAdminPage() {
   const { id } = useParams<{ id: string }>();
   const [branch, setBranch] = useState<Branch | null>(null);
@@ -13,7 +15,8 @@ export function BranchIdentityAdminPage() {
   const [hexText, setHexText] = useState("");
   const [glyph, setGlyph] = useState<Glyph | null>(null);
   const [imageUrl, setImageUrl] = useState<string | null>(null);
-  const [covers, setCovers] = useState<{ url: string; label: string }[]>([]);
+  const [secondaryUrl, setSecondaryUrl] = useState<string | null>(null);
+  const [pictures, setPictures] = useState<BranchPicture[]>([]);
   const [uploading, setUploading] = useState(false);
   const [status, setStatus] = useState<{ kind: "ok" | "error"; text: string } | null>(null);
 
@@ -26,14 +29,9 @@ export function BranchIdentityAdminPage() {
       setHexText(c ?? "");
       setGlyph((b?.identityGlyph as Glyph | null) ?? null);
       setImageUrl(b?.identityImageUrl ?? null);
-      // the pictures that already exist for this branch: its own cover and its albums' covers
-      if (b) api<{ title: string; coverArtUrl: string | null }[]>(`/api/branches/${b.slug}/albums`).then((albums) => {
-        const found: { url: string; label: string }[] = [];
-        const add = (url: string | null | undefined, label: string) => { if (url && !found.some((f) => f.url === url)) found.push({ url, label }); };
-        add(b.coverArtUrl, "Branch cover");
-        albums.forEach((a) => add(a.coverArtUrl, a.title));
-        setCovers(found.slice(0, 12));
-      }).catch(() => {});
+      setSecondaryUrl(b?.identitySecondaryImageUrl ?? null);
+      // every picture this branch has: its cover, its albums' covers and their gallery images
+      if (b) api<BranchPicture[]>(`/api/branches/${b.slug}/images`).then((p) => setPictures(p.slice(0, 40))).catch(() => {});
     });
   }, [id]);
 
@@ -42,6 +40,15 @@ export function BranchIdentityAdminPage() {
     setHexText(v);
     setStatus(null);
     if (isHexColor(v)) setColor(v.toLowerCase());
+  }
+  /** The main image decides the branch's colour: the average of the picture (it can still be changed by hand afterwards). */
+  async function chooseMain(url: string | null) {
+    setImageUrl(url);
+    setStatus(null);
+    if (!url) return;
+    const avg = await colorFromImageUrl(url);
+    if (avg) { pickColor(avg); setStatus({ kind: "ok", text: `The branch's colour is now ${avg}, the average of this picture. You can still change it above.` }); }
+    else setStatus({ kind: "error", text: "Couldn't read this picture's colours, so the colour is unchanged. Choose one above if you like." });
   }
   async function uploadImage(file: File) {
     if (!branch) return;
@@ -53,8 +60,8 @@ export function BranchIdentityAdminPage() {
       const res = await fetch(`/api/admin/branches/${branch.id}/identity-image`, { method: "POST", body: form, headers: getToken() ? { authorization: `Bearer ${getToken()}` } : {} });
       const body = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(body.error ?? "Couldn't upload that picture.");
-      setImageUrl(body.identityImageUrl);
-      setStatus({ kind: "ok", text: "Uploaded. Press Save to keep your other choices too." });
+      await chooseMain(body.identityImageUrl);
+      setStatus((cur) => ({ kind: "ok", text: `Uploaded. ${cur?.kind === "ok" ? cur.text + " " : ""}Press Save to keep your choices.` }));
     } catch (e) {
       setStatus({ kind: "error", text: e instanceof Error ? e.message : "Couldn't upload that picture." });
     } finally {
@@ -65,7 +72,7 @@ export function BranchIdentityAdminPage() {
     if (!branch) return;
     if (hexText && !isHexColor(hexText)) { setStatus({ kind: "error", text: "A colour looks like #4fa8e0: a # and six letters or digits." }); return; }
     try {
-      await api(`/api/admin/branches/${branch.id}`, { method: "PATCH", body: JSON.stringify({ identityColor: color, identityGlyph: glyph, identityImageUrl: imageUrl }) });
+      await api(`/api/admin/branches/${branch.id}`, { method: "PATCH", body: JSON.stringify({ identityColor: color, identityGlyph: glyph, identityImageUrl: imageUrl, identitySecondaryImageUrl: secondaryUrl }) });
       setStatus({ kind: "ok", text: "Saved. It shows on Soundbay, the homepage map and the branch page." });
     } catch (e) {
       setStatus({ kind: "error", text: e instanceof ApiError ? e.message : "Couldn't save." });
@@ -105,15 +112,15 @@ export function BranchIdentityAdminPage() {
       </fieldset>
 
       <fieldset className="idn-group" data-testid="identity-image">
-        <legend>Logo picture <span className="home-dim">(optional: replaces the emblem)</span></legend>
-        <div className="idn-glyphs" role="radiogroup" aria-label="Logo picture">
-          <button type="button" role="radio" aria-checked={imageUrl === null} className={`idn-glyph${imageUrl === null ? " on" : ""}`} onClick={() => { setImageUrl(null); setStatus(null); }} data-testid="image-none"><span>Use the emblem</span></button>
-          {covers.map((c, i) => (
-            <button key={c.url} type="button" role="radio" aria-checked={imageUrl === c.url} className={`idn-glyph${imageUrl === c.url ? " on" : ""}`} onClick={() => { setImageUrl(c.url); setStatus(null); }} data-testid={`image-existing-${i}`} title={c.label}>
+        <legend>Main image <span className="home-dim">(optional: shown instead of the emblem, and the branch's colour becomes its average)</span></legend>
+        <div className="idn-glyphs" role="radiogroup" aria-label="Main image">
+          <button type="button" role="radio" aria-checked={imageUrl === null} className={`idn-glyph${imageUrl === null ? " on" : ""}`} onClick={() => chooseMain(null)} data-testid="image-none"><span>Use the emblem</span></button>
+          {pictures.map((c, i) => (
+            <button key={c.url} type="button" role="radio" aria-checked={imageUrl === c.url} className={`idn-glyph${imageUrl === c.url ? " on" : ""}`} onClick={() => chooseMain(c.url)} data-testid={`image-existing-${i}`} title={c.label}>
               <img src={c.url} alt="" width={44} height={44} style={{ objectFit: "cover", borderRadius: 8 }} /><span>{c.label}</span>
             </button>
           ))}
-          {imageUrl && !covers.some((c) => c.url === imageUrl) && (
+          {imageUrl && !pictures.some((c) => c.url === imageUrl) && (
             <button type="button" role="radio" aria-checked className="idn-glyph on" data-testid="image-uploaded"><img src={imageUrl} alt="" width={44} height={44} style={{ objectFit: "cover", borderRadius: 8 }} /><span>Uploaded</span></button>
           )}
         </div>
@@ -121,8 +128,22 @@ export function BranchIdentityAdminPage() {
         {uploading && <span className="home-dim" role="status"> Uploading…</span>}
       </fieldset>
 
+      <fieldset className="idn-group" data-testid="identity-secondary">
+        <legend>Secondary image <span className="home-dim">(optional: the soft background of its tile on the homepage grid, and of the whole module while it is chosen)</span></legend>
+        <div className="idn-glyphs" role="radiogroup" aria-label="Secondary image">
+          <button type="button" role="radio" aria-checked={secondaryUrl === null} className={`idn-glyph${secondaryUrl === null ? " on" : ""}`} onClick={() => { setSecondaryUrl(null); setStatus(null); }} data-testid="secondary-none"><span>None</span></button>
+          {pictures.map((c, i) => (
+            <button key={c.url} type="button" role="radio" aria-checked={secondaryUrl === c.url} className={`idn-glyph${secondaryUrl === c.url ? " on" : ""}`} onClick={() => { setSecondaryUrl(c.url); setStatus(null); }} data-testid={`secondary-existing-${i}`} title={c.label}>
+              <img src={c.url} alt="" width={44} height={44} style={{ objectFit: "cover", borderRadius: 8 }} /><span>{c.label}</span>
+            </button>
+          ))}
+        </div>
+        {pictures.length === 0 && <p className="home-dim">This branch has no pictures yet: add album covers or gallery images to its albums and they appear here.</p>}
+      </fieldset>
+
       <h2 className="home-h2">Preview</h2>
-      <div className="idn-preview" data-testid="identity-preview" style={{ ["--emb" as string]: shown.color }}>
+      <div className="idn-preview" data-testid="identity-preview" style={{ ["--emb" as string]: shown.color, position: "relative", isolation: "isolate" }}>
+        {secondaryUrl && <div aria-hidden="true" data-testid="identity-preview-bg" style={{ position: "absolute", inset: 0, zIndex: -1, borderRadius: "inherit", backgroundImage: `url("${secondaryUrl}")`, backgroundSize: "cover", backgroundPosition: "center", opacity: 0.17 }} />}
         <BranchEmblem glyph={shown.glyph} color={shown.color} size={44} imageUrl={imageUrl} />
         <div><strong>{branch.name}</strong><div className="home-dim" style={{ fontSize: "0.85rem" }}>{branch.description || "The branch description appears here."}</div></div>
         <svg viewBox="0 0 30 30" width="36" height="36" aria-label="Its dot on the map" role="img"><circle cx="15" cy="15" r="7" fill={shown.color} /><circle cx="15" cy="15" r="12" fill="none" stroke={shown.color} strokeOpacity="0.6" /></svg>

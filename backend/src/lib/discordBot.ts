@@ -1,4 +1,6 @@
-import { Client, GatewayIntentBits, Partials } from "discord.js";
+import { Client, GatewayIntentBits, Partials, type User } from "discord.js";
+import { createDiscordLookup, discordIdOf, type DiscordIdentity, type FoundDiscordUser } from "./discordLookup.js";
+import { allowedMentions, webhookBody } from "./discordPayload.js";
 import { prisma } from "./prisma.js";
 import { findOrCreateGhostUser } from "./discordImport.js";
 import { toDayKey } from "./dayKey.js";
@@ -142,37 +144,77 @@ async function handleIncomingDiscordMessage(message: {
  *  username, this is the mechanism. Silently no-ops if the bot isn't
  *  connected, no username is given, or no match is found - notification
  *  delivery failures shouldn't ever break the action that triggered them. */
-interface DiscordIdentity {
-  discordUserId?: string | null;
-  discordUsername?: string | null;
-}
 
-/** Resolves a Discord identity to an actual discord.js User object.
- *  Prefers a direct fetch by id (reliable, works without a shared guild
- *  or the Server Members intent) over searching guild members by
- *  username (the fallback, since usernames are what we ask most users
- *  for - but that path needs Server Members intent and a shared server). */
+const toFound = (u: User): FoundDiscordUser => ({
+  id: u.id,
+  username: u.username,
+  // a still PNG: always accepted as a webhook avatar, whatever the member's picture is
+  avatarUrl: u.displayAvatarURL({ extension: "png", size: 256, forceStatic: true }),
+});
+
+/** Finds a member's Discord account. Cached for half an hour, retried once, one lookup at a time per member, and an older answer is used
+ *  if Discord fails (see discordLookup.ts). By id when we have one (reliable); otherwise a targeted member search by username (not a
+ *  download of every member of every server, which timed out now and then). */
+const lookup = createDiscordLookup({
+  async fetchById(id, force) {
+    if (!client) throw new Error("the Discord bot is not connected");
+    return toFound(await client.users.fetch(id, { force }));
+  },
+  async searchByUsername(username) {
+    if (!client) throw new Error("the Discord bot is not connected");
+    let searchFailed = false;
+    for (const guild of client.guilds.cache.values()) {
+      try {
+        const found = await guild.members.search({ query: username, limit: 10 });
+        const match = found.find((m) => m.user.username.toLowerCase() === username.toLowerCase());
+        if (match) return toFound(match.user);
+      } catch (err) {
+        searchFailed = true;
+        console.warn(`Discord bridge: member search for "${username}" failed in "${guild.name}":`, err);
+      }
+    }
+    if (searchFailed) throw new Error("member search failed in at least one server");
+    return null;
+  },
+});
+
+/** Resolves a Discord identity to an actual discord.js User object (for sending a DM). */
 async function resolveDiscordUser(identity: DiscordIdentity) {
   if (!client) return null;
-  if (identity.discordUserId) {
-    try {
-      return await client.users.fetch(identity.discordUserId);
-    } catch (err) {
-      console.warn(`Discord bridge: could not fetch user by id "${identity.discordUserId}":`, err);
-    }
+  const found = await lookup.resolve(identity);
+  if (!found) return null;
+  try {
+    return await client.users.fetch(found.id);
+  } catch (err) {
+    console.warn(`Discord bridge: could not fetch user "${found.id}":`, err);
+    return null;
   }
-  if (identity.discordUsername) {
-    try {
-      for (const guild of client.guilds.cache.values()) {
-        const members = await guild.members.fetch();
-        const match = members.find((m) => m.user.username.toLowerCase() === identity.discordUsername!.toLowerCase());
-        if (match) return match.user;
-      }
-    } catch (err) {
-      console.error("Discord bridge: failed to search guild members:", err);
-    }
+}
+
+/** For every mentioned member the website has no Discord id for but a Discord username, finds the id (so the mention can really ping them). */
+export async function fillDiscordIds<T extends { discordUserId: string | null; discordUsername: string | null }>(mentioned: T[]): Promise<T[]> {
+  if (!client) return mentioned;
+  return Promise.all(mentioned.map(async (m) => {
+    if (m.discordUserId || !m.discordUsername) return m;
+    const found = await lookup.resolve({ discordUsername: m.discordUsername });
+    return found ? { ...m, discordUserId: found.id } : m;
+  }));
+}
+
+/** The best Discord identity for a website member: their own id, a captured one, or the one from a linked Discord-import account, then
+ *  their Discord username. Falls back to whatever the caller already knew. */
+async function discordIdentityForUser(userId: number, given?: DiscordIdentity): Promise<DiscordIdentity | undefined> {
+  try {
+    const u = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { discordUserId: true, discordUsername: true, discordId: true, linkedGhosts: { where: { discordId: { not: null } }, select: { discordId: true }, take: 1 } },
+    });
+    if (!u) return given;
+    return { discordUserId: discordIdOf(u) ?? given?.discordUserId ?? null, discordUsername: u.discordUsername ?? given?.discordUsername ?? null };
+  } catch (err) {
+    console.warn("Discord bridge: could not read the author's Discord identity:", err);
+    return given;
   }
-  return null;
 }
 
 export async function sendDiscordDM(identity: DiscordIdentity, message: string): Promise<void> {
@@ -193,8 +235,7 @@ export async function sendDiscordDM(identity: DiscordIdentity, message: string):
  *  Discord avatar on a forwarded message. */
 export async function findDiscordAvatarUrl(identity: DiscordIdentity): Promise<string | null> {
   if (!client || (!identity.discordUserId && !identity.discordUsername)) return null;
-  const user = await resolveDiscordUser(identity);
-  return user?.displayAvatarURL({ size: 256 }) ?? null;
+  return (await lookup.resolve(identity))?.avatarUrl ?? null;
 }
 
 export type AnnouncementEvent = "join_applied" | "join_approved" | "news_published" | "calls_for_artists" | "calls_for_ideas";
@@ -241,6 +282,10 @@ export async function forwardMessageToDiscord(
   options?: {
     attachments?: { url: string; filename: string }[];
     replyTo?: { discordMessageId: string | null; authorUsername: string; excerpt: string } | null;
+    /** Discord ids of the members the message mentions: the only people it may ping. */
+    mentionUserIds?: string[];
+    /** The website member who wrote it, so their Discord picture is found whichever of their Discord details the site has. */
+    authorUserId?: number;
   },
 ): Promise<string | null> {
   if (!client) return null;
@@ -250,6 +295,8 @@ export async function forwardMessageToDiscord(
 
     const attachments = options?.attachments ?? [];
     const replyTo = options?.replyTo ?? null;
+    const mentionUserIds = options?.mentionUserIds ?? [];
+    if (options?.authorUserId) authorDiscordIdentity = await discordIdentityForUser(options.authorUserId, authorDiscordIdentity);
 
     // Webhooks only exist on a parent text channel - posting into a
     // thread or a forum post (which Discord implements as a thread under
@@ -281,7 +328,7 @@ export async function forwardMessageToDiscord(
         // bot-send path can, so each attachment is fetched from our own
         // storage first and re-uploaded as multipart form parts.
         const form = new FormData();
-        form.append("payload_json", JSON.stringify({ username: `${authorUsername} | Exo-API`, content: quotedContent, ...(avatarUrl ? { avatar_url: avatarUrl } : {}) }));
+        form.append("payload_json", JSON.stringify(webhookBody({ authorUsername, content: quotedContent, avatarUrl, mentionUserIds })));
         for (let i = 0; i < attachments.length; i++) {
           const a = attachments[i];
           const fileRes = await fetch(a.url);
@@ -294,7 +341,7 @@ export async function forwardMessageToDiscord(
         res = await fetch(`${channel.discordWebhookUrl}?wait=true${threadIdParam}`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ username: `${authorUsername} | Exo-API`, content: quotedContent, ...(avatarUrl ? { avatar_url: avatarUrl } : {}) }),
+          body: JSON.stringify(webhookBody({ authorUsername, content: quotedContent, avatarUrl, mentionUserIds })),
         });
       }
       if (!res.ok) return null;
@@ -306,6 +353,7 @@ export async function forwardMessageToDiscord(
     if (discordChannel?.isTextBased() && "send" in discordChannel) {
       const sent = await discordChannel.send({
         content: `${authorUsername}: ${content}`,
+        allowedMentions: allowedMentions(mentionUserIds),
         files: attachments.map((a) => ({ attachment: a.url, name: a.filename })),
         ...(replyTo?.discordMessageId ? { reply: { messageReference: replyTo.discordMessageId } } : {}),
       });

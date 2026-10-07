@@ -8,10 +8,10 @@ import { toMessageDTO } from "../lib/messageDto.js";
 import { broadcast } from "../lib/chatHub.js";
 import { sendTemplatedMail } from "../lib/emailTemplates.js";
 import { createNotification } from "../lib/notify.js";
-import { resolveMentions, translateMentionsForDiscord } from "../lib/mentions.js";
+import { resolveMentions, toDiscordMentions } from "../lib/mentions.js";
 import { parseSearchQuery } from "../lib/searchQuery.js";
 import { walkChannelHistoryInChunks } from "../lib/messageChunking.js";
-import { forwardMessageToDiscord, sendDiscordDM, triggerDiscordTyping } from "../lib/discordBot.js";
+import { fillDiscordIds, forwardMessageToDiscord, sendDiscordDM, triggerDiscordTyping } from "../lib/discordBot.js";
 
 const messageInclude = {
   author: { select: { username: true, avatarUrl: true, isGhost: true, discordUsername: true, discordUserId: true, linkedUserId: true, linkedUser: { select: { username: true, avatarUrl: true } } } },
@@ -240,7 +240,8 @@ export async function messageRoutes(app: FastifyInstance): Promise<void> {
         ).catch((err) => app.log.error(err, "mention createNotification failed"));
       }
 
-      const contentForDiscord = translateMentionsForDiscord(contentRaw, mentioned);
+      // @name becomes a real <@id> mention for every mentioned member whose Discord account can be found (their id, a linked account's, or by their Discord username)
+      const { content: contentForDiscord, userIds: mentionUserIds } = toDiscordMentions(contentRaw, await fillDiscordIds(mentioned));
       void forwardMessageToDiscord(
         channel.slug,
         dto.authorUsername,
@@ -248,6 +249,8 @@ export async function messageRoutes(app: FastifyInstance): Promise<void> {
         { discordUserId: full.author.discordUserId, discordUsername: full.author.discordUsername },
         {
           attachments: dto.attachments.map((a) => ({ url: `https://exomusica.com${a.url}`, filename: a.filename })),
+          mentionUserIds,
+          authorUserId: req.user!.id,
           replyTo: dto.replyPreview
             ? { discordMessageId: full.replyTo?.discordMessageId ?? null, authorUsername: dto.replyPreview.authorUsername, excerpt: dto.replyPreview.excerpt }
             : null,

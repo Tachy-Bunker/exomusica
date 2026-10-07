@@ -46,20 +46,35 @@ export async function resolveMentions(
   }));
 }
 
-/** Converts @username mentions to Discord's <@snowflakeId> mention syntax
- *  before forwarding a website message to Discord, for every mentioned
- *  user who has a Discord identity on file. Mentions of users without one
- *  are left as plain text (mentioning them just wasn't resolvable). */
-export function translateMentionsForDiscord(
+/** Converts @username mentions to Discord's <@snowflakeId> mention syntax before a website message is posted to Discord, for every mentioned
+ *  member whose Discord id is known; the ids it converted come back too, so the post can allow exactly those pings. Done in one pass over
+ *  the same @name tokens the site itself recognises, so a name with a dot or hyphen is matched whole ("@mira.x" is not "@mira" plus ".x"),
+ *  and punctuation after a name ("hi @mira.") stays where it was. Mentions it can't resolve are left as plain text. */
+export function toDiscordMentions(
   content: string,
   mentioned: { username: string; discordUserId: string | null }[],
-): string {
-  let result = content;
-  for (const m of mentioned) {
-    if (!m.discordUserId) continue;
-    result = result.replace(new RegExp(`@${m.username}\\b`, "gi"), `<@${m.discordUserId}>`);
-  }
-  return result;
+): { content: string; userIds: string[] } {
+  const byName = new Map<string, string>();
+  for (const m of mentioned) if (m.discordUserId) byName.set(m.username.toLowerCase(), m.discordUserId);
+  const ids = new Set<string>();
+  const out = content.replace(/@([a-zA-Z0-9_.-]+)/g, (whole, token: string) => {
+    let name = token;
+    let tail = "";
+    while (name) {
+      const id = byName.get(name.toLowerCase());
+      if (id) { ids.add(id); return `<@${id}>${tail}`; }
+      if (!/[.-]$/.test(name)) break;
+      tail = name.slice(-1) + tail; // "mira." at the end of a sentence is "mira" and a full stop
+      name = name.slice(0, -1);
+    }
+    return whole;
+  });
+  return { content: out, userIds: [...ids] };
+}
+
+/** The text only (see toDiscordMentions). */
+export function translateMentionsForDiscord(content: string, mentioned: { username: string; discordUserId: string | null }[]): string {
+  return toDiscordMentions(content, mentioned).content;
 }
 
 /** Converts Discord's <@snowflakeId> mentions to website @username mentions

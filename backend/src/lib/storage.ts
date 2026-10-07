@@ -1,3 +1,4 @@
+import { TRACK_FORMATS, type TrackFormat } from "./trackSearch.js";
 import { randomUUID } from "node:crypto";
 import { mkdir, writeFile, unlink } from "node:fs/promises";
 import path from "node:path";
@@ -263,6 +264,18 @@ const ALLOWED_SOUND_TYPES: Record<string, string> = {
 };
 
 /** Saves an admin-uploaded notification sound clip. */
+/** An admin's own audio file for an album track, kept on this server (for when an external host doesn't work). Any of the seven track formats. */
+export async function saveTrackFile(filename: string, _mimeType: string, buffer: Buffer): Promise<{ url: string; format: TrackFormat }> {
+  const ext = path.extname(filename).toLowerCase();
+  const format = TRACK_FORMATS[ext];
+  if (!format) throw new Error("unsupported audio type - use MP3, WAV, OGG, Opus, M4A, AAC or FLAC");
+  const dir = path.join(UPLOADS_DIR, "tracks");
+  await mkdir(dir, { recursive: true });
+  const diskName = `${randomUUID()}${ext}`;
+  await writeFile(path.join(dir, diskName), buffer);
+  return { url: `/uploads/tracks/${diskName}`, format };
+}
+
 export async function saveSoundFile(filename: string, mimeType: string, buffer: Buffer): Promise<{ url: string }> {
   const ext = ALLOWED_SOUND_TYPES[mimeType] ?? path.extname(filename).toLowerCase();
   if (![".mp3", ".wav", ".ogg"].includes(ext)) {

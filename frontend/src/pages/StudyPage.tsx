@@ -1,3 +1,4 @@
+import { branchHref } from "../lib/branchLinks";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { api } from "../lib/api";
@@ -354,7 +355,7 @@ export function StudyPage() {
     setShowChatPicker(false);
     useToastStore.getState().showToast(change.newChat ? "Created a new chat for this study" : change.channelSlug === null ? "This study no longer has a chat" : "This study's chat has been changed");
   }
-  const chatPath = (c: NonNullable<StudyDetail["channel"]>) => (c.kind === "BRANCH" && c.branch ? `/branch/${c.branch.slug}` : `/topic/${c.slug}`);
+  const chatPath = (c: NonNullable<StudyDetail["channel"]>) => (c.kind === "BRANCH" && c.branch ? branchHref(c.branch.slug) : `/topic/${c.slug}`);
 
   const qrButton = (
     <button className="btn" title="A QR code that opens this study - for sharing or printing" onClick={() => setShowQr(true)}>

@@ -1,3 +1,4 @@
+import { branchHref } from "../lib/branchLinks";
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { api } from "../lib/api";
@@ -72,7 +73,7 @@ export function TopicSwitcher({ label = "Location" }: { label?: string }) {
     setOpen(false);
     setQuery("");
     if (isDesktop) openChat(b.channel!.slug, b.name, b.slug);
-    else navigate(`/branch/${b.slug}`);
+    else navigate(branchHref(b.slug));
   }
 
   function selectTopic(t: SwitchableTopic) {

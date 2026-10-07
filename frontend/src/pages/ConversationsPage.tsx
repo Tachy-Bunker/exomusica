@@ -1,5 +1,6 @@
-import { Suspense, lazy, useEffect, useMemo, useState } from "react";
+import { Suspense, lazy, useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
+import { MemberAddIcon } from "../components/ActivityIcons";
 import { InstrumentView } from "../components/InstrumentView";
 import { MissionStatus } from "../components/MissionStatus";
 import { ScopePanel } from "../components/ScopePanel";
@@ -10,6 +11,7 @@ import { usePresenceStore } from "../lib/presenceStore";
 import { timeAgo } from "../lib/relativeTime";
 import { countByKind, filterConversations, KIND_LABEL, SIGNAL_LABEL, sortConversations, normalizeConversations, type ConversationFilter, type ConversationSort, type ConversationsData } from "../lib/spaceHubs";
 import { useDocumentTitle } from "../lib/useDocumentTitle";
+import { useLivePoll } from "../lib/livePoll";
 import { useOpenInDock } from "../lib/useOpenInDock";
 import { useUrlParams } from "../lib/useUrlParams";
 
@@ -36,21 +38,16 @@ export function ConversationsPage() {
   useDocumentTitle("Conversations");
   const { data: first, failed } = useLoaded(loadConversations);
   const [data, setData] = useState<ConversationsData | null>(null);
-  const [updatedAt, setUpdatedAt] = useState(Date.now());
-  const [live, setLive] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [showAll, setShowAll] = useState(false);
   const [tick, setTick] = useState(Date.now());
   const onOpen = useOpenInDock();
-  useEffect(() => { if (first) { setData(normalizeConversations(first)); setUpdatedAt(Date.now()); } }, [first]);
-  // "Live": about every 30 seconds, only while the tab is visible and live is on. The server keeps a 30 s cache, so this is cheap for everyone.
-  useEffect(() => {
-    if (!live || !data) return;
-    const id = window.setInterval(() => {
-      if (document.hidden) return;
-      api<ConversationsData>("/api/conversations").then((d) => { setData(normalizeConversations(d)); setUpdatedAt(Date.now()); }).catch(() => {});
-    }, 30_000);
-    return () => window.clearInterval(id);
-  }, [live, !!data]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (first) setData(normalizeConversations(first)); }, [first]);
+  const refresh = useCallback(() => {
+    setRefreshing(true);
+    return api<ConversationsData>("/api/conversations").then((d) => setData(normalizeConversations(d))).catch(() => {}).finally(() => setRefreshing(false));
+  }, []);
+
   useEffect(() => { const id = window.setInterval(() => setTick(Date.now()), 15_000); return () => window.clearInterval(id); }, []); // "5 min ago" stays true without refetching
   const [params, setParam] = useUrlParams();
   const viewers = usePresenceStore((s) => s.viewersByChannel);
@@ -63,6 +60,9 @@ export function ConversationsPage() {
   const query = params.get("q") ?? "";
   const viewParam = params.get("view");
   const view: View = viewParam === "list" || viewParam === "map" ? viewParam : "instrument";
+  // The live data refreshes only while it is shown (not in the Map view), the tab is visible and the visitor is around; the server also
+  // keeps one shared copy for 15 seconds and works nothing out unless asked, so an idle tab costs nothing.
+  const refreshNow = useLivePoll(refresh, !!data && view !== "map");
 
   const all = data?.conversations ?? [];
   const counts = useMemo(() => countByKind(all), [all]);
@@ -74,11 +74,12 @@ export function ConversationsPage() {
     <div className="home-page space-page" data-testid="conversations-page">
       <header className="conv-head">
         <h1>Conversations</h1>
+        <Link className="conv-members" to="/members" aria-label="Members" title="Members" data-testid="conv-members"><MemberAddIcon size={22} /></Link>
         {data && <MissionStatus data={data} hereNow={hereNow} now={now} />}
       </header>
 
       <section aria-label="Find a conversation">
-        <div className="space-controls">
+        <div className="space-controls conv-controls">
           <div className="view-switch" role="group" aria-label="How to show conversations">
             {VIEWS.map((v) => <button key={v.id} type="button" aria-pressed={view === v.id} onClick={() => setParam("view", v.id, "instrument")} data-testid={`view-${v.id}`}>{v.label}</button>)}
           </div>
@@ -91,19 +92,17 @@ export function ConversationsPage() {
                   {SORTS.map((s) => <option key={s.id} value={s.id}>{s.label}</option>)}
                 </select>
               </label>
+              <div className="space-chips" role="group" aria-label="Kind of conversation">
+                {FILTERS.map((f) => (
+                  <button key={f.id} type="button" className="space-chip" aria-pressed={kind === f.id} onClick={() => setParam("kind", f.id, "all")} data-testid={`conv-filter-${f.id}`} disabled={f.id !== "all" && counts[f.id] === 0}>
+                    {f.label} <span className="space-chip-n">{counts[f.id]}</span>
+                  </button>
+                ))}
+                <span className="space-chips-links"><Link to="/discussion">Classic list</Link></span>
+              </div>
             </>
           )}
         </div>
-        {view !== "map" && (
-          <div className="space-chips" role="group" aria-label="Kind of conversation">
-            {FILTERS.map((f) => (
-              <button key={f.id} type="button" className="space-chip" aria-pressed={kind === f.id} onClick={() => setParam("kind", f.id, "all")} data-testid={`conv-filter-${f.id}`} disabled={f.id !== "all" && counts[f.id] === 0}>
-                {f.label} <span className="space-chip-n">{counts[f.id]}</span>
-              </button>
-            ))}
-            <span className="space-chips-links"><Link to="/discussion">Classic list</Link></span>
-          </div>
-        )}
       </section>
 
       {view === "map" ? (
@@ -113,7 +112,7 @@ export function ConversationsPage() {
       ) : !data ? (
         <div className="home-placeholder" aria-busy={!failed}>{failed ? "Couldn't load the conversations. Reload to try again." : "Listening for signals…"}</div>
       ) : view === "instrument" ? (
-        <InstrumentView data={data} rows={shown} live={live} onToggleLive={() => setLive((v) => !v)} updatedAt={updatedAt} showAll={showAll} onShowAll={() => setShowAll(true)} now={now} onOpen={onOpen} />
+        <InstrumentView data={data} rows={shown} onRefresh={refreshNow} refreshing={refreshing} showAll={showAll} onShowAll={() => setShowAll(true)} now={now} onOpen={onOpen} />
       ) : (
         <>
           <ScopePanel data={data} now={now} />

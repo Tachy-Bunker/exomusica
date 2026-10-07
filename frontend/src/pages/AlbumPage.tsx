@@ -1,5 +1,6 @@
+import { branchHref } from "../lib/branchLinks";
 import { useEffect, useState } from "react";
-import { useParams, Link, useNavigate } from "react-router-dom";
+import { useParams, Link, useNavigate, useSearchParams } from "react-router-dom";
 import { api } from "../lib/api";
 import { useAudioStore } from "../lib/audioStore";
 import { useDocumentTitle } from "../lib/useDocumentTitle";
@@ -9,6 +10,9 @@ import { useIsDesktop } from "../lib/useIsDesktop";
 import { isTypingTarget } from "../lib/isTypingTarget";
 import type { PlayableTrackDTO } from "../lib/types";
 import { AddToPlaylistControl } from "../components/AddToPlaylistControl";
+import { ShareAutoplay } from "../components/ShareAutoplay";
+import { ShareModal } from "../components/ShareModal";
+import { parseAutoplay } from "../lib/shareState";
 
 interface TrackWithComposers extends PlayableTrackDTO {
   composers: { id: number; name: string; slug: string | null }[];
@@ -36,8 +40,12 @@ export function AlbumPage() {
   const lightbox = useLightbox();
   const [album, setAlbum] = useState<AlbumDetail | null>(null);
   const play = useAudioStore((s) => s.play);
+  const playAt = useAudioStore((s) => s.playAt);
   const addToQueue = useAudioStore((s) => s.addToQueue);
+  const clearQueue = useAudioStore((s) => s.clearQueue);
   const setCurrentPlaylist = useAudioStore((s) => s.setCurrentPlaylist);
+  const [searchParams] = useSearchParams();
+  const [shareOpen, setShareOpen] = useState(false);
 
   useEffect(() => {
     if (!slug) return;
@@ -50,7 +58,7 @@ export function AlbumPage() {
     if (!isDesktop || !album) return;
     function handleKeyDown(e: KeyboardEvent) {
       if (isTypingTarget(e.target)) return;
-      if (e.code === "KeyR") navigate(`/branch/${album!.branch.slug}`);
+      if (e.code === "KeyR") navigate(branchHref(album!.branch.slug));
     }
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
@@ -60,7 +68,7 @@ export function AlbumPage() {
 
   return (
     <div className="page-column" style={{ maxWidth: 720 }}>
-      <Link to={`/branch/${album.branch.slug}`} style={{ fontSize: "0.85rem" }}>
+      <Link to={branchHref(album.branch.slug)} style={{ fontSize: "0.85rem" }}>
         ← Back to {album.branch.name}
         {isDesktop && " (R)"}
       </Link>
@@ -161,7 +169,30 @@ export function AlbumPage() {
         <button className="btn" onClick={() => addToQueue(album.tracks)}>
           Add all to queue
         </button>
+        <button className="btn" onClick={() => setShareOpen(true)} data-testid="share-open-btn" title="Share a link to this album, or to a song in it and a moment of that song">Share</button>
       </div>
+      <ShareAutoplay
+        ready
+        tracks={album.tracks.map((t) => ({ id: t.id, source: t.source, title: t.title, composer: t.composer }))}
+        request={parseAutoplay(searchParams)}
+        start={(index, t) => {
+          const [first, ...rest] = album.tracks.slice(index);
+          if (!first) return;
+          playAt(first, t);
+          clearQueue();
+          addToQueue(rest);
+          setCurrentPlaylist(null);
+        }}
+      />
+      {shareOpen && (
+        <ShareModal
+          title="Share this album"
+          pathname={`/album/${slug}`}
+          tracks={album.tracks.map((t) => ({ id: t.id, source: t.source, title: t.title, composer: t.composer }))}
+          onClose={() => setShareOpen(false)}
+        />
+      )}
+
       <div style={{ display: "flex", flexDirection: "column", gap: "0.4rem" }}>
         {album.tracks.map((t, i) => (
           <div

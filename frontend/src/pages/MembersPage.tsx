@@ -98,7 +98,7 @@ export function MembersPage() {
               <article key={m.username} className="crew-card" data-username={m.username}>
                 <Avatar m={m} inChat={inChat.has(m.username)} />
                 <div className="crew-main">
-                  <h3 className="sig-title"><Link className="sig-link" to={`/u/${encodeURIComponent(m.username)}`}>{m.username}</Link></h3>
+                  <h3 className="sig-title"><Link className="sig-link uname-color" to={`/u/${encodeURIComponent(m.username)}`}>{m.username}</Link></h3>
                   <p className="home-dim crew-joined">Joined {monthYear(m.joinedAt)}</p>
                   {m.bio && <p className="crew-bio">{m.bio}</p>}
                   <p className="sig-meta home-dim">

@@ -13,16 +13,20 @@ export interface HomeBranch {
   anchor: boolean;
   color: string | null;
   glyph: string | null;
-  image: string | null;
+  image: string | null; // the main image: shown instead of the emblem
+  secondaryImage: string | null; // the background of its tile, and of the module when it is chosen
   albums: number;
+  tracks: number;
   chatSlug: string | null;
   lastActiveAt: number | null;
 }
 export interface HomeActivity {
   kind: "chat" | "album" | "study" | "update" | "challenge" | "member";
-  label: string;
-  title: string;
-  detail: string;
+  label: string; // what kind of thing it is: read by screen readers (the card shows an icon)
+  title: string; // the thing itself: the chat's name, the album, the study...
+  by: string | null; // a username, shown in the members' colour and linking to their page
+  text: string; // for a chat: what was said
+  detail: string; // the dimmed preview line
   href: string;
   at: number;
 }
@@ -54,3 +58,6 @@ export function useHome(): { home: HomeData | null; failed: boolean } {
   }, []);
   return { home, failed };
 }
+
+/** One of a branch's pictures (see GET /api/branches/:slug/images). */
+export interface BranchPicture { url: string; kind: "branch-cover" | "album-cover" | "gallery"; label: string; albumSlug: string | null }

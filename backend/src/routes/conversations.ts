@@ -6,7 +6,7 @@ import { shapeMember, type Member, type MemberRow } from "../lib/members.js";
 import { PUBLIC_CHANNEL_FILTER, isPublicChannel } from "../lib/publicChannels.js";
 import { ttlCache } from "../lib/ttlCache.js";
 
-const buildConversations = ttlCache(30_000, async () => {
+const buildConversations = ttlCache(15_000, async () => {
   const channels = await prisma.forumChannel.findMany({
     where: PUBLIC_CHANNEL_FILTER, // unlisted (hidden-branch) chats stay out of the list; they still open by their address
     select: {

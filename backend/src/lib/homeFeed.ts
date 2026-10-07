@@ -4,9 +4,11 @@ export type ActivityKind = "chat" | "album" | "study" | "update" | "challenge" |
 
 export interface ActivityItem {
   kind: ActivityKind;
-  label: string; // small heading on the card: "New album", "Chat · Resonant Glass"
-  title: string;
-  detail: string;
+  label: string; // what kind of thing this is ("New album"): for screen readers, since the card shows an icon
+  title: string; // the thing itself: the chat's name, the album, the study...
+  by: string | null; // a member's username, shown in the member's colour and linking to their page
+  text: string; // for a chat: what was said (or "sent a voice note")
+  detail: string; // the dimmed preview line
   href: string;
   at: number; // when it happened (ms since 1970); the page turns it into "12 min ago"
 }

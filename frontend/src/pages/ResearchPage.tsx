@@ -1,3 +1,4 @@
+import { Username } from "../components/Username";
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { api } from "../lib/api";
@@ -66,7 +67,7 @@ export function ResearchPage() {
           <header className="xl-head"><h2 id="xl-research-h">Research</h2><span className="xl-kind xl-kind-knowledge">Knowledge</span></header>
           <ul className="xl2-list">
             {studies.slice(0, 6).map((s) => (
-              <li key={s.slug}><Link to={`/study/${s.slug}`}><b>{s.title}</b><span className="home-dim"> {s.owner} · {s.status === "COMPLETE" ? "complete" : "in progress"}</span></Link></li>
+              <li key={s.slug}><Link to={`/study/${s.slug}`}><b>{s.title}</b></Link><span className="home-dim"> <Username name={s.owner} /> · {s.status === "COMPLETE" ? "complete" : "in progress"}</span></li>
             ))}
           </ul>
           {studies.length === 0 && <p className="home-dim">No studies yet. Yours could be the first.</p>}
