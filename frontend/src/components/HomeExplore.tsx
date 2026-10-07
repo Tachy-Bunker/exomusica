@@ -1,41 +1,54 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../lib/api";
 import { useAudioStore } from "../lib/audioStore";
 import { useAuth } from "../lib/auth";
-import { layoutBranches, makeShuffler, VIEW_H, VIEW_W } from "../lib/exploreLayout";
+import { identityOf } from "../lib/branchIdentity";
+import { cameraTarget, gridLayout, stepToward, TILE_H, TILE_W } from "../lib/branchGrid";
+import { makeShuffler } from "../lib/exploreLayout";
 import type { HomeBranch } from "../lib/home";
 import { timeAgo } from "../lib/relativeTime";
 import type { Branch, PlayableTrackDTO } from "../lib/types";
-import { identityOf } from "../lib/branchIdentity";
 import { BranchEmblem } from "./BranchEmblem";
+import { ExpandIcon, PlayIcon, ShuffleIcon } from "./Icons";
 import { SpaceMap } from "./SpaceMap";
 
 const CYCLE_MS = 7000;
-const MAX_DRIFTING = 40; // a very large map keeps still: nothing animates that the device doesn't need to
-
 const prefersReducedMotion = () => typeof window !== "undefined" && !!window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
 
 /**
- * A small, calm map of the branches. It drifts gently, introduces one branch at a time (shuffle or tap), and shows a short card about it.
- * The full interactive map opens full screen from the button. Nothing heavy loads until that button is pressed.
+ * Every branch on a grid bigger than the window that shows it. Choosing a branch (or shuffling) sends the camera travelling to it, fast at first
+ * and gentle on arrival, and a card tells you about it. The branch that is playing is followed automatically. The full interactive map opens
+ * full screen from the button in the window's corner; nothing heavy loads until then.
  */
 export function HomeExplore({ branches, openFull = false, initialSlug = null }: { branches: HomeBranch[]; openFull?: boolean; initialSlug?: string | null }) {
   const { user } = useAuth();
   const play = useAudioStore((s) => s.play);
   const addToQueue = useAudioStore((s) => s.addToQueue);
   const clearQueue = useAudioStore((s) => s.clearQueue);
+  const nowSlug = useAudioStore((s) => s.currentTrack?.branchSlug ?? null);
 
   const slugKey = branches.map((b) => b.slug).join("|");
   const shuffle = useMemo(() => makeShuffler(branches.map((b) => b.slug)), [slugKey]); // eslint-disable-line react-hooks/exhaustive-deps
-  const [selected, setSelected] = useState<string | null>(() => (initialSlug && branches.some((b) => b.slug === initialSlug) ? initialSlug : shuffle(null)));
-  const [touched, setTouched] = useState(!!initialSlug && branches.some((b) => b.slug === initialSlug)); // a chosen branch stays put // once the person takes over, the map stops introducing branches by itself
+  const startOn = initialSlug && branches.some((b) => b.slug === initialSlug) ? initialSlug : null;
+  const [selected, setSelected] = useState<string | null>(() => startOn ?? shuffle(null));
+  const [touched, setTouched] = useState(!!startOn); // once the person takes over, the map stops moving on by itself
   const [full, setFull] = useState(openFull);
   const [fullBranches, setFullBranches] = useState<Branch[] | null>(null);
   const [playing, setPlaying] = useState(false);
-  const wrapRef = useRef<HTMLElement>(null);
 
   useEffect(() => { if (selected === null || !branches.some((b) => b.slug === selected)) setSelected(shuffle(null)); }, [slugKey]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const bySlug = useMemo(() => new Map(branches.map((b) => [b.slug, b])), [branches]);
+  // When something starts playing, the grid travels to that branch (and stays: the person can shuffle on from there).
+  const firstRun = useRef(true);
+  useEffect(() => {
+    const skip = firstRun.current && !!startOn;
+    firstRun.current = false;
+    if (skip || !nowSlug || !bySlug.has(nowSlug)) return;
+    setTouched(true);
+    setSelected(nowSlug);
+  }, [nowSlug]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Introduce a new branch every few seconds until the person interacts. Never when they prefer reduced motion or the tab is hidden.
   useEffect(() => {
@@ -44,12 +57,46 @@ export function HomeExplore({ branches, openFull = false, initialSlug = null }: 
     return () => window.clearInterval(id);
   }, [touched, shuffle, branches.length]);
 
-  const { nodes, edges } = useMemo(() => layoutBranches(branches), [branches]);
-  const bySlug = useMemo(() => new Map(branches.map((b) => [b.slug, b])), [branches]);
-  const nodeBySlug = useMemo(() => new Map(nodes.map((n) => [n.slug, n])), [nodes]);
-  const current = selected ? bySlug.get(selected) ?? null : null;
-  const drifting = nodes.length <= MAX_DRIFTING;
+  // ---- the grid and its camera
+  const grid = useMemo(() => gridLayout(branches.map((b) => b.slug)), [slugKey]); // eslint-disable-line react-hooks/exhaustive-deps
+  const tileOf = useMemo(() => new Map(grid.tiles.map((t) => [t.slug, t])), [grid]);
+  const winRef = useRef<HTMLDivElement>(null);
+  const camRef = useRef<HTMLDivElement>(null);
+  const [win, setWin] = useState({ w: 640, h: 300 });
+  useEffect(() => {
+    const el = winRef.current;
+    if (!el) return;
+    const measure = () => setWin({ w: el.clientWidth || 640, h: el.clientHeight || 300 });
+    measure();
+    if (typeof ResizeObserver === "undefined") return;
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+  const target = useMemo(() => { const t = selected ? tileOf.get(selected) : undefined; return t ? cameraTarget(t, win, grid) : { x: 0, y: 0 }; }, [selected, tileOf, win.w, win.h, grid]); // eslint-disable-line react-hooks/exhaustive-deps
+  const cam = useRef({ x: 0, y: 0, raf: 0, last: 0, target: { x: 0, y: 0 }, inited: false, sel: null as string | null });
+  useLayoutEffect(() => {
+    const c = cam.current;
+    const apply = () => { if (camRef.current) camRef.current.style.transform = `translate3d(${-c.x}px, ${-c.y}px, 0)`; };
+    c.target = target;
+    const justResized = c.sel === selected; // same branch, new window size: jump rather than travel
+    c.sel = selected;
+    if (!c.inited || justResized || prefersReducedMotion()) { c.x = target.x; c.y = target.y; c.inited = true; apply(); return; }
+    if (c.raf) return; // already travelling: it picks up the new target on its next frame
+    c.last = performance.now();
+    const tick = (now: number) => {
+      const dt = (now - c.last) / 1000;
+      c.last = now;
+      c.x = stepToward(c.x, c.target.x, dt);
+      c.y = stepToward(c.y, c.target.y, dt);
+      apply();
+      c.raf = c.x !== c.target.x || c.y !== c.target.y ? requestAnimationFrame(tick) : 0;
+    };
+    c.raf = requestAnimationFrame(tick);
+  }, [target.x, target.y]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => () => { if (cam.current.raf) cancelAnimationFrame(cam.current.raf); }, []);
 
+  const current = selected ? bySlug.get(selected) ?? null : null;
   const choose = useCallback((slug: string) => { setTouched(true); setSelected(slug); }, []);
   const shuffleNow = useCallback(() => { setTouched(true); setSelected((cur) => shuffle(cur)); }, [shuffle]);
 
@@ -109,59 +156,44 @@ export function HomeExplore({ branches, openFull = false, initialSlug = null }: 
     );
   }
 
+  const idn = current ? identityOf({ slug: current.slug, color: current.color, glyph: current.glyph, seed: current.seed }) : null;
+  const pic = current ? current.image || current.coverArtUrl : null;
   return (
-    <section id="home-explore" className="home-section" aria-labelledby="home-explore-h" ref={wrapRef} onPointerDown={() => setTouched(true)} onFocus={() => setTouched(true)}>
-      <div className="home-h2-row">
-        <h2 id="home-explore-h" className="home-h2">Explore the branches</h2>
-        <span className="home-h2-actions">
-          <button type="button" className="btn" onClick={shuffleNow} data-testid="explore-shuffle">Shuffle</button>
-          <button type="button" className="btn" onClick={openFullScreen} data-testid="explore-full">Full screen</button>
-        </span>
-      </div>
+    <section id="home-explore" className="home-section" aria-labelledby="home-explore-h" onPointerDown={() => setTouched(true)} onFocus={() => setTouched(true)}>
+      <h2 id="home-explore-h" className="home-h2">Explore the branches</h2>
       <div className="explore">
-        <svg className="explore-map" viewBox={`0 0 ${VIEW_W} ${VIEW_H}`} role="group" aria-label="Map of the branches" data-testid="explore-map">
-          {edges.map((e) => {
-            const a = nodeBySlug.get(e.from)!, b = nodeBySlug.get(e.to)!;
-            return <line key={e.from + e.to} className="explore-edge" x1={a.x} y1={a.y} x2={b.x} y2={b.y} />;
-          })}
-          {nodes.map((n, i) => {
-            const b = bySlug.get(n.slug)!;
-            const on = n.slug === selected;
-            const idn = identityOf({ slug: b.slug, color: b.color, glyph: b.glyph, seed: b.seed });
-            return (
-              <g
-                key={n.slug}
-                className={`explore-node${on ? " on" : ""}${b.seed ? " seed" : ""}${drifting ? " drift" : ""}`}
-                style={drifting ? { animationDelay: `${-(i * 1.7) % 9}s`, animationDuration: `${8 + (i % 5)}s` } : undefined}
-                role="button"
-                tabIndex={0}
-                aria-label={b.name}
-                aria-pressed={on}
-                data-slug={n.slug}
-                onClick={() => choose(n.slug)}
-                onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); choose(n.slug); } }}
-              >
-                {on && <circle className="explore-halo" cx={n.x} cy={n.y} r={n.r + 2.4} style={{ stroke: idn.color }} />}
-                <circle className="explore-dot" cx={n.x} cy={n.y} r={n.r} style={{ fill: idn.color }} />
-                <circle className="explore-hit" cx={n.x} cy={n.y} r={Math.max(n.r + 2, 4)} />
-                {on && <text className="explore-label" x={n.x} y={n.y - n.r - 3.2} textAnchor="middle">{b.name}</text>}
-              </g>
-            );
-          })}
-        </svg>
-        {current && (
+        <div className="gridwin" ref={winRef} data-testid="explore-map" role="group" aria-label="The branches, laid out on a grid">
+          <div className="gridcam" ref={camRef} style={{ width: grid.width, height: grid.height }}>
+            {grid.tiles.map((t) => {
+              const b = bySlug.get(t.slug)!;
+              const i = identityOf({ slug: b.slug, color: b.color, glyph: b.glyph, seed: b.seed });
+              const on = t.slug === selected;
+              return (
+                <button key={t.slug} type="button" className={`gtile${on ? " on" : ""}${b.seed ? " seed" : ""}`} style={{ left: t.x, top: t.y, width: TILE_W, height: TILE_H, ["--emb" as string]: i.color }} data-slug={t.slug} aria-pressed={on} onClick={() => choose(t.slug)} onFocus={(e) => { if (e.currentTarget.matches(":focus-visible")) choose(t.slug); }}>
+                  <span className="gtile-top"><BranchEmblem glyph={i.glyph} color={i.color} size={30} imageUrl={b.image} /></span>
+                  <span className="gtile-name">{b.name}</span>
+                  <span className="gtile-meta">{b.albums} album{b.albums === 1 ? "" : "s"}</span>
+                </button>
+              );
+            })}
+          </div>
+          <button type="button" className="btn gridwin-full" onClick={openFullScreen} data-testid="explore-full"><ExpandIcon size={14} /> Full screen</button>
+        </div>
+        {current && idn && (
           <article className="explore-card" data-testid="explore-card" aria-live="off">
-            {current.coverArtUrl ? <img className="explore-cover" src={current.coverArtUrl} alt="" loading="lazy" width={72} height={72} /> : (() => { const i = identityOf({ slug: current.slug, color: current.color, glyph: current.glyph, seed: current.seed }); return <BranchEmblem glyph={i.glyph} color={i.color} size={56} />; })()}
+            {pic ? <img className="explore-cover" src={pic} alt="" loading="lazy" width={72} height={72} /> : <BranchEmblem glyph={idn.glyph} color={idn.color} size={56} />}
             <div className="explore-card-body">
               <h3 className="explore-name">{current.name}</h3>
               {current.seed && <span className="home-chip">Growing seed</span>}
+              {nowSlug === current.slug && <span className="home-chip home-chip-live" data-testid="explore-playing">Playing now</span>}
               <p className="explore-blurb">{current.blurb || "No description yet."}</p>
               <p className="home-dim explore-meta">
                 {current.albums} album{current.albums === 1 ? "" : "s"}
                 {current.lastActiveAt ? ` · active ${timeAgo(current.lastActiveAt)}` : ""}
               </p>
               <div className="explore-actions">
-                <button type="button" className="btn btn-primary" onClick={playBranch} disabled={playing} data-testid="explore-play">{playing ? "Loading…" : "Play shuffle"}</button>
+                <button type="button" className="btn icon-btn" onClick={shuffleNow} aria-label="Pick another branch at random" title="Shuffle branches" data-testid="explore-shuffle"><ShuffleIcon size={18} /></button>
+                <button type="button" className="btn btn-primary icon-btn" onClick={playBranch} disabled={playing} aria-label={`Play a shuffle of ${current.name}`} title={`Play a shuffle of ${current.name}`} data-testid="explore-play"><PlayIcon size={18} /></button>
                 <Link className="btn" to={`/branch/${current.slug}`} data-testid="explore-open">Open branch</Link>
               </div>
             </div>

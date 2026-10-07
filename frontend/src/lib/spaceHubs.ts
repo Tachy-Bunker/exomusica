@@ -20,7 +20,7 @@ export interface Conversation {
   lastBy: string | null;
   lastText: string;
 }
-export interface RecentMessage { id: number; channelName: string; href: string; author: string; text: string; at: number }
+export interface RecentMessage { id: number; channelSlug: string; channelName: string; branchSlug: string | null; href: string; author: string; text: string; at: number }
 export interface ConversationsData {
   generatedAt: number;
   totals: { conversations: number; week: number; day: number; activeChats: number; lastSignalAt: number | null };
@@ -99,3 +99,18 @@ export function nameHue(name: string): number {
 }
 /** The first letter (or character) to show on a picture-less avatar. */
 export const initialOf = (name: string) => (Array.from(name.trim())[0] ?? "?").toUpperCase();
+
+/** Fills in anything an older server reply lacks, so a page never breaks on a missing field (for instance while a deploy is half done). */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function normalizeConversations(d: Record<string, any>): ConversationsData {
+  const zeros = () => new Array(14).fill(0);
+  const goodTrace = (t: unknown): number[] => (Array.isArray(t) && t.length === 14 ? (t as number[]) : zeros());
+  return {
+    generatedAt: d.generatedAt ?? Date.now(),
+    totals: { conversations: 0, week: 0, day: 0, activeChats: 0, lastSignalAt: null, ...(d.totals ?? {}) },
+    trace: goodTrace(d.trace),
+    recent: Array.isArray(d.recent) ? d.recent : [],
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    conversations: ((d.conversations ?? []) as Record<string, any>[]).map((c) => ({ studies: [], branch: null, category: null, blurb: "", day: 0, week: 0, voices: 0, total: 0, level: 0, lastAt: null, lastBy: null, lastText: "", ...c, trace: goodTrace(c.trace) })) as unknown as Conversation[],
+  };
+}

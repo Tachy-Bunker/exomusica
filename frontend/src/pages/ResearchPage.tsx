@@ -51,77 +51,55 @@ export function ResearchPage() {
   }
 
   return (
-    <div className="page-column xl" style={{ maxWidth: 940 }} data-testid="xenolab-page">
-      <h1>XenoLab</h1>
-      <p className="home-lede" style={{ marginBottom: "0.6rem" }}>Study sound. Share what you find. Tools to work on a sound, and studies that keep what you learn.</p>
+    <div className="page-column xl2" data-testid="xenolab-page">
+      <header className="xl2-head">
+        <h1>XenoLab</h1>
+        <p className="home-dim">Study sound. Share what you find.</p>
+      </header>
+      <div className="xl2-start">
+        <input value={newTitle} onChange={(e) => setNewTitle(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") startStudy(); }} placeholder="Start a new study..." aria-label="Title of a new study" />
+        <button className="btn btn-primary" onClick={startStudy}>Start a study</button>
+      </div>
 
-      <ol className="xl-flow" aria-label="How the lab fits together" data-testid="xenolab-flow">
-        <li><a href="#xl-processing"><b>1 · Process</b><span>change the audio</span></a></li>
-        <li aria-hidden="true" className="xl-arrow">→</li>
-        <li><a href="#xl-analysis"><b>2 · Analyze</b><span>measure it</span></a></li>
-        <li aria-hidden="true" className="xl-arrow">→</li>
-        <li><a href="#xl-research"><b>3 · Document</b><span>write it up in a study</span></a></li>
-      </ol>
-
-      <section id="xl-research" className="xl-block" aria-labelledby="xl-research-h" data-testid="xenolab-research">
-        <header className="xl-head"><h2 id="xl-research-h">Research</h2><span className="xl-kind xl-kind-knowledge">Knowledge</span></header>
-        <p className="home-dim xl-sub">Studies are where results are written down, shared and discussed. Everything the tools below produce can be put into one.</p>
-        <div style={{ display: "flex", gap: "0.6rem", margin: "0.8rem 0", flexWrap: "wrap" }}>
-          <input value={newTitle} onChange={(e) => setNewTitle(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") startStudy(); }} placeholder="Start a new study..." aria-label="Title of a new study" style={{ flex: "1 1 240px" }} />
-          <button className="btn btn-primary" onClick={startStudy}>Start a study</button>
-        </div>
-        <h3 className="xl-h3">Recently active</h3>
-        <div style={{ display: "flex", flexDirection: "column", gap: "0.4rem" }}>
-          {studies.slice(0, 6).map((s) => (
-            <Link key={s.slug} to={`/study/${s.slug}`} className="home-card xl-study">
-              <span className="home-card-title">{s.title}</span>
-              <span className="home-dim home-card-meta">by {s.owner} · {s.status === "COMPLETE" ? "complete" : "in progress"}</span>
-            </Link>
-          ))}
+      <div className="xl2-grid">
+        <section id="xl-research" className="xl2-card" aria-labelledby="xl-research-h" data-testid="xenolab-research">
+          <header className="xl-head"><h2 id="xl-research-h">Research</h2><span className="xl-kind xl-kind-knowledge">Knowledge</span></header>
+          <ul className="xl2-list">
+            {studies.slice(0, 6).map((s) => (
+              <li key={s.slug}><Link to={`/study/${s.slug}`}><b>{s.title}</b><span className="home-dim"> {s.owner} · {s.status === "COMPLETE" ? "complete" : "in progress"}</span></Link></li>
+            ))}
+          </ul>
           {studies.length === 0 && <p className="home-dim">No studies yet. Yours could be the first.</p>}
-        </div>
-        <p className="xl-links"><Link to="/studies">All studies</Link><Link to="/wiki">Read the Log (wiki and news)</Link></p>
-      </section>
+          <p className="xl-links"><Link to="/studies">All studies</Link><Link to="/wiki">Read the Log</Link></p>
+        </section>
 
-      <section id="xl-processing" className="xl-block" aria-labelledby="xl-processing-h" data-testid="xenolab-processing">
-        <header className="xl-head"><h2 id="xl-processing-h">Audio processing</h2><span className="xl-kind xl-kind-tool">Tool · changes sound</span></header>
-        <p className="home-dim xl-sub">These take a recording in and give a different recording back.</p>
-        <div className="home-grid">
-          <Link className="home-card" to="/lab/voice">
-            <span className="home-card-title">Voice lab</span>
-            <span className="home-dim home-card-meta">Clean up and level a voice recording. Record a voice note to keep in a study.</span>
-          </Link>
-        </div>
-      </section>
+        <div className="xl2-tools">
+          <section id="xl-processing" className="xl2-card" aria-labelledby="xl-processing-h" data-testid="xenolab-processing">
+            <header className="xl-head"><h2 id="xl-processing-h">Audio processing</h2><span className="xl-kind xl-kind-tool">Tool · changes sound</span></header>
+            <Link className="xl2-tool" to="/lab/voice"><b>Voice lab</b><span className="home-dim">Clean up and level a recording</span></Link>
+          </section>
 
-      <section id="xl-analysis" className="xl-block" aria-labelledby="xl-analysis-h" data-testid="xenolab-analysis">
-        <header className="xl-head"><h2 id="xl-analysis-h">Analysis</h2><span className="xl-kind xl-kind-tool">Tool · measures sound</span></header>
-        <p className="home-dim xl-sub">These leave the audio alone and measure it. They work on clips inside a study, and the results become charts there.</p>
-        <ul className="xl-list">
-          <li><b>Analyze this clip</b> <span className="home-dim">pitch, loudness, brightness and note starts of a clip in a study</span></li>
-          <li><b>Import labels</b> <span className="home-dim">bring in markers from Audacity, REAPER or Praat as cited clips</span></li>
-          <li><b>Plot your own data</b> <span className="home-dim">paste numbers below and see a chart straight away</span></li>
-        </ul>
-        <p className="xl-links"><a href="#xl-research">Open or start a study to analyze a clip</a></p>
-        <div className="xl-demo">
-          <p style={{ fontSize: "0.8rem", color: "var(--text-dim)", margin: "0 0 0.4rem" }}>
-            {usingRealData ? "Live data from a recent study - edit it yourself:" : "Try it - paste your own data and watch it render instantly:"}
-          </p>
-          <div style={{ display: "flex", gap: "1rem", flexWrap: "wrap" }}>
-            <div style={{ flex: "1 1 260px" }}>
+          <section id="xl-analysis" className="xl2-card" aria-labelledby="xl-analysis-h" data-testid="xenolab-analysis">
+            <header className="xl-head"><h2 id="xl-analysis-h">Analysis</h2><span className="xl-kind xl-kind-tool">Tool · measures sound</span></header>
+            <ul className="xl2-list xl2-small">
+              <li><b>Analyze this clip</b> <span className="home-dim">pitch, loudness and more, inside a study</span></li>
+              <li><b>Import labels</b> <span className="home-dim">from Audacity, REAPER or Praat</span></li>
+            </ul>
+            <details className="xl2-demo" data-testid="xenolab-chart-tool">
+              <summary>Plot your own data</summary>
+              <p className="xl2-demo-note">{usingRealData ? "Live data from a recent study. Edit it yourself:" : "Paste numbers and watch the chart draw:"}</p>
               <select value={demoKind} onChange={(e) => setDemoKind(e.target.value as typeof demoKind)} aria-label="Chart type" style={{ marginBottom: "0.4rem" }}>
                 <option value="LINE">Line</option>
                 <option value="BAR">Bar</option>
                 <option value="SCATTER">Scatter</option>
               </select>
-              <textarea value={demoCsv} onChange={(e) => { setDemoCsv(e.target.value); setUsingRealData(false); }} rows={8} aria-label="Chart data" style={{ width: "100%", fontFamily: "var(--font-mono)", fontSize: "0.8rem" }} />
-            </div>
-            <div style={{ flex: "1 1 300px" }}>
+              <textarea value={demoCsv} onChange={(e) => { setDemoCsv(e.target.value); setUsingRealData(false); }} rows={6} aria-label="Chart data" style={{ width: "100%", fontFamily: "var(--font-mono)", fontSize: "0.8rem" }} />
               <StudyChartView kind={demoKind} xLabel={null} yLabel={null} dataCsv={demoCsv} />
-            </div>
-          </div>
+            </details>
+          </section>
         </div>
-      </section>
+      </div>
+      <p className="home-dim xl2-note">What the tools produce can go straight into a study.</p>
     </div>
   );
 }

@@ -13,6 +13,7 @@ export interface HomeBranch {
   anchor: boolean;
   color: string | null;
   glyph: string | null;
+  image: string | null;
   albums: number;
   chatSlug: string | null;
   lastActiveAt: number | null;

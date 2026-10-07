@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
+import { ACTIVITY_ICON } from "../components/ActivityIcons";
 import { HomeExplore } from "../components/HomeExplore";
 import { api } from "../lib/api";
 import { useAudioStore } from "../lib/audioStore";
@@ -11,12 +12,6 @@ import type { PlayableTrackDTO } from "../lib/types";
 import { useDocumentTitle } from "../lib/useDocumentTitle";
 
 interface MyStudy { slug: string; title: string; status: string; updatedAt: string; owner: string }
-
-const WAYS = [
-  { to: "/soundbay", name: "Soundbay", line: "Wander through the sound", more: "Branches, albums, playlists" },
-  { to: "/xenolab", name: "XenoLab", line: "See how it's made", more: "Studies, tools, measurements" },
-  { to: "/telemetry", name: "Telemetry", line: "Join the conversation", more: "Chats, challenges, samples" },
-];
 
 export function HomePage() {
   useDocumentTitle("");
@@ -59,11 +54,11 @@ export function HomePage() {
       {user ? (
         <header className="home-hero" data-testid="home-member-hero">
           <h1>Welcome back, {user.username}</h1>
-          <div className="home-chips">
-            {hasUnreadPms && <Link className="home-chip home-chip-alert" to="/pms">New message</Link>}
-            <Link className="home-chip" to="/telemetry">Telemetry</Link>
-            <Link className="home-chip" to="/xenolab">XenoLab</Link>
-          </div>
+          {hasUnreadPms && (
+            <div className="home-chips">
+              <Link className="home-chip home-chip-alert" to="/pms">New message</Link>
+            </div>
+          )}
           {myStudies && myStudies[0] && (
             <Link className="home-card home-continue" to={`/study/${myStudies[0].slug}`}>
               <span className="home-card-tag">Continue your latest study</span>
@@ -74,11 +69,10 @@ export function HomePage() {
         </header>
       ) : (
         <header className="home-hero" data-testid="home-visitor-hero">
-          <h1>Experimental music that's easy to get into.</h1>
-          <p className="home-lede">A community and lab. Listen to branches of new sound, read the research behind it, and make your own.</p>
+          <h1>Alien sonic worlds</h1>
+          <p className="home-lede">We want to expand the horizons of music. Here you can listen, chat, research with other Exomusical enthusiasts.</p>
           <div className="home-cta">
             <button type="button" className="btn btn-primary" onClick={listenNow} disabled={listening} data-testid="listen-now">{listening ? "Loading…" : "Listen now"}</button>
-            <Link className="btn" to="/xenolab">Browse XenoLab</Link>
             <Link className="btn" to="/join" data-testid="hero-join">Request to join</Link>
           </div>
           <p className="home-stats" data-testid="home-stats">
@@ -107,7 +101,7 @@ export function HomePage() {
             <div className="home-grid" data-testid="activity">
               {home.activity.map((a: HomeActivity, i) => (
                 <Link key={`${a.kind}-${a.href}-${i}`} className="home-card" to={a.href} data-kind={a.kind}>
-                  <span className="home-card-tag">{a.label}</span>
+                  <span className="home-card-tag">{(() => { const Icon = ACTIVITY_ICON[a.kind]; return <Icon size={15} />; })()}{a.label}</span>
                   <span className="home-card-title">{a.title}</span>
                   <span className="home-dim home-card-meta">{[a.detail, timeAgo(a.at)].filter(Boolean).join(" · ")}</span>
                 </Link>
@@ -119,19 +113,6 @@ export function HomePage() {
         ) : (
           <div className="home-placeholder" aria-busy={!failed}>{failed ? "Couldn't load the latest activity." : "Loading…"}</div>
         )}
-      </section>
-
-      <section className="home-section" aria-labelledby="home-ways-h">
-        <h2 id="home-ways-h" className="home-h2">{user ? "Jump to" : "Three ways in"}</h2>
-        <div className="home-ways">
-          {WAYS.map((w) => (
-            <Link key={w.to} className="home-card" to={w.to}>
-              <span className="home-card-tag">{w.name}</span>
-              <span className="home-card-title">{w.line}</span>
-              <span className="home-dim home-card-meta">{w.more}</span>
-            </Link>
-          ))}
-        </div>
       </section>
 
       {user ? (

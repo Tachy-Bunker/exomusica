@@ -46,3 +46,20 @@ export const SECTIONS = [
   { id: "sb-albums", label: "Community albums" },
 ] as const;
 export type SectionId = (typeof SECTIONS)[number]["id"];
+
+/** The branch that is playing right now goes to the top of its list, for as long as it plays (everything else keeps its order). */
+export function pinPlaying<T extends { slug: string }>(rows: T[], playingSlug: string | null): T[] {
+  if (!playingSlug) return rows;
+  const i = rows.findIndex((r) => r.slug === playingSlug);
+  return i <= 0 ? rows : [rows[i], ...rows.slice(0, i), ...rows.slice(i + 1)];
+}
+
+/** Up to three pictures for a branch's preview: its own cover first, then its albums' covers, each only once. */
+export function galleryOf(branchCover: string | null, albums: { slug: string; title: string; coverArtUrl: string | null }[], max = 3): { url: string; label: string; albumSlug: string | null }[] {
+  const out: { url: string; label: string; albumSlug: string | null }[] = [];
+  const seen = new Set<string>();
+  const add = (url: string | null, label: string, albumSlug: string | null) => { if (url && !seen.has(url) && out.length < max) { seen.add(url); out.push({ url, label, albumSlug }); } };
+  add(branchCover, "Branch cover", null);
+  for (const a of albums) add(a.coverArtUrl, a.title, a.slug);
+  return out;
+}

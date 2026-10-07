@@ -110,7 +110,8 @@ function dist(a: { x: number; y: number }, b: { x: number; y: number }) {
   return Math.hypot(a.x - b.x, a.y - b.y);
 }
 
-export function ForumMapPage() {
+/** `embedded`: fill the window it is placed in (the Conversations page's Map view) instead of the whole screen. */
+export function ForumMapPage({ embedded = false, onViewAsList }: { embedded?: boolean; onViewAsList?: () => void } = {}) {
   const [nodes, setNodes] = useState<MapNode[]>([]);
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [zoom, setZoom] = useState(1);
@@ -479,7 +480,7 @@ export function ForumMapPage() {
       ref={containerRef}
       style={{
         position: "relative",
-        height: "calc(100dvh - var(--nav-height, 3.6rem) - 3rem - var(--player-height, 0px))",
+        height: embedded ? "100%" : "calc(100dvh - var(--nav-height, 3.6rem) - 3rem - var(--player-height, 0px))",
         background: "radial-gradient(ellipse at center, var(--bg-elevated) 0%, var(--bg-inset) 70%)",
         overflow: "hidden",
         borderRadius: "var(--radius)",
@@ -525,7 +526,7 @@ export function ForumMapPage() {
         }
       `}</style>
 
-      <button className="btn" style={{ position: "absolute", top: 12, left: 12, zIndex: 5 }} onClick={() => navigate("/discussion")}>
+      <button className="btn" style={{ position: "absolute", top: 12, left: 12, zIndex: 5 }} onClick={() => (onViewAsList ? onViewAsList() : navigate("/discussion"))}>
         View as list
       </button>
 

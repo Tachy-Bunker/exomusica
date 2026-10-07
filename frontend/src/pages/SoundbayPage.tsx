@@ -1,13 +1,15 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { ChatIcon } from "../components/ActivityIcons";
 import { BranchEmblem } from "../components/BranchEmblem";
+import { PlayIcon } from "../components/Icons";
 import { api } from "../lib/api";
 import { useAudioStore } from "../lib/audioStore";
 import { identityOf } from "../lib/branchIdentity";
 import { useChatDockStore } from "../lib/chatDockStore";
 import { useHome, type HomeBranch } from "../lib/home";
 import { timeAgo } from "../lib/relativeTime";
-import { FILTER_LABEL, SECTIONS, SORT_LABEL, filterBranches, filterSimple, sortBranches, sortSimple, type BranchFilterKey, type SectionId, type SoundbaySort } from "../lib/soundbay";
+import { FILTER_LABEL, SECTIONS, SORT_LABEL, filterBranches, filterSimple, galleryOf, pinPlaying, sortBranches, sortSimple, type BranchFilterKey, type SectionId, type SoundbaySort } from "../lib/soundbay";
 import type { PlayableTrackDTO } from "../lib/types";
 import { useDocumentTitle } from "../lib/useDocumentTitle";
 import { useIsDesktop } from "../lib/useIsDesktop";
@@ -35,7 +37,7 @@ function useCurrentSection(ids: string[]): string | null {
   return current ?? ids[0] ?? null; // before any scrolling, the first section is where you are
 }
 
-function BranchRow({ b, open, onToggle }: { b: HomeBranch; open: boolean; onToggle: () => void }) {
+function BranchRow({ b, open, onToggle, playing }: { b: HomeBranch; open: boolean; onToggle: () => void; playing: boolean }) {
   const navigate = useNavigate();
   const isDesktop = useIsDesktop();
   const openChat = useChatDockStore((s) => s.openChat);
@@ -65,25 +67,30 @@ function BranchRow({ b, open, onToggle }: { b: HomeBranch; open: boolean; onTogg
     } finally { setBusy(false); }
   }
 
+  const gallery = galleryOf(b.coverArtUrl, albums ?? []);
   return (
-    <li className={`sb-row${open ? " open" : ""}${b.seed ? " seed" : ""}`} style={{ ["--emb" as string]: idn.color }} data-slug={b.slug} data-testid="branch-row">
+    <li className={`sb-row${open ? " open" : ""}${b.seed ? " seed" : ""}${playing ? " playing" : ""}`} style={{ ["--emb" as string]: idn.color }} data-slug={b.slug} data-testid="branch-row">
       <div className="sb-row-main">
-        <BranchEmblem glyph={idn.glyph} color={idn.color} size={40} />
+        {/* The whole row is the toggle: a real button under the text and links, so a click anywhere that isn't a link or button opens the preview. */}
+        <button type="button" className="sb-toggle" aria-expanded={open} aria-controls={`sb-prev-${b.slug}`} aria-label={`${open ? "Collapse" : "Expand"} ${b.name}`} onClick={onToggle} data-testid="preview-toggle" />
+        <BranchEmblem glyph={idn.glyph} color={idn.color} size={40} imageUrl={b.image} />
         <div className="sb-row-text">
-          <h3 className="sb-row-name"><Link to={`/branch/${b.slug}`}>{b.name}</Link>{b.seed && <span className="home-chip">Growing seed</span>}</h3>
+          <h3 className="sb-row-name">
+            <Link to={`/branch/${b.slug}`}>{b.name}</Link>
+            {b.seed && <span className="home-chip">Growing seed</span>}
+            {playing && <span className="sb-playing" data-testid="now-playing"><i /><i /><i />Playing now</span>}
+          </h3>
           <p className="sb-row-blurb">{b.blurb || "No description yet."}</p>
-          <p className="home-dim sb-row-meta">{b.albums} album{b.albums === 1 ? "" : "s"}{b.lastActiveAt ? ` · active ${timeAgo(b.lastActiveAt)}` : " · no activity yet"}</p>
+          <p className="sb-row-meta">{b.albums} album{b.albums === 1 ? "" : "s"}<span className="sb-active">{b.lastActiveAt ? ` · active ${timeAgo(b.lastActiveAt)}` : " · no activity yet"}</span></p>
         </div>
         <div className="sb-actions">
-          <button type="button" className="sb-act" aria-expanded={open} aria-controls={`sb-prev-${b.slug}`} onClick={onToggle} data-testid="preview-toggle">{open ? "Hide" : "Preview"}</button>
           <Link className="sb-act" to={`/branch/${b.slug}`} data-testid="row-open">Open</Link>
-          {b.chatSlug && <button type="button" className="sb-act sb-extra" onClick={discuss} data-testid="row-discuss">Discussion</button>}
+          {b.chatSlug && <button type="button" className="sb-act sb-extra" onClick={discuss} data-testid="row-discuss"><ChatIcon size={13} /> Discussion</button>}
           <Link className="sb-act sb-extra" to={`/?branch=${b.slug}`} data-testid="row-map">Map</Link>
         </div>
       </div>
       {open && (
         <div className="sb-preview" id={`sb-prev-${b.slug}`} data-testid="branch-preview">
-          {b.coverArtUrl && <img className="sb-cover" src={b.coverArtUrl} alt="" loading="lazy" width={96} height={96} />}
           <div className="sb-prev-body">
             <p className="sb-prev-blurb">{b.blurb || "No description yet."}</p>
             <p className="sb-prev-label">Albums</p>
@@ -91,12 +98,17 @@ function BranchRow({ b, open, onToggle }: { b: HomeBranch; open: boolean; onTogg
               <ul className="sb-chips">{albums.slice(0, 8).map((a) => <li key={a.slug}><Link to={`/album/${a.slug}`}>{a.title}</Link></li>)}{albums.length > 8 && <li><Link to={`/branch/${b.slug}`}>+{albums.length - 8} more</Link></li>}</ul>
             )}
             <div className="sb-prev-actions">
-              <button type="button" className="btn btn-primary" onClick={shuffle} disabled={busy || b.albums === 0} data-testid="prev-play">{busy ? "Loading…" : "Play shuffle"}</button>
+              <button type="button" className="btn btn-primary icon-btn" onClick={shuffle} disabled={busy || b.albums === 0} aria-label={`Play a shuffle of ${b.name}`} title="Play shuffle" data-testid="prev-play"><PlayIcon size={17} /></button>
               <Link className="btn" to={`/branch/${b.slug}`}>Open branch</Link>
-              {b.chatSlug && <button type="button" className="btn" onClick={discuss}>Discussion</button>}
+              {b.chatSlug && <button type="button" className="btn" onClick={discuss}><ChatIcon size={14} /> Discussion</button>}
               <Link className="btn" to={`/?branch=${b.slug}`}>On the map</Link>
             </div>
           </div>
+          {gallery.length > 0 && (
+            <ul className="sb-gallery" aria-label={`Pictures from ${b.name}`} data-testid="branch-gallery">
+              {gallery.map((g) => <li key={g.url}>{g.albumSlug ? <Link to={`/album/${g.albumSlug}`} title={g.label}><img src={g.url} alt={g.label} loading="lazy" /></Link> : <img src={g.url} alt={g.label} loading="lazy" />}</li>)}
+            </ul>
+          )}
         </div>
       )}
     </li>
@@ -128,8 +140,11 @@ export function SoundbayPage() {
   const query = params.get("q") ?? "";
 
   const all = home?.branches ?? [];
-  const grown = useMemo(() => sortBranches(filterBranches(all.filter((b) => !b.seed), filter, query), sort), [all, filter, query, sort]);
-  const seeds = useMemo(() => sortBranches(filterBranches(all.filter((b) => b.seed), filter, query), sort), [all, filter, query, sort]);
+  const nowSlug = useAudioStore((s) => s.currentTrack?.branchSlug ?? null);
+  const isPlaying = useAudioStore((s) => s.isPlaying);
+  const playingSlug = isPlaying ? nowSlug : null; // while a branch is playing, it moves to the top of its list and is marked
+  const grown = useMemo(() => pinPlaying(sortBranches(filterBranches(all.filter((b) => !b.seed), filter, query), sort), playingSlug), [all, filter, query, sort, playingSlug]);
+  const seeds = useMemo(() => pinPlaying(sortBranches(filterBranches(all.filter((b) => b.seed), filter, query), sort), playingSlug), [all, filter, query, sort, playingSlug]);
   const lists = useMemo(() => sortSimple(filterSimple(playlists ?? [], query, (p) => `${p.title} ${p.owner} ${p.description ?? ""}`), sort, (p) => p.title), [playlists, query, sort]);
   const albs = useMemo(() => sortSimple(filterSimple(albums ?? [], query, (a) => `${a.title} ${a.composer} ${a.owner.username}`), sort, (a) => a.title), [albums, query, sort]);
   const counts: Record<SectionId, number> = { "sb-branches": grown.length, "sb-seeds": seeds.length, "sb-playlists": lists.length, "sb-albums": albs.length };
@@ -154,7 +169,7 @@ export function SoundbayPage() {
   const branchSection = (id: SectionId, title: string, sub: string, rows: HomeBranch[]) => rows.length > 0 && (
     <section id={id} className="sb-section" aria-labelledby={`${id}-h`}>
       <div className="home-h2-row"><h2 id={`${id}-h`} className="home-h2">{title} <span className="home-dim sb-count">{rows.length}</span></h2><span className="home-dim">{sub}</span></div>
-      <ul className="sb-list">{rows.map((b) => <BranchRow key={b.slug} b={b} open={openSlugs.has(b.slug)} onToggle={() => toggle(b.slug)} />)}</ul>
+      <ul className="sb-list">{rows.map((b) => <BranchRow key={b.slug} b={b} open={openSlugs.has(b.slug)} onToggle={() => toggle(b.slug)} playing={b.slug === playingSlug} />)}</ul>
     </section>
   );
 
@@ -162,9 +177,8 @@ export function SoundbayPage() {
     <div className="home-page space-page" data-testid="soundbay-page">
       <header className="home-hero">
         <h1>Soundbay</h1>
-        <p className="home-lede">Branches of sound, with their albums and playlists. Search, filter, or just start somewhere.</p>
         <div className="home-cta">
-          <button type="button" className="btn btn-primary" onClick={shuffleAll} disabled={busy} data-testid="shuffle-all">{busy ? "Loading…" : "Shuffle everything"}</button>
+          <button type="button" className="btn btn-primary icon-btn" onClick={shuffleAll} disabled={busy} aria-label="Shuffle everything" title="Shuffle everything" data-testid="shuffle-all"><PlayIcon size={18} /></button>
           <Link className="btn" to="/?map=full" data-testid="open-map">Explore the map</Link>
           <Link className="btn" to="/listen">Player and playlists</Link>
         </div>

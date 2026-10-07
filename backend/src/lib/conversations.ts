@@ -115,7 +115,7 @@ export function sumTraces(traces: number[][]): number[] {
 }
 
 export interface RecentRow { id: number; channel_slug: string; channel_name: string; branch_slug: string | null; username: string; text: string | null; at: Date; files: string | null }
-export interface RecentMessage { id: number; channelName: string; href: string; author: string; text: string; at: number }
+export interface RecentMessage { id: number; channelSlug: string; channelName: string; branchSlug: string | null; href: string; author: string; text: string; at: number }
 
 /** The live feed: plain text per message; a message with nothing readable and no files is left out. */
 export function shapeRecent(rows: RecentRow[]): RecentMessage[] {
@@ -123,7 +123,7 @@ export function shapeRecent(rows: RecentRow[]): RecentMessage[] {
   for (const r of rows) {
     const text = plainExcerpt(r.text ?? "", 110) || attachmentOnlyLabel(r.files ? r.files.split("\n") : []);
     if (!text) continue;
-    out.push({ id: r.id, channelName: r.channel_name, href: r.branch_slug ? `/branch/${r.branch_slug}` : `/topic/${r.channel_slug}`, author: r.username, text, at: r.at.getTime() });
+    out.push({ id: r.id, channelSlug: r.channel_slug, channelName: r.channel_name, branchSlug: r.branch_slug, href: r.branch_slug ? `/branch/${r.branch_slug}` : `/topic/${r.channel_slug}`, author: r.username, text, at: r.at.getTime() });
   }
   return out;
 }

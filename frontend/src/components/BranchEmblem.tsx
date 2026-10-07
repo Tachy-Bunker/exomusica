@@ -1,7 +1,14 @@
 import type { Glyph } from "../lib/branchIdentity";
 
 /** A branch's emblem: its glyph in its colour, on a softly tinted tile. Decorative (the name is always written next to it). */
-export function BranchEmblem({ glyph, color, size = 40 }: { glyph: Glyph; color: string; size?: number }) {
+export function BranchEmblem({ glyph, color, size = 40, imageUrl }: { glyph: Glyph; color: string; size?: number; imageUrl?: string | null }) {
+  if (imageUrl) {
+    return (
+      <span className="emblem emblem-img" style={{ ["--emb" as string]: color, width: size, height: size }} aria-hidden="true">
+        <img src={imageUrl} alt="" loading="lazy" width={size} height={size} />
+      </span>
+    );
+  }
   return (
     <span className="emblem" style={{ ["--emb" as string]: color, width: size, height: size }} aria-hidden="true">
       <svg viewBox="0 0 24 24" width={size * 0.62} height={size * 0.62} fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" focusable="false">

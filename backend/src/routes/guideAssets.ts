@@ -29,6 +29,24 @@ export async function guideAssetRoutes(app: FastifyInstance): Promise<void> {
     return reply.code(204).send();
   });
 
+  // The picture that stands in for a branch's emblem (Soundbay, the homepage map). Uploading also sets it; DELETE puts the emblem back.
+  app.post<{ Params: { id: string } }>("/api/admin/branches/:id/identity-image", { preHandler: requireAdmin }, async (req, reply) => {
+    const file = await req.file();
+    if (!file) return reply.code(400).send({ error: "no file uploaded" });
+    const buffer = await file.toBuffer();
+    try {
+      const { url } = await saveSiteImage(file.filename, file.mimetype, buffer, "branch-identity");
+      const branch = await prisma.branch.update({ where: { id: Number(req.params.id) }, data: { identityImageUrl: url } });
+      return { identityImageUrl: branch.identityImageUrl };
+    } catch (err) {
+      return reply.code(400).send({ error: err instanceof Error ? err.message : "upload failed" });
+    }
+  });
+  app.delete<{ Params: { id: string } }>("/api/admin/branches/:id/identity-image", { preHandler: requireAdmin }, async (req) => {
+    await prisma.branch.update({ where: { id: Number(req.params.id) }, data: { identityImageUrl: null } });
+    return { status: "ok" };
+  });
+
   // Voiceover audio upload for a branch's first-time intro.
   app.post<{ Params: { id: string } }>("/api/admin/branches/:id/voiceover", { preHandler: requireAdmin }, async (req, reply) => {
     const file = await req.file();

@@ -160,6 +160,7 @@ model Branch {
   contributeBackgroundOpacity Float   @default(0.3)
   identityColor       String?     // admin-chosen accent colour, #rrggbb: gives the branch a recognisable look in lists and on the map
   identityGlyph       String?     // admin-chosen emblem, one of a fixed set (see lib/branchIdentity.ts)
+  identityImageUrl    String?     // admin-chosen picture used instead of the emblem: an uploaded image or one of the branch's own covers
   previewAttachmentId Int?        @unique
   previewAttachment   Attachment? @relation("BranchPreview", fields: [previewAttachmentId], references: [id])
   sketches            BranchSketch[]

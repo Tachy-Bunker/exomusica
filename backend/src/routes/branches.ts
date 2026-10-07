@@ -32,6 +32,7 @@ export async function branchRoutes(app: FastifyInstance): Promise<void> {
         posY: true,
         identityColor: true,
         identityGlyph: true,
+        identityImageUrl: true,
         channel: { select: { id: true, slug: true } },
       },
       orderBy: { id: "asc" },
@@ -196,6 +197,7 @@ export async function branchRoutes(app: FastifyInstance): Promise<void> {
       contributeBackgroundOpacity: number;
       identityColor: string | null;
       identityGlyph: string | null;
+      identityImageUrl: string | null;
     }>;
   }>("/api/admin/branches/:id", { preHandler: requireAdmin }, async (req, reply) => {
     const problem = identityProblem(req.body ?? {});

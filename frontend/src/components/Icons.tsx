@@ -119,3 +119,11 @@ export function QueueIcon({ size = 20, className }: IconProps) {
     </svg>
   );
 }
+
+export function PlayIcon({ size = 20, className }: IconProps) {
+  return (
+    <svg className={className} width={size} height={size} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false">
+      <path d="M7 4.6v14.8a1 1 0 0 0 1.5.86l12-7.4a1 1 0 0 0 0-1.72l-12-7.4A1 1 0 0 0 7 4.6z" />
+    </svg>
+  );
+}
