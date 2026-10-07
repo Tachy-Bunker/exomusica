@@ -55,6 +55,8 @@ export interface Branch {
   ogTitle?: string | null;
   ogDescription?: string | null;
   ogImageUrl?: string | null;
+  identityColor?: string | null;
+  identityGlyph?: string | null;
   channel: { id: number; slug: string; discordChannelId: string | null; discordWebhookUrl: string | null } | null;
 }
 

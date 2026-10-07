@@ -11,11 +11,12 @@ import { SoundbayPage } from "./pages/SoundbayPage";
 import { TelemetryPage } from "./pages/TelemetryPage";
 import { ConversationsPage } from "./pages/ConversationsPage";
 import { MembersPage } from "./pages/MembersPage";
+import { LogPage } from "./pages/LogPage";
+import { BranchIdentityAdminPage } from "./pages/admin/BranchIdentityAdminPage";
 import { EmbedPlaylistPage } from "./pages/EmbedPlaylistPage";
 import { EmbedMainSpacemapPage } from "./pages/EmbedMainSpacemapPage";
 import { LoginPage } from "./pages/LoginPage";
 import { JoinPage } from "./pages/JoinPage";
-import { WikiPage } from "./pages/WikiPage";
 import { StudiesIndexPage } from "./pages/StudiesIndexPage";
 import { VoiceLabPage } from "./pages/VoiceLabPage";
 import { ContributePage } from "./pages/ContributePage";
@@ -23,7 +24,6 @@ import { ListenPage } from "./pages/ListenPage";
 import { ResearchPage } from "./pages/ResearchPage";
 import { SubmitWorkPage } from "./pages/SubmitWorkPage";
 import { StudyPage } from "./pages/StudyPage";
-import { NewsPage } from "./pages/NewsPage";
 import { DiscussionIndexPage } from "./pages/DiscussionIndexPage";
 import { ForumMapPage } from "./pages/ForumMapPage";
 import { TopicPage } from "./pages/TopicPage";
@@ -95,7 +95,7 @@ export default function App() {
                 <Route path="login" element={<LoginPage />} />
             <Route path="join" element={<JoinPage />} />
             <Route path="about" element={<Navigate to="/wiki" replace />} />
-            <Route path="wiki" element={<WikiPage />} />
+            <Route path="wiki" element={<LogPage />} />
             <Route path="studies" element={<StudiesIndexPage />} />
             <Route path="lab/voice" element={<VoiceLabPage />} />
             <Route path="contribute" element={<ContributePage />} />
@@ -109,9 +109,9 @@ export default function App() {
               <Route path="log" element={<Navigate to="/wiki" replace />} />
             <Route path="submit" element={<SubmitWorkPage />} />
             <Route path="study/:slug" element={<StudyPage />} />
-            <Route path="wiki/:slug" element={<WikiPage />} />
-            <Route path="news" element={<NewsPage />} />
-            <Route path="news/:slug" element={<NewsPage />} />
+            <Route path="wiki/:slug" element={<LogPage />} />
+            <Route path="news" element={<LogPage />} />
+            <Route path="news/:slug" element={<LogPage />} />
             <Route path="discussion" element={<DiscussionIndexPage />} />
             <Route path="discussion/map" element={<ForumMapPage />} />
             <Route path="branch/:slug" element={<BranchPage />} />
@@ -143,6 +143,7 @@ export default function App() {
                 <Route path="all-tracks" element={<AllTracksAdminPage />} />
                 <Route path="studies" element={<StudiesAdminPage />} />
                 <Route path="branches/:id/contribute" element={<BranchContributeAdminPage />} />
+                <Route path="branches/:id/identity" element={<BranchIdentityAdminPage />} />
                 <Route path="submissions" element={<SubmissionsAdminPage />} />
                 <Route path="contributor-points" element={<ContributorPointsAdminPage />} />
                 <Route path="blog" element={<BlogAdminPage />} />

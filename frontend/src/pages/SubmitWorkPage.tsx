@@ -27,6 +27,8 @@ export function SubmitWorkPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const branchSlug = searchParams.get("branch");
+  const albumSlug = searchParams.get("album"); // a submission that was started earlier and is being continued
+  const [resume, setResume] = useState<{ state: "idle" | "loading" | "error"; message?: string }>({ state: albumSlug ? "loading" : "idle" });
   const [branch, setBranch] = useState<ContributeBranch | null>(null);
 
   const [title, setTitle] = useState("");
@@ -43,6 +45,24 @@ export function SubmitWorkPage() {
   useEffect(() => {
     if (branchSlug) api<ContributeBranch>(`/api/contribute/branches/${branchSlug}`).then(setBranch);
   }, [branchSlug]);
+
+  // Continue a submission that was started earlier: only your own, and only while it is still waiting (a reviewed one can't be changed).
+  useEffect(() => {
+    if (!albumSlug || !user) return;
+    let alive = true;
+    api<{ id: number; slug: string; title: string; owner: { username: string }; submissionStatus: string | null; submissionChannel: { slug: string } | null; tracks: SubmissionTrack[] }>(`/api/community-albums/${albumSlug}`)
+      .then((d) => {
+        if (!alive) return;
+        if (d.owner.username !== user.username) return setResume({ state: "error", message: "That submission belongs to someone else." });
+        if (d.submissionStatus !== "PENDING") return setResume({ state: "error", message: "That submission has already been reviewed, so it can't be changed. You're welcome to start a new one." });
+        setAlbum({ id: d.id, slug: d.slug, title: d.title, submissionChannel: d.submissionChannel });
+        setChannelSlug(d.submissionChannel?.slug ?? null);
+        setTracks(d.tracks.map((t) => ({ id: t.id, title: t.title, composer: t.composer })));
+        setResume({ state: "idle" });
+      })
+      .catch(() => alive && setResume({ state: "error", message: "That submission couldn't be loaded." }));
+    return () => { alive = false; };
+  }, [albumSlug, user?.username]); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function createSubmission(e: React.FormEvent) {
     e.preventDefault();
@@ -77,7 +97,7 @@ export function SubmitWorkPage() {
   }
 
   function finish() {
-    useToastStore.getState().showToast("Submitted ✓");
+    useToastStore.getState().showToast("Sent for review ✓");
     if (album) navigate(`/community-album/${album.slug}`);
   }
 
@@ -92,7 +112,7 @@ export function SubmitWorkPage() {
   if (!branchSlug) {
     return (
       <p>
-        Pick a branch to submit to from <Link to="/contribute">Choose your next project</Link> first.
+        Choose a branch to submit to on the <Link to="/contribute">Contribute</Link> page first.
       </p>
     );
   }
@@ -100,11 +120,21 @@ export function SubmitWorkPage() {
   return (
     <div style={{ maxWidth: 600 }}>
       <h1>Submit work{branch ? ` to ${branch.name}` : ""}</h1>
+      <ol className="ct-mini" aria-label="Steps" data-testid="submit-steps">
+        <li aria-current={!album ? "step" : undefined}>1 · Name it</li>
+        <li aria-current={album && tracks.length === 0 ? "step" : undefined}>2 · Add your tracks</li>
+        <li aria-current={album && tracks.length > 0 ? "step" : undefined}>3 · Send for review</li>
+      </ol>
+      <p className="home-dim" style={{ fontSize: "0.85rem" }}>The team listens and decides. Your work only joins the branch if it is approved, and you'll hear back in a discussion that opens for it.</p>
 
-      {!album ? (
+      {resume.state === "loading" && <p className="home-dim" role="status">Loading your submission…</p>}
+      {resume.state === "error" && <p role="alert" data-testid="resume-error" style={{ color: "var(--accent-danger)" }}>{resume.message}</p>}
+      {resume.state === "loading" ? null : !album ? (
         <form onSubmit={createSubmission} style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
-          <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Album/EP title" required />
-          <input value={composer} onChange={(e) => setComposer(e.target.value)} placeholder="Your artist name" required />
+          <label htmlFor="sub-title">Album or EP title</label>
+          <input id="sub-title" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Album/EP title" required />
+          <label htmlFor="sub-artist">Your artist name</label>
+          <input id="sub-artist" value={composer} onChange={(e) => setComposer(e.target.value)} placeholder="Your artist name" required />
           <button className="btn btn-primary" type="submit">
             Start submission
           </button>
@@ -112,7 +142,7 @@ export function SubmitWorkPage() {
       ) : (
         <>
           <p style={{ color: "var(--text-dim)", fontSize: "0.85rem" }}>
-            "{album.title}" created. Add tracks below, then finish when ready.
+            "{album.title}" is started and waiting for review. Add your tracks below, then finish.
             {channelSlug && (
               <>
                 {" "}
@@ -133,9 +163,12 @@ export function SubmitWorkPage() {
           )}
 
           <div style={{ border: "1px solid var(--border)", borderRadius: "var(--radius)", padding: "0.6rem", display: "flex", flexDirection: "column", gap: "0.4rem" }}>
-            <input value={trackTitle} onChange={(e) => setTrackTitle(e.target.value)} placeholder="Track title" />
-            <input value={trackComposer} onChange={(e) => setTrackComposer(e.target.value)} placeholder="Track artist (if different from album artist)" />
-            <input ref={fileInputRef} type="file" accept="audio/*" />
+            <label htmlFor="sub-track-title">Track title</label>
+            <input id="sub-track-title" value={trackTitle} onChange={(e) => setTrackTitle(e.target.value)} placeholder="Track title" />
+            <label htmlFor="sub-track-artist">Track artist (if different from the album artist)</label>
+            <input id="sub-track-artist" value={trackComposer} onChange={(e) => setTrackComposer(e.target.value)} placeholder="Track artist (if different from album artist)" />
+            <label htmlFor="sub-track-file">Audio file</label>
+            <input id="sub-track-file" ref={fileInputRef} type="file" accept="audio/*" />
             {uploadError && <p style={{ color: "var(--accent-danger, #e2703f)", fontSize: "0.8rem" }}>{uploadError}</p>}
             <button className="btn" onClick={uploadTrack}>
               Add track
@@ -143,8 +176,9 @@ export function SubmitWorkPage() {
           </div>
 
           <button className="btn btn-primary" style={{ marginTop: "1rem" }} disabled={tracks.length === 0} onClick={finish}>
-            Finish submission
+            Finish and send for review
           </button>
+          {tracks.length === 0 && <p className="home-dim" style={{ fontSize: "0.8rem" }}>Add at least one track so the team has something to listen to.</p>}
         </>
       )}
     </div>

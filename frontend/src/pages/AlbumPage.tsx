@@ -61,7 +61,7 @@ export function AlbumPage() {
   return (
     <div className="page-column" style={{ maxWidth: 720 }}>
       <Link to={`/branch/${album.branch.slug}`} style={{ fontSize: "0.85rem" }}>
-        ← {album.branch.name}
+        ← Back to {album.branch.name}
         {isDesktop && " (R)"}
       </Link>
       <div style={{ display: "flex", gap: "1.2rem", marginTop: "0.6rem" }}>

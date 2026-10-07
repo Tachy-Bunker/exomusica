@@ -11,14 +11,23 @@ export interface Conversation {
   branch: { slug: string; name: string } | null;
   studies: { slug: string; title: string }[];
   total: number;
+  day: number;
   week: number;
   voices: number;
   level: 0 | 1 | 2 | 3 | 4;
+  trace: number[];
   lastAt: number | null;
   lastBy: string | null;
   lastText: string;
 }
-export interface ConversationsData { generatedAt: number; totals: { conversations: number; week: number }; conversations: Conversation[] }
+export interface RecentMessage { id: number; channelName: string; href: string; author: string; text: string; at: number }
+export interface ConversationsData {
+  generatedAt: number;
+  totals: { conversations: number; week: number; day: number; activeChats: number; lastSignalAt: number | null };
+  trace: number[]; // all chats together, per day for 14 days, oldest first, today last
+  conversations: Conversation[];
+  recent: RecentMessage[];
+}
 export interface Member { username: string; avatarUrl: string | null; bio: string; joinedAt: number; studies: number; messages: number }
 export interface MembersData { generatedAt: number; count: number; members: Member[] }
 

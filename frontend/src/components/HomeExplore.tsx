@@ -7,6 +7,8 @@ import { layoutBranches, makeShuffler, VIEW_H, VIEW_W } from "../lib/exploreLayo
 import type { HomeBranch } from "../lib/home";
 import { timeAgo } from "../lib/relativeTime";
 import type { Branch, PlayableTrackDTO } from "../lib/types";
+import { identityOf } from "../lib/branchIdentity";
+import { BranchEmblem } from "./BranchEmblem";
 import { SpaceMap } from "./SpaceMap";
 
 const CYCLE_MS = 7000;
@@ -18,7 +20,7 @@ const prefersReducedMotion = () => typeof window !== "undefined" && !!window.mat
  * A small, calm map of the branches. It drifts gently, introduces one branch at a time (shuffle or tap), and shows a short card about it.
  * The full interactive map opens full screen from the button. Nothing heavy loads until that button is pressed.
  */
-export function HomeExplore({ branches, openFull = false }: { branches: HomeBranch[]; openFull?: boolean }) {
+export function HomeExplore({ branches, openFull = false, initialSlug = null }: { branches: HomeBranch[]; openFull?: boolean; initialSlug?: string | null }) {
   const { user } = useAuth();
   const play = useAudioStore((s) => s.play);
   const addToQueue = useAudioStore((s) => s.addToQueue);
@@ -26,8 +28,8 @@ export function HomeExplore({ branches, openFull = false }: { branches: HomeBran
 
   const slugKey = branches.map((b) => b.slug).join("|");
   const shuffle = useMemo(() => makeShuffler(branches.map((b) => b.slug)), [slugKey]); // eslint-disable-line react-hooks/exhaustive-deps
-  const [selected, setSelected] = useState<string | null>(() => shuffle(null));
-  const [touched, setTouched] = useState(false); // once the person takes over, the map stops introducing branches by itself
+  const [selected, setSelected] = useState<string | null>(() => (initialSlug && branches.some((b) => b.slug === initialSlug) ? initialSlug : shuffle(null)));
+  const [touched, setTouched] = useState(!!initialSlug && branches.some((b) => b.slug === initialSlug)); // a chosen branch stays put // once the person takes over, the map stops introducing branches by itself
   const [full, setFull] = useState(openFull);
   const [fullBranches, setFullBranches] = useState<Branch[] | null>(null);
   const [playing, setPlaying] = useState(false);
@@ -108,7 +110,7 @@ export function HomeExplore({ branches, openFull = false }: { branches: HomeBran
   }
 
   return (
-    <section className="home-section" aria-labelledby="home-explore-h" ref={wrapRef} onPointerDown={() => setTouched(true)} onFocus={() => setTouched(true)}>
+    <section id="home-explore" className="home-section" aria-labelledby="home-explore-h" ref={wrapRef} onPointerDown={() => setTouched(true)} onFocus={() => setTouched(true)}>
       <div className="home-h2-row">
         <h2 id="home-explore-h" className="home-h2">Explore the branches</h2>
         <span className="home-h2-actions">
@@ -125,6 +127,7 @@ export function HomeExplore({ branches, openFull = false }: { branches: HomeBran
           {nodes.map((n, i) => {
             const b = bySlug.get(n.slug)!;
             const on = n.slug === selected;
+            const idn = identityOf({ slug: b.slug, color: b.color, glyph: b.glyph, seed: b.seed });
             return (
               <g
                 key={n.slug}
@@ -138,8 +141,8 @@ export function HomeExplore({ branches, openFull = false }: { branches: HomeBran
                 onClick={() => choose(n.slug)}
                 onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); choose(n.slug); } }}
               >
-                {on && <circle className="explore-halo" cx={n.x} cy={n.y} r={n.r + 2.4} />}
-                <circle className="explore-dot" cx={n.x} cy={n.y} r={n.r} />
+                {on && <circle className="explore-halo" cx={n.x} cy={n.y} r={n.r + 2.4} style={{ stroke: idn.color }} />}
+                <circle className="explore-dot" cx={n.x} cy={n.y} r={n.r} style={{ fill: idn.color }} />
                 <circle className="explore-hit" cx={n.x} cy={n.y} r={Math.max(n.r + 2, 4)} />
                 {on && <text className="explore-label" x={n.x} y={n.y - n.r - 3.2} textAnchor="middle">{b.name}</text>}
               </g>
@@ -148,7 +151,7 @@ export function HomeExplore({ branches, openFull = false }: { branches: HomeBran
         </svg>
         {current && (
           <article className="explore-card" data-testid="explore-card" aria-live="off">
-            {current.coverArtUrl && <img className="explore-cover" src={current.coverArtUrl} alt="" loading="lazy" width={72} height={72} />}
+            {current.coverArtUrl ? <img className="explore-cover" src={current.coverArtUrl} alt="" loading="lazy" width={72} height={72} /> : (() => { const i = identityOf({ slug: current.slug, color: current.color, glyph: current.glyph, seed: current.seed }); return <BranchEmblem glyph={i.glyph} color={i.color} size={56} />; })()}
             <div className="explore-card-body">
               <h3 className="explore-name">{current.name}</h3>
               {current.seed && <span className="home-chip">Growing seed</span>}

@@ -1,10 +1,12 @@
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
+import { InstrumentView } from "../components/InstrumentView";
 import { SignalBars, SpaceGlyph } from "../components/SpaceGlyph";
+import { api } from "../lib/api";
 import { loadConversations, useLoaded } from "../lib/hubs";
 import { usePresenceStore } from "../lib/presenceStore";
 import { timeAgo } from "../lib/relativeTime";
-import { countByKind, filterConversations, KIND_LABEL, SIGNAL_LABEL, sortConversations, type ConversationFilter, type ConversationSort } from "../lib/spaceHubs";
+import { countByKind, filterConversations, KIND_LABEL, SIGNAL_LABEL, sortConversations, type ConversationFilter, type ConversationSort, type ConversationsData } from "../lib/spaceHubs";
 import { useDocumentTitle } from "../lib/useDocumentTitle";
 import { useUrlParams } from "../lib/useUrlParams";
 
@@ -24,7 +26,23 @@ const HOUR = 3_600_000;
 
 export function ConversationsPage() {
   useDocumentTitle("Conversations");
-  const { data, failed } = useLoaded(loadConversations);
+  const { data: first, failed } = useLoaded(loadConversations);
+  const [data, setData] = useState<ConversationsData | null>(null);
+  const [updatedAt, setUpdatedAt] = useState(Date.now());
+  const [live, setLive] = useState(true);
+  const [showAll, setShowAll] = useState(false);
+  const [tick, setTick] = useState(Date.now());
+  useEffect(() => { if (first) { setData(first); setUpdatedAt(Date.now()); } }, [first]);
+  // "Live": about every 30 seconds, only while the tab is visible and live is on. The server keeps a 30 s cache, so this is cheap for everyone.
+  useEffect(() => {
+    if (!live || !data) return;
+    const id = window.setInterval(() => {
+      if (document.hidden) return;
+      api<ConversationsData>("/api/conversations").then((d) => { setData(d); setUpdatedAt(Date.now()); }).catch(() => {});
+    }, 30_000);
+    return () => window.clearInterval(id);
+  }, [live, !!data]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { const id = window.setInterval(() => setTick(Date.now()), 15_000); return () => window.clearInterval(id); }, []); // "5 min ago" stays true without refetching
   const [params, setParam] = useUrlParams();
   const viewers = usePresenceStore((s) => s.viewersByChannel);
 
@@ -34,12 +52,13 @@ export function ConversationsPage() {
   const sortParam = params.get("sort");
   const sort: ConversationSort = SORTS.some((s) => s.id === sortParam) ? (sortParam as ConversationSort) : "recent";
   const query = params.get("q") ?? "";
+  const view: "instrument" | "list" = params.get("view") === "list" ? "list" : "instrument";
 
   const all = data?.conversations ?? [];
   const counts = useMemo(() => countByKind(all), [all]);
   const shown = useMemo(() => sortConversations(filterConversations(all, kind, query), sort), [all, kind, query, sort]);
   const hereNow = useMemo(() => [...viewers.values()].reduce((n, v) => n + v.length, 0), [viewers]);
-  const now = Date.now();
+  const now = tick;
 
   return (
     <div className="home-page space-page" data-testid="conversations-page">
@@ -59,6 +78,10 @@ export function ConversationsPage() {
 
       <section aria-label="Find a conversation">
         <div className="space-controls">
+          <div className="view-switch" role="group" aria-label="How to show conversations">
+            <button type="button" aria-pressed={view === "instrument"} onClick={() => setParam("view", "instrument", "instrument")} data-testid="view-instrument">Instrument</button>
+            <button type="button" aria-pressed={view === "list"} onClick={() => setParam("view", "list", "instrument")} data-testid="view-list">List</button>
+          </div>
           <input
             type="search"
             className="space-search"
@@ -90,6 +113,8 @@ export function ConversationsPage() {
 
       {!data ? (
         <div className="home-placeholder" aria-busy={!failed}>{failed ? "Couldn't load the conversations. Reload to try again." : "Listening for signals…"}</div>
+      ) : view === "instrument" ? (
+        <InstrumentView data={data} rows={shown} hereNow={hereNow} live={live} onToggleLive={() => setLive((v) => !v)} updatedAt={updatedAt} showAll={showAll} onShowAll={() => setShowAll(true)} now={now} />
       ) : shown.length === 0 ? (
         <p className="home-dim" data-testid="conv-empty">
           {all.length === 0 ? "No conversations yet." : "No signals match. Try fewer words, or clear the filter."}

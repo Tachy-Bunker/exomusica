@@ -11,6 +11,8 @@ export interface HomeBranch {
   parentSlug: string | null;
   seed: boolean;
   anchor: boolean;
+  color: string | null;
+  glyph: string | null;
   albums: number;
   chatSlug: string | null;
   lastActiveAt: number | null;

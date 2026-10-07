@@ -51,6 +51,8 @@ export function HomePage() {
     }
   }
 
+  useEffect(() => { if (home && params.get("branch")) document.getElementById("home-explore")?.scrollIntoView({ block: "start" }); }, [home]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const stats = home?.stats;
   return (
     <div className="home-page" data-testid="home-page">
@@ -93,7 +95,7 @@ export function HomePage() {
       )}
 
       {home ? (
-        <HomeExplore branches={home.branches} openFull={params.get("map") === "full"} />
+        <HomeExplore branches={home.branches} openFull={params.get("map") === "full"} initialSlug={params.get("branch")} />
       ) : (
         <section className="home-section"><h2 className="home-h2">Explore the branches</h2><div className="home-placeholder" aria-busy={!failed}>{failed ? "Couldn't load the branches. Reload to try again." : "Loading…"}</div></section>
       )}

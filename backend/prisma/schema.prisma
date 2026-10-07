@@ -158,6 +158,8 @@ model Branch {
   briefMarkdown       String?     @db.Text // admin-authored concept brief for contributors, shown on "Choose your next project"
   contributeBackgroundUrl     String?
   contributeBackgroundOpacity Float   @default(0.3)
+  identityColor       String?     // admin-chosen accent colour, #rrggbb: gives the branch a recognisable look in lists and on the map
+  identityGlyph       String?     // admin-chosen emblem, one of a fixed set (see lib/branchIdentity.ts)
   previewAttachmentId Int?        @unique
   previewAttachment   Attachment? @relation("BranchPreview", fields: [previewAttachmentId], references: [id])
   sketches            BranchSketch[]

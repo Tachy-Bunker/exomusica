@@ -1,4 +1,5 @@
 // Shaping for the Conversations hub: pure, so it is tested without a database.
+import { TRACE_DAYS } from "./conversationSql.js";
 import { attachmentOnlyLabel, plainExcerpt } from "./publicChannels.js";
 
 export type ConversationKind = "branch" | "study" | "question" | "topic";
@@ -18,6 +19,7 @@ export interface ChannelRow {
 export interface StatsRow {
   id: number;
   total: number;
+  day: number;
   week: number;
   voices: number;
   last_text: string | null;
@@ -37,7 +39,9 @@ export interface Conversation {
   total: number;
   week: number;
   voices: number;
+  day: number; // messages in the last 24 hours
   level: 0 | 1 | 2 | 3 | 4; // signal strength: 0 dormant ... 4 busy
+  trace: number[]; // messages per day for the last 14 days, oldest first, today last
   lastAt: number | null;
   lastBy: string | null;
   lastText: string;
@@ -63,7 +67,7 @@ export function activityLevel(week: number, lastAt: number | null, now = Date.no
   return 1;
 }
 
-export function shapeConversation(ch: ChannelRow, st: StatsRow | undefined, now = Date.now()): Conversation {
+export function shapeConversation(ch: ChannelRow, st: StatsRow | undefined, now = Date.now(), trace: number[] = new Array(TRACE_DAYS).fill(0)): Conversation {
   const lastAt = st?.last_at ? st.last_at.getTime() : null;
   const files = st?.last_files ? st.last_files.split("\n") : [];
   const text = plainExcerpt(st?.last_text ?? "", 90) || attachmentOnlyLabel(files);
@@ -80,9 +84,46 @@ export function shapeConversation(ch: ChannelRow, st: StatsRow | undefined, now 
     total: st?.total ?? 0,
     week: st?.week ?? 0,
     voices: st?.voices ?? 0,
+    day: st?.day ?? 0,
+    trace,
     level: activityLevel(st?.week ?? 0, lastAt, now),
     lastAt,
     lastBy: by,
     lastText: by && text ? (text.startsWith("sent ") || text.startsWith("shared ") ? `${by} ${text}` : `${by}: ${text}`) : "",
   };
+}
+
+export interface TraceRow { id: number; ago: number; n: number }
+
+/** Turns "chat 11 had 3 messages 2 days ago" rows into one 14-number trace per chat (oldest first, today last). Rows outside the window are ignored. */
+export function buildTraces(rows: TraceRow[]): Map<number, number[]> {
+  const out = new Map<number, number[]>();
+  for (const r of rows) {
+    if (r.ago < 0 || r.ago >= TRACE_DAYS) continue;
+    const t = out.get(r.id) ?? new Array(TRACE_DAYS).fill(0);
+    t[TRACE_DAYS - 1 - r.ago] += r.n;
+    out.set(r.id, t);
+  }
+  return out;
+}
+
+/** All chats added together, day by day. */
+export function sumTraces(traces: number[][]): number[] {
+  const total = new Array(TRACE_DAYS).fill(0);
+  for (const t of traces) t.forEach((n, i) => { total[i] += n; });
+  return total;
+}
+
+export interface RecentRow { id: number; channel_slug: string; channel_name: string; branch_slug: string | null; username: string; text: string | null; at: Date; files: string | null }
+export interface RecentMessage { id: number; channelName: string; href: string; author: string; text: string; at: number }
+
+/** The live feed: plain text per message; a message with nothing readable and no files is left out. */
+export function shapeRecent(rows: RecentRow[]): RecentMessage[] {
+  const out: RecentMessage[] = [];
+  for (const r of rows) {
+    const text = plainExcerpt(r.text ?? "", 110) || attachmentOnlyLabel(r.files ? r.files.split("\n") : []);
+    if (!text) continue;
+    out.push({ id: r.id, channelName: r.channel_name, href: r.branch_slug ? `/branch/${r.branch_slug}` : `/topic/${r.channel_slug}`, author: r.username, text, at: r.at.getTime() });
+  }
+  return out;
 }

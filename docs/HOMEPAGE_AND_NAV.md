@@ -6,15 +6,15 @@ Tools (bell, messages, account, donate) are at the far right; the presence orbs 
 
 | Section | Address | What it is |
 |---|---|---|
-| Soundbay | `/soundbay` | Branches (most recently active first), growing seeds, playlists, community albums; shuffle; the way to the map and the player (`/listen`) |
-| XenoLab | `/xenolab` | The Research page: start a study, recent studies, tools (Voice lab) and the Log |
+| Soundbay | `/soundbay` | Branches, growing seeds, playlists and community albums as compact rows with search, sort, filters, a section jump bar and previews; the way to the map and the player (`/listen`) |
+| XenoLab | `/xenolab` | Research (knowledge: studies), Audio processing (tool: Voice lab) and Analysis (tool: measuring clips in a study), joined by a Process, Analyze, Document loop |
 | Telemetry | `/telemetry` | The community hub: **Conversations** (`/conversations`), **Members** (`/members`), the conversation map, challenges, sample bank, contribute, cult activities, messages; recent chat |
-| Log | `/wiki` | The wiki, with **Pages** and **News** as tabs (`components/LogTabs.tsx`). News posts keep `/news/...` |
+| Log | `/wiki` | One explorer for the wiki and the news: News is a folder of posts, wiki pages nest to any depth (`pages/LogPage.tsx`, `lib/logTree.ts`). `/wiki/...` and `/news/...` keep working |
 
 Old addresses redirect: `/research` to `/xenolab`, `/log` and `/about` to `/wiki`.
 
-**Shortcuts** (desktop, not while typing): `S` Soundbay, `X` XenoLab, `R` Telemetry, `L` Log, `C` home. The older letters still work: `K` wiki, `N` news, `M` forum map, `U` cult activities.
-`T` is not used for Telemetry because the Community, News and Wiki pages already use it. Below 1320 px the Admin link becomes a gear. Phones get two rows (brand, then the four links).
+**Shortcuts** (desktop, not while typing, and not while a dialog or the full-screen map is open): `B` Soundbay, `X` XenoLab, `M` Telemetry, `G` Log, `C` home. Only shortcuts that are shown (the underlined letters) exist. The letters avoid `W A S D E F T R` (maps and returning from a page) and `L P` (the player). `R` returns from a page: branch page to Soundbay, topic page to Conversations, album page to its branch.
+Below 1320 px the Admin link becomes a gear. Phones get two rows (brand, then the four links). On the homepage the brand itself is highlighted.
 
 ## Homepage (`/`)
 Order: hero, **Explore the branches**, **Happening now**, three ways in, then the join band (visitors) or **Your work** (members).
@@ -57,3 +57,19 @@ which stops for people who prefer reduced motion.
 ## Not built yet
 Unread counts per conversation, hover cards on names in chat (Profile / Message), the Music and Research hubs' deeper pages.
 
+
+## Soundbay (`/soundbay`)
+Sticky toolbar: search (branches, playlists and albums), sort (most recently active, A to Z, most albums), filters (active this month, has a discussion, has albums), and a jump bar with live counts per section. All of it is in the address. Branches are compact rows (emblem, name, description, albums, last activity) with Preview, Open, Discussion (the chat dock on desktop) and Map (the homepage map with that branch chosen).
+A preview fetches that branch's albums only when first opened.
+
+## Branch identity (admin)
+`/admin/branches/:id/identity` (an "Identity" button on each branch): one accent colour (12 suggestions or any `#rrggbb`) and one emblem (8). Both optional; "Automatic" gives a colour derived from the name. Stored in `Branch.identityColor` and `Branch.identityGlyph` (**migration**: `branch_identity`), validated on the server (`lib/branchIdentity.ts`), shown on Soundbay, as the branch's dot and card on the homepage map.
+
+## Conversations: the instrument (`/conversations`)
+Default view: mission status (a Busy / Steady / Quiet / Silent lamp comparing the last 24 hours with the previous 13 days' daily average), readouts, a 14-day scope of all chats with the three busiest overlaid, a trace per channel, and a live feed (refreshes about every 30 s while visible; can be paused). The previous list is `?view=list`. Data: `GET /api/conversations` now also returns `day`, a 14-day `trace` per chat and for the system, and `recent` messages, all from public chats only.
+
+## Contribute (`/contribute`, `/submit`)
+Guided: six clickable steps (Choose, Brief, Sketches, Submit, Review, If approved), a branch chooser (search, filters, sort) and a panel with the concept (the brief), a sample, the sketches and the member's own submissions to that branch (`mySubmissions` from `GET /api/contribute/branches`, only ever the viewer's own). Review is a person's decision: no wording says or implies automatic publishing (a test enforces it). A started submission with no tracks is continued at `/submit?branch=...&album=...` (only your own, only while pending); the album page itself has no upload controls.
+
+## Keyboard
+The global player shortcuts (Space, arrows) now step aside when focus is on a control that uses those keys itself (buttons, checkboxes, dropdowns, radio groups, sliders), so Space presses a focused button.

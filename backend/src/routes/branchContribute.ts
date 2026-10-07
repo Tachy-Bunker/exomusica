@@ -3,13 +3,14 @@ import { ZipArchive } from "archiver";
 import path from "node:path";
 import { createReadStream, existsSync } from "node:fs";
 import { prisma } from "../lib/prisma.js";
-import { requireAdmin } from "../lib/auth.js";
+import { requireAdmin, verifyToken } from "../lib/auth.js";
+import { submissionState } from "../lib/submissionState.js";
 
 const UPLOADS_DIR = path.join(process.cwd(), "uploads");
 
 export async function branchContributeRoutes(app: FastifyInstance): Promise<void> {
   // Public: every branch's contribution info for "Choose your next project"
-  app.get("/api/contribute/branches", async () => {
+  app.get("/api/contribute/branches", async (req) => {
     const branches = await prisma.branch.findMany({
       where: { visibility: "VISIBLE" },
       select: {
@@ -25,6 +26,16 @@ export async function branchContributeRoutes(app: FastifyInstance): Promise<void
       },
       orderBy: { name: "asc" },
     });
+    // The viewer's OWN submissions, so the page can say where each one stands. Nobody else's are ever included.
+    const header = req.headers.authorization;
+    const userId = header?.startsWith("Bearer ") ? (verifyToken(header.slice(7))?.id ?? null) : null;
+    const mine = userId
+      ? await prisma.communityAlbum.findMany({
+          where: { ownerId: userId, targetBranchId: { not: null }, submissionStatus: { not: null } },
+          orderBy: { createdAt: "desc" },
+          select: { slug: true, title: true, submissionStatus: true, targetBranch: { select: { slug: true } }, _count: { select: { tracks: true } } },
+        })
+      : [];
     return branches.map((b) => ({
       slug: b.slug,
       name: b.name,
@@ -35,6 +46,9 @@ export async function branchContributeRoutes(app: FastifyInstance): Promise<void
       backgroundOpacity: b.contributeBackgroundOpacity,
       previewUrl: b.previewAttachment ? b.previewAttachment.storagePath : null,
       sketchCount: b._count.sketches,
+      mySubmissions: mine
+        .filter((a) => a.targetBranch?.slug === b.slug)
+        .map((a) => ({ slug: a.slug, title: a.title, trackCount: a._count.tracks, state: submissionState(a.submissionStatus!, a._count.tracks) })),
     }));
   });
 

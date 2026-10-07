@@ -50,10 +50,10 @@ import { resumeSharedContextIfNeeded } from "../lib/oneShotSfx";
 import { resumeAnalyserContextIfNeeded } from "../lib/audioAnalyser";
 
 const NAV_SECTIONS: { section: Section; label: string; to: string; letter: string }[] = [
-  { section: "soundbay", label: "Soundbay", to: "/soundbay", letter: "s" },
+  { section: "soundbay", label: "Soundbay", to: "/soundbay", letter: "b" },
   { section: "xenolab", label: "XenoLab", to: "/xenolab", letter: "x" },
-  { section: "telemetry", label: "Telemetry", to: "/telemetry", letter: "r" },
-  { section: "log", label: "Log", to: "/wiki", letter: "l" },
+  { section: "telemetry", label: "Telemetry", to: "/telemetry", letter: "m" },
+  { section: "log", label: "Log", to: "/wiki", letter: "g" },
 ];
 
 export function Layout() {
@@ -91,36 +91,29 @@ export function Layout() {
     function handleShortcut(e: KeyboardEvent) {
       if (isTypingTarget(e.target)) return;
       if (e.ctrlKey || e.metaKey || e.altKey) return;
+      if (document.querySelector('[aria-modal="true"]')) return; // a dialog or the full-screen map is open: its keys are its own
       // These are letter shortcuts, matched to the actual character
       // produced (e.key), not the physical key position (e.code) - on
       // AZERTY and other non-QWERTY layouts, the key at the QWERTY "M"
       // position doesn't produce "m" at all, so e.code would silently
       // never fire for anyone not on QWERTY.
       switch (e.key.toLowerCase()) {
+        // Only shortcuts that are shown on screen (the underlined letters) exist. The letters are chosen to stay clear of
+        // everything else: W A S D E F T R move around the maps and return from a page, L and P belong to the player.
         case "c":
           navigate("/");
           break;
-        case "s":
+        case "b":
           navigate("/soundbay");
           break;
         case "x":
           navigate("/xenolab");
           break;
-        case "r":
+        case "m":
           navigate("/telemetry");
           break;
-        case "l":
-        case "k": // the old Wiki letter still works
+        case "g":
           navigate("/wiki");
-          break;
-        case "n":
-          navigate("/news");
-          break;
-        case "m":
-          navigate("/discussion/map");
-          break;
-        case "u":
-          navigate("/cult");
           break;
         case "e":
           if (suppressGlobalEShortcut) break; // a page with its own E-key handling (e.g. the forum map's crosshair reveal/enter) owns this keypress instead
@@ -336,7 +329,7 @@ export function Layout() {
             ))}
           </nav>
         </div>
-        <Link to="/" className="brand">
+        <Link to="/" className="brand" aria-current={location.pathname === "/" ? "page" : undefined}>
           {isDesktop ? <>⩽ {underlineLetter("EXOMUSICA", "c")} ⪖</> : "⩽EXOMUSICA⪖"}
         </Link>
         <div className="nav-side nav-right">

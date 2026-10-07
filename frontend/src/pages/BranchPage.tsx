@@ -84,7 +84,7 @@ export function BranchPage() {
     if (!isDesktop) return;
     function handleKeyDown(e: KeyboardEvent) {
       if (isTypingTarget(e.target)) return;
-      if (e.code === "KeyR") navigate("/");
+      if (e.code === "KeyR") navigate("/soundbay");
     }
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
@@ -100,7 +100,7 @@ export function BranchPage() {
     <div className={isDesktop ? "page-column" : undefined} style={{ fontFamily, ...(isDesktop ? { maxWidth: 1000 } : { display: "flex", flexDirection: "column", height: "calc(100dvh - var(--nav-height, 3.6rem) - 3rem - var(--player-height, 0px))", marginTop: "-0.6rem" }) }}>
       <div style={isDesktop ? {} : { flexShrink: 0, overflowY: "auto" }}>
         <p style={{ marginBottom: "0.5rem" }}>
-          <Link to="/">{isDesktop ? "← back to Exo-Lands (R)" : "← Back to Exo-Lands"}</Link>
+          <Link to="/soundbay">{isDesktop ? "← Soundbay (R)" : "← Soundbay"}</Link>
         </p>
         <h1>{branch.name}</h1>
         {branch.description && <p style={{ color: "var(--text-dim)", maxWidth: 640 }}>{branch.description}</p>}

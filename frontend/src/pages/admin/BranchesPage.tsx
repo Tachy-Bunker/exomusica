@@ -337,6 +337,9 @@ export function BranchesPage() {
                     <Link className="btn" to={`/admin/branches/${b.id}/contribute`}>
                       Contribute settings
                     </Link>{" "}
+                    <Link className="btn" to={`/admin/branches/${b.id}/identity`}>
+                      Identity
+                    </Link>{" "}
                     <button className="btn btn-danger" onClick={() => handleDelete(b)}>
                       Delete
                     </button>

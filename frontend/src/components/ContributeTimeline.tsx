@@ -1,11 +1,13 @@
-export type ContributeStepKey = "brief" | "sketches" | "submit" | "feedback" | "official";
+export type ContributeStepKey = "choose" | "brief" | "sketches" | "submit" | "feedback" | "official";
 
-const STEPS: { key: ContributeStepKey; label: string; caption: string }[] = [
+/** The steps, in the words of what actually happens. Review is a person's decision: the last step says "if approved", never "goes live". */
+export const CONTRIBUTE_STEPS: { key: ContributeStepKey; label: string; caption: string }[] = [
+  { key: "choose", label: "Choose", caption: "pick a branch" },
   { key: "brief", label: "Brief", caption: "read the concept" },
-  { key: "sketches", label: "Sketches", caption: "grab source material" },
-  { key: "submit", label: "Submit", caption: "upload, credit, done" },
-  { key: "feedback", label: "Feedback", caption: "discuss with the team" },
-  { key: "official", label: "Official", caption: "goes live on the branch" },
+  { key: "sketches", label: "Sketches", caption: "get source material" },
+  { key: "submit", label: "Submit", caption: "upload and credit" },
+  { key: "feedback", label: "Review", caption: "the team listens and replies" },
+  { key: "official", label: "If approved", caption: "added to the branch" },
 ];
 
 interface Props {
@@ -13,51 +15,19 @@ interface Props {
   onStepChange: (key: ContributeStepKey | null) => void;
 }
 
+/** Each step is a real button: press it to see where on the page it happens. It works with the keyboard and on touch (no hover needed). */
 export function ContributeTimeline({ activeStep, onStepChange }: Props) {
   return (
-    <div style={{ display: "flex", alignItems: "flex-start", marginBottom: "1.2rem", overflowX: "auto" }}>
-      {STEPS.map((step, i) => (
-        <div key={step.key} style={{ display: "flex", alignItems: "flex-start", flex: i < STEPS.length - 1 ? 1 : "0 0 auto" }}>
-          <div
-            onMouseEnter={() => onStepChange(step.key)}
-            onMouseLeave={() => {
-              if (activeStep === step.key) onStepChange(null);
-            }}
-            onClick={() => onStepChange(activeStep === step.key ? null : step.key)}
-            style={{
-              display: "flex",
-              flexDirection: "column",
-              alignItems: "center",
-              minWidth: 84,
-              cursor: "pointer",
-              padding: "0.3rem",
-              borderRadius: "var(--radius)",
-              background: activeStep === step.key ? "var(--bg-elevated)" : "transparent",
-            }}
-          >
-            <span
-              style={{
-                width: 22,
-                height: 22,
-                borderRadius: "50%",
-                background: activeStep === step.key ? "var(--accent-forum)" : "var(--accent-forum-dim)",
-                border: "1px solid var(--accent-forum)",
-                color: "var(--text)",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                fontSize: "0.75rem",
-                flexShrink: 0,
-              }}
-            >
-              {i + 1}
-            </span>
-            <span style={{ fontWeight: 600, fontSize: "0.85rem", marginTop: "0.3rem", color: "var(--text)" }}>{step.label}</span>
-            <span style={{ fontSize: "0.7rem", color: "var(--text-dim)", textAlign: "center" }}>{step.caption}</span>
-          </div>
-          {i < STEPS.length - 1 && <div style={{ flex: 1, height: 1, background: "var(--border)", marginTop: 11 }} />}
-        </div>
+    <ol className="ct-steps" aria-label="How contributing works" data-testid="contribute-steps">
+      {CONTRIBUTE_STEPS.map((step, i) => (
+        <li key={step.key}>
+          <button type="button" className="ct-step" aria-pressed={activeStep === step.key} onClick={() => onStepChange(activeStep === step.key ? null : step.key)} data-testid={`step-${step.key}`}>
+            <span className="ct-step-n" aria-hidden="true">{i + 1}</span>
+            <span className="ct-step-label">{step.label}</span>
+            <span className="ct-step-caption">{step.caption}</span>
+          </button>
+        </li>
       ))}
-    </div>
+    </ol>
   );
 }

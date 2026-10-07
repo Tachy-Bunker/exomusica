@@ -1,7 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import { prisma } from "../lib/prisma.js";
-import { CONVERSATION_STATS_SQL, MEMBER_LIST_SQL } from "../lib/conversationSql.js";
-import { shapeConversation, type Conversation, type StatsRow } from "../lib/conversations.js";
+import { CONVERSATION_STATS_SQL, CONVERSATION_TRACE_SQL, MEMBER_LIST_SQL, RECENT_MESSAGES_SQL } from "../lib/conversationSql.js";
+import { buildTraces, shapeConversation, shapeRecent, sumTraces, type Conversation, type RecentRow, type StatsRow, type TraceRow } from "../lib/conversations.js";
 import { shapeMember, type Member, type MemberRow } from "../lib/members.js";
 import { PUBLIC_CHANNEL_FILTER, isPublicChannel } from "../lib/publicChannels.js";
 import { ttlCache } from "../lib/ttlCache.js";
@@ -16,13 +16,35 @@ const buildConversations = ttlCache(30_000, async () => {
     },
   });
   const listed = channels.filter((c) => isPublicChannel(c)); // never rely on the query filter alone
-  const stats = listed.length ? await prisma.$queryRawUnsafe<StatsRow[]>(CONVERSATION_STATS_SQL, listed.map((c) => c.id)) : [];
+  const ids = listed.map((c) => c.id);
+  // All three queries only ever see the listed (public) chats, so nothing about an unlisted chat is computed or shown.
+  const [stats, traceRows, recentRows] = ids.length
+    ? await Promise.all([
+        prisma.$queryRawUnsafe<StatsRow[]>(CONVERSATION_STATS_SQL, ids),
+        prisma.$queryRawUnsafe<TraceRow[]>(CONVERSATION_TRACE_SQL, ids),
+        prisma.$queryRawUnsafe<RecentRow[]>(RECENT_MESSAGES_SQL, ids),
+      ])
+    : [[], [], []];
   const byId = new Map(stats.map((s) => [s.id, s]));
+  const traces = buildTraces(traceRows);
   const now = Date.now();
   const conversations: Conversation[] = listed
-    .map((c) => shapeConversation({ ...c, branch: c.branch ? { slug: c.branch.slug, name: c.branch.name } : null }, byId.get(c.id), now))
+    .map((c) => shapeConversation({ ...c, branch: c.branch ? { slug: c.branch.slug, name: c.branch.name } : null }, byId.get(c.id), now, traces.get(c.id)))
     .sort((a, b) => (b.lastAt ?? 0) - (a.lastAt ?? 0) || a.name.localeCompare(b.name));
-  return { generatedAt: now, totals: { conversations: conversations.length, week: conversations.reduce((n, c) => n + c.week, 0) }, conversations };
+  const lastSignal = conversations.reduce<number | null>((m, c) => (c.lastAt !== null && (m === null || c.lastAt > m) ? c.lastAt : m), null);
+  return {
+    generatedAt: now,
+    totals: {
+      conversations: conversations.length,
+      week: conversations.reduce((n, c) => n + c.week, 0),
+      day: conversations.reduce((n, c) => n + c.day, 0),
+      activeChats: conversations.filter((c) => c.week > 0).length,
+      lastSignalAt: lastSignal,
+    },
+    trace: sumTraces(conversations.map((c) => c.trace)),
+    conversations,
+    recent: shapeRecent(recentRows),
+  };
 });
 
 const buildMembers = ttlCache(60_000, async () => {

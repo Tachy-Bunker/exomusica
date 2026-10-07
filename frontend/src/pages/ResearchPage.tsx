@@ -51,65 +51,77 @@ export function ResearchPage() {
   }
 
   return (
-    <div className="page-column" style={{ maxWidth: 900 }}>
-      <h1>Study sound. Share what you find.</h1>
-      <p style={{ color: "var(--text-dim)" }}>This is the lab, not the stage - document phenomena and build the ecosystem's shared knowledge.</p>
+    <div className="page-column xl" style={{ maxWidth: 940 }} data-testid="xenolab-page">
+      <h1>XenoLab</h1>
+      <p className="home-lede" style={{ marginBottom: "0.6rem" }}>Study sound. Share what you find. Tools to work on a sound, and studies that keep what you learn.</p>
 
-      <div style={{ display: "flex", gap: "0.6rem", margin: "1rem 0" }}>
-        <input value={newTitle} onChange={(e) => setNewTitle(e.target.value)} placeholder="Start a new study..." style={{ flex: 1 }} />
-        <button className="btn btn-primary" onClick={startStudy}>
-          Start a study
-        </button>
-      </div>
+      <ol className="xl-flow" aria-label="How the lab fits together" data-testid="xenolab-flow">
+        <li><a href="#xl-processing"><b>1 · Process</b><span>change the audio</span></a></li>
+        <li aria-hidden="true" className="xl-arrow">→</li>
+        <li><a href="#xl-analysis"><b>2 · Analyze</b><span>measure it</span></a></li>
+        <li aria-hidden="true" className="xl-arrow">→</li>
+        <li><a href="#xl-research"><b>3 · Document</b><span>write it up in a study</span></a></li>
+      </ol>
 
-      <div style={{ border: "1px solid var(--border)", borderRadius: "var(--radius)", padding: "0.8rem", marginTop: "1rem" }}>
-        <p style={{ fontSize: "0.8rem", color: "var(--text-dim)", margin: "0 0 0.4rem" }}>
-          {usingRealData ? "Live data from a recent study - edit it yourself:" : "Try it - paste your own data and watch it render instantly:"}
-        </p>
-        <div style={{ display: "flex", gap: "1rem", flexWrap: "wrap" }}>
-          <div style={{ flex: "1 1 260px" }}>
-            <select value={demoKind} onChange={(e) => setDemoKind(e.target.value as typeof demoKind)} style={{ marginBottom: "0.4rem" }}>
-              <option value="LINE">Line</option>
-              <option value="BAR">Bar</option>
-              <option value="SCATTER">Scatter</option>
-            </select>
-            <textarea
-              value={demoCsv}
-              onChange={(e) => {
-                setDemoCsv(e.target.value);
-                setUsingRealData(false);
-              }}
-              rows={8}
-              style={{ width: "100%", fontFamily: "var(--font-mono)", fontSize: "0.8rem" }}
-            />
-          </div>
-          <div style={{ flex: "1 1 300px" }}>
-            <StudyChartView kind={demoKind} xLabel={null} yLabel={null} dataCsv={demoCsv} />
+      <section id="xl-research" className="xl-block" aria-labelledby="xl-research-h" data-testid="xenolab-research">
+        <header className="xl-head"><h2 id="xl-research-h">Research</h2><span className="xl-kind xl-kind-knowledge">Knowledge</span></header>
+        <p className="home-dim xl-sub">Studies are where results are written down, shared and discussed. Everything the tools below produce can be put into one.</p>
+        <div style={{ display: "flex", gap: "0.6rem", margin: "0.8rem 0", flexWrap: "wrap" }}>
+          <input value={newTitle} onChange={(e) => setNewTitle(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") startStudy(); }} placeholder="Start a new study..." aria-label="Title of a new study" style={{ flex: "1 1 240px" }} />
+          <button className="btn btn-primary" onClick={startStudy}>Start a study</button>
+        </div>
+        <h3 className="xl-h3">Recently active</h3>
+        <div style={{ display: "flex", flexDirection: "column", gap: "0.4rem" }}>
+          {studies.slice(0, 6).map((s) => (
+            <Link key={s.slug} to={`/study/${s.slug}`} className="home-card xl-study">
+              <span className="home-card-title">{s.title}</span>
+              <span className="home-dim home-card-meta">by {s.owner} · {s.status === "COMPLETE" ? "complete" : "in progress"}</span>
+            </Link>
+          ))}
+          {studies.length === 0 && <p className="home-dim">No studies yet. Yours could be the first.</p>}
+        </div>
+        <p className="xl-links"><Link to="/studies">All studies</Link><Link to="/wiki">Read the Log (wiki and news)</Link></p>
+      </section>
+
+      <section id="xl-processing" className="xl-block" aria-labelledby="xl-processing-h" data-testid="xenolab-processing">
+        <header className="xl-head"><h2 id="xl-processing-h">Audio processing</h2><span className="xl-kind xl-kind-tool">Tool · changes sound</span></header>
+        <p className="home-dim xl-sub">These take a recording in and give a different recording back.</p>
+        <div className="home-grid">
+          <Link className="home-card" to="/lab/voice">
+            <span className="home-card-title">Voice lab</span>
+            <span className="home-dim home-card-meta">Clean up and level a voice recording. Record a voice note to keep in a study.</span>
+          </Link>
+        </div>
+      </section>
+
+      <section id="xl-analysis" className="xl-block" aria-labelledby="xl-analysis-h" data-testid="xenolab-analysis">
+        <header className="xl-head"><h2 id="xl-analysis-h">Analysis</h2><span className="xl-kind xl-kind-tool">Tool · measures sound</span></header>
+        <p className="home-dim xl-sub">These leave the audio alone and measure it. They work on clips inside a study, and the results become charts there.</p>
+        <ul className="xl-list">
+          <li><b>Analyze this clip</b> <span className="home-dim">pitch, loudness, brightness and note starts of a clip in a study</span></li>
+          <li><b>Import labels</b> <span className="home-dim">bring in markers from Audacity, REAPER or Praat as cited clips</span></li>
+          <li><b>Plot your own data</b> <span className="home-dim">paste numbers below and see a chart straight away</span></li>
+        </ul>
+        <p className="xl-links"><a href="#xl-research">Open or start a study to analyze a clip</a></p>
+        <div className="xl-demo">
+          <p style={{ fontSize: "0.8rem", color: "var(--text-dim)", margin: "0 0 0.4rem" }}>
+            {usingRealData ? "Live data from a recent study - edit it yourself:" : "Try it - paste your own data and watch it render instantly:"}
+          </p>
+          <div style={{ display: "flex", gap: "1rem", flexWrap: "wrap" }}>
+            <div style={{ flex: "1 1 260px" }}>
+              <select value={demoKind} onChange={(e) => setDemoKind(e.target.value as typeof demoKind)} aria-label="Chart type" style={{ marginBottom: "0.4rem" }}>
+                <option value="LINE">Line</option>
+                <option value="BAR">Bar</option>
+                <option value="SCATTER">Scatter</option>
+              </select>
+              <textarea value={demoCsv} onChange={(e) => { setDemoCsv(e.target.value); setUsingRealData(false); }} rows={8} aria-label="Chart data" style={{ width: "100%", fontFamily: "var(--font-mono)", fontSize: "0.8rem" }} />
+            </div>
+            <div style={{ flex: "1 1 300px" }}>
+              <StudyChartView kind={demoKind} xLabel={null} yLabel={null} dataCsv={demoCsv} />
+            </div>
           </div>
         </div>
-      </div>
-
-      <h2 style={{ fontSize: "1rem", marginTop: "1.5rem" }}>Recently active</h2>
-      <div style={{ display: "flex", flexDirection: "column", gap: "0.4rem" }}>
-        {studies.slice(0, 6).map((s) => (
-          <Link key={s.slug} to={`/study/${s.slug}`} style={{ border: "1px solid var(--border)", borderRadius: "var(--radius)", padding: "0.5rem 0.7rem", textDecoration: "none", color: "inherit" }}>
-            {s.title} <span style={{ color: "var(--text-dim)", fontSize: "0.8rem" }}>by {s.owner}</span>
-          </Link>
-        ))}
-      </div>
-      <p style={{ margin: "0.6rem 0 0" }}><Link to="/studies" style={{ color: "var(--text-dim)" }}>All studies</Link></p>
-
-      <h2 style={{ fontSize: "1rem", marginTop: "1.5rem" }}>Tools and reference</h2>
-      <div className="home-grid" data-testid="xenolab-tools">
-        <Link className="home-card" to="/lab/voice">
-          <span className="home-card-title">Voice lab</span>
-          <span className="home-dim home-card-meta">Clean up and level a voice recording</span>
-        </Link>
-        <Link className="home-card" to="/wiki">
-          <span className="home-card-title">Log</span>
-          <span className="home-dim home-card-meta">The wiki and the news</span>
-        </Link>
-      </div>
+      </section>
     </div>
   );
 }

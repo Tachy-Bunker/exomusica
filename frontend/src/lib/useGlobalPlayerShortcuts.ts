@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 import { useAudioStore } from "./audioStore";
 import { useAmbienceStore } from "./ambienceStore";
-import { isTypingTarget } from "./isTypingTarget";
+import { isTypingTarget, usesArrowsItself, usesSpaceItself } from "./isTypingTarget";
 
 export function useGlobalPlayerShortcuts(): void {
   useEffect(() => {
@@ -17,6 +17,11 @@ export function useGlobalPlayerShortcuts(): void {
         store.toggleShuffle();
         return;
       }
+
+      // Space and the arrows keep their normal job when focus is on a control that uses them (pressing Space on a button must press it).
+      const spaceIsTheControls = e.key === " " && usesSpaceItself(e.target);
+      const arrowsAreTheControls = e.key.startsWith("Arrow") && usesArrowsItself(e.target);
+      if (spaceIsTheControls || arrowsAreTheControls) return;
 
       if (!store.currentTrack) {
         if (e.key === " ") {

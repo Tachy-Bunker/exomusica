@@ -1,6 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import { prisma } from "../lib/prisma.js";
 import { requireAdmin } from "../lib/auth.js";
+import { identityProblem, normalizeColor } from "../lib/branchIdentity.js";
 import { trackToDTO } from "../lib/embeds.js";
 
 interface CreateBranchBody {
@@ -29,6 +30,8 @@ export async function branchRoutes(app: FastifyInstance): Promise<void> {
         isAnchor: true,
         posX: true,
         posY: true,
+        identityColor: true,
+        identityGlyph: true,
         channel: { select: { id: true, slug: true } },
       },
       orderBy: { id: "asc" },
@@ -191,9 +194,15 @@ export async function branchRoutes(app: FastifyInstance): Promise<void> {
       previewAttachmentId: number | null;
       contributeBackgroundUrl: string | null;
       contributeBackgroundOpacity: number;
+      identityColor: string | null;
+      identityGlyph: string | null;
     }>;
-  }>("/api/admin/branches/:id", { preHandler: requireAdmin }, async (req) => {
-    const branch = await prisma.branch.update({ where: { id: Number(req.params.id) }, data: req.body ?? {} });
+  }>("/api/admin/branches/:id", { preHandler: requireAdmin }, async (req, reply) => {
+    const problem = identityProblem(req.body ?? {});
+    if (problem) return reply.code(400).send({ error: problem });
+    const data = { ...(req.body ?? {}) };
+    if (typeof data.identityColor === "string") data.identityColor = normalizeColor(data.identityColor)!;
+    const branch = await prisma.branch.update({ where: { id: Number(req.params.id) }, data });
     await prisma.auditLog.create({
       data: { actorId: req.user!.id, action: "branch.update", targetType: "Branch", targetId: branch.id, meta: req.body },
     });
