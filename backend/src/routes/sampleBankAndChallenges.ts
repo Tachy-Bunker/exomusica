@@ -2,6 +2,7 @@ import type { FastifyInstance } from "fastify";
 import { prisma } from "../lib/prisma.js";
 import { requireAuth, requireAdmin, verifyToken, type AuthedUser } from "../lib/auth.js";
 import { canHaveFile, couponProblem, generateCode, isValidCode, makeLimiter, normalizeCode } from "../lib/resourceAccess.js";
+import { isPreviewLink, previewProblem } from "../lib/rewards.js";
 import { deleteAttachmentAndReclaim, saveCommunityAlbumCover, saveSampleBankFile } from "../lib/storage.js";
 
 function kindFromMime(mimeType: string): "AUDIO" | "PATCH" | "SCRIPT" | "OTHER" {
@@ -22,6 +23,14 @@ function viewerOf(header: string | undefined): AuthedUser | null {
   return header?.startsWith("Bearer ") ? verifyToken(header.slice(7)) : null;
 }
 
+const PREVIEW_MAX_BYTES = 20 * 1024 * 1024;
+/** Stores an author's preview listen. Audio only and short enough to be a preview; throws a readable message otherwise. */
+async function savePreviewFile(userId: number, f: { filename: string; mimetype: string; buffer: Buffer }) {
+  if (!f.mimetype.startsWith("audio/")) throw new Error("A preview must be an audio file (or give a link instead).");
+  if (f.buffer.length > PREVIEW_MAX_BYTES) throw new Error("A preview is a short listen: keep the file under 20 MB.");
+  return saveSampleBankFile(userId, f.filename, f.mimetype, f.buffer);
+}
+
 export async function sampleBankAndChallengesRoutes(app: FastifyInstance): Promise<void> {
   // --- Sample bank ----------------------------------------------------------
 
@@ -29,7 +38,7 @@ export async function sampleBankAndChallengesRoutes(app: FastifyInstance): Promi
     const viewer = viewerOf(req.headers.authorization);
     const items = await prisma.sampleBankItem.findMany({
       where: req.query.tag ? { tags: { has: req.query.tag } } : undefined,
-      include: { owner: { select: { username: true } }, attachment: { select: { storagePath: true, filename: true } } },
+      include: { owner: { select: { username: true } }, attachment: { select: { storagePath: true, filename: true } }, rewards: { where: { active: true }, select: { id: true, cost: true, stock: true } } },
       orderBy: { createdAt: "desc" },
     });
     const unlocked = new Set(viewer ? (await prisma.resourceUnlock.findMany({ where: { userId: viewer.id }, select: { itemId: true } })).map((u) => u.itemId) : []);
@@ -48,6 +57,8 @@ export async function sampleBankAndChallengesRoutes(app: FastifyInstance): Promi
       price: i.price,
       payNote: i.payNote,
       paypalUrl: i.paypalUrl,
+      previewUrl: i.previewUrl,
+      pointsReward: i.paid ? (i.rewards.filter((r) => r.stock === null || r.stock > 0).sort((a, b) => a.cost - b.cost)[0] ?? null) : null, // the cheapest way to open it with contributor points, if the team set one
       owner: i.owner.username,
       cover: i.imageUrls[0] ?? null,
       gallery: i.imageUrls.slice(1),
@@ -82,13 +93,19 @@ export async function sampleBankAndChallengesRoutes(app: FastifyInstance): Promi
 
   app.get("/api/admin/resources", { preHandler: requireAdmin }, async () => {
     const items = await prisma.sampleBankItem.findMany({ include: { owner: { select: { username: true } }, _count: { select: { coupons: true, unlocks: true } } }, orderBy: { createdAt: "desc" } });
-    return items.map((i) => ({ id: i.id, title: i.title, description: i.description, owner: i.owner.username, kind: i.kind, cover: i.imageUrls[0] ?? null, paid: i.paid, price: i.price, payNote: i.payNote, paypalUrl: i.paypalUrl, ogTitle: i.ogTitle, ogDescription: i.ogDescription, ogImageUrl: i.ogImageUrl, couponCount: i._count.coupons, unlockCount: i._count.unlocks }));
+    return items.map((i) => ({ id: i.id, title: i.title, description: i.description, owner: i.owner.username, kind: i.kind, cover: i.imageUrls[0] ?? null, previewUrl: i.previewUrl, paid: i.paid, price: i.price, payNote: i.payNote, paypalUrl: i.paypalUrl, ogTitle: i.ogTitle, ogDescription: i.ogDescription, ogImageUrl: i.ogImageUrl, couponCount: i._count.coupons, unlockCount: i._count.unlocks }));
   });
 
   app.patch<{ Params: { id: string }; Body: Record<string, unknown> }>("/api/admin/resources/:id", { preHandler: requireAdmin }, async (req, reply) => {
     const b = req.body ?? {};
     const data: Record<string, unknown> = {};
     if (b.paid !== undefined) data.paid = b.paid === true;
+    if (data.paid === true) {
+      const cur = await prisma.sampleBankItem.findUnique({ where: { id: Number(req.params.id) }, select: { previewUrl: true, imageUrls: true } });
+      if (!cur) return reply.code(404).send({ error: "no such resource" });
+      const problem = previewProblem(cur);
+      if (problem) return reply.code(400).send({ error: problem });
+    }
     for (const [key, max] of [["price", 60], ["payNote", 2000], ["ogTitle", 200], ["ogDescription", 400]] as const) {
       const v = cleanText(b[key], max);
       if (v !== undefined) data[key] = v;
@@ -147,12 +164,14 @@ export async function sampleBankAndChallengesRoutes(app: FastifyInstance): Promi
     let sound: { filename: string; mimetype: string; buffer: Buffer } | null = null;
     let cover: { filename: string; mimetype: string; buffer: Buffer } | null = null;
     const gallery: { filename: string; mimetype: string; buffer: Buffer }[] = [];
+    let preview: { filename: string; mimetype: string; buffer: Buffer } | null = null;
     for await (const part of req.parts()) {
       if (part.type === "field") { fields[part.fieldname] = String(part.value ?? ""); continue; }
       const buffer = await part.toBuffer();
       const entry = { filename: part.filename, mimetype: part.mimetype, buffer };
       if (part.fieldname === "file") sound = entry;
       else if (part.fieldname === "cover") cover = entry;
+      else if (part.fieldname === "preview") preview = entry;
       else if (part.fieldname === "gallery") { if (gallery.length < 3) gallery.push(entry); }
     }
     if (!sound) return reply.code(400).send({ error: "no file uploaded" });
@@ -161,10 +180,14 @@ export async function sampleBankAndChallengesRoutes(app: FastifyInstance): Promi
     const description = fields.description?.trim() || null;
     const tags = (fields.tags ?? "").split(",").map((t) => t.trim().toLowerCase()).filter(Boolean);
 
+    const previewLink = fields.previewLink?.trim() || null;
+    if (previewLink && !isPreviewLink(previewLink)) return reply.code(400).send({ error: "The preview link must be a web address (https://...)." });
     const savedImages: { id: number; url: string }[] = [];
     let attachment;
+    let previewAtt: { id: number; storagePath: string } | null = null;
     try {
       attachment = await saveSampleBankFile(req.user!.id, sound.filename, sound.mimetype, sound.buffer);
+      if (preview) previewAtt = await savePreviewFile(req.user!.id, preview);
       for (const img of [...(cover ? [cover] : []), ...gallery]) {
         const a = await saveCommunityAlbumCover(req.user!.id, img.filename, img.mimetype, img.buffer);
         savedImages.push({ id: a.id, url: a.storagePath });
@@ -172,10 +195,11 @@ export async function sampleBankAndChallengesRoutes(app: FastifyInstance): Promi
     } catch (err) {
       for (const img of savedImages) await deleteAttachmentAndReclaim(img.id).catch(() => {});
       if (attachment) await deleteAttachmentAndReclaim(attachment.id).catch(() => {});
+      if (previewAtt) await deleteAttachmentAndReclaim(previewAtt.id).catch(() => {});
       return reply.code(400).send({ error: err instanceof Error ? err.message : "upload failed" });
     }
     const item = await prisma.sampleBankItem.create({
-      data: { ownerId: req.user!.id, title, description, tags, kind: kindFromMime(sound.mimetype), attachmentId: attachment.id, imageUrls: savedImages.map((i) => i.url), imageAttachmentIds: savedImages.map((i) => i.id) },
+      data: { ownerId: req.user!.id, title, description, tags, kind: kindFromMime(sound.mimetype), attachmentId: attachment.id, imageUrls: savedImages.map((i) => i.url), imageAttachmentIds: savedImages.map((i) => i.id), previewUrl: previewAtt?.storagePath ?? previewLink, previewAttachmentId: previewAtt?.id ?? null },
     });
     return reply.code(201).send(item);
   });
@@ -186,7 +210,40 @@ export async function sampleBankAndChallengesRoutes(app: FastifyInstance): Promi
     if (item.ownerId !== req.user!.id) return reply.code(403).send({ error: "not yours" });
     await prisma.sampleBankItem.delete({ where: { id: item.id } });
     for (const id of item.imageAttachmentIds) await deleteAttachmentAndReclaim(id).catch(() => {});
+    if (item.previewAttachmentId) await deleteAttachmentAndReclaim(item.previewAttachmentId).catch(() => {});
     return { status: "ok" };
+  });
+
+  // The author (or an admin) adds, replaces or removes the preview: an audio file, or a link to one.
+  app.post<{ Params: { id: string } }>("/api/sample-bank/:id/preview", { preHandler: requireAuth }, async (req, reply) => {
+    const item = await prisma.sampleBankItem.findUnique({ where: { id: Number(req.params.id) } });
+    if (!item) return reply.code(404).send({ error: "no such item" });
+    if (item.ownerId !== req.user!.id && !req.user!.isAdmin) return reply.code(403).send({ error: "not yours" });
+    let link: string | null = null;
+    let file: { filename: string; mimetype: string; buffer: Buffer } | null = null;
+    for await (const part of req.parts()) {
+      if (part.type === "field") { if (part.fieldname === "link") link = String(part.value ?? "").trim() || null; continue; }
+      if (part.fieldname === "preview") file = { filename: part.filename, mimetype: part.mimetype, buffer: await part.toBuffer() };
+    }
+    if (!file && !link) return reply.code(400).send({ error: "Add an audio file or a link." });
+    if (!file && !isPreviewLink(link)) return reply.code(400).send({ error: "The preview link must be a web address (https://...)." });
+    let saved: { id: number; storagePath: string } | null = null;
+    if (file) {
+      try { saved = await savePreviewFile(item.ownerId, file); } catch (err) { return reply.code(400).send({ error: err instanceof Error ? err.message : "upload failed" }); }
+    }
+    const updated = await prisma.sampleBankItem.update({ where: { id: item.id }, data: { previewUrl: saved?.storagePath ?? link, previewAttachmentId: saved?.id ?? null } });
+    if (item.previewAttachmentId) await deleteAttachmentAndReclaim(item.previewAttachmentId).catch(() => {});
+    return { previewUrl: updated.previewUrl };
+  });
+
+  app.delete<{ Params: { id: string } }>("/api/sample-bank/:id/preview", { preHandler: requireAuth }, async (req, reply) => {
+    const item = await prisma.sampleBankItem.findUnique({ where: { id: Number(req.params.id) } });
+    if (!item) return reply.code(404).send({ error: "no such item" });
+    if (item.ownerId !== req.user!.id && !req.user!.isAdmin) return reply.code(403).send({ error: "not yours" });
+    if (item.paid && item.imageUrls.length === 0) return reply.code(400).send({ error: "A paid resource needs a preview or a picture, so this one stays until another is added." });
+    await prisma.sampleBankItem.update({ where: { id: item.id }, data: { previewUrl: null, previewAttachmentId: null } });
+    if (item.previewAttachmentId) await deleteAttachmentAndReclaim(item.previewAttachmentId).catch(() => {});
+    return reply.code(204).send();
   });
 
   // --- Challenges -------------------------------------------------------

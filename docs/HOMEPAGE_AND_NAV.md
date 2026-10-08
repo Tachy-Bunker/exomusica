@@ -174,3 +174,24 @@ Tracks are normalised to **−11 LUFS** (`lib/replayGain.ts`). A quieter track i
 - **Master Terminal** (`components/Terminal.tsx`, Ctrl/Cmd+K, or ` or : outside fields): type a name to go there, or a command. All commands live in `lib/actions.ts` (the registry); add an `Action` there and it exists in the terminal. `GET /api/atlas/index` feeds name matching (cached 60 s).
 - **Operator** (`lib/operator.ts`): the one voice for the site's small notices.
 - Not done yet (planned next): real View Transitions (the app uses `BrowserRouter`, which has no `viewTransition`; needs a data-router migration), GUI-action → command hints, terminal on/off setting, `play` command.
+
+## fix282: contributor-point rewards, resource previews, points page
+
+**Rewards sit on the existing ledger** (`ContributorPointsEntry`); no new currency.
+- `Reward` (title, cost, optional `itemId` of a paid resource, `perUser`, `stock`, `active`) and `RewardClaim` (status pending → fulfilled | refunded).
+- A reward linked to a paid resource unlocks it at once (`ResourceUnlock.via = "points"`). Others go to the admin queue (`/admin/rewards`).
+- Claim runs in one transaction under `pg_advisory_xact_lock(userId)` (no double spend); stock is decremented with `updateMany ... stock > 0`.
+- Refund adds a +cost ledger entry, restores stock and removes the points-based unlock.
+- Rewards are opt-in: an admin creates one per resource (redeeming points costs the artist a donation). A reward with claims cannot be deleted, only switched off.
+- Admin can also gift a resource to a member (`POST /api/admin/resources/:id/grant`, `via = "gift"`). All admin writes are audit-logged.
+
+**Previews** are supplied by the author (audio ≤ 20 MB, or an https link) and play with the same `SamplePlay` button as the Contribute page. No auto-generation.
+- `SampleBankItem.previewUrl` / `previewAttachmentId`; `POST/DELETE /api/sample-bank/:id/preview` (owner or admin).
+- A resource can only be marked paid with a preview or at least one picture (`previewProblem`).
+- Previews are public by design.
+
+**Members** now see their balance, history and claims at `/rewards`. Terminal: `go rewards`, `admin rewards`.
+
+**Known limits:** paid files are still protected by URL secrecy only (signed short-lived links are planned). Earning is manual (admin awards, accepted submissions) until the hypothesis basket. No generic entitlements table yet; it comes with the ARG keys.
+
+Tests: `backend/_scratch/rewards.test.ts`, `frontend/_scratch/e2e_fix282.py` (21 checks).

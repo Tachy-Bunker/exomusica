@@ -47,6 +47,8 @@ import { AllTracksAdminPage } from "./pages/admin/AllTracksAdminPage";
 import { StudiesAdminPage } from "./pages/admin/StudiesAdminPage";
 import { ResourcesAdminPage } from "./pages/admin/ResourcesAdminPage";
 import { FeaturedAdminPage } from "./pages/admin/FeaturedAdminPage";
+import { RewardsAdminPage } from "./pages/admin/RewardsAdminPage";
+import { RewardsPage } from "./pages/RewardsPage";
 import { BranchContributeAdminPage } from "./pages/admin/BranchContributeAdminPage";
 import { SubmissionsAdminPage } from "./pages/admin/SubmissionsAdminPage";
 import { ContributorPointsAdminPage } from "./pages/admin/ContributorPointsAdminPage";
@@ -141,6 +143,7 @@ export default function App() {
             <Route path="pms" element={<PMsPage />} />
             <Route path="pms/:username" element={<PMsPage />} />
             <Route path="account" element={<AccountSettingsPage />} />
+            <Route path="rewards" element={<RewardsPage />} />
 
             <Route path="admin" element={<RequireAdmin />}>
               <Route element={<AdminLayout />}>
@@ -155,6 +158,7 @@ export default function App() {
                 <Route path="studies" element={<StudiesAdminPage />} />
                 <Route path="resources" element={<ResourcesAdminPage />} />
                 <Route path="featured" element={<FeaturedAdminPage />} />
+                <Route path="rewards" element={<RewardsAdminPage />} />
                 <Route path="branches/:id/contribute" element={<BranchContributeAdminPage />} />
                 <Route path="branches/:id/identity" element={<BranchIdentityAdminPage />} />
                 <Route path="submissions" element={<SubmissionsAdminPage />} />

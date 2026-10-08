@@ -1,0 +1,18 @@
+import { balanceOf, claimProblem, cleanReward, previewProblem, isPreviewLink } from "../src/lib/rewards.js";
+let fails = 0;
+const ok = (c: boolean, m: string) => { console.log((c ? "ok   " : "FAIL ") + m); if (!c) fails++; };
+const R = { active: true, cost: 100, stock: null, perUser: 1 };
+ok(balanceOf([{ points: 50 }, { points: -20 }, { points: 10 }]) === 40 && balanceOf([]) === 0, "balance adds earnings and spending");
+ok(claimProblem(R, 100, 0) === null, "claim: exactly enough is enough");
+ok(claimProblem(R, 99, 0)!.includes("1 more"), "claim: says how many more points");
+ok(claimProblem({ ...R, active: false }, 999, 0) !== null, "claim: inactive");
+ok(claimProblem({ ...R, stock: 0 }, 999, 0)!.includes("run out") && claimProblem({ ...R, stock: 1 }, 999, 0) === null, "claim: stock");
+ok(claimProblem(R, 999, 1)!.includes("already") && claimProblem({ ...R, perUser: 3 }, 999, 2) === null && claimProblem({ ...R, perUser: 3 }, 999, 3) !== null, "claim: per member limit");
+ok(claimProblem(R, -50, 0)!.includes("have 0"), "claim: a negative balance reads as 0");
+const c = cleanReward({ title: " Early access ", cost: "250", perUser: 2, stock: "" });
+ok(c.ok && c.data.title === "Early access" && c.data.cost === 250 && c.data.stock === null && c.data.perUser === 2, "reward: cleaned values");
+ok(!cleanReward({ title: "", cost: 5 }).ok && !cleanReward({ title: "x", cost: 0 }).ok && !cleanReward({ title: "x", cost: 1.5 }).ok && !cleanReward({ title: "x", cost: 5, stock: -1 }).ok, "reward: rejects empty title, bad cost, negative stock");
+ok(cleanReward({ cost: 10 }, true).ok && !cleanReward({ cost: 0 }, true).ok, "reward: partial edit");
+ok(previewProblem({ previewUrl: null, imageUrls: [] }) !== null && previewProblem({ previewUrl: "/uploads/x.mp3", imageUrls: [] }) === null && previewProblem({ previewUrl: null, imageUrls: ["/uploads/a.png"] }) === null, "paid needs a preview or a picture");
+ok(isPreviewLink("https://example.com/a.mp3") && isPreviewLink("/uploads/sample-bank/x.mp3") && !isPreviewLink("http://example.com/a.mp3") && !isPreviewLink("javascript:alert(1)") && !isPreviewLink("//evil.com/x"), "preview link: https or our uploads only");
+process.exit(fails ? 1 : 0);

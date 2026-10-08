@@ -47,6 +47,9 @@ export function AdminLayout() {
         <NavLink to="/admin/featured" className={({ isActive }) => (isActive ? "active" : "")}>
           Featured
         </NavLink>
+        <NavLink to="/admin/rewards" className={({ isActive }) => (isActive ? "active" : "")}>
+          Rewards
+        </NavLink>
         <NavLink to="/admin/submissions" className={({ isActive }) => (isActive ? "active" : "")}>
           Submissions
         </NavLink>

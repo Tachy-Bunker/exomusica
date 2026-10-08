@@ -91,6 +91,7 @@ model User {
   playlistCollaborations PlaylistCollaborator[]
   sampleBankItems SampleBankItem[]
   resourceUnlocks ResourceUnlock[]
+  rewardClaims RewardClaim[]
   studies         Study[]
   studyRevisions  StudyRevision[] @relation("StudyRevisionAuthor")
   challengeSubmissions ChallengeSubmission[]
@@ -938,8 +939,11 @@ model SampleBankItem {
   ogTitle       String?
   ogDescription String?
   ogImageUrl    String?
+  previewUrl   String?    // a short listen (or a link to one) that the author supplies: shown on the card like the sample on the Contribute page. Public by design.
+  previewAttachmentId Int? // the uploaded preview's file, so it is removed (and the quota given back) with the resource
   coupons      ResourceCoupon[]
   unlocks      ResourceUnlock[]
+  rewards      Reward[]
 }
 
 // A code that opens paid resources: for one resource, or (itemId null) for every paid one. The admin makes them and hands them to the contributing artists.
@@ -966,6 +970,7 @@ model ResourceUnlock {
   item      SampleBankItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
   couponId  Int?
   coupon    ResourceCoupon? @relation(fields: [couponId], references: [id], onDelete: SetNull)
+  via       String   @default("coupon") // how it was opened: coupon, points or gift
   createdAt DateTime @default(now())
 
   @@unique([userId, itemId])
@@ -1067,6 +1072,7 @@ model ContributorPointsEntry {
   awardedById Int?
   awardedBy   User?  @relation("PointsAwardedBy", fields: [awardedById], references: [id], onDelete: SetNull)
   createdAt DateTime @default(now())
+  claim     RewardClaim? // set on the spending entry (negative points) made when a reward was claimed
 }
 
 enum TrackPermission {
@@ -1167,4 +1173,38 @@ model EdgeCount {
 
   @@id([from, to])
   @@index([from, n])
+}
+
+// Something a member can spend contributor points on. A reward linked to a paid resource opens it at once; any other reward (a callsign suffix,
+// early access, a featured slot...) lands in the admin's queue to be fulfilled by hand. The points themselves live in ContributorPointsEntry.
+model Reward {
+  id          Int      @id @default(autoincrement())
+  title       String
+  description String?  @db.Text
+  cost        Int
+  itemId      Int?
+  item        SampleBankItem? @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  perUser     Int      @default(1) // how many times one member may claim it
+  stock       Int?     // how many are left; null = no limit
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  claims      RewardClaim[]
+}
+
+model RewardClaim {
+  id          Int      @id @default(autoincrement())
+  userId      Int
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  rewardId    Int
+  reward      Reward   @relation(fields: [rewardId], references: [id], onDelete: Cascade)
+  cost        Int      // what it cost at the time
+  entryId     Int?     @unique
+  entry       ContributorPointsEntry? @relation(fields: [entryId], references: [id], onDelete: SetNull)
+  status      String   @default("pending") // pending (waiting for the team), fulfilled, refunded
+  note        String?
+  createdAt   DateTime @default(now())
+  fulfilledAt DateTime?
+
+  @@index([userId])
+  @@index([status])
 }

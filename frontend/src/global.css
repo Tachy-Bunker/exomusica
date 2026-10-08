@@ -5438,3 +5438,15 @@ th {
 .term-in input { flex: 1; background: transparent; border: 0; outline: 0; color: var(--text); font: inherit; font-size: 1rem; padding: 0; box-shadow: none; }
 .term-foot { padding: 0.25rem 0.8rem 0.45rem; color: var(--text-dim); font-size: 0.7rem; }
 @media (max-width: 899px) { .term-backdrop { padding-top: 4vh; } .term-foot { display: none; } }
+
+/* ===== fix282: rewards, previews ===== */
+.rewards-balance { font-size: 1.1rem; margin: 0.2rem 0 1rem; } .rewards-balance b { font-size: 2.2rem; color: var(--accent-audio); font-variant-numeric: tabular-nums; }
+.rewards-list { list-style: none; padding: 0; margin: 0 0 1.2rem; display: grid; gap: 0.7rem; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); }
+.reward-card { padding: 0.8rem 0.9rem; border: 1px solid var(--border); border-radius: var(--radius); background: var(--bg-inset); display: flex; flex-direction: column; gap: 0.4rem; }
+.reward-head { display: flex; align-items: baseline; justify-content: space-between; gap: 0.6rem; } .reward-cost { font-family: ui-monospace, Menlo, Consolas, monospace; color: var(--accent-audio); white-space: nowrap; }
+.reward-foot { margin-top: auto; display: flex; align-items: center; justify-content: space-between; gap: 0.6rem; }
+.reward-card p { margin: 0; font-size: 0.86rem; }
+.rewards-ledger { list-style: none; padding: 0; margin: 0 0 1rem; display: flex; flex-direction: column; gap: 0.3rem; font-size: 0.9rem; }
+.pts { display: inline-block; min-width: 3.4rem; font-variant-numeric: tabular-nums; color: var(--accent-audio); } .pts.neg { color: var(--text-dim); }
+.reward-admin.off { opacity: 0.55; }
+.res-preview { margin: 0.3rem 0 0.2rem; } .res-points { align-items: center; margin-top: 0.4rem; } .res-preview-edit { margin-top: 0.5rem; display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: flex-start; } .res-preview-edit .xl-form { flex-basis: 100%; }

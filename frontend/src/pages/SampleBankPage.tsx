@@ -3,6 +3,8 @@ import { api } from "../lib/api";
 import { setPendingAnalysis } from "../lib/analyzerHandoff";
 import { useAuth } from "../lib/auth";
 import { Username } from "../components/Username";
+import { SamplePlay } from "../components/SamplePlay";
+import { Link } from "react-router-dom";
 
 interface SampleItem {
   id: number;
@@ -17,6 +19,8 @@ interface SampleItem {
   price?: string | null;
   payNote?: string | null;
   paypalUrl?: string | null;
+  previewUrl?: string | null;
+  pointsReward?: { id: number; cost: number; stock: number | null } | null;
   owner: string;
   cover?: string | null;
   gallery?: string[];
@@ -27,7 +31,7 @@ interface SampleItem {
 const DEFAULT_DONATE = "https://paypal.me/tachybunker";
 
 /** The unlock box of a paid resource: how to pay, then the code the artist (or the team) hands out. */
-function UnlockBox({ item, onUnlocked }: { item: SampleItem; onUnlocked: (fileUrl: string) => void }) {
+function UnlockBox({ item, balance, signedIn, onUnlocked, onSpent }: { item: SampleItem; balance: number | null; signedIn: boolean; onUnlocked: (fileUrl: string) => void; onSpent: (balance: number) => void }) {
   const [code, setCode] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -39,6 +43,17 @@ function UnlockBox({ item, onUnlocked }: { item: SampleItem; onUnlocked: (fileUr
       onUnlocked(r.fileUrl);
     } catch (e) { setError(e instanceof Error ? e.message : "That code didn't work."); } finally { setBusy(false); }
   }
+  async function spend() {
+    if (!item.pointsReward) return;
+    setBusy(true); setError(null);
+    try {
+      const r = await api<{ fileUrl: string | null; balance: number }>(`/api/rewards/${item.pointsReward.id}/claim`, { method: "POST" });
+      onSpent(r.balance);
+      if (r.fileUrl) onUnlocked(r.fileUrl);
+    } catch (e) { setError(e instanceof Error ? e.message : "Couldn't use your points."); } finally { setBusy(false); }
+  }
+  const pr = item.pointsReward;
+  const short = pr && balance !== null ? pr.cost - balance : 0;
   return (
     <div className="res-unlock" data-testid="res-unlock">
       <p className="home-dim res-pay-note">{item.payNote?.trim() || `This resource is paid${item.price ? ` (${item.price})` : ""}. Support its artist with a PayPal donation, then enter the code you are given.`}</p>
@@ -47,7 +62,54 @@ function UnlockBox({ item, onUnlocked }: { item: SampleItem; onUnlocked: (fileUr
         <input value={code} onChange={(e) => setCode(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") void redeem(); }} placeholder="Have a code?" aria-label={`Code for ${item.title}`} autoComplete="off" spellCheck={false} style={{ flex: "1 1 120px", minWidth: 0 }} data-testid="res-code" />
         <button className="btn btn-primary" disabled={busy || !code.trim()} onClick={() => void redeem()} data-testid="res-redeem">Unlock</button>
       </div>
+      {pr && (
+        <div className="xl-form-row res-points" data-testid="res-points">
+          {signedIn ? (
+            <>
+              <button className="btn" disabled={busy || short > 0} onClick={() => void spend()} data-testid="res-spend">Unlock with {pr.cost} points</button>
+              <span className="home-dim">{balance === null ? "" : short > 0 ? `you have ${balance}: ${short} more to go` : `you have ${balance}`} · <Link to="/rewards">your points</Link></span>
+            </>
+          ) : <span className="home-dim">Contributors can unlock this with {pr.cost} points. <Link to="/login">Log in</Link></span>}
+        </div>
+      )}
       {error && <p className="an-err" role="alert">{error}</p>}
+    </div>
+  );
+}
+
+/** The author's own control for a resource's preview: add or replace it (an audio file or a link), or take it away. */
+function PreviewEditor({ item, onChanged }: { item: SampleItem; onChanged: (previewUrl: string | null) => void }) {
+  const [open, setOpen] = useState(false);
+  const [link, setLink] = useState("");
+  const [msg, setMsg] = useState<string | null>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
+  async function save() {
+    const file = fileRef.current?.files?.[0];
+    if (!file && !link.trim()) { setMsg("Choose an audio file or paste a link."); return; }
+    const fd = new FormData();
+    if (file) fd.append("preview", file); else fd.append("link", link.trim());
+    setMsg(null);
+    try {
+      const r = await api<{ previewUrl: string | null }>(`/api/sample-bank/${item.id}/preview`, { method: "POST", body: fd });
+      onChanged(r.previewUrl); setOpen(false); setLink(""); if (fileRef.current) fileRef.current.value = "";
+    } catch (e) { setMsg(e instanceof Error ? e.message : "Couldn't save the preview"); }
+  }
+  async function remove() {
+    setMsg(null);
+    try { await api(`/api/sample-bank/${item.id}/preview`, { method: "DELETE" }); onChanged(null); } catch (e) { setMsg(e instanceof Error ? e.message : "Couldn't remove it"); }
+  }
+  return (
+    <div className="res-preview-edit" data-testid="preview-editor">
+      <button className="btn" onClick={() => setOpen((v) => !v)} aria-expanded={open}>{item.previewUrl ? "Change preview" : "Add a preview"}</button>
+      {item.previewUrl && <button className="btn" onClick={() => void remove()}>Remove preview</button>}
+      {open && (
+        <div className="xl-form" style={{ marginTop: "0.5rem" }}>
+          <label className="xl-file"><span className="home-dim">A short audio preview</span><input ref={fileRef} type="file" accept="audio/*" aria-label="Preview audio file" data-testid="preview-file" /></label>
+          <input placeholder="…or a link to one (https://…)" value={link} onChange={(e) => setLink(e.target.value)} aria-label="Preview link" data-testid="preview-link" />
+          <div className="xl-form-row"><button className="btn btn-primary" onClick={() => void save()} data-testid="preview-save">Save preview</button></div>
+        </div>
+      )}
+      {msg && <p className="an-err" role="alert">{msg}</p>}
     </div>
   );
 }
@@ -67,10 +129,19 @@ export function SamplesPanel({ onAnalyze, focusId = null }: { onAnalyze: () => v
   const [error, setError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<number | null>(null);
   const [copied, setCopied] = useState<number | null>(null);
+  const [balance, setBalance] = useState<number | null>(null);
+  const [previewFile, setPreviewFile] = useState<string>("");
+  const previewRef = useRef<HTMLInputElement>(null);
+  const [previewLink, setPreviewLink] = useState("");
   useEffect(() => { // a linked resource (/resource/12) is brought into view
     if (focusId === null || !items) return;
     document.getElementById(`resource-${focusId}`)?.scrollIntoView({ block: "center" });
   }, [focusId, items === null]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { // contributor points are only fetched when something here can be bought with them
+    if (!user || !(items ?? []).some((i) => i.locked && i.pointsReward)) return;
+    api<{ balance: number }>("/api/account/points").then((r) => setBalance(r.balance)).catch(() => {});
+  }, [user, items === null]); // eslint-disable-line react-hooks/exhaustive-deps
+  const setPreview = (id: number, previewUrl: string | null) => setItems((list) => (list ?? []).map((i) => (i.id === id ? { ...i, previewUrl } : i)));
   const unlock = (id: number, fileUrl: string) => setItems((list) => (list ?? []).map((i) => (i.id === id ? { ...i, fileUrl, locked: false } : i)));
   async function copyLink(id: number) {
     try { await navigator.clipboard.writeText(`${window.location.origin}/resource/${id}`); setCopied(id); window.setTimeout(() => setCopied((c) => (c === id ? null : c)), 1800); } catch { /* the link is also the address of the card */ }
@@ -97,10 +168,13 @@ export function SamplesPanel({ onAnalyze, focusId = null }: { onAnalyze: () => v
     const cover = coverInputRef.current?.files?.[0];
     if (cover) formData.append("cover", cover);
     for (const g of Array.from(galleryInputRef.current?.files ?? []).slice(0, 3)) formData.append("gallery", g);
+    const prev = previewRef.current?.files?.[0];
+    if (prev) formData.append("preview", prev); else if (previewLink.trim()) formData.append("previewLink", previewLink.trim());
     try {
       await api("/api/sample-bank", { method: "POST", body: formData });
       setTitle(""); setDescription(""); setTags("");
-      for (const r of [fileInputRef, coverInputRef, galleryInputRef]) if (r.current) r.current.value = "";
+      for (const r of [fileInputRef, coverInputRef, galleryInputRef, previewRef]) if (r.current) r.current.value = "";
+      setPreviewLink(""); setPreviewFile("");
       setAdding(false);
       load();
     } catch (err) {
@@ -142,6 +216,8 @@ export function SamplesPanel({ onAnalyze, focusId = null }: { onAnalyze: () => v
           <input placeholder="Description (optional)" value={description} onChange={(e) => setDescription(e.target.value)} aria-label="Description" />
           <input placeholder="Tags, comma separated (field-recording, water, granular)" value={tags} onChange={(e) => setTags(e.target.value)} aria-label="Tags" />
           <label className="xl-file"><span className="home-dim">The file</span><input ref={fileInputRef} type="file" aria-label="Resource file" /></label>
+          <label className="xl-file"><span className="home-dim">A short audio preview (optional; people hear it before they have the file)</span><input ref={previewRef} type="file" accept="audio/*" aria-label="Preview audio" data-testid="resource-preview" onChange={(e) => setPreviewFile(e.target.files?.[0]?.name ?? "")} /></label>
+          {!previewFile && <input placeholder="…or a link to a preview (https://…)" value={previewLink} onChange={(e) => setPreviewLink(e.target.value)} aria-label="Preview link" />}
           <label className="xl-file"><span className="home-dim">Cover image (optional)</span><input ref={coverInputRef} type="file" accept="image/*" aria-label="Cover image" data-testid="resource-cover" /></label>
           <label className="xl-file"><span className="home-dim">Gallery, up to 3 images (optional)</span><input ref={galleryInputRef} type="file" accept="image/*" multiple aria-label="Gallery images" data-testid="resource-gallery" onChange={(e) => { if (e.target.files && e.target.files.length > 3) { setError("A gallery holds up to 3 images: only the first 3 will be added."); } }} /></label>
           <div className="xl-form-row"><button className="btn btn-primary" onClick={upload}>Upload</button></div>
@@ -169,9 +245,11 @@ export function SamplesPanel({ onAnalyze, focusId = null }: { onAnalyze: () => v
               </div>
               {item.description && <p className="xl-card-text">{item.description}</p>}
               {item.gallery && item.gallery.length > 0 && <div className="xl-thumbs">{item.gallery.map((g) => <a key={g} href={g} target="_blank" rel="noreferrer"><img src={g} alt="" loading="lazy" /></a>)}</div>}
+              {item.previewUrl && (item.locked || item.kind !== "AUDIO") && <div className="res-preview"><SamplePlay sample={{ kind: "attachment", url: item.previewUrl, title: `Preview: ${item.title}`, origin: null }} branchSlug="" /></div>}
               {item.kind === "AUDIO" && item.fileUrl && <audio controls preload="none" src={item.fileUrl} className="xl-audio" aria-label={`Preview ${item.title}`} />}
               {item.tags.length > 0 && <div className="xl-chips">{item.tags.map((t) => <button key={t} className="xl-chip" onClick={() => setTagFilter(t)}>{t}</button>)}</div>}
-              {item.locked && <UnlockBox item={item} onUnlocked={(url) => unlock(item.id, url)} />}
+              {item.locked && <UnlockBox item={item} balance={balance} signedIn={!!user} onUnlocked={(url) => unlock(item.id, url)} onSpent={setBalance} />}
+              {user && (user.username === item.owner || user.isAdmin) && <PreviewEditor item={item} onChanged={(u) => setPreview(item.id, u)} />}
               <div className="xl-card-actions">
                 {item.fileUrl && <a className="btn" href={item.fileUrl} download={item.filename}>Download</a>}
                 {item.kind === "AUDIO" && item.fileUrl && <button className="btn" disabled={busyId === item.id} onClick={() => analyze(item)}>{busyId === item.id ? "Loading…" : "Analyze"}</button>}
