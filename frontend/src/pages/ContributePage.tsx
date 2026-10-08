@@ -20,8 +20,8 @@ const FILTERS: { id: BranchFilter; label: string }[] = [
 ];
 const SORTS: { id: BranchSort; label: string }[] = [{ id: "az", label: "A to Z" }, { id: "material", label: "Most to start from" }];
 
-export function ContributePage() {
-  useDocumentTitle("Contribute");
+export function ContributePage({ embedded = false }: { embedded?: boolean } = {}) {
+  useDocumentTitle(embedded ? "XenoLab" : "Contribute");
   const { user } = useAuth();
   const navigate = useNavigate();
   const isDesktop = useIsDesktop();
@@ -118,7 +118,7 @@ export function ContributePage() {
 
   return (
     <div className="page-column" style={{ maxWidth: 1000 }} data-testid="contribute-page">
-      <h1>Contribute</h1>
+      {!embedded && <h1>Contribute</h1>}
       <p className="home-lede" style={{ marginBottom: "0.6rem" }}>Pick a branch, make something for it, and send it in. A person on the team listens and decides whether it joins the branch.</p>
       <ContributeTimeline activeStep={activeStep} onStepChange={setActiveStep} />
 

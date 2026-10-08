@@ -1,3 +1,5 @@
+import { PlayGlow } from "./PlayGlow";
+import { BranchStudies } from "./BranchStudies";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../lib/api";
@@ -215,7 +217,7 @@ export function HomeExplore({ branches, openFull = false, initialSlug = null }: 
               </p>
               <div className="explore-actions">
                 <button type="button" className="btn icon-btn" onClick={shuffleNow} aria-label="Pick another branch at random" title="Shuffle branches" data-testid="explore-shuffle"><ShuffleIcon size={18} /></button>
-                <button type="button" className="btn btn-primary icon-btn" onClick={playBranch} disabled={playing} aria-label={`Play a shuffle of ${current.name}`} title={`Play a shuffle of ${current.name}`} data-testid="explore-play"><PlayIcon size={18} /></button>
+                <PlayGlow><button type="button" className="btn btn-primary icon-btn" onClick={playBranch} disabled={playing} aria-label={`Play a shuffle of ${current.name}`} title={`Play a shuffle of ${current.name}`} data-testid="explore-play"><PlayIcon size={18} /></button></PlayGlow>
               </div>
             </article>
           )}
@@ -232,6 +234,7 @@ export function HomeExplore({ branches, openFull = false, initialSlug = null }: 
             ))}
           </ul>
         )}
+        {current && <BranchStudies studies={current.studies ?? []} />}
       </div>
 
       {full && (

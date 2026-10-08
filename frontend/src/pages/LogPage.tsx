@@ -132,7 +132,7 @@ export function LogPage() {
                   <span className="log-chev log-chev-none" aria-hidden="true" />
                 )}
                 <Link to={r.to} aria-current={current ? "page" : undefined}>{r.label}</Link>
-                {r.kind === "studies" && <span className="home-dim log-hint"> Documented experiments</span>}
+                {r.kind === "studies" && <span className="home-dim log-hint"> <Link to="/xenolab" data-testid="log-xenolab-link">from XenoLab</Link></span>}
                 {r.kind === "news-folder" && posts && <span className="home-dim log-hint"> {posts.length}</span>}
               </li>
             );

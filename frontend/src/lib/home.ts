@@ -19,6 +19,7 @@ export interface HomeBranch {
   albums: number;
   tracks: number;
   chatSlug: string | null;
+  studies: { slug: string; title: string; complete: boolean }[]; // studies connected to the branch, newest first
   lastActiveAt: number | null;
 }
 export interface HomeActivity {

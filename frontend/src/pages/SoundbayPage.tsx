@@ -1,3 +1,5 @@
+import { PlayGlow } from "../components/PlayGlow";
+import { BranchStudies } from "../components/BranchStudies";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { AlbumIcon, ChatIcon, MapIcon } from "../components/ActivityIcons";
@@ -41,6 +43,8 @@ function useCurrentSection(ids: string[]): string | null {
   return current ?? ids[0] ?? null; // before any scrolling, the first section is where you are
 }
 
+let queueToken = 0; // bumped whenever an album is started, so a slower earlier one never adds its albums after a later choice
+
 function BranchRow({ b, open, onToggle, playing }: { b: HomeBranch; open: boolean; onToggle: () => void; playing: boolean }) {
   const navigate = useNavigate();
   const isDesktop = useIsDesktop();
@@ -62,6 +66,7 @@ function BranchRow({ b, open, onToggle, playing }: { b: HomeBranch; open: boolea
   const discuss = () => { if (!b.chatSlug) return; if (isDesktop) openChat(b.chatSlug, b.name, b.slug); else navigate(`/branch/${b.slug}`); }; // a phone has no dock: the branch page is where its chat lives
   async function start(key: string, url: string, pick: (r: unknown) => PlayableTrackDTO[]) {
     if (busy) return;
+    queueToken++; // whatever album was lining up its neighbours is no longer the plan
     setBusy(key);
     try {
       const tracks = pick(await api<unknown>(url));
@@ -73,7 +78,21 @@ function BranchRow({ b, open, onToggle, playing }: { b: HomeBranch; open: boolea
     } finally { setBusy(null); }
   }
   const shuffle = () => start("shuffle", `/api/branches/${b.slug}/tracks/shuffle`, (r) => r as PlayableTrackDTO[]);
-  const playAlbum = (slug: string) => start(slug, `/api/albums/${slug}`, (r) => (r as { tracks: PlayableTrackDTO[] }).tracks);
+  // Playing an album also lines up the branch's other albums behind it (the ones after it first, then the ones before), so the music carries on in context.
+  const playAlbum = async (slug: string) => {
+    await start(slug, `/api/albums/${slug}`, (r) => (r as { tracks: PlayableTrackDTO[] }).tracks);
+    const list = albums ?? [];
+    const at = list.findIndex((a) => a.slug === slug);
+    const others = [...list.slice(at + 1), ...list.slice(0, Math.max(0, at))].filter((a) => (a.trackCount ?? 0) > 0);
+    const token = ++queueToken;
+    for (const a of others) {
+      try {
+        const detail = await api<{ tracks: PlayableTrackDTO[] }>(`/api/albums/${a.slug}`);
+        if (token !== queueToken || useAudioStore.getState().currentTrack?.branchSlug !== b.slug) return; // something else was started meanwhile
+        useAudioStore.getState().addToQueue(detail.tracks);
+      } catch { /* an album that can't be fetched is simply left out */ }
+    }
+  };
 
   // Pictures not already shown another way: album covers are in the album list, the main image is the logo, the secondary one is a background.
   const gallery = (pictures ?? []).filter((p) => p.kind !== "album-cover" && p.url !== b.image && p.url !== b.secondaryImage).slice(0, 3);
@@ -93,7 +112,8 @@ function BranchRow({ b, open, onToggle, playing }: { b: HomeBranch; open: boolea
           <p className="sb-row-meta">{b.albums} album{b.albums === 1 ? "" : "s"} · {b.tracks} track{b.tracks === 1 ? "" : "s"}<span className="sb-active">{b.lastActiveAt ? ` · active ${timeAgo(b.lastActiveAt)}` : " · no activity yet"}</span></p>
         </div>
         <div className="sb-actions">
-          <button type="button" className="sb-act sb-play" onClick={shuffle} disabled={busy !== null || b.tracks === 0} aria-label={`Play a shuffle of ${b.name}`} title="Play shuffle" data-testid="row-play"><PlayIcon size={13} /></button>
+          {/* No albums: nothing to play, so no button. Open with albums: the albums below are the way in, so the shuffle fades out (and comes back when closed). */}
+          {b.albums > 0 && <PlayGlow when="hover" hostSelector=".sb-row" active={!open}><button type="button" className={`sb-act sb-play${open ? " sb-play-faded" : ""}`} onClick={shuffle} disabled={busy !== null || b.tracks === 0} tabIndex={open ? -1 : undefined} aria-hidden={open ? true : undefined} aria-label={`Play a shuffle of ${b.name}`} title="Play shuffle" data-testid="row-play"><PlayIcon size={13} /></button></PlayGlow>}
           {b.chatSlug && <button type="button" className="sb-act sb-extra" onClick={discuss} data-testid="row-discuss"><ChatIcon size={13} /> Discussion</button>}
           <Link className="sb-act sb-extra" to={`/?branch=${b.slug}`} data-testid="row-map"><MapIcon size={13} /> Map</Link>
         </div>
@@ -120,6 +140,7 @@ function BranchRow({ b, open, onToggle, playing }: { b: HomeBranch; open: boolea
                 ))}
               </ul>
             )}
+            <BranchStudies studies={b.studies ?? []} />
           </div>
           {gallery.length > 0 && (
             <ul className="sb-gallery" aria-label={`Pictures from ${b.name}`} data-testid="branch-gallery">
@@ -251,7 +272,7 @@ export function SoundbayPage() {
           <button type="button" className="btn icon-btn title-btn" onClick={copyLink} aria-label="Copy a link to this view" title="Copy a link to this view: the branches that are open, the search and the filter are all in it" data-testid="copy-link">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M10 13a5 5 0 0 0 7.07 0l3-3a5 5 0 0 0-7.07-7.07l-1.7 1.7" /><path d="M14 11a5 5 0 0 0-7.07 0l-3 3a5 5 0 0 0 7.07 7.07l1.7-1.7" /></svg>
           </button>
-          <button type="button" className="btn btn-primary icon-btn title-btn" onClick={shuffleAll} disabled={busy} aria-label="Shuffle everything" title="Shuffle everything" data-testid="shuffle-all"><PlayIcon size={18} /></button>
+          <PlayGlow active={!isPlaying}><button type="button" className="btn btn-primary icon-btn title-btn" onClick={shuffleAll} disabled={busy} aria-label="Shuffle everything" title="Shuffle everything" data-testid="shuffle-all"><PlayIcon size={18} /></button></PlayGlow>
           <Link className="btn title-btn" to="/?map=full" data-testid="open-map"><MapIcon size={15} /> Explore the map</Link>
         </div>
       </header>

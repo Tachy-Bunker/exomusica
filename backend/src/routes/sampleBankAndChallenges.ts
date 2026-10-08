@@ -1,7 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import { prisma } from "../lib/prisma.js";
 import { requireAuth, requireAdmin } from "../lib/auth.js";
-import { saveSampleBankFile } from "../lib/storage.js";
+import { deleteAttachmentAndReclaim, saveCommunityAlbumCover, saveSampleBankFile } from "../lib/storage.js";
 
 function kindFromMime(mimeType: string): "AUDIO" | "PATCH" | "SCRIPT" | "OTHER" {
   if (mimeType.startsWith("audio/")) return "AUDIO";
@@ -28,34 +28,47 @@ export async function sampleBankAndChallengesRoutes(app: FastifyInstance): Promi
       fileUrl: i.attachment.storagePath,
       filename: i.attachment.filename,
       owner: i.owner.username,
+      cover: i.imageUrls[0] ?? null,
+      gallery: i.imageUrls.slice(1),
       createdAt: i.createdAt,
     }));
   });
 
   app.post("/api/sample-bank", { preHandler: requireAuth }, async (req, reply) => {
-    const file = await req.file();
-    if (!file) return reply.code(400).send({ error: "no file uploaded" });
-    const titleField = file.fields.title;
-    const title = titleField && "value" in titleField ? String(titleField.value) : null;
-    const descField = file.fields.description;
-    const description = descField && "value" in descField ? String(descField.value) : null;
-    const tagsField = file.fields.tags;
-    const tagsRaw = tagsField && "value" in tagsField ? String(tagsField.value) : "";
-    const tags = tagsRaw
-      .split(",")
-      .map((t) => t.trim().toLowerCase())
-      .filter(Boolean);
+    // Fields and files arrive in any order: the sound itself ("file"), an optional "cover" image and up to three "gallery" images.
+    const fields: Record<string, string> = {};
+    let sound: { filename: string; mimetype: string; buffer: Buffer } | null = null;
+    let cover: { filename: string; mimetype: string; buffer: Buffer } | null = null;
+    const gallery: { filename: string; mimetype: string; buffer: Buffer }[] = [];
+    for await (const part of req.parts()) {
+      if (part.type === "field") { fields[part.fieldname] = String(part.value ?? ""); continue; }
+      const buffer = await part.toBuffer();
+      const entry = { filename: part.filename, mimetype: part.mimetype, buffer };
+      if (part.fieldname === "file") sound = entry;
+      else if (part.fieldname === "cover") cover = entry;
+      else if (part.fieldname === "gallery") { if (gallery.length < 3) gallery.push(entry); }
+    }
+    if (!sound) return reply.code(400).send({ error: "no file uploaded" });
+    const title = fields.title?.trim();
     if (!title) return reply.code(400).send({ error: "title is required" });
+    const description = fields.description?.trim() || null;
+    const tags = (fields.tags ?? "").split(",").map((t) => t.trim().toLowerCase()).filter(Boolean);
 
-    const buffer = await file.toBuffer();
+    const savedImages: { id: number; url: string }[] = [];
     let attachment;
     try {
-      attachment = await saveSampleBankFile(req.user!.id, file.filename, file.mimetype, buffer);
+      attachment = await saveSampleBankFile(req.user!.id, sound.filename, sound.mimetype, sound.buffer);
+      for (const img of [...(cover ? [cover] : []), ...gallery]) {
+        const a = await saveCommunityAlbumCover(req.user!.id, img.filename, img.mimetype, img.buffer);
+        savedImages.push({ id: a.id, url: a.storagePath });
+      }
     } catch (err) {
+      for (const img of savedImages) await deleteAttachmentAndReclaim(img.id).catch(() => {});
+      if (attachment) await deleteAttachmentAndReclaim(attachment.id).catch(() => {});
       return reply.code(400).send({ error: err instanceof Error ? err.message : "upload failed" });
     }
     const item = await prisma.sampleBankItem.create({
-      data: { ownerId: req.user!.id, title, description, tags, kind: kindFromMime(file.mimetype), attachmentId: attachment.id },
+      data: { ownerId: req.user!.id, title, description, tags, kind: kindFromMime(sound.mimetype), attachmentId: attachment.id, imageUrls: savedImages.map((i) => i.url), imageAttachmentIds: savedImages.map((i) => i.id) },
     });
     return reply.code(201).send(item);
   });
@@ -65,6 +78,7 @@ export async function sampleBankAndChallengesRoutes(app: FastifyInstance): Promi
     if (!item) return reply.code(404).send({ error: "no such item" });
     if (item.ownerId !== req.user!.id) return reply.code(403).send({ error: "not yours" });
     await prisma.sampleBankItem.delete({ where: { id: item.id } });
+    for (const id of item.imageAttachmentIds) await deleteAttachmentAndReclaim(id).catch(() => {});
     return { status: "ok" };
   });
 

@@ -1,9 +1,10 @@
 import type { FastifyInstance } from "fastify";
 import { prisma } from "../lib/prisma.js";
-import { CONVERSATION_STATS_SQL, CONVERSATION_TRACE_SQL, MEMBER_LIST_SQL, RECENT_MESSAGES_SQL } from "../lib/conversationSql.js";
+import { CONVERSATION_STATS_SQL, CONVERSATION_TRACE_SQL, MEMBER_LIST_SQL, MEMBER_STATS_SQL, RECENT_MESSAGES_SQL } from "../lib/conversationSql.js";
 import { buildTraces, shapeConversation, shapeRecent, sumTraces, type Conversation, type RecentRow, type StatsRow, type TraceRow } from "../lib/conversations.js";
 import { shapeMember, type Member, type MemberRow } from "../lib/members.js";
 import { PUBLIC_CHANNEL_FILTER, isPublicChannel } from "../lib/publicChannels.js";
+import { TRACE_DAYS } from "../lib/conversationSql.js";
 import { ttlCache } from "../lib/ttlCache.js";
 
 const buildConversations = ttlCache(15_000, async () => {
@@ -63,5 +64,22 @@ export async function conversationRoutes(app: FastifyInstance): Promise<void> {
   app.get("/api/members", async (_req, reply) => {
     reply.header("cache-control", "public, max-age=30");
     return buildMembers();
+  });
+  // One member's public footprint: Signals (messages in public chats), a 14-day trace, and the studies they own.
+  app.get<{ Params: { username: string } }>("/api/users/:username/stats", async (req, reply) => {
+    const user = await prisma.user.findUnique({ where: { username: req.params.username }, select: { id: true, isGhost: true, deletedAt: true } });
+    if (!user || user.isGhost || user.deletedAt) return reply.code(404).send({ error: "no such user" });
+    const [rows, studies] = await Promise.all([
+      prisma.$queryRawUnsafe<{ total: number; ago: number | null }[]>(MEMBER_STATS_SQL, user.id),
+      prisma.study.findMany({ where: { ownerId: user.id }, orderBy: { updatedAt: "desc" }, take: 50, select: { slug: true, title: true, status: true } }),
+    ]);
+    const trace = new Array<number>(TRACE_DAYS).fill(0);
+    let signals = 0;
+    for (const r of rows) {
+      if (r.ago === null) signals = r.total; // the ROLLUP row
+      else if (r.ago >= 0 && r.ago < TRACE_DAYS) trace[TRACE_DAYS - 1 - r.ago] += r.total;
+    }
+    reply.header("cache-control", "public, max-age=30");
+    return { signals, trace, studies };
   });
 }

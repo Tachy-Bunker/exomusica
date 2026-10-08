@@ -96,3 +96,17 @@ WHERE m."isDeleted" = false AND m."channelId" = ANY($1::int[])
 ORDER BY m."createdAt" DESC, m.id DESC
 LIMIT 14
 `;
+
+/** $1 = user id. One member's messages in chats the public may read, per UTC day (`ago`); the row with a null `ago` is the all-time total. */
+export const MEMBER_STATS_SQL = `
+SELECT x.ago, COUNT(*)::int AS total
+FROM (
+  SELECT ((now() AT TIME ZONE 'UTC')::date - m."createdAt"::date)::int AS ago
+  FROM "Message" m
+  JOIN "ForumChannel" c ON c.id = m."channelId"
+  LEFT JOIN "Branch" b ON b.id = c."branchId"
+  WHERE m."isDeleted" = false AND m."authorId" = $1
+    AND (c."branchId" IS NULL OR b.visibility <> 'HIDDEN')
+) x
+GROUP BY ROLLUP (x.ago)
+`;

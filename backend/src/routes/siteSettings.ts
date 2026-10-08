@@ -21,6 +21,7 @@ export async function siteSettingsRoutes(app: FastifyInstance): Promise<void> {
         textColorSecondary: true,
         chatTitleColor: true,
         usernameColor: true,
+        playHighlightColor: true,
         accentPrimaryColor: true,
         contentTextScaleDesktop: true,
         contentTextScaleMobile: true,
@@ -96,6 +97,7 @@ export async function siteSettingsRoutes(app: FastifyInstance): Promise<void> {
         textColorSecondary: null,
         chatTitleColor: null,
         usernameColor: null,
+        playHighlightColor: null,
         accentPrimaryColor: null,
         contentTextScaleDesktop: 2.0,
         contentTextScaleMobile: 1.6,
@@ -220,6 +222,7 @@ export async function siteSettingsRoutes(app: FastifyInstance): Promise<void> {
       textColorSecondary: string | null;
       chatTitleColor: string | null;
       usernameColor: string | null;
+      playHighlightColor: string | null;
       accentPrimaryColor: string | null;
       contentTextScaleDesktop: number;
       contentTextScaleMobile: number;
@@ -275,6 +278,9 @@ export async function siteSettingsRoutes(app: FastifyInstance): Promise<void> {
     if (body.usernameColor !== undefined && body.usernameColor !== null && !isHexColor(body.usernameColor)) {
       return reply.code(400).send({ error: "usernameColor must be a colour like #e8b86f" });
     }
+    if (body.playHighlightColor !== undefined && body.playHighlightColor !== null && !isHexColor(body.playHighlightColor)) {
+      return reply.code(400).send({ error: "playHighlightColor must be a colour like #8fd8ff" });
+    }
     for (const key of [
       "defaultFontId",
       "defaultWikiPageId",
@@ -282,6 +288,7 @@ export async function siteSettingsRoutes(app: FastifyInstance): Promise<void> {
       "textColorSecondary",
       "chatTitleColor",
       "usernameColor",
+      "playHighlightColor",
       "accentPrimaryColor",
       "contentTextScaleDesktop",
       "contentTextScaleMobile",

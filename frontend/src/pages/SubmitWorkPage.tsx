@@ -112,7 +112,7 @@ export function SubmitWorkPage() {
   if (!branchSlug) {
     return (
       <p>
-        Choose a branch to submit to on the <Link to="/contribute">Contribute</Link> page first.
+        Choose a branch to submit to on the <Link to="/xenolab?tab=contribute">Contribute</Link> tab in XenoLab first.
       </p>
     );
   }

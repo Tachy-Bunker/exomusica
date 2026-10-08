@@ -17,6 +17,7 @@ async function buildHome() {
         channel: { select: { id: true, slug: true } },
         albums: { select: { createdAt: true }, orderBy: { createdAt: "desc" }, take: 1 },
         _count: { select: { albums: true } },
+        studies: { select: { slug: true, title: true, status: true }, orderBy: { updatedAt: "desc" }, take: 4 },
       },
     }),
     prisma.message.findMany({
@@ -73,6 +74,7 @@ async function buildHome() {
     albums: b._count.albums,
     tracks: tracksByBranch.get(b.id) ?? 0,
     chatSlug: b.channel?.slug ?? null,
+    studies: b.studies.map((s) => ({ slug: s.slug, title: s.title, complete: s.status === "COMPLETE" })),
     lastActiveAt: lastActiveAt(b.albums[0]?.createdAt, b.channel ? lastMessageByChannel.get(b.channel.id) : null),
   }));
 

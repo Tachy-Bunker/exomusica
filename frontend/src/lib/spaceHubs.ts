@@ -114,3 +114,26 @@ export function normalizeConversations(d: Record<string, any>): ConversationsDat
     conversations: ((d.conversations ?? []) as Record<string, any>[]).map((c) => ({ studies: [], branch: null, category: null, blurb: "", day: 0, week: 0, voices: 0, total: 0, level: 0, lastAt: null, lastBy: null, lastText: "", ...c, trace: goodTrace(c.trace) })) as unknown as Conversation[],
   };
 }
+
+
+// ---------------------------------------------------------------- the grouped list
+
+export interface ListGroup { key: string; title: string; items: Conversation[] }
+
+/**
+ * The List view: topics under their categories (in the admin's category order), then the branches, the growing seeds, the studies and the questions.
+ * No sorting: inside each group the conversations keep the order they come in.
+ */
+export function groupForList(list: Conversation[], categoryOrder: string[], seedChats: Set<string>): ListGroup[] {
+  const topics = new Map<string, Conversation[]>();
+  for (const c of list) if (c.kind === "topic") (topics.get(c.category ?? "") ?? topics.set(c.category ?? "", []).get(c.category ?? "")!).push(c);
+  const rank = (cat: string) => { const i = categoryOrder.indexOf(cat); return i === -1 ? Number.MAX_SAFE_INTEGER : i; };
+  const cats = [...topics.keys()].sort((a, b) => (a === "" ? 1 : b === "" ? -1 : rank(a) - rank(b))); // stable: categories nobody ordered keep their first-seen order, no category goes last
+  const groups: ListGroup[] = cats.map((c) => ({ key: `topic:${c}`, title: c || "Topics", items: topics.get(c)! }));
+  const branches = list.filter((c) => c.kind === "branch");
+  groups.push({ key: "branches", title: "Branches", items: branches.filter((c) => !seedChats.has(c.slug)) });
+  groups.push({ key: "seeds", title: "Growing seeds", items: branches.filter((c) => seedChats.has(c.slug)) });
+  groups.push({ key: "studies", title: "Studies", items: list.filter((c) => c.kind === "study") });
+  groups.push({ key: "questions", title: "Questions", items: list.filter((c) => c.kind === "question") });
+  return groups.filter((g) => g.items.length > 0);
+}

@@ -64,7 +64,7 @@ model User {
   volumeSfxIdle         Float        @default(0.8) // SFX volume when no music is playing
   volumeSfxPlaying      Float        @default(0.6) // SFX volume while music is playing - ducked so it doesn't compete
   volumeMusic           Float        @default(1.0)
-  caEnabled             Boolean      @default(true)
+  caEnabled             Boolean      @default(false)
   moireEnabled          Boolean      @default(false)
   exclusiveMediaPlayback Boolean     @default(true) // when on, starting any audio/video (main player or chat-embedded) pauses every other one playing
   notifyWeeklySummary   Boolean      @default(true)
@@ -170,6 +170,7 @@ model Branch {
 
   channel ForumChannel?
   albums  Album[]
+  studies Study[] @relation("StudyBranches") // studies connected to this branch (shown in its Explore module and expanded in Soundbay)
 }
 
 // Admin-curated chat attachments ("selected experiments") a contributor
@@ -379,7 +380,7 @@ model Track {
   format          AudioFormat
   durationSeconds Int?
   position        Int         @default(0)
-  replayGainDb    Float? // sitewide loudness normalization - null means not yet analyzed
+  replayGainDb    Float? @map("replay_gain_db_v2") // sitewide loudness normalization (target -11 LUFS, boost limited by peak) - null means not yet analyzed. The column name changed with the target so every track is measured afresh.
   genres          String[] @default([]) // user-assigned, as many as wanted - drives Venn Views placement
   lyrics          String?  @db.Text // also doubles as the constellation scan panel's logbook description
 
@@ -661,6 +662,7 @@ model SiteSettings {
   scanSfxUrl     String? // spacemap text-reveal loop (branch lock-on + F/E/T hint)
   defaultWikiPageId Int?
   defaultWikiPage   WikiPage? @relation(fields: [defaultWikiPageId], references: [id])
+  playHighlightColor String? // glow + drifting firefly on the Play buttons visitors should reach for; null = no highlight
   usernameColor      String? // the colour every username is shown in outside chat (and the link to their page)
   textColorPrimary   String? // overrides --text site-wide
   textColorSecondary String? // overrides --text-dim site-wide
@@ -804,6 +806,7 @@ model Study {
   charts      StudyChart[]
   revisions   StudyRevision[]
   files       Attachment[]      @relation("StudyFiles")
+  branches    Branch[]          @relation("StudyBranches") // none, one or several
 }
 
 // A snapshot of a study's title and body taken on save, so earlier drafts
@@ -911,6 +914,8 @@ model SampleBankItem {
   kind         SampleKind
   attachmentId Int        @unique
   attachment   Attachment @relation(fields: [attachmentId], references: [id])
+  imageUrls    String[]   // the cover image first, then up to 3 gallery images
+  imageAttachmentIds Int[] // their files, so they are removed (and the quota given back) with the resource
   createdAt    DateTime   @default(now())
   mapNode      ForumMapNode?
 }
@@ -1014,7 +1019,7 @@ model CommunityTrack {
   durationSeconds Int?
   position        Int            @default(0)
   permission      TrackPermission @default(LISTEN_ONLY) // creator-set: how others may use this track
-  replayGainDb    Float? // sitewide loudness normalization - null means not yet analyzed
+  replayGainDb    Float? @map("replay_gain_db_v2") // sitewide loudness normalization (target -11 LUFS, boost limited by peak) - null means not yet analyzed. The column name changed with the target so every track is measured afresh.
   lyrics          String? // also acts as a description; shown expandable on the album page and playlist list view
   genres          String[] @default([]) // user-assigned, as many as wanted - drives Venn Views placement
 

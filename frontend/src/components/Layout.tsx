@@ -251,6 +251,7 @@ export function Layout() {
       moireRotationSpeed: number;
       faviconUrl: string | null;
       usernameColor: string | null;
+      playHighlightColor?: string | null;
     }>("/api/site-settings").then((s) => {
       setSiteFont(s.defaultFont);
       useAmbienceStore.getState().setUrl(s.ambienceUrl);
@@ -268,6 +269,7 @@ export function Layout() {
       if (s.textColorSecondary) root.setProperty("--text-dim", s.textColorSecondary);
       if (s.chatTitleColor) root.setProperty("--chat-title-color", s.chatTitleColor);
       if (s.usernameColor) root.setProperty("--username-color", s.usernameColor);
+      useSiteEffectsStore.getState().setEffects({ playHighlightColor: s.playHighlightColor ?? null });
       if (s.accentPrimaryColor) {
         root.setProperty("--accent-forum", s.accentPrimaryColor);
         root.setProperty("--accent-forum-dim", darkenHex(s.accentPrimaryColor, 0.45));

@@ -1,5 +1,5 @@
 import { Suspense, lazy } from "react";
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { ChromaticAberrationLayer } from "./components/ChromaticAberrationLayer";
 import { MoireLayer } from "./components/MoireLayer";
 import { useSiteEffectsStore } from "./lib/siteEffectsStore";
@@ -9,7 +9,6 @@ import { RequireAdmin } from "./components/RequireAdmin";
 import { HomePage } from "./pages/HomePage";
 import { MiniChatWindowPage } from "./pages/MiniChatWindowPage";
 import { SoundbayPage } from "./pages/SoundbayPage";
-import { TelemetryPage } from "./pages/TelemetryPage";
 import { ConversationsPage } from "./pages/ConversationsPage";
 import { MembersPage } from "./pages/MembersPage";
 import { LogPage } from "./pages/LogPage";
@@ -18,7 +17,6 @@ import { EmbedPlaylistPage } from "./pages/EmbedPlaylistPage";
 import { EmbedMainSpacemapPage } from "./pages/EmbedMainSpacemapPage";
 import { LoginPage } from "./pages/LoginPage";
 import { JoinPage } from "./pages/JoinPage";
-import { ContributePage } from "./pages/ContributePage";
 import { ListenPage } from "./pages/ListenPage";
 import { ResearchPage } from "./pages/ResearchPage";
 import { SubmitWorkPage } from "./pages/SubmitWorkPage";
@@ -70,6 +68,12 @@ import { GuideAssetsAdminPage } from "./pages/admin/GuideAssetsAdminPage";
 import { CommunitySpotlightAdminPage } from "./pages/admin/CommunitySpotlightAdminPage";
 import { useIsDesktop } from "./lib/useIsDesktop";
 
+/** The old address of Telemetry: same page, same filters in the address. */
+function ConversationsRedirect() {
+  const loc = useLocation();
+  return <Navigate to={`/telemetry${loc.search}`} replace />;
+}
+
 const VoiceLabPage = lazy(() => import("./pages/VoiceLabPage").then((m) => ({ default: m.VoiceLabPage })));
 
 export default function App() {
@@ -97,13 +101,13 @@ export default function App() {
             <Route path="wiki" element={<LogPage />} />
             <Route path="studies" element={<Navigate to="/xenolab?tab=studies" replace />} />
             <Route path="lab/voice" element={<Suspense fallback={null}><VoiceLabPage /></Suspense>} />
-            <Route path="contribute" element={<ContributePage />} />
+            <Route path="contribute" element={<Navigate to="/xenolab?tab=contribute" replace />} />
             <Route path="listen" element={<ListenPage />} />
               <Route path="xenolab" element={<ResearchPage />} />
               <Route path="research" element={<Navigate to="/xenolab" replace />} />
               <Route path="soundbay" element={<SoundbayPage />} />
-              <Route path="telemetry" element={<TelemetryPage />} />
-              <Route path="conversations" element={<ConversationsPage />} />
+              <Route path="telemetry" element={<ConversationsPage />} />
+              <Route path="conversations" element={<ConversationsRedirect />} />
               <Route path="members" element={<MembersPage />} />
               <Route path="log" element={<Navigate to="/wiki" replace />} />
             <Route path="submit" element={<SubmitWorkPage />} />
@@ -118,8 +122,8 @@ export default function App() {
             <Route path="community-album/:slug" element={<CommunityAlbumPage />} />
             <Route path="cult" element={<CommunityPage />} />
             <Route path="my-music" element={<MyMusicPage />} />
-            <Route path="sample-bank" element={<Navigate to="/xenolab?tab=samples" replace />} />
-            <Route path="challenges" element={<Navigate to="/xenolab?tab=challenges" replace />} />
+            <Route path="sample-bank" element={<Navigate to="/xenolab?tab=resources" replace />} />
+            <Route path="challenges" element={<Navigate to="/xenolab?tab=open" replace />} />
             <Route path="playlist/:slug" element={<PlaylistSpaceMapPage />} />
             <Route path="playlist/:slug/list" element={<PlaylistPage />} />
             <Route path="collaborator/:slug" element={<CollaboratorPage />} />

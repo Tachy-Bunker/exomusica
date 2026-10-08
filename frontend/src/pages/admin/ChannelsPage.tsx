@@ -25,7 +25,64 @@ interface Font {
   name: string;
 }
 
+interface BackupPreview { slug: string; name: string; messages: number; exists: boolean }
+
+function download(data: unknown, filename: string) {
+  const url = URL.createObjectURL(new Blob([JSON.stringify(data)], { type: "application/json" }));
+  const a = document.createElement("a");
+  a.href = url; a.download = filename; a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
 export function ChannelsPage() {
+  const [picked, setPicked] = useState<Set<number>>(new Set());
+  const [note, setNote] = useState<string | null>(null);
+  const [restore, setRestore] = useState<{ data: unknown; items: BackupPreview[]; chosen: Set<string> } | null>(null);
+
+  async function exportTopics(ids: number[] | "all") {
+    setNote(null);
+    try {
+      const q = ids === "all" ? "all=1" : `ids=${ids.join(",")}`;
+      const data = await api<{ topics: { slug: string }[] }>(`/api/admin/topics/export?${q}`);
+      download(data, `exomusica-${data.topics.length === 1 ? data.topics[0].slug : "topics"}-${new Date().toISOString().slice(0, 10)}.json`);
+      setNote(`Exported ${data.topics.length} topic${data.topics.length === 1 ? "" : "s"}.`);
+    } catch (e) { setNote(e instanceof ApiError ? e.message : "Export failed"); }
+  }
+
+  async function chooseBackup(e: ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    try {
+      const data = JSON.parse(await file.text()) as { format?: string; topics?: { slug: string; name: string; messages?: unknown[] }[] };
+      if (data.format !== "exomusica-topics" || !Array.isArray(data.topics)) throw new Error();
+      const items = data.topics.map((t) => ({ slug: t.slug, name: t.name, messages: t.messages?.length ?? 0, exists: topics.some((x) => x.slug === t.slug) }));
+      setRestore({ data, items, chosen: new Set(items.map((i) => i.slug)) });
+      setNote(null);
+    } catch { setNote("That file is not an Exomusica topic backup."); }
+  }
+
+  async function runRestore() {
+    if (!restore) return;
+    try {
+      const r = await api<{ results: { slug: string; created: boolean; added: number; skipped: number }[] }>("/api/admin/topics/import", {
+        method: "POST", body: JSON.stringify({ data: restore.data, only: [...restore.chosen] }),
+      });
+      setNote(r.results.map((x) => `${x.slug}: ${x.created ? "created, " : ""}${x.added} message${x.added === 1 ? "" : "s"} added${x.skipped ? `, ${x.skipped} already there` : ""}`).join(" · "));
+      setRestore(null);
+      load();
+    } catch (e) { setNote(e instanceof ApiError ? e.message : "Import failed"); }
+  }
+
+  async function removeTopic(t: ChannelSummary) {
+    if (!window.confirm(`Delete "${t.name}" and all its messages? This cannot be undone. Export it first if you may want it back.`)) return;
+    try {
+      await api(`/api/admin/channels/${t.id}`, { method: "DELETE" });
+      setPicked((p) => { const n = new Set(p); n.delete(t.id); return n; });
+      load();
+    } catch (e) { setNote(e instanceof ApiError ? e.message : "Delete failed"); }
+  }
+
   const [topics, setTopics] = useState<ChannelSummary[]>([]);
   const [categoryOrder, setCategoryOrder] = useState<string[]>([]);
   const [categorySaved, setCategorySaved] = useState(false);
@@ -189,6 +246,38 @@ export function ChannelsPage() {
         </div>
       )}
 
+      <div className="topic-backup" data-testid="topic-backup" style={{ border: "1px solid var(--border)", borderRadius: "var(--radius)", padding: "0.8rem", maxWidth: 520, marginBottom: "1.5rem" }}>
+        <h2 style={{ fontSize: "1rem", marginTop: 0 }}>Backup &amp; restore</h2>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: "0.5rem", alignItems: "center" }}>
+          <button className="btn" disabled={picked.size === 0} onClick={() => exportTopics([...picked])}>Export selected ({picked.size})</button>
+          <button className="btn" onClick={() => exportTopics("all")}>Export all</button>
+          <label className="btn" style={{ cursor: "pointer" }}>Import…<input type="file" accept="application/json,.json" onChange={chooseBackup} hidden /></label>
+        </div>
+        <p style={{ color: "var(--text-dim)", fontSize: "0.8rem", margin: "0.5rem 0 0" }}>
+          Text, authors and replies are saved; uploaded files and reactions are not. Importing never overwrites: missing topics are created, existing ones only get messages they lack.
+        </p>
+        {restore && (
+          <div style={{ marginTop: "0.7rem" }}>
+            {restore.items.map((i) => (
+              <label key={i.slug} style={{ display: "flex", gap: "0.5rem", alignItems: "center", padding: "0.15rem 0" }}>
+                <input type="checkbox" checked={restore.chosen.has(i.slug)} onChange={(e) => setRestore((r) => {
+                  if (!r) return r;
+                  const c = new Set(r.chosen); if (e.target.checked) c.add(i.slug); else c.delete(i.slug);
+                  return { ...r, chosen: c };
+                })} />
+                <span>{i.name}</span>
+                <span style={{ color: "var(--text-dim)", fontSize: "0.8rem" }}>{i.messages} messages · {i.exists ? "merge" : "new"}</span>
+              </label>
+            ))}
+            <div style={{ marginTop: "0.5rem", display: "flex", gap: "0.5rem" }}>
+              <button className="btn btn-primary" disabled={restore.chosen.size === 0} onClick={runRestore}>Import {restore.chosen.size}</button>
+              <button className="btn" onClick={() => setRestore(null)}>Cancel</button>
+            </div>
+          </div>
+        )}
+        {note && <p role="status" style={{ fontSize: "0.85rem", margin: "0.6rem 0 0" }}>{note}</p>}
+      </div>
+
       <form onSubmit={handleSubmit} style={{ maxWidth: 420, marginBottom: "2rem" }}>
         <div className="field">
           <label htmlFor="slug">Slug</label>
@@ -237,6 +326,7 @@ export function ChannelsPage() {
       <table>
         <thead>
           <tr>
+            <th><input type="checkbox" aria-label="Select all topics" checked={topics.length > 0 && picked.size === topics.length} onChange={(e) => setPicked(e.target.checked ? new Set(topics.map((t) => t.id)) : new Set())} /></th>
             <th>Name</th>
             <th>Category</th>
             <th>Order</th>
@@ -247,6 +337,7 @@ export function ChannelsPage() {
         <tbody>
           {topics.map((t) => (
             <tr key={t.slug} id={`channel-row-${t.id}`}>
+              <td><input type="checkbox" aria-label={`Select ${t.name}`} checked={picked.has(t.id)} onChange={(e) => setPicked((p) => { const n = new Set(p); if (e.target.checked) n.add(t.id); else n.delete(t.id); return n; })} /></td>
               {editingId === t.id ? (
                 <td colSpan={3}>
                   <input value={editForm.name} onChange={(e) => setEditForm((f) => ({ ...f, name: e.target.value }))} style={{ marginBottom: "0.2rem" }} />
@@ -328,9 +419,11 @@ export function ChannelsPage() {
                     </button>
                   </>
                 ) : (
-                  <button className="btn" onClick={() => startEdit(t)}>
-                    Edit
-                  </button>
+                  <>
+                    <button className="btn" onClick={() => startEdit(t)}>Edit</button>{" "}
+                    <button className="btn" onClick={() => exportTopics([t.id])} title="Download a backup of this topic">Export</button>{" "}
+                    <button className="btn" onClick={() => removeTopic(t)} style={{ color: "var(--accent-danger)" }}>Delete</button>
+                  </>
                 )}
               </td>
             </tr>

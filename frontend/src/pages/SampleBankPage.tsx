@@ -13,6 +13,8 @@ interface SampleItem {
   fileUrl: string;
   filename: string;
   owner: string;
+  cover?: string | null;
+  gallery?: string[];
   createdAt?: string;
 }
 
@@ -27,6 +29,8 @@ export function SamplesPanel({ onAnalyze }: { onAnalyze: () => void }) {
   const [description, setDescription] = useState("");
   const [tags, setTags] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const coverInputRef = useRef<HTMLInputElement>(null);
+  const galleryInputRef = useRef<HTMLInputElement>(null);
   const [error, setError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<number | null>(null);
 
@@ -48,10 +52,13 @@ export function SamplesPanel({ onAnalyze }: { onAnalyze: () => void }) {
     if (description.trim()) formData.append("description", description.trim());
     formData.append("tags", tags);
     formData.append("file", file);
+    const cover = coverInputRef.current?.files?.[0];
+    if (cover) formData.append("cover", cover);
+    for (const g of Array.from(galleryInputRef.current?.files ?? []).slice(0, 3)) formData.append("gallery", g);
     try {
       await api("/api/sample-bank", { method: "POST", body: formData });
       setTitle(""); setDescription(""); setTags("");
-      if (fileInputRef.current) fileInputRef.current.value = "";
+      for (const r of [fileInputRef, coverInputRef, galleryInputRef]) if (r.current) r.current.value = "";
       setAdding(false);
       load();
     } catch (err) {
@@ -80,20 +87,21 @@ export function SamplesPanel({ onAnalyze }: { onAnalyze: () => void }) {
 
   return (
     <div data-testid="samples-panel">
-      <div className="xl-bar">
-        <p className="home-dim xl-bar-text">Raw material, not finished tracks: field recordings, synth presets, one-shots, scripts. Anything others might build with.</p>
-        {user && <button className="btn btn-primary" aria-expanded={adding} onClick={() => setAdding((v) => !v)}>{adding ? "Cancel" : "Add a sample"}</button>}
-      </div>
+      {user && (
+        <div className="xl-bar xl-bar-end">
+          <button className="btn btn-primary" aria-expanded={adding} onClick={() => setAdding((v) => !v)}>{adding ? "Cancel" : "Add a resource"}</button>
+        </div>
+      )}
 
       {user && adding && (
         <div className="xl-form">
           <input placeholder="Title" value={title} onChange={(e) => setTitle(e.target.value)} aria-label="Sample title" />
           <input placeholder="Description (optional)" value={description} onChange={(e) => setDescription(e.target.value)} aria-label="Description" />
           <input placeholder="Tags, comma separated (field-recording, water, granular)" value={tags} onChange={(e) => setTags(e.target.value)} aria-label="Tags" />
-          <div className="xl-form-row">
-            <input ref={fileInputRef} type="file" aria-label="Sample file" />
-            <button className="btn btn-primary" onClick={upload}>Upload</button>
-          </div>
+          <label className="xl-file"><span className="home-dim">The file</span><input ref={fileInputRef} type="file" aria-label="Resource file" /></label>
+          <label className="xl-file"><span className="home-dim">Cover image (optional)</span><input ref={coverInputRef} type="file" accept="image/*" aria-label="Cover image" data-testid="resource-cover" /></label>
+          <label className="xl-file"><span className="home-dim">Gallery, up to 3 images (optional)</span><input ref={galleryInputRef} type="file" accept="image/*" multiple aria-label="Gallery images" data-testid="resource-gallery" onChange={(e) => { if (e.target.files && e.target.files.length > 3) { setError("A gallery holds up to 3 images: only the first 3 will be added."); } }} /></label>
+          <div className="xl-form-row"><button className="btn btn-primary" onClick={upload}>Upload</button></div>
         </div>
       )}
       {error && <p className="an-err" role="alert">{error}</p>}
@@ -111,11 +119,13 @@ export function SamplesPanel({ onAnalyze }: { onAnalyze: () => void }) {
         <ul className="xl-cards">
           {items.map((item) => (
             <li key={item.id} className="xl-card">
+              {item.cover && <img className="xl-cover" src={item.cover} alt="" loading="lazy" />}
               <div className="xl-card-top">
                 <b>{item.title}</b>
                 <span className="home-dim"><Username name={item.owner} /> · {item.kind.toLowerCase()}</span>
               </div>
               {item.description && <p className="xl-card-text">{item.description}</p>}
+              {item.gallery && item.gallery.length > 0 && <div className="xl-thumbs">{item.gallery.map((g) => <a key={g} href={g} target="_blank" rel="noreferrer"><img src={g} alt="" loading="lazy" /></a>)}</div>}
               {item.kind === "AUDIO" && <audio controls preload="none" src={item.fileUrl} className="xl-audio" aria-label={`Preview ${item.title}`} />}
               {item.tags.length > 0 && <div className="xl-chips">{item.tags.map((t) => <button key={t} className="xl-chip" onClick={() => setTagFilter(t)}>{t}</button>)}</div>}
               <div className="xl-card-actions">

@@ -5071,3 +5071,68 @@ th {
 .tm-expanded { margin-top: 0.4rem; }
 .tm-links { display: flex; gap: 1rem; margin: 0.6rem 0 0; }
 .tm-note { margin-top: 1.4rem; font-size: 0.85rem; }
+
+/* Play highlight: a breathing glow and a few fireflies (positions come from lib/fireflies.ts) */
+.play-hl { display: inline-flex; position: relative; vertical-align: middle; }
+.play-hl > :first-child { transition: box-shadow 0.4s, transform 0.4s; }
+.play-hl-on > :first-child { box-shadow: 0 0 10px 1px color-mix(in srgb, var(--hl) 60%, transparent), 0 0 22px 3px color-mix(in srgb, var(--hl) 28%, transparent); animation: play-breathe 3.6s ease-in-out infinite; }
+.play-fly { position: absolute; left: 50%; top: 50%; width: 5px; height: 5px; margin: -2.5px 0 0 -2.5px; border-radius: 50%; background: var(--hl); box-shadow: 0 0 6px 2px color-mix(in srgb, var(--hl) 80%, transparent); pointer-events: none; will-change: transform, opacity; }
+@keyframes play-breathe { 0%, 100% { transform: scale(1); box-shadow: 0 0 8px 1px color-mix(in srgb, var(--hl) 50%, transparent), 0 0 18px 2px color-mix(in srgb, var(--hl) 22%, transparent); } 50% { transform: scale(1.06); box-shadow: 0 0 14px 3px color-mix(in srgb, var(--hl) 75%, transparent), 0 0 30px 6px color-mix(in srgb, var(--hl) 34%, transparent); } }
+@media (prefers-reduced-motion: reduce) { .play-hl-on > :first-child { animation: none; } }
+
+/* Soundbay: with albums open, the branch shuffle steps aside (and returns when the row closes) */
+.sb-play { transition: opacity 0.25s; }
+.sb-play-faded { opacity: 0; pointer-events: none; }
+
+/* Sort controls are rarely used: quiet until reached for */
+.space-sort { opacity: 0.5; transition: opacity 0.2s; }
+.space-sort:hover, .space-sort:focus-within { opacity: 1; }
+
+.branch-studies ul { list-style: none; margin: 0.2rem 0 0; padding: 0; display: flex; flex-direction: column; gap: 0.2rem; }
+.explore-module > .branch-studies { margin: 0.8rem 0 0; padding: 0 0.2rem; }
+.study-branches { font-size: 0.85rem; margin: 0 0 0.8rem; }
+.study-branch-picker { margin-top: 0.4rem; }
+
+/* Telemetry: the grouped list */
+.tlist { display: flex; flex-direction: column; gap: 1.4rem; margin-top: 1rem; }
+.tlist-title { font-size: 0.8rem; letter-spacing: 0; font-weight: 600; margin: 0 0 0.35rem; color: var(--text-dim); }
+.tlist-title span { font-weight: 400; }
+.tlist-rows { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--border); }
+.tlist-row { display: flex; align-items: center; gap: 0.7rem; padding: 0.5rem 0.2rem; border-bottom: 1px solid var(--border); min-width: 0; }
+.tlist-main { display: flex; flex-direction: column; min-width: 0; flex: 1 1 auto; }
+.tlist-desc { font-size: 0.82rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tlist-side { display: flex; align-items: center; gap: 0.5rem; flex: 0 0 auto; font-size: 0.82rem; white-space: nowrap; }
+@media (max-width: 600px) { .tlist-side > .sig-here { display: none; } }
+.log-tree-buttons .btn { opacity: 0.35; transition: opacity 0.2s; }
+.log-tree-buttons .btn:hover, .log-tree-buttons .btn:focus-visible { opacity: 1; }
+.xl-bar-end { justify-content: flex-end; }
+.xl-file { display: flex; flex-direction: column; gap: 0.15rem; font-size: 0.85rem; }
+.xl-cover { width: 100%; max-height: 160px; object-fit: cover; border-radius: var(--radius); }
+.xl-thumbs { display: flex; gap: 0.35rem; }
+.xl-thumbs img { width: 56px; height: 56px; object-fit: cover; border-radius: 4px; border: 1px solid var(--border); display: block; }
+
+/* Homepage: Happening now as boxes */
+.hb-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; align-items: start; }
+@media (max-width: 800px) { .hb-grid { grid-template-columns: minmax(0, 1fr); } }
+.hb { border: 1px solid var(--border); border-radius: var(--radius); padding: 0.8rem 0.95rem; background: var(--bg-elevated); min-width: 0; }
+.hb-title { font-size: 1rem; margin: 0 0 0.5rem; }
+.hb-title a { color: inherit; text-decoration: none; }
+.hb-title a:hover { text-decoration: underline; }
+.hb-count { font-weight: 400; font-size: 0.85rem; }
+.hb-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.hb-item { display: flex; flex-direction: column; gap: 0.1rem; padding: 0.45rem 0; border-bottom: 1px solid var(--border); min-width: 0; overflow-wrap: anywhere; }
+.hb-item:last-child { border-bottom: none; }
+
+/* Member page */
+.profile-back { display: inline-flex; align-items: center; gap: .5rem; align-self: flex-start; color: var(--text-dim); font-size: .85rem; text-decoration: none; }
+.profile-back:hover { color: var(--text); }
+.profile-back kbd { font: inherit; font-size: .7rem; padding: 0 .35rem; border: 1px solid var(--border, #333); border-radius: 3px; opacity: .6; }
+.profile-stats { display: flex; flex-direction: column; gap: .5rem; margin: 1rem 0; padding: .9rem 1rem; border: 1px solid var(--border, #2a2a2a); border-radius: 6px; }
+.ps-row { display: flex; gap: 2rem; }
+.ps-row div { display: flex; flex-direction: column; }
+.ps-row b { font-size: 1.5rem; font-weight: 600; font-variant-numeric: tabular-nums; }
+.ps-row span, .ps-cap { color: var(--text-dim); font-size: .72rem; letter-spacing: .08em; text-transform: uppercase; }
+.profile-trace { width: 100%; height: 44px; }
+.profile-trace .pt-on { fill: var(--accent-forum, #7cf); }
+.profile-trace .pt-zero { fill: var(--text-dim); opacity: .35; }
+.ps-studies { margin: .4rem 0 0; padding-left: 1.1rem; font-size: .9rem; }

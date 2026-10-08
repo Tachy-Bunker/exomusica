@@ -1,3 +1,4 @@
+import { StudyBranches } from "../components/StudyBranches";
 import { branchHref } from "../lib/branchLinks";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
@@ -53,6 +54,7 @@ interface StudyDetail {
   status: "IN_PROGRESS" | "COMPLETE";
   owner: { id: number; username: string };
   channel: { slug: string; name: string; kind: "BRANCH" | "DISCUSSION"; branch: { slug: string } | null } | null;
+  branches?: { slug: string; name: string }[];
   files: (StudyFileInfo & { url: string })[];
   annotations: Annotation[];
   charts: Chart[];
@@ -409,6 +411,8 @@ export function StudyPage() {
           </>
         )}
       </p>
+
+      <StudyBranches studySlug={study.slug} linked={study.branches ?? []} canEdit={isOwner} onChange={reload} />
 
       {!isOwner && <div style={{ display: "flex", gap: "0.4rem", marginBottom: "1rem" }}>{qrButton}</div>}
 

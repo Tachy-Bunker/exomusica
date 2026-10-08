@@ -58,7 +58,7 @@ export function DiscussionIndexPage() {
           <Link to="/xenolab?tab=studies" className="btn">
             Studies
           </Link>
-          <Link to="/contribute" className="btn">
+          <Link to="/xenolab?tab=contribute" className="btn">
             Contribute
           </Link>
           <Link to="/discussion/map" className="btn">

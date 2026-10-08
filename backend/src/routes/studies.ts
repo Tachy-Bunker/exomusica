@@ -37,7 +37,7 @@ export async function studiesRoutes(app: FastifyInstance): Promise<void> {
 
   app.get("/api/studies", async () => {
     const studies = await prisma.study.findMany({
-      select: { slug: true, title: true, body: true, status: true, createdAt: true, updatedAt: true, owner: { select: { username: true } }, channel: { select: { slug: true } } },
+      select: { slug: true, title: true, body: true, status: true, createdAt: true, updatedAt: true, owner: { select: { username: true } }, channel: { select: { slug: true } }, branches: { select: { slug: true, name: true, visibility: true } } },
       orderBy: { updatedAt: "desc" },
     });
     return studies.map((s) => ({
@@ -49,6 +49,7 @@ export async function studiesRoutes(app: FastifyInstance): Promise<void> {
       updatedAt: s.updatedAt,
       owner: s.owner.username,
       channelSlug: s.channel?.slug ?? null,
+      branches: s.branches.filter((b) => b.visibility !== "HIDDEN").map((b) => ({ slug: b.slug, name: b.name })),
     }));
   });
 
@@ -58,13 +59,14 @@ export async function studiesRoutes(app: FastifyInstance): Promise<void> {
       include: {
         owner: { select: { id: true, username: true } },
         channel: { select: { slug: true, name: true, kind: true, branch: { select: { slug: true } } } },
+        branches: { select: { slug: true, name: true, visibility: true } },
         annotations: { orderBy: { position: "asc" } },
         charts: { orderBy: { position: "asc" } },
         files: { select: { id: true, filename: true, mimeType: true, sizeBytes: true, storagePath: true }, orderBy: { id: "asc" } },
       },
     });
     if (!study) return reply.code(404).send({ error: "no such study" });
-    return { ...study, files: study.files.map((f) => ({ id: f.id, filename: f.filename, mimeType: f.mimeType, sizeBytes: Number(f.sizeBytes), url: f.storagePath })) };
+    return { ...study, branches: study.branches.filter((b) => b.visibility !== "HIDDEN").map((b) => ({ slug: b.slug, name: b.name })), files: study.files.map((f) => ({ id: f.id, filename: f.filename, mimeType: f.mimeType, sizeBytes: Number(f.sizeBytes), url: f.storagePath })) };
   });
 
   app.post<{ Body: { title: string; body?: string } }>("/api/studies", { preHandler: requireAuth }, async (req, reply) => {
@@ -83,7 +85,7 @@ export async function studiesRoutes(app: FastifyInstance): Promise<void> {
     return reply.code(201).send(study);
   });
 
-  app.patch<{ Params: { slug: string }; Body: Partial<{ title: string; body: string; status: "IN_PROGRESS" | "COMPLETE"; channelSlug: string | null; newChat: boolean }> }>(
+  app.patch<{ Params: { slug: string }; Body: Partial<{ title: string; body: string; status: "IN_PROGRESS" | "COMPLETE"; channelSlug: string | null; newChat: boolean; branchSlugs: string[] }> }>(
     "/api/studies/:slug",
     { preHandler: requireAuth },
     async (req, reply) => {
@@ -93,8 +95,14 @@ export async function studiesRoutes(app: FastifyInstance): Promise<void> {
 
       // Only these fields may be changed through this route. (Passing the raw
       // body through would let an owner rewrite ownerId, slug, channelId...)
-      const { title, body, status, channelSlug, newChat } = req.body ?? {};
-      const data: { title?: string; body?: string; status?: "IN_PROGRESS" | "COMPLETE"; channelId?: number | null } = {};
+      const { title, body, status, channelSlug, newChat, branchSlugs } = req.body ?? {};
+      const data: { title?: string; body?: string; status?: "IN_PROGRESS" | "COMPLETE"; channelId?: number | null; branches?: { set: { id: number }[] } } = {};
+      // The branches the study is about: none, one or several. Hidden branches can only be picked by an admin.
+      if (Array.isArray(branchSlugs)) {
+        const slugs = [...new Set(branchSlugs.filter((x): x is string => typeof x === "string"))].slice(0, 20);
+        const found = await prisma.branch.findMany({ where: { slug: { in: slugs }, ...(req.user!.isAdmin ? {} : { visibility: { not: "HIDDEN" } }) }, select: { id: true } });
+        data.branches = { set: found.map((b) => ({ id: b.id })) };
+      }
       if (typeof title === "string") {
         if (!title.trim()) return reply.code(400).send({ error: "title can't be empty" });
         data.title = title.trim();

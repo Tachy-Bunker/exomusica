@@ -93,7 +93,8 @@ export function levels(samples: Float32Array, sr: number) {
  * Same measurement as `loudness()` in analysis.ts, but filters sample by sample and keeps only 100 ms energy sums, so a
  * ten-minute file costs a few kilobytes instead of hundreds of megabytes. Also returns the loudness range.
  */
-export function streamLoudness(samples: Float32Array, sr: number) {
+/** K-weighted mean-square energy of each 100 ms stretch of one channel (streaming: constant memory besides the output). */
+export function kSubEnergies(samples: Float32Array, sr: number): number[] {
   const { shelf, highpass } = kWeighting(sr);
   let s1 = 0, s2 = 0, t1 = 0, t2 = 0; // transposed direct form II states
   const sub = Math.max(1, Math.round(0.1 * sr));
@@ -112,6 +113,11 @@ export function streamLoudness(samples: Float32Array, sr: number) {
     acc += z * z;
     if (++cnt === sub) { subEnergy.push(acc / cnt); acc = 0; cnt = 0; }
   }
+  return subEnergy;
+}
+
+/** Gated integrated loudness (BS.1770 / EBU R128) and loudness range from 100 ms energies (summed over channels for multichannel). */
+export function loudnessFromSub(subEnergy: number[]) {
   const lufs = (ms: number) => -0.691 + 10 * Math.log10(ms);
   const series: { t: number; v: number | null }[] = [];
   const energies: number[] = [];
@@ -133,6 +139,11 @@ export function streamLoudness(samples: Float32Array, sr: number) {
     if (vals.length >= 10) range = vals[Math.floor(vals.length * 0.95)] - vals[Math.floor(vals.length * 0.1)];
   }
   return { integrated, range, series };
+}
+
+/** One mono signal: same measurement as `loudness()` in analysis.ts, without its hundreds of megabytes of copies. */
+export function streamLoudness(samples: Float32Array, sr: number) {
+  return loudnessFromSub(kSubEnergies(samples, sr));
 }
 
 // ------------------------------------------------------------------ tempo

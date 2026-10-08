@@ -12,6 +12,51 @@ import { useDocumentTitle } from "../lib/useDocumentTitle";
 
 interface MyStudy { slug: string; title: string; status: string; updatedAt: string; owner: string }
 
+function ActivityRow({ a }: { a: HomeActivity }) {
+  const Icon = ACTIVITY_ICON[a.kind];
+  const voice = a.text.startsWith("sent ") || a.text.startsWith("shared ");
+  return (
+    <li className="hb-item" data-kind={a.kind}>
+      <span className="home-card-head">
+        <Icon size={16} />
+        <span className="sr-only">{a.label}: </span>
+        <Link className="home-card-link home-card-title" to={a.href}>{a.title}</Link>
+      </span>
+      {a.kind === "chat" && a.by && <span className="home-card-preview">{voice ? <><Username name={a.by} /> {a.text}</> : <><Username name={a.by} />: {a.text}</>}</span>}
+      {a.kind === "study" && a.by && <span className="home-card-preview">by <Username name={a.by} /></span>}
+      {a.detail && <span className="home-card-preview">{a.detail}</span>}
+      <span className="home-dim home-card-meta">{timeAgo(a.at)}</span>
+    </li>
+  );
+}
+
+/** The community at a glance: chats, members and member music each have a box (the same ones Telemetry is built from); everything else lands in "Other". */
+function HappeningNow({ activity, members }: { activity: HomeActivity[]; members: number }) {
+  const chats = activity.filter((a) => a.kind === "chat").slice(0, 4);
+  const newcomers = activity.filter((a) => a.kind === "member").slice(0, 3);
+  const other = activity.filter((a) => a.kind !== "chat" && a.kind !== "member").slice(0, 6);
+  return (
+    <div className="hb-grid" data-testid="activity">
+      <section className="hb" aria-labelledby="hb-conv" data-testid="hb-conversations">
+        <h3 id="hb-conv" className="hb-title"><Link to="/telemetry">Conversations</Link></h3>
+        {chats.length ? <ul className="hb-list">{chats.map((a, i) => <ActivityRow key={`${a.href}-${i}`} a={a} />)}</ul> : <p className="home-dim">It's quiet right now. Be the first to start something.</p>}
+      </section>
+      <section className="hb" aria-labelledby="hb-mem" data-testid="hb-members">
+        <h3 id="hb-mem" className="hb-title"><Link to="/members">Members</Link> <span className="home-dim hb-count">{members.toLocaleString()}</span></h3>
+        {newcomers.length ? <ul className="hb-list">{newcomers.map((a, i) => <ActivityRow key={`${a.href}-${i}`} a={a} />)}</ul> : <p className="home-dim">Everyone aboard, and how to reach them.</p>}
+      </section>
+      <section className="hb" aria-labelledby="hb-cult" data-testid="hb-cult">
+        <h3 id="hb-cult" className="hb-title"><Link to="/cult">Cult activities</Link></h3>
+        <p className="home-dim">Community playlists and members' own music.</p>
+      </section>
+      <section className="hb" aria-labelledby="hb-other" data-testid="hb-other">
+        <h3 id="hb-other" className="hb-title">Other</h3>
+        {other.length ? <ul className="hb-list">{other.map((a, i) => <ActivityRow key={`${a.kind}-${a.href}-${i}`} a={a} />)}</ul> : <p className="home-dim">No other news yet.</p>}
+      </section>
+    </div>
+  );
+}
+
 export function HomePage() {
   useDocumentTitle("");
   const { user } = useAuth();
@@ -62,7 +107,7 @@ export function HomePage() {
                 <>
                   <Link to="/members">{stats.members.toLocaleString()} members</Link>
                   <Link to="/soundbay">{stats.tracks.toLocaleString()} tracks</Link>
-                  <Link to="/studies">{stats.studies.toLocaleString()} studies</Link>
+                  <Link to="/xenolab">{stats.studies.toLocaleString()} studies</Link>
                   <Link to="/soundbay">{stats.branches.toLocaleString()} branches</Link>
                 </>
               ) : "\u00a0"}
@@ -79,39 +124,13 @@ export function HomePage() {
 
       <section className="home-section" aria-labelledby="home-now-h">
         <div className="home-h2-row"><h2 id="home-now-h" className="home-h2">Happening now</h2></div>
-        {home ? (
-          home.activity.length ? (
-            <div className="home-grid" data-testid="activity">
-              {home.activity.map((a: HomeActivity, i) => {
-                const Icon = ACTIVITY_ICON[a.kind];
-                const voice = a.text.startsWith("sent ") || a.text.startsWith("shared ");
-                return (
-                  <article key={`${a.kind}-${a.href}-${i}`} className="home-card" data-kind={a.kind}>
-                    <span className="home-card-head">
-                      <Icon size={17} />
-                      <span className="sr-only">{a.label}: </span>
-                      <Link className="home-card-link home-card-title" to={a.href}>{a.title}</Link>
-                    </span>
-                    {a.kind === "chat" && a.by && <span className="home-card-preview">{voice ? <><Username name={a.by} /> {a.text}</> : <><Username name={a.by} />: {a.text}</>}</span>}
-                    {a.kind === "study" && a.by && <span className="home-card-preview">by <Username name={a.by} /></span>}
-                    {a.detail && <span className="home-card-preview">{a.detail}</span>}
-                    <span className="home-dim home-card-meta">{timeAgo(a.at)}</span>
-                  </article>
-                );
-              })}
-            </div>
-          ) : (
-            <p className="home-dim">It's quiet right now. Be the first to start something.</p>
-          )
-        ) : (
-          <div className="home-placeholder" aria-busy={!failed}>{failed ? "Couldn't load the latest activity." : "Loading…"}</div>
-        )}
+        {home ? <HappeningNow activity={home.activity} members={home.stats.members} /> : <div className="home-placeholder" aria-busy={!failed}>{failed ? "Couldn't load the latest activity." : "Loading…"}</div>}
       </section>
 
       {user ? (
         myStudies && myStudies.length > 0 && (
           <section className="home-section" aria-labelledby="home-work-h" data-testid="home-your-work">
-            <div className="home-h2-row"><h2 id="home-work-h" className="home-h2">Your work</h2><Link to="/studies" className="home-dim">All studies</Link></div>
+            <div className="home-h2-row"><h2 id="home-work-h" className="home-h2">Your work</h2><Link to="/xenolab" className="home-dim">All studies</Link></div>
             <div className="home-grid">
               {myStudies.map((s) => (
                 <Link key={s.slug} className="home-card" to={`/study/${s.slug}`}>

@@ -1,3 +1,4 @@
+import { PlayGlow } from "../components/PlayGlow";
 import { useEffect, useState } from "react";
 import { useParams, Link, useSearchParams } from "react-router-dom";
 import { api } from "../lib/api";
@@ -130,7 +131,7 @@ export function PlaylistPage() {
   }
 
   return (
-    <div style={{ maxWidth: 720 }}>
+    <div style={{ maxWidth: 720, margin: "0 auto" }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
         <div>
           {editingTitle ? (
@@ -258,10 +259,12 @@ export function PlaylistPage() {
             </Link>
             {album.source === "community" && <span style={{ fontSize: "0.7rem", color: "var(--text-dim)", marginLeft: "0.4rem" }}>(community)</span>}
             {album.items.map((item) => (
-              <div key={item.id} style={{ display: "flex", alignItems: "center", gap: "0.5rem", fontSize: "0.9rem", padding: "0.15rem 0" }}>
-                <button className="btn" style={{ padding: "0.1rem 0.4rem" }} onClick={() => playTrack(item)} title="Play">
-                  ▶
-                </button>
+              <div key={item.id} className="track-hl-host" style={{ display: "flex", alignItems: "center", gap: "0.5rem", fontSize: "0.9rem", padding: "0.15rem 0" }}>
+                <PlayGlow when="hover" hostSelector=".track-hl-host">
+                  <button className="btn" style={{ padding: "0.1rem 0.4rem" }} onClick={() => playTrack(item)} title="Play">
+                    ▶
+                  </button>
+                </PlayGlow>
                 <span style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{item.title}</span>
               </div>
             ))}

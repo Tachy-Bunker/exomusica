@@ -5,6 +5,7 @@ interface SiteEffectsState {
   caBurst: number;
   chatOpenSfxUrl: string | null;
   userCaEnabled: boolean;
+  playHighlightColor: string | null; // glow + firefly on the Play buttons to reach for; null = off
   userMoireEnabled: boolean;
   exclusiveMediaPlayback: boolean;
   chatHudRevealRate: number;
@@ -26,7 +27,8 @@ export const useSiteEffectsStore = create<SiteEffectsState>((set) => ({
   caInitial: 0.15,
   caBurst: 0.6,
   chatOpenSfxUrl: null,
-  userCaEnabled: true,
+  userCaEnabled: false,
+  playHighlightColor: null,
   userMoireEnabled: false,
   exclusiveMediaPlayback: true,
   chatHudRevealRate: 30,

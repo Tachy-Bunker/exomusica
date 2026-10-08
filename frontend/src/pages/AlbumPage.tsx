@@ -1,3 +1,5 @@
+import { PlayGlow } from "../components/PlayGlow";
+import { PlayIcon } from "../components/Icons";
 import { branchHref } from "../lib/branchLinks";
 import { useEffect, useState } from "react";
 import { useParams, Link, useNavigate, useSearchParams } from "react-router-dom";
@@ -166,6 +168,9 @@ export function AlbumPage() {
 
       <div style={{ display: "flex", alignItems: "center", gap: "0.6rem", marginTop: "1.5rem" }}>
         <h2 style={{ fontSize: "1rem", margin: 0 }}>Tracks</h2>
+        <PlayGlow>
+          <button className="btn btn-primary icon-btn" onClick={() => { const [first, ...rest] = album.tracks; if (!first) return; play(first); clearQueue(); addToQueue(rest); setCurrentPlaylist(null); }} disabled={album.tracks.length === 0} aria-label="Play the album" title="Play the album" data-testid="album-play-all"><PlayIcon size={16} /></button>
+        </PlayGlow>
         <button className="btn" onClick={() => addToQueue(album.tracks)}>
           Add all to queue
         </button>
@@ -197,6 +202,7 @@ export function AlbumPage() {
         {album.tracks.map((t, i) => (
           <div
             key={t.id}
+            className="track-hl-host"
             style={{
               display: "flex",
               alignItems: "center",
@@ -206,9 +212,11 @@ export function AlbumPage() {
               borderRadius: "var(--radius)",
             }}
           >
-            <button className="btn" onClick={() => { play(t); setCurrentPlaylist(null); }}>
-              ▶
-            </button>
+            <PlayGlow when="hover" hostSelector=".track-hl-host">
+              <button className="btn" onClick={() => { play(t); setCurrentPlaylist(null); }}>
+                ▶
+              </button>
+            </PlayGlow>
             <button className="btn" onClick={() => addToQueue([t])} title="Add to queue">
               +
             </button>

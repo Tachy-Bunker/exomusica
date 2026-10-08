@@ -144,9 +144,8 @@ export function SoundAnalyzer() {
       >
         <input ref={inputRef} className="sr-only" type="file" accept="audio/*,video/*,.flac,.opus,.m4a" aria-label="Choose a sound file to analyze" data-testid="analyzer-input" onChange={(e) => { pick(e.target.files); e.target.value = ""; }} />
         {phase.name === "idle" && (<>
-          <p className="an-drop-title">Drop a sound here to measure it</p>
-          <p className="home-dim">Loudness, pitch, tempo, key, spectrum and problems. It never leaves your device.</p>
-          <button className="btn btn-primary" onClick={() => inputRef.current?.click()}>Choose a file</button>
+          <p className="home-dim">LUFS, dB peak, spectrum, tempo, pitch analyzed in your browser locally.</p>
+          <button className="btn btn-primary" onClick={() => inputRef.current?.click()}>Choose or drop a file</button>
         </>)}
         {busy && (
           <div role="status" aria-live="polite" data-testid="analyzer-progress">

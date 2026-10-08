@@ -1,3 +1,5 @@
+import { PlayGlow } from "../components/PlayGlow";
+import { PlayIcon } from "../components/Icons";
 import { Username } from "../components/Username";
 import { useEffect, useState } from "react";
 import { useParams, Link, useSearchParams } from "react-router-dom";
@@ -113,6 +115,11 @@ export function CommunityAlbumPage() {
       <div style={{ display: "flex", alignItems: "center", gap: "0.6rem", marginTop: "1.5rem" }}>
         <h2 style={{ fontSize: "1rem", margin: 0 }}>Tracks</h2>
         {album.tracks.length > 0 && (
+          <PlayGlow>
+            <button className="btn btn-primary icon-btn" onClick={() => playTrack(album.tracks[0])} aria-label="Play the album" title="Play the album" data-testid="album-play-all"><PlayIcon size={16} /></button>
+          </PlayGlow>
+        )}
+        {album.tracks.length > 0 && (
           <button className="btn" onClick={() => addToQueue(album.tracks)}>
             Add all to queue
           </button>
@@ -146,11 +153,13 @@ export function CommunityAlbumPage() {
           <p style={{ color: "var(--text-dim)" }}>No tracks yet.</p>
         ) : (
           album.tracks.map((t, i) => (
-            <div key={t.id} style={{ border: "1px solid var(--border)", borderRadius: "var(--radius)" }}>
+            <div key={t.id} className="track-hl-host" style={{ border: "1px solid var(--border)", borderRadius: "var(--radius)" }}>
               <div style={{ display: "flex", alignItems: "center", gap: "0.6rem", padding: "0.4rem 0.6rem" }}>
-                <button className="btn" onClick={() => playTrack(t)}>
-                  ▶
-                </button>
+                <PlayGlow when="hover" hostSelector=".track-hl-host">
+                  <button className="btn" onClick={() => playTrack(t)}>
+                    ▶
+                  </button>
+                </PlayGlow>
                 <button className="btn" onClick={() => addToQueue([t])} title="Add to queue">
                   +
                 </button>
