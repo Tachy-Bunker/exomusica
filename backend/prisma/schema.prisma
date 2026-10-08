@@ -92,6 +92,8 @@ model User {
   sampleBankItems SampleBankItem[]
   resourceUnlocks ResourceUnlock[]
   rewardClaims RewardClaim[]
+  hypotheses   Hypothesis[]
+  trials       Trial[]
   studies         Study[]
   studyRevisions  StudyRevision[] @relation("StudyRevisionAuthor")
   challengeSubmissions ChallengeSubmission[]
@@ -820,6 +822,7 @@ model Study {
   revisions   StudyRevision[]
   files       Attachment[]      @relation("StudyFiles")
   branches    Branch[]          @relation("StudyBranches") // none, one or several
+  hypotheses  Hypothesis[]
 }
 
 // A snapshot of a study's title and body taken on save, so earlier drafts
@@ -1207,4 +1210,46 @@ model RewardClaim {
 
   @@index([userId])
   @@index([status])
+}
+
+// A testable claim with a protocol. Anyone can try it; the tally says how it is going, the author says what it means.
+model Hypothesis {
+  id            Int      @id @default(autoincrement())
+  authorId      Int
+  author        User     @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  title         String
+  claim         String   @db.Text   // one sentence a test could show wrong
+  protocol      String   @db.Text   // how to test it and what counts as yes
+  requirements  String[]            // e.g. "headphones", "quiet room"
+  status        String   @default("open") // open | testing | supported | contested | refuted | inconclusive
+  statusNote    String?
+  question      String?             // the one-tap question for an A/B test ("Which sounds brighter?"); the claim predicts A
+  stimulusAUrl  String?
+  stimulusBUrl  String?
+  stimulusAAttachmentId Int?
+  stimulusBAttachmentId Int?
+  studyId       Int?
+  study         Study?   @relation(fields: [studyId], references: [id], onDelete: SetNull)
+  bonusPaid     Boolean  @default(false)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  trials        Trial[]
+
+  @@index([status])
+}
+
+// One answer from one participant (a member, or an anonymous browser token that is only ever stored hashed).
+model Trial {
+  id           Int        @id @default(autoincrement())
+  hypothesisId Int
+  hypothesis   Hypothesis @relation(fields: [hypothesisId], references: [id], onDelete: Cascade)
+  userId       Int?
+  user         User?      @relation(fields: [userId], references: [id], onDelete: SetNull)
+  who          String     // "u:<id>" or "p:<sha256 of the token>"
+  pick         String     // claim | other | unsure (in the hypothesis's own terms)
+  note         String?
+  createdAt    DateTime   @default(now())
+
+  @@unique([hypothesisId, who])
+  @@index([hypothesisId])
 }

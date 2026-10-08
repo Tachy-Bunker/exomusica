@@ -48,6 +48,8 @@ import { StudiesAdminPage } from "./pages/admin/StudiesAdminPage";
 import { ResourcesAdminPage } from "./pages/admin/ResourcesAdminPage";
 import { FeaturedAdminPage } from "./pages/admin/FeaturedAdminPage";
 import { RewardsAdminPage } from "./pages/admin/RewardsAdminPage";
+import { HypothesesPage, HypothesisDrawPage } from "./pages/HypothesesPage";
+import { HypothesisPage } from "./pages/HypothesisPage";
 import { RewardsPage } from "./pages/RewardsPage";
 import { BranchContributeAdminPage } from "./pages/admin/BranchContributeAdminPage";
 import { SubmissionsAdminPage } from "./pages/admin/SubmissionsAdminPage";
@@ -144,6 +146,9 @@ export default function App() {
             <Route path="pms/:username" element={<PMsPage />} />
             <Route path="account" element={<AccountSettingsPage />} />
             <Route path="rewards" element={<RewardsPage />} />
+            <Route path="hypotheses" element={<HypothesesPage />} />
+            <Route path="hypotheses/draw" element={<HypothesisDrawPage />} />
+            <Route path="hypothesis/:id" element={<HypothesisPage />} />
 
             <Route path="admin" element={<RequireAdmin />}>
               <Route element={<AdminLayout />}>

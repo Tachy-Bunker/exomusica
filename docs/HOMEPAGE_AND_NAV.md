@@ -195,3 +195,26 @@ Tracks are normalised to **−11 LUFS** (`lib/replayGain.ts`). A quieter track i
 **Known limits:** paid files are still protected by URL secrecy only (signed short-lived links are planned). Earning is manual (admin awards, accepted submissions) until the hypothesis basket. No generic entitlements table yet; it comes with the ARG keys.
 
 Tests: `backend/_scratch/rewards.test.ts`, `frontend/_scratch/e2e_fix282.py` (21 checks).
+
+## fix283: hypothesis basket
+
+Pages: `/hypotheses` (list, status filter, "Draw one", propose), `/hypothesis/:id`, `/hypotheses/draw` (straight to a random open one). Terminal: `go basket`, `go draw`.
+
+**A hypothesis** = title, claim (one falsifiable sentence), protocol, requirements, status (`open`, `testing`, `supported`, `contested`, `refuted`, `inconclusive`) with an author note, and an optional link to one of the author's studies.
+
+**Two ways to answer, one tap each**
+- *A/B test*: the author gives two clips (audio ≤ 10 MB or https links) and a question; the claim predicts **A**. Each participant gets the clips in random order (client-side coin flip, sent as `swapped`); the server maps "Clip 1/2" back to claim/other (`normalisePick`).
+- *Try-it*: no clips; participants try the protocol and tap "It holds / It doesn't / Not sure".
+- Clips cannot be edited after creation (the answers are about those clips).
+
+**Participant mode**: no account needed. A random token is kept in localStorage and only its SHA-256 is stored (`Trial.who = "p:<hash>"`, members `"u:<id>"`). One answer per participant per hypothesis (unique index). Authors can't answer their own. Settled hypotheses take no answers. 60 answers/min/IP.
+
+**Blind results**: for A/B tests the split is hidden until you have answered (author/admin always see it).
+
+**Statistics**: exact two-sided binomial test against 50% over the informative answers (claim + other; "can't tell" is counted but not tested). `suggestStatus` only *suggests* (≥10 informative: p < .05 → supported/refuted; ≥30 and p > .3 → inconclusive). The author decides; "contested" is always manual.
+
+**Points**: members +1 per answer (max 5 per UTC day, ledger reason "Trial: …"); author +5 once when they settle a hypothesis with ≥20 informative answers.
+
+**Known limits**: anonymous tokens can be reset by clearing storage (so a determined person can answer twice; this is a crowd poll, not a trial); the swap flag is client-supplied; hypotheses are not Atlas entities yet (no frequency/margins); the pipeline study draft → wiki claim is only the study link for now.
+
+Tests: `backend/_scratch/hypotheses.test.ts`, `frontend/_scratch/e2e_fix283.py` (18 checks).

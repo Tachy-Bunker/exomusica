@@ -5450,3 +5450,21 @@ th {
 .pts { display: inline-block; min-width: 3.4rem; font-variant-numeric: tabular-nums; color: var(--accent-audio); } .pts.neg { color: var(--text-dim); }
 .reward-admin.off { opacity: 0.55; }
 .res-preview { margin: 0.3rem 0 0.2rem; } .res-points { align-items: center; margin-top: 0.4rem; } .res-preview-edit { margin-top: 0.5rem; display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: flex-start; } .res-preview-edit .xl-form { flex-basis: 100%; }
+
+/* fix283: hypothesis basket */
+.hyp-filters { display: flex; flex-wrap: wrap; gap: 0.35rem; margin: 0.8rem 0; }
+.hyp-filters .xl-chip.on { border-color: var(--accent-audio); color: var(--accent-audio); }
+.hyp-list { list-style: none; padding: 0; margin: 0; display: grid; gap: 0.6rem; }
+.hyp-card { padding: 0.7rem 0.9rem; border: 1px solid var(--border); border-radius: var(--radius); background: var(--bg-inset); }
+.hyp-head { display: flex; align-items: baseline; justify-content: space-between; gap: 0.6rem; flex-wrap: wrap; }
+.hyp-claim { margin: 0.3rem 0; } .hyp-claim-big { margin: 0.6rem 0 1rem; padding: 0.2rem 0 0.2rem 0.9rem; border-left: 3px solid var(--accent-audio); font-size: 1.15rem; line-height: 1.4; }
+.hyp-protocol { white-space: pre-wrap; overflow-wrap: anywhere; }
+.hyp-status { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 0.78rem; padding: 0.05rem 0.5rem; border: 1px solid var(--border); border-radius: 99px; white-space: nowrap; }
+.hyp-status.s-supported { border-color: var(--accent-audio); color: var(--accent-audio); } .hyp-status.s-refuted { text-decoration: line-through; } .hyp-status.s-contested { border-style: dashed; }
+.hyp-try { margin: 1rem 0; padding: 0.9rem; border: 1px solid var(--border); border-radius: var(--radius); background: var(--bg-inset); display: grid; gap: 0.7rem; }
+.hyp-clips { display: flex; flex-wrap: wrap; gap: 0.6rem; }
+.hyp-new { margin: 0.8rem 0; } .hyp-ab { border: 1px dashed var(--border); border-radius: var(--radius); padding: 0.6rem; display: grid; gap: 0.5rem; min-width: 0; }
+.hyp-notes { padding-left: 1.1rem; display: grid; gap: 0.3rem; } .hyp-admin { margin-top: 1.5rem; padding-top: 0.5rem; border-top: 1px solid var(--border); }
+.tally-bar { display: flex; height: 14px; border-radius: 7px; overflow: hidden; border: 1px solid var(--border); background: var(--bg-inset); }
+.tally-claim { background: var(--accent-audio); } .tally-other { background: repeating-linear-gradient(45deg, var(--border), var(--border) 4px, transparent 4px, transparent 8px); } .tally-unsure { background: var(--bg-inset); }
+.tally-nums { font-variant-numeric: tabular-nums; margin: 0.3rem 0 0; }

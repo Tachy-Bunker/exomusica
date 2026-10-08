@@ -1,0 +1,24 @@
+import assert from "node:assert/strict";
+import { binomP, tally, suggestStatus, normalisePick, cleanHypothesis, cleanNote } from "../src/lib/hypotheses.ts";
+const near = (a: number, b: number, e = 1e-6) => assert.ok(Math.abs(a - b) < e, `${a} vs ${b}`);
+near(binomP(5, 10), 1); near(binomP(10, 10), 2 / 1024); near(binomP(0, 10), 2 / 1024); near(binomP(9, 10), 22 / 1024); near(binomP(0, 0), 1);
+assert.ok(binomP(60, 100) > 0.05 && binomP(65, 100) < 0.01);
+const t = tally(["claim", "claim", "other", "unsure"]);
+assert.deepEqual([t.n, t.claim, t.other, t.unsure, t.informative], [4, 2, 1, 1, 3]); near(t.share!, 2 / 3);
+assert.equal(tally([]).share, null);
+assert.equal(suggestStatus(tally([])), "open");
+assert.equal(suggestStatus(tally(["claim", "claim"])), "testing");
+assert.equal(suggestStatus(tally(Array(14).fill("claim").concat(["other"]))), "supported");
+assert.equal(suggestStatus(tally(Array(14).fill("other").concat(["claim"]))), "refuted");
+assert.equal(suggestStatus(tally(Array(16).fill("claim").concat(Array(15).fill("other")))), "inconclusive");
+assert.equal(suggestStatus(tally(Array(8).fill("claim"))), "testing");
+// swap logic
+assert.equal(normalisePick("first", false), "claim"); assert.equal(normalisePick("second", false), "other");
+assert.equal(normalisePick("first", true), "other"); assert.equal(normalisePick("second", true), "claim");
+assert.equal(normalisePick("unsure", true), "unsure"); assert.equal(normalisePick("nope", false), null);
+assert.equal(cleanHypothesis({ title: "", claim: "x", protocol: "y" }).ok, false);
+assert.equal(cleanHypothesis({ title: "t", claim: "", protocol: "y" }).ok, false);
+const c = cleanHypothesis({ title: " t ", claim: "c", protocol: "p", requirements: "headphones, quiet room,headphones", question: "" });
+assert.ok(c.ok && c.v.requirements.length === 2 && c.v.question === null && c.v.title === "t");
+assert.equal(cleanNote("   "), null); assert.equal(cleanNote("x".repeat(500))!.length, 280);
+console.log("hypotheses ok");

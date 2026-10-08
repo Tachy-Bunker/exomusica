@@ -47,6 +47,8 @@ export const PLACES: { names: string[]; to: string; label: string }[] = [
   { names: ["news"], to: "/news", label: "News" },
   { names: ["topics", "discussion", "forum"], to: "/discussion", label: "Topics" },
   { names: ["messages", "pms"], to: "/pms", label: "Messages" },
+  { names: ["hypotheses", "basket", "hyp"], to: "/hypotheses", label: "Hypotheses" },
+  { names: ["draw", "draw one"], to: "/hypotheses/draw", label: "Draw a hypothesis" },
   { names: ["rewards", "points"], to: "/rewards", label: "Rewards" },
   { names: ["account", "settings"], to: "/account", label: "Account" },
 ];
