@@ -3813,9 +3813,6 @@ th {
     flex-basis: 100%;
     justify-content: flex-start;
   }
-  .sb-extra {
-    display: none;
-  }
   .sb-row-blurb {
     -webkit-line-clamp: 1;
   }
@@ -4977,3 +4974,8 @@ th {
 @media (max-width: 700px) {
   .sb-row { scroll-margin-top: 1rem; } /* the toolbar scrolls away on phones */
 }
+
+/* ---- Soundbay: the expanded branch holds only what the row doesn't say; the row's buttons show on phones too ---- */
+.sb-prev-details { margin: 0.1rem 0 0.5rem; white-space: pre-line; line-height: 1.5; max-width: 70ch; }
+.sb-play { padding-left: 0.7rem; padding-right: 0.7rem; }
+.sb-play:not(:disabled) { background: color-mix(in srgb, var(--accent-forum) 28%, transparent); }

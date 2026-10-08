@@ -18,6 +18,7 @@ export function BranchesPage() {
   const [editForm, setEditForm] = useState({
     name: "",
     description: "",
+    longDescription: "",
     fontId: "",
     parentId: "",
     isAnchor: false,
@@ -65,6 +66,7 @@ export function BranchesPage() {
     setEditForm({
       name: b.name,
       description: b.description ?? "",
+      longDescription: b.longDescription ?? "",
       fontId: b.fontId ? String(b.fontId) : "",
       parentId: b.parentId ? String(b.parentId) : "",
       isAnchor: !!b.isAnchor,
@@ -84,6 +86,7 @@ export function BranchesPage() {
       body: JSON.stringify({
         name: editForm.name,
         description: editForm.description,
+        longDescription: editForm.longDescription,
         fontId: editForm.fontId ? Number(editForm.fontId) : null,
         parentId: editForm.parentId ? Number(editForm.parentId) : null,
         isAnchor: editForm.isAnchor,
@@ -216,6 +219,18 @@ export function BranchesPage() {
                     rows={2}
                     value={editForm.description}
                     onChange={(e) => setEditForm((f) => ({ ...f, description: e.target.value }))}
+                    aria-label="Short description (shown in the branch's row)"
+                    placeholder="Short description (shown in the branch's row)"
+                  />
+                  <textarea
+                    rows={4}
+                    maxLength={4000}
+                    value={editForm.longDescription}
+                    onChange={(e) => setEditForm((f) => ({ ...f, longDescription: e.target.value }))}
+                    aria-label="Longer description (shown when the branch is expanded in Soundbay)"
+                    placeholder="Longer description: shown when the branch is expanded in Soundbay. Leave empty to show none, so the short one isn't repeated."
+                    data-testid="branch-long-description"
+                    style={{ marginTop: "0.2rem" }}
                   />
                   <select value={editForm.fontId} onChange={(e) => setEditForm((f) => ({ ...f, fontId: e.target.value }))}>
                     <option value="">- site default font -</option>

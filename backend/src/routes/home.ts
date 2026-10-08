@@ -11,7 +11,7 @@ async function buildHome() {
     prisma.branch.findMany({
       where: NOT_HIDDEN,
       select: {
-        id: true, slug: true, name: true, description: true, coverArtUrl: true, posX: true, posY: true, visibility: true, isAnchor: true,
+        id: true, slug: true, name: true, description: true, longDescription: true, coverArtUrl: true, posX: true, posY: true, visibility: true, isAnchor: true,
         identityColor: true, identityGlyph: true, identityImageUrl: true, identitySecondaryImageUrl: true,
         parent: { select: { slug: true } },
         channel: { select: { id: true, slug: true } },
@@ -67,6 +67,7 @@ async function buildHome() {
     anchor: b.isAnchor,
     color: b.identityColor,
     glyph: b.identityGlyph,
+    details: b.longDescription?.trim() || null,
     image: b.identityImageUrl,
     secondaryImage: b.identitySecondaryImageUrl,
     albums: b._count.albums,

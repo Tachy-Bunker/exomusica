@@ -13,6 +13,7 @@ export interface HomeBranch {
   anchor: boolean;
   color: string | null;
   glyph: string | null;
+  details: string | null; // the longer description, shown when the branch is expanded in Soundbay
   image: string | null; // the main image: shown instead of the emblem
   secondaryImage: string | null; // the background of its tile, and of the module when it is chosen
   albums: number;

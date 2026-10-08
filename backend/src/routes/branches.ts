@@ -24,6 +24,7 @@ export async function branchRoutes(app: FastifyInstance): Promise<void> {
         slug: true,
         name: true,
         description: true,
+        longDescription: true,
         coverArtUrl: true,
         visibility: true,
         crystalCount: true,
@@ -193,6 +194,7 @@ export async function branchRoutes(app: FastifyInstance): Promise<void> {
     Body: Partial<{
       name: string;
       description: string;
+      longDescription: string | null;
       coverArtUrl: string;
       hidden: boolean;
       visibility: "VISIBLE" | "HIDDEN" | "BABY_CRYSTALS";
@@ -219,7 +221,12 @@ export async function branchRoutes(app: FastifyInstance): Promise<void> {
   }>("/api/admin/branches/:id", { preHandler: requireAdmin }, async (req, reply) => {
     const problem = identityProblem(req.body ?? {});
     if (problem) return reply.code(400).send({ error: problem });
+    const longText = (req.body ?? {}).longDescription;
+    if (longText !== undefined && longText !== null && (typeof longText !== "string" || longText.length > 4000)) {
+      return reply.code(400).send({ error: "longDescription must be text of at most 4000 characters" });
+    }
     const data = { ...(req.body ?? {}) };
+    if (typeof data.longDescription === "string") data.longDescription = data.longDescription.trim() || null; // an empty box means none
     if (typeof data.identityColor === "string") data.identityColor = normalizeColor(data.identityColor)!;
     const branch = await prisma.branch.update({ where: { id: Number(req.params.id) }, data });
     await prisma.auditLog.create({

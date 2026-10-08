@@ -90,9 +90,10 @@ function BranchRow({ b, open, onToggle, playing }: { b: HomeBranch; open: boolea
             {playing && <span className="sb-playing" data-testid="now-playing"><i /><i /><i />Playing now</span>}
           </h3>
           <p className="sb-row-blurb">{b.blurb || "No description yet."}</p>
-          <p className="sb-row-meta">{b.albums} album{b.albums === 1 ? "" : "s"}<span className="sb-active">{b.lastActiveAt ? ` · active ${timeAgo(b.lastActiveAt)}` : " · no activity yet"}</span></p>
+          <p className="sb-row-meta">{b.albums} album{b.albums === 1 ? "" : "s"} · {b.tracks} track{b.tracks === 1 ? "" : "s"}<span className="sb-active">{b.lastActiveAt ? ` · active ${timeAgo(b.lastActiveAt)}` : " · no activity yet"}</span></p>
         </div>
         <div className="sb-actions">
+          <button type="button" className="sb-act sb-play" onClick={shuffle} disabled={busy !== null || b.tracks === 0} aria-label={`Play a shuffle of ${b.name}`} title="Play shuffle" data-testid="row-play"><PlayIcon size={13} /></button>
           {b.chatSlug && <button type="button" className="sb-act sb-extra" onClick={discuss} data-testid="row-discuss"><ChatIcon size={13} /> Discussion</button>}
           <Link className="sb-act sb-extra" to={`/?branch=${b.slug}`} data-testid="row-map"><MapIcon size={13} /> Map</Link>
         </div>
@@ -100,13 +101,7 @@ function BranchRow({ b, open, onToggle, playing }: { b: HomeBranch; open: boolea
       {open && (
         <div className="sb-preview" id={`sb-prev-${b.slug}`} data-testid="branch-preview">
           <div className="sb-prev-body">
-            <p className="sb-prev-blurb">{b.blurb || "No description yet."}</p>
-            <p className="home-dim sb-prev-stats">{b.albums} album{b.albums === 1 ? "" : "s"} · {b.tracks} track{b.tracks === 1 ? "" : "s"}{b.lastActiveAt ? ` · active ${timeAgo(b.lastActiveAt)}` : ""}</p>
-            <div className="sb-prev-actions">
-              <button type="button" className="btn btn-primary icon-btn" onClick={shuffle} disabled={busy !== null || b.tracks === 0} aria-label={`Play a shuffle of ${b.name}`} title="Play shuffle" data-testid="prev-play"><PlayIcon size={17} /></button>
-              {b.chatSlug && <button type="button" className="btn" onClick={discuss} data-testid="prev-discuss"><ChatIcon size={14} /> Discussion</button>}
-              <Link className="btn" to={`/?branch=${b.slug}`} data-testid="prev-map"><MapIcon size={14} /> Map</Link>
-            </div>
+            {b.details && <p className="sb-prev-details" data-testid="branch-details">{b.details}</p>}
             <p className="sb-prev-label">Albums</p>
             {albums === null ? <p className="home-dim">Loading albums…</p> : albums.length === 0 ? <p className="home-dim">No albums yet.</p> : (
               <ul className="sb-albums" data-testid="branch-albums">
@@ -186,6 +181,17 @@ export function SoundbayPage() {
     const cur = parseOpenList(new URLSearchParams(window.location.search).get("open"));
     setParam("open", openListParam(cur.includes(slug) ? cur.filter((x) => x !== slug) : [...cur, slug]), "");
   };
+  // A branch that starts playing moves to the top of its list; if it is open, the page follows it up there (not when it is merely resumed).
+  const lastPlayingRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!playingSlug || playingSlug === lastPlayingRef.current) return;
+    lastPlayingRef.current = playingSlug;
+    if (!openSlugs.has(playingSlug)) return;
+    const slug = playingSlug.replace(/["\\]/g, "");
+    const id = window.setTimeout(() => document.querySelector(`.sb-row[data-slug="${slug}"]`)?.scrollIntoView({ block: "start", behavior: "smooth" }), 120);
+    return () => window.clearTimeout(id);
+  }, [playingSlug]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const scrolledToOpen = useRef(false);
   useEffect(() => { // arriving with open=...: bring the first of those branches into view (once it is really on the page)
     if (!home || scrolledToOpen.current || forcedList.length === 0) return;

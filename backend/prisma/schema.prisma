@@ -137,6 +137,7 @@ model Branch {
   ogDescription String?
   ogImageUrl    String?
   description String?
+  longDescription String? @db.Text // the second, longer description: shown when the branch is expanded in Soundbay (the short one is the row's)
   coverArtUrl String?
   hidden      Boolean  @default(false) // soft take-down: excluded from public listings, data untouched
   visibility  BranchVisibility @default(VISIBLE) // supersedes `hidden` - kept alongside it rather than migrated destructively; see deploy notes for the backfill
