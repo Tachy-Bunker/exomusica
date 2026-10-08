@@ -1,3 +1,4 @@
+import { Suspense, lazy } from "react";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { ChromaticAberrationLayer } from "./components/ChromaticAberrationLayer";
 import { MoireLayer } from "./components/MoireLayer";
@@ -17,8 +18,6 @@ import { EmbedPlaylistPage } from "./pages/EmbedPlaylistPage";
 import { EmbedMainSpacemapPage } from "./pages/EmbedMainSpacemapPage";
 import { LoginPage } from "./pages/LoginPage";
 import { JoinPage } from "./pages/JoinPage";
-import { StudiesIndexPage } from "./pages/StudiesIndexPage";
-import { VoiceLabPage } from "./pages/VoiceLabPage";
 import { ContributePage } from "./pages/ContributePage";
 import { ListenPage } from "./pages/ListenPage";
 import { ResearchPage } from "./pages/ResearchPage";
@@ -32,8 +31,6 @@ import { AlbumPage } from "./pages/AlbumPage";
 import { CommunityAlbumPage } from "./pages/CommunityAlbumPage";
 import { CommunityPage } from "./pages/CommunityPage";
 import { MyMusicPage } from "./pages/MyMusicPage";
-import { SampleBankPage } from "./pages/SampleBankPage";
-import { ChallengesPage } from "./pages/ChallengesPage";
 import { PlaylistPage } from "./pages/PlaylistPage";
 import { PlaylistSpaceMapPage } from "./pages/PlaylistSpaceMapPage";
 import { CollaboratorPage } from "./pages/CollaboratorPage";
@@ -73,6 +70,8 @@ import { GuideAssetsAdminPage } from "./pages/admin/GuideAssetsAdminPage";
 import { CommunitySpotlightAdminPage } from "./pages/admin/CommunitySpotlightAdminPage";
 import { useIsDesktop } from "./lib/useIsDesktop";
 
+const VoiceLabPage = lazy(() => import("./pages/VoiceLabPage").then((m) => ({ default: m.VoiceLabPage })));
+
 export default function App() {
   const isDesktop = useIsDesktop();
   const userCaEnabled = useSiteEffectsStore((s) => s.userCaEnabled);
@@ -96,8 +95,8 @@ export default function App() {
             <Route path="join" element={<JoinPage />} />
             <Route path="about" element={<Navigate to="/wiki" replace />} />
             <Route path="wiki" element={<LogPage />} />
-            <Route path="studies" element={<StudiesIndexPage />} />
-            <Route path="lab/voice" element={<VoiceLabPage />} />
+            <Route path="studies" element={<Navigate to="/xenolab?tab=studies" replace />} />
+            <Route path="lab/voice" element={<Suspense fallback={null}><VoiceLabPage /></Suspense>} />
             <Route path="contribute" element={<ContributePage />} />
             <Route path="listen" element={<ListenPage />} />
               <Route path="xenolab" element={<ResearchPage />} />
@@ -119,8 +118,8 @@ export default function App() {
             <Route path="community-album/:slug" element={<CommunityAlbumPage />} />
             <Route path="cult" element={<CommunityPage />} />
             <Route path="my-music" element={<MyMusicPage />} />
-            <Route path="sample-bank" element={<SampleBankPage />} />
-            <Route path="challenges" element={<ChallengesPage />} />
+            <Route path="sample-bank" element={<Navigate to="/xenolab?tab=samples" replace />} />
+            <Route path="challenges" element={<Navigate to="/xenolab?tab=challenges" replace />} />
             <Route path="playlist/:slug" element={<PlaylistSpaceMapPage />} />
             <Route path="playlist/:slug/list" element={<PlaylistPage />} />
             <Route path="collaborator/:slug" element={<CollaboratorPage />} />

@@ -1,7 +1,8 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { api } from "../lib/api";
+import { setPendingAnalysis } from "../lib/analyzerHandoff";
 import { useAuth } from "../lib/auth";
-import { useDocumentTitle } from "../lib/useDocumentTitle";
+import { Username } from "../components/Username";
 
 interface SampleItem {
   id: number;
@@ -12,27 +13,35 @@ interface SampleItem {
   fileUrl: string;
   filename: string;
   owner: string;
+  createdAt?: string;
 }
 
-export function SampleBankPage() {
-  useDocumentTitle("Sample Bank");
+/** Raw material to build with. Lives in XenoLab's Samples tab. Audio plays right on the card and can be sent to the Analyzer. */
+export function SamplesPanel({ onAnalyze }: { onAnalyze: () => void }) {
   const { user } = useAuth();
-  const [items, setItems] = useState<SampleItem[]>([]);
+  const [items, setItems] = useState<SampleItem[] | null>(null);
+  const [allTags, setAllTags] = useState<string[]>([]);
   const [tagFilter, setTagFilter] = useState("");
+  const [adding, setAdding] = useState(false);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [tags, setTags] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [error, setError] = useState<string | null>(null);
+  const [busyId, setBusyId] = useState<number | null>(null);
 
   function load() {
-    api<SampleItem[]>(`/api/sample-bank${tagFilter ? `?tag=${encodeURIComponent(tagFilter)}` : ""}`).then(setItems);
+    api<SampleItem[]>(`/api/sample-bank${tagFilter ? `?tag=${encodeURIComponent(tagFilter)}` : ""}`).then((list) => {
+      setItems(list);
+      if (!tagFilter) setAllTags(topTags(list));
+    }).catch(() => setItems([]));
   }
   useEffect(load, [tagFilter]);
 
   async function upload() {
     const file = fileInputRef.current?.files?.[0];
-    if (!file || !title.trim()) return;
+    if (!file) { setError("Choose a file first."); return; }
+    if (!title.trim()) { setError("Give it a title."); return; }
     setError(null);
     const formData = new FormData();
     formData.append("title", title.trim());
@@ -41,10 +50,9 @@ export function SampleBankPage() {
     formData.append("file", file);
     try {
       await api("/api/sample-bank", { method: "POST", body: formData });
-      setTitle("");
-      setDescription("");
-      setTags("");
+      setTitle(""); setDescription(""); setTags("");
       if (fileInputRef.current) fileInputRef.current.value = "";
+      setAdding(false);
       load();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Upload failed");
@@ -56,75 +64,75 @@ export function SampleBankPage() {
     load();
   }
 
-  return (
-    <div style={{ maxWidth: 720 }}>
-      <h1>Sample Bank</h1>
-      <p style={{ color: "var(--text-dim)" }}>
-        Raw material, not finished tracks - field recordings, synth presets, alterant scripts, one-shots. Anything
-        others might build with.
-      </p>
+  async function analyze(item: SampleItem) {
+    setBusyId(item.id); setError(null);
+    try {
+      const res = await fetch(item.fileUrl);
+      if (!res.ok) throw new Error();
+      setPendingAnalysis({ blob: await res.blob(), name: item.filename });
+      onAnalyze();
+    } catch {
+      setError("Could not load that sample to analyze it.");
+    } finally {
+      setBusyId(null);
+    }
+  }
 
-      {user && (
-        <div style={{ border: "1px solid var(--border)", borderRadius: "var(--radius)", padding: "0.6rem", marginBottom: "1.5rem" }}>
-          <h3 style={{ fontSize: "0.95rem", marginTop: 0 }}>Add something</h3>
-          <div style={{ display: "flex", flexDirection: "column", gap: "0.4rem" }}>
-            <input placeholder="Title" value={title} onChange={(e) => setTitle(e.target.value)} />
-            <input placeholder="Description (optional)" value={description} onChange={(e) => setDescription(e.target.value)} />
-            <input placeholder="Tags, comma separated (e.g. field-recording, water, granular)" value={tags} onChange={(e) => setTags(e.target.value)} />
-            <div style={{ display: "flex", gap: "0.4rem", alignItems: "center" }}>
-              <input ref={fileInputRef} type="file" style={{ fontSize: "0.8rem" }} />
-              <button className="btn btn-primary" onClick={upload}>
-                Upload
-              </button>
-            </div>
-            {error && <p style={{ color: "var(--accent-forum)", fontSize: "0.8rem" }}>{error}</p>}
+  return (
+    <div data-testid="samples-panel">
+      <div className="xl-bar">
+        <p className="home-dim xl-bar-text">Raw material, not finished tracks: field recordings, synth presets, one-shots, scripts. Anything others might build with.</p>
+        {user && <button className="btn btn-primary" aria-expanded={adding} onClick={() => setAdding((v) => !v)}>{adding ? "Cancel" : "Add a sample"}</button>}
+      </div>
+
+      {user && adding && (
+        <div className="xl-form">
+          <input placeholder="Title" value={title} onChange={(e) => setTitle(e.target.value)} aria-label="Sample title" />
+          <input placeholder="Description (optional)" value={description} onChange={(e) => setDescription(e.target.value)} aria-label="Description" />
+          <input placeholder="Tags, comma separated (field-recording, water, granular)" value={tags} onChange={(e) => setTags(e.target.value)} aria-label="Tags" />
+          <div className="xl-form-row">
+            <input ref={fileInputRef} type="file" aria-label="Sample file" />
+            <button className="btn btn-primary" onClick={upload}>Upload</button>
           </div>
         </div>
       )}
+      {error && <p className="an-err" role="alert">{error}</p>}
 
-      <input
-        placeholder="Filter by tag…"
-        value={tagFilter}
-        onChange={(e) => setTagFilter(e.target.value)}
-        style={{ marginBottom: "1rem", maxWidth: 260 }}
-      />
+      {allTags.length > 0 && (
+        <div className="xl-chips" role="group" aria-label="Filter by tag">
+          <button className={`xl-chip${tagFilter === "" ? " on" : ""}`} aria-pressed={tagFilter === ""} onClick={() => setTagFilter("")}>All</button>
+          {allTags.map((t) => <button key={t} className={`xl-chip${tagFilter === t ? " on" : ""}`} aria-pressed={tagFilter === t} onClick={() => setTagFilter(tagFilter === t ? "" : t)}>{t}</button>)}
+        </div>
+      )}
 
-      {items.length === 0 ? (
-        <p style={{ color: "var(--text-dim)" }}>Nothing here yet.</p>
+      {items === null ? <p className="home-dim">Loading…</p> : items.length === 0 ? (
+        <p className="home-dim">{tagFilter ? `Nothing tagged "${tagFilter}".` : "Nothing here yet. Add the first sound."}</p>
       ) : (
-        items.map((item) => (
-          <div key={item.id} style={{ border: "1px solid var(--border)", borderRadius: "var(--radius)", padding: "0.6rem", marginBottom: "0.6rem" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-              <div>
-                <div style={{ fontFamily: "var(--font-display)" }}>{item.title}</div>
-                <div style={{ fontSize: "0.8rem", color: "var(--text-dim)" }}>
-                  by {item.owner} · {item.kind}
-                </div>
-                {item.description && <p style={{ fontSize: "0.85rem", margin: "0.3rem 0" }}>{item.description}</p>}
-                {item.tags.length > 0 && (
-                  <div style={{ display: "flex", gap: "0.3rem", flexWrap: "wrap" }}>
-                    {item.tags.map((t) => (
-                      <span key={t} className="btn" style={{ fontSize: "0.7rem", padding: "0.1rem 0.4rem", cursor: "pointer" }} onClick={() => setTagFilter(t)}>
-                        {t}
-                      </span>
-                    ))}
-                  </div>
-                )}
+        <ul className="xl-cards">
+          {items.map((item) => (
+            <li key={item.id} className="xl-card">
+              <div className="xl-card-top">
+                <b>{item.title}</b>
+                <span className="home-dim"><Username name={item.owner} /> · {item.kind.toLowerCase()}</span>
               </div>
-              <div style={{ display: "flex", gap: "0.4rem", flexShrink: 0 }}>
-                <a className="btn" href={item.fileUrl} download={item.filename}>
-                  Download
-                </a>
-                {user?.username === item.owner && (
-                  <button className="btn btn-danger" onClick={() => remove(item.id)}>
-                    Delete
-                  </button>
-                )}
+              {item.description && <p className="xl-card-text">{item.description}</p>}
+              {item.kind === "AUDIO" && <audio controls preload="none" src={item.fileUrl} className="xl-audio" aria-label={`Preview ${item.title}`} />}
+              {item.tags.length > 0 && <div className="xl-chips">{item.tags.map((t) => <button key={t} className="xl-chip" onClick={() => setTagFilter(t)}>{t}</button>)}</div>}
+              <div className="xl-card-actions">
+                <a className="btn" href={item.fileUrl} download={item.filename}>Download</a>
+                {item.kind === "AUDIO" && <button className="btn" disabled={busyId === item.id} onClick={() => analyze(item)}>{busyId === item.id ? "Loading…" : "Analyze"}</button>}
+                {user?.username === item.owner && <button className="btn btn-danger" onClick={() => remove(item.id)}>Delete</button>}
               </div>
-            </div>
-          </div>
-        ))
+            </li>
+          ))}
+        </ul>
       )}
     </div>
   );
+}
+
+function topTags(list: SampleItem[]): string[] {
+  const count = new Map<string, number>();
+  for (const i of list) for (const t of i.tags) count.set(t, (count.get(t) ?? 0) + 1);
+  return [...count.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])).slice(0, 12).map(([t]) => t);
 }

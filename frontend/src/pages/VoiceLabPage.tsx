@@ -18,7 +18,7 @@ const fmtTime = (s: number) => `${Math.floor(s / 60)}:${(s % 60).toFixed(1).padS
 const AUDIO_EXT = /\.(wav|mp3|m4a|aac|ogg|oga|opus|flac|webm|mp4|aif|aiff|caf)$/i;
 const looksLikeAudio = (f: File) => f.type.startsWith("audio/") || AUDIO_EXT.test(f.name);
 
-export function VoiceLabPage() {
+export function VoiceLabPage({ embedded = false }: { embedded?: boolean } = {}) {
   const [source, setSource] = useState<{ name: string; buffer: AudioBuffer } | null>(null);
   const [processed, setProcessed] = useState<AudioBuffer | null>(null);
   const [progress, setProgress] = useState<number | null>(null);
@@ -241,8 +241,8 @@ export function VoiceLabPage() {
   const needsProcessing = !!source && !processed && progress === null;
 
   return (
-    <div className="page-column" style={{ maxWidth: 720 }}>
-      <h1>Voice lab</h1>
+    <div className={embedded ? undefined : "page-column"} style={embedded ? undefined : { maxWidth: 720 }} data-testid="voice-lab">
+      {!embedded && <h1>Voice lab</h1>}
       <p style={{ color: "var(--text-dim)" }}>Record or load audio to process through our curated effects</p>
 
       <section style={{ display: "flex", gap: "0.8rem", flexWrap: "wrap", alignItems: "stretch", marginBottom: "1rem" }}>

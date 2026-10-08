@@ -2,177 +2,131 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../lib/api";
 import { useAuth } from "../lib/auth";
-import { useDocumentTitle } from "../lib/useDocumentTitle";
+import { Username } from "../components/Username";
 
-interface ChallengeSummary {
-  id: number;
-  title: string;
-  prompt: string;
-  active: boolean;
-  submissionCount: number;
-}
-interface Submission {
-  id: number;
-  username: string;
-  trackTitle: string;
-  albumTitle: string;
-  albumSlug: string;
-  coverArtUrl: string | null;
-}
-interface ChallengeDetail {
-  id: number;
-  title: string;
-  prompt: string;
-  active: boolean;
-  submissions: Submission[];
-}
+interface ChallengeSummary { id: number; title: string; prompt: string; active: boolean; submissionCount: number }
+interface Submission { id: number; username: string; trackTitle: string; albumTitle: string; albumSlug: string; coverArtUrl: string | null }
+interface ChallengeDetail { id: number; title: string; prompt: string; active: boolean; submissions: Submission[] }
 
-export function ChallengesPage() {
-  useDocumentTitle("Challenges");
+/** A recurring constraint and a thread of what people made of it. Lives in XenoLab's Challenges tab. The newest open one starts open. */
+export function ChallengesPanel() {
   const { user } = useAuth();
-  const [challenges, setChallenges] = useState<ChallengeSummary[]>([]);
+  const [challenges, setChallenges] = useState<ChallengeSummary[] | null>(null);
   const [openId, setOpenId] = useState<number | null>(null);
   const [detail, setDetail] = useState<ChallengeDetail | null>(null);
   const [myTracks, setMyTracks] = useState<{ id: number; title: string; albumTitle: string }[]>([]);
   const [chosenTrack, setChosenTrack] = useState<number | "">("");
-
   const [newTitle, setNewTitle] = useState("");
   const [newPrompt, setNewPrompt] = useState("");
+  const [error, setError] = useState<string | null>(null);
 
-  function loadChallenges() {
-    api<ChallengeSummary[]>("/api/challenges").then(setChallenges);
+  function loadChallenges(autoOpen = false) {
+    api<ChallengeSummary[]>("/api/challenges").then((list) => {
+      setChallenges(list);
+      if (autoOpen) { const first = list.find((c) => c.active) ?? list[0]; if (first) openChallenge(first.id); }
+    }).catch(() => setChallenges([]));
   }
-  useEffect(loadChallenges, []);
+  useEffect(() => loadChallenges(true), []);
 
   async function openChallenge(id: number) {
     setOpenId(id);
-    const d = await api<ChallengeDetail>(`/api/challenges/${id}`);
-    setDetail(d);
+    setDetail(await api<ChallengeDetail>(`/api/challenges/${id}`));
   }
 
   useEffect(() => {
     if (!user) return;
     api<{ slug: string }[]>("/api/community-albums?mine=true").then((albums) => {
-      Promise.all(
-        albums.map((a) =>
-          api<{ tracks: { id: number; title: string }[] }>(`/api/community-albums/${a.slug}`).then((d) =>
-            d.tracks.map((t) => ({ id: t.id, title: t.title, albumTitle: a.slug })),
-          ),
-        ),
-      ).then((lists) => setMyTracks(lists.flat()));
-    });
+      Promise.all(albums.map((a) => api<{ tracks: { id: number; title: string }[] }>(`/api/community-albums/${a.slug}`).then((d) => d.tracks.map((t) => ({ id: t.id, title: t.title, albumTitle: a.slug }))))).then((lists) => setMyTracks(lists.flat()));
+    }).catch(() => {});
   }, [user]);
 
   async function submit() {
     if (!openId || !chosenTrack) return;
+    setError(null);
     try {
       await api(`/api/challenges/${openId}/submit`, { method: "POST", body: JSON.stringify({ trackId: chosenTrack }) });
       setChosenTrack("");
       openChallenge(openId);
       loadChallenges();
     } catch (err) {
-      alert(err instanceof Error ? err.message : "Failed to submit");
+      setError(err instanceof Error ? err.message : "Failed to submit");
     }
   }
-
   async function withdraw(submissionId: number) {
     await api(`/api/challenge-submissions/${submissionId}`, { method: "DELETE" });
     if (openId) openChallenge(openId);
     loadChallenges();
   }
-
   async function createChallenge(e: React.FormEvent) {
     e.preventDefault();
     if (!newTitle.trim() || !newPrompt.trim()) return;
     await api("/api/admin/challenges", { method: "POST", body: JSON.stringify({ title: newTitle.trim(), prompt: newPrompt.trim() }) });
-    setNewTitle("");
-    setNewPrompt("");
+    setNewTitle(""); setNewPrompt("");
     loadChallenges();
   }
-
   async function toggleActive(id: number, active: boolean) {
     await api(`/api/admin/challenges/${id}`, { method: "PATCH", body: JSON.stringify({ active }) });
     loadChallenges();
   }
 
   return (
-    <div style={{ maxWidth: 720 }}>
-      <h1>Challenges</h1>
-      <p style={{ color: "var(--text-dim)" }}>A recurring constraint, a submission thread - see what people make of it.</p>
+    <div data-testid="challenges-panel">
+      <p className="home-dim xl-bar-text">A constraint to make something from. Take one on, then submit a track you made for it.</p>
 
       {user?.isAdmin && (
-        <form onSubmit={createChallenge} style={{ border: "1px solid var(--border)", borderRadius: "var(--radius)", padding: "0.6rem", marginBottom: "1.5rem", display: "flex", flexDirection: "column", gap: "0.4rem" }}>
-          <h3 style={{ fontSize: "0.9rem", margin: 0 }}>New challenge (admin)</h3>
-          <input placeholder="Title" value={newTitle} onChange={(e) => setNewTitle(e.target.value)} />
-          <textarea placeholder="The prompt / constraint" value={newPrompt} onChange={(e) => setNewPrompt(e.target.value)} rows={2} />
-          <button className="btn btn-primary" type="submit" style={{ alignSelf: "flex-start" }}>
-            Create
-          </button>
+        <form onSubmit={createChallenge} className="xl-form">
+          <b>New challenge (admin)</b>
+          <input placeholder="Title" value={newTitle} onChange={(e) => setNewTitle(e.target.value)} aria-label="Challenge title" />
+          <textarea placeholder="The prompt / constraint" value={newPrompt} onChange={(e) => setNewPrompt(e.target.value)} rows={2} aria-label="Challenge prompt" />
+          <button className="btn btn-primary" type="submit" style={{ alignSelf: "flex-start" }}>Create</button>
         </form>
       )}
 
-      {challenges.map((c) => (
-        <div key={c.id} style={{ border: "1px solid var(--border)", borderRadius: "var(--radius)", padding: "0.6rem", marginBottom: "0.6rem", opacity: c.active ? 1 : 0.6 }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-            <div>
-              <div style={{ fontFamily: "var(--font-display)" }}>
-                {c.title} {!c.active && <span style={{ fontSize: "0.7rem", color: "var(--text-dim)" }}>(closed)</span>}
+      {challenges === null ? <p className="home-dim">Loading…</p> : challenges.length === 0 ? <p className="home-dim">No challenges yet.</p> : (
+        <ul className="xl-cards">
+          {challenges.map((c) => (
+            <li key={c.id} className={`xl-card${c.active ? "" : " xl-card-closed"}`}>
+              <div className="xl-card-top">
+                <b>{c.title}</b>
+                <span className="home-dim">{c.active ? "open" : "closed"} · {c.submissionCount} submission{c.submissionCount !== 1 ? "s" : ""}</span>
               </div>
-              <div style={{ fontSize: "0.8rem", color: "var(--text-dim)" }}>{c.submissionCount} submission{c.submissionCount !== 1 ? "s" : ""}</div>
-            </div>
-            <div style={{ display: "flex", gap: "0.4rem" }}>
-              <button className="btn" onClick={() => openChallenge(c.id)}>
-                {openId === c.id ? "Hide" : "View"}
-              </button>
-              {user?.isAdmin && (
-                <button className="btn" onClick={() => toggleActive(c.id, !c.active)}>
-                  {c.active ? "Close" : "Reopen"}
-                </button>
-              )}
-            </div>
-          </div>
+              {openId !== c.id && <p className="xl-card-text xl-clamp">{c.prompt}</p>}
+              <div className="xl-card-actions">
+                <button className="btn" aria-expanded={openId === c.id} onClick={() => (openId === c.id ? (setOpenId(null), setDetail(null)) : openChallenge(c.id))}>{openId === c.id ? "Hide" : c.active ? "Take it on" : "View"}</button>
+                {user?.isAdmin && <button className="btn" onClick={() => toggleActive(c.id, !c.active)}>{c.active ? "Close" : "Reopen"}</button>}
+              </div>
 
-          {openId === c.id && detail && (
-            <div style={{ marginTop: "0.6rem", paddingTop: "0.6rem", borderTop: "1px solid var(--border)" }}>
-              <p>{detail.prompt}</p>
-
-              {detail.submissions.length === 0 ? (
-                <p style={{ color: "var(--text-dim)", fontSize: "0.85rem" }}>No submissions yet.</p>
-              ) : (
-                detail.submissions.map((s) => (
-                  <div key={s.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: "0.85rem", marginBottom: "0.3rem" }}>
-                    <span>
-                      <Link to={`/community-album/${s.albumSlug}`}>{s.trackTitle}</Link>
-                      <span style={{ color: "var(--text-dim)" }}> - {s.username}</span>
-                    </span>
-                    {user?.username === s.username && (
-                      <button className="btn btn-danger" style={{ fontSize: "0.7rem" }} onClick={() => withdraw(s.id)}>
-                        withdraw
-                      </button>
-                    )}
-                  </div>
-                ))
-              )}
-
-              {user && detail.active && (
-                <div style={{ display: "flex", gap: "0.4rem", marginTop: "0.6rem" }}>
-                  <select value={chosenTrack} onChange={(e) => setChosenTrack(e.target.value ? Number(e.target.value) : "")} style={{ flex: 1 }}>
-                    <option value="">- pick one of your tracks -</option>
-                    {myTracks.map((t) => (
-                      <option key={t.id} value={t.id}>
-                        {t.title}
-                      </option>
-                    ))}
-                  </select>
-                  <button className="btn btn-primary" onClick={submit}>
-                    Submit
-                  </button>
+              {openId === c.id && detail && (
+                <div className="xl-card-open">
+                  <p className="xl-card-text">{detail.prompt}</p>
+                  {detail.submissions.length === 0 ? <p className="home-dim">No submissions yet. Be the first.</p> : (
+                    <ul className="xl2-list">
+                      {detail.submissions.map((s) => (
+                        <li key={s.id} className="xl-sub">
+                          <span><Link to={`/community-album/${s.albumSlug}`}>{s.trackTitle}</Link> <span className="home-dim"><Username name={s.username} /></span></span>
+                          {user?.username === s.username && <button className="btn btn-danger" onClick={() => withdraw(s.id)}>withdraw</button>}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                  {!user && detail.active && <p className="home-dim"><Link to="/login">Log in</Link> to submit a track.</p>}
+                  {user && detail.active && (
+                    <div className="xl-form-row">
+                      <select value={chosenTrack} onChange={(e) => setChosenTrack(e.target.value ? Number(e.target.value) : "")} aria-label="Your track to submit" style={{ flex: 1 }}>
+                        <option value="">{myTracks.length ? "- pick one of your tracks -" : "- you have no tracks yet -"}</option>
+                        {myTracks.map((t) => <option key={t.id} value={t.id}>{t.title}</option>)}
+                      </select>
+                      <button className="btn btn-primary" onClick={submit} disabled={!chosenTrack}>Submit</button>
+                    </div>
+                  )}
+                  {user && detail.active && myTracks.length === 0 && <p className="home-dim">Upload a track first in <Link to="/cult">Cult activities</Link>.</p>}
+                  {error && <p className="an-err" role="alert">{error}</p>}
                 </div>
               )}
-            </div>
-          )}
-        </div>
-      ))}
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   );
 }

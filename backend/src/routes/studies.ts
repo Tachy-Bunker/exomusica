@@ -2,6 +2,7 @@ import { createReadStream } from "node:fs";
 import { stat } from "node:fs/promises";
 import path from "node:path";
 import { UPLOADS_DIR } from "../lib/storage.js";
+import { studyExcerpt } from "../lib/studyExcerpt.js";
 import { isTextFile, readTextPreview } from "../lib/textFiles.js";
 import type { FastifyInstance } from "fastify";
 import { prisma } from "../lib/prisma.js";
@@ -36,12 +37,13 @@ export async function studiesRoutes(app: FastifyInstance): Promise<void> {
 
   app.get("/api/studies", async () => {
     const studies = await prisma.study.findMany({
-      select: { slug: true, title: true, status: true, createdAt: true, updatedAt: true, owner: { select: { username: true } }, channel: { select: { slug: true } } },
+      select: { slug: true, title: true, body: true, status: true, createdAt: true, updatedAt: true, owner: { select: { username: true } }, channel: { select: { slug: true } } },
       orderBy: { updatedAt: "desc" },
     });
     return studies.map((s) => ({
       slug: s.slug,
       title: s.title,
+      excerpt: studyExcerpt(s.body),
       status: s.status,
       createdAt: s.createdAt,
       updatedAt: s.updatedAt,

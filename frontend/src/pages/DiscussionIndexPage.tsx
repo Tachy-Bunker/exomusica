@@ -55,7 +55,7 @@ export function DiscussionIndexPage() {
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <h1>Forums</h1>
         <div style={{ display: "flex", gap: "0.4rem" }}>
-          <Link to="/studies" className="btn">
+          <Link to="/xenolab?tab=studies" className="btn">
             Studies
           </Link>
           <Link to="/contribute" className="btn">

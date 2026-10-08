@@ -232,11 +232,11 @@ export function ForumMapPage({ embedded = false, onViewAsList }: { embedded?: bo
       return;
     }
     if (n.type === "SAMPLE_BANK_ITEM") {
-      navigate(`/sample-bank`);
+      navigate(`/xenolab?tab=samples`);
       return;
     }
     if (n.type === "CHALLENGE") {
-      navigate(`/challenges`);
+      navigate(`/xenolab?tab=challenges`);
       return;
     }
     if (n.type === "STUDY" && n.study) {

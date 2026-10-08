@@ -1,106 +1,137 @@
+import { Suspense, lazy, useEffect, useRef, useState } from "react";
+import { Link } from "react-router-dom";
 import { Username } from "../components/Username";
-import { useEffect, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { PlotTool } from "../components/xenolab/PlotTool";
+import { LogPanel } from "../components/xenolab/LogPanel";
+import { StudiesPanel, StudyCardView } from "../components/xenolab/StudiesPanel";
+import { SoundAnalyzer } from "../components/SoundAnalyzer";
+import { ChallengesPanel } from "./ChallengesPage";
+import { SamplesPanel } from "./SampleBankPage";
 import { api } from "../lib/api";
+import { setPendingAnalysis } from "../lib/analyzerHandoff";
+import { useAuth } from "../lib/auth";
+import { timeAgo } from "../lib/relativeTime";
 import { useDocumentTitle } from "../lib/useDocumentTitle";
-import { StudyChartView } from "../components/StudyChartView";
+import { useUrlParams } from "../lib/useUrlParams";
+import { LAB_TABS, parseTab, studyToContinue, type LabTab, type StudyCard } from "../lib/xenolab";
 
-interface StudySummary {
-  slug: string;
-  title: string;
-  status: "IN_PROGRESS" | "COMPLETE";
-  owner: string;
-  updatedAt: string;
-}
-interface StudyDetail {
-  charts: { kind: "LINE" | "BAR" | "SCATTER" | "TABLE"; xLabel: string | null; yLabel: string | null; dataCsv: string }[];
+const VoiceLab = lazy(() => import("./VoiceLabPage").then((m) => ({ default: m.VoiceLabPage })));
+
+interface ChallengeLite { id: number; title: string; prompt: string; active: boolean; submissionCount: number }
+interface SampleLite { id: number; title: string; owner: string; kind: string; fileUrl: string }
+
+function MiniDrop({ onFile }: { onFile: (f: File) => void }) {
+  const ref = useRef<HTMLInputElement>(null);
+  const [over, setOver] = useState(false);
+  return (
+    <div className={`an-drop an-drop-mini${over ? " an-drop-over" : ""}`} onDragOver={(e) => { e.preventDefault(); setOver(true); }} onDragLeave={() => setOver(false)} onDrop={(e) => { e.preventDefault(); setOver(false); const f = e.dataTransfer.files[0]; if (f) onFile(f); }}>
+      <input ref={ref} className="sr-only" type="file" accept="audio/*,video/*,.flac,.opus,.m4a" aria-label="Choose a sound file to analyze" data-testid="overview-drop-input" onChange={(e) => { const f = e.target.files?.[0]; if (f) onFile(f); e.target.value = ""; }} />
+      <p className="an-drop-title">Drop a sound to measure it</p>
+      <p className="home-dim">Loudness, pitch, tempo, key, problems. Stays on your device.</p>
+      <button className="btn btn-primary" onClick={() => ref.current?.click()}>Choose a file</button>
+    </div>
+  );
 }
 
-const SAMPLE_CSV = "frequency,amplitude\n100,0.4\n250,0.9\n500,0.6\n1000,1.0\n2000,0.5\n4000,0.2";
+function Overview({ studies, go }: { studies: StudyCard[] | null; go: (t: LabTab) => void }) {
+  const { user } = useAuth();
+  const [challenges, setChallenges] = useState<ChallengeLite[]>([]);
+  const [samples, setSamples] = useState<SampleLite[]>([]);
+  useEffect(() => {
+    api<ChallengeLite[]>("/api/challenges").then(setChallenges).catch(() => {});
+    api<SampleLite[]>("/api/sample-bank").then((l) => setSamples(l.slice(0, 3))).catch(() => {});
+  }, []);
+  const cont = studies ? studyToContinue(studies, user?.username ?? null) : null;
+  const challenge = challenges.find((c) => c.active) ?? null;
+  const others = (studies ?? []).filter((s) => s.slug !== cont?.slug).slice(0, 3);
+
+  return (
+    <div data-testid="xenolab-overview">
+      <div className="xl-two">
+        <section className="xl2-card" aria-labelledby="xl-next-h" data-testid="xenolab-next">
+          <header className="xl-head"><h2 id="xl-next-h">{cont ? "Pick up where you left off" : "Start something"}</h2></header>
+          {cont ? (
+            <>
+              <b>{cont.title}</b>
+              <p className="xl-card-text xl-clamp">{cont.excerpt || "No writing yet."}</p>
+              <p className="home-dim xl-card-meta">Edited {timeAgo(Date.parse(cont.updatedAt))}</p>
+              <div className="xl-card-actions"><Link className="btn btn-primary" to={`/study/${cont.slug}`} data-testid="xenolab-continue">Continue</Link><button className="btn" onClick={() => go("studies")}>New study</button></div>
+            </>
+          ) : user ? (
+            <>
+              <p>A study is a write-up with its own discussion: an experiment, a set of listening notes, a comparison.</p>
+              <div className="xl-card-actions"><button className="btn btn-primary" onClick={() => go("studies")} data-testid="xenolab-start-first">Start a study</button></div>
+            </>
+          ) : (
+            <>
+              <p>Studies are write-ups with their own discussion: experiments, listening notes, comparisons.</p>
+              <div className="xl-card-actions"><Link className="btn btn-primary" to="/login">Log in to start one</Link><button className="btn" onClick={() => go("studies")}>Read studies</button></div>
+            </>
+          )}
+        </section>
+        <section className="xl2-card" aria-labelledby="xl-an-h">
+          <header className="xl-head"><h2 id="xl-an-h">Analyze a sound</h2><span className="xl-kind xl-kind-tool">Tool · measures sound</span></header>
+          <MiniDrop onFile={(f) => { setPendingAnalysis({ blob: f, name: f.name }); go("analyze"); }} />
+        </section>
+      </div>
+
+      <h2 className="home-h2 xl-h">Open now</h2>
+      <div className="xl-three">
+        <section className="xl2-card" aria-labelledby="xl-ch-h">
+          <header className="xl-head"><h2 id="xl-ch-h">Challenge</h2></header>
+          {challenge ? (<><b>{challenge.title}</b><p className="xl-card-text xl-clamp">{challenge.prompt}</p><p className="home-dim xl-card-meta">{challenge.submissionCount} submission{challenge.submissionCount === 1 ? "" : "s"}</p><div className="xl-card-actions"><button className="btn" onClick={() => go("challenges")}>Take it on</button></div></>) : <p className="home-dim">No open challenge right now.</p>}
+        </section>
+        <section className="xl2-card" aria-labelledby="xl-sm-h">
+          <header className="xl-head"><h2 id="xl-sm-h">New samples</h2></header>
+          {samples.length ? (<ul className="xl2-list">{samples.map((s) => <li key={s.id}><b>{s.title}</b> <span className="home-dim"><Username name={s.owner} /></span>{s.kind === "AUDIO" && <audio controls preload="none" src={s.fileUrl} className="xl-audio" aria-label={`Preview ${s.title}`} />}</li>)}</ul>) : <p className="home-dim">No samples yet.</p>}
+          <div className="xl-card-actions"><button className="btn" onClick={() => go("samples")}>All samples</button></div>
+        </section>
+        <section className="xl2-card" aria-labelledby="xl-vl-h">
+          <header className="xl-head"><h2 id="xl-vl-h">Voice lab</h2><span className="xl-kind xl-kind-tool">Tool · changes sound</span></header>
+          <p>Clean up and level a recording, right in the browser.</p>
+          <div className="xl-card-actions"><button className="btn" onClick={() => go("voice")}>Open</button></div>
+        </section>
+      </div>
+
+      {others.length > 0 && (<>
+        <div className="home-h2-row xl-h"><h2 className="home-h2">Latest studies</h2><button className="btn-link" onClick={() => go("studies")}>All studies</button></div>
+        <ul className="xl-cards">{others.map((s) => <StudyCardView key={s.slug} s={s} />)}</ul>
+      </>)}
+    </div>
+  );
+}
 
 export function ResearchPage() {
   useDocumentTitle("XenoLab");
-  const navigate = useNavigate();
-  const [studies, setStudies] = useState<StudySummary[]>([]);
-  const [demoCsv, setDemoCsv] = useState(SAMPLE_CSV);
-  const [demoKind, setDemoKind] = useState<"LINE" | "BAR" | "SCATTER">("LINE");
-  const [newTitle, setNewTitle] = useState("");
-  const [usingRealData, setUsingRealData] = useState(false);
-
-  useEffect(() => {
-    api<StudySummary[]>("/api/studies").then((data) => {
-      setStudies(data);
-      const mostRecent = data[0];
-      if (mostRecent) {
-        // The live demo is a nicety: if that study can't be loaded, the page just shows the built-in example.
-        api<StudyDetail>(`/api/studies/${mostRecent.slug}`).then((detail) => {
-          const chart = detail.charts?.find((c) => c.kind !== "TABLE");
-          if (chart) {
-            setDemoCsv(chart.dataCsv);
-            setDemoKind(chart.kind as "LINE" | "BAR" | "SCATTER");
-            setUsingRealData(true);
-          }
-        }).catch(() => {});
-      }
-    }).catch(() => {});
-  }, []);
-
-  async function startStudy() {
-    if (!newTitle.trim()) return;
-    const created = await api<{ slug: string }>("/api/studies", { method: "POST", body: JSON.stringify({ title: newTitle.trim() }) });
-    navigate(`/study/${created.slug}`);
-  }
+  const [params, setParam] = useUrlParams();
+  const tab = parseTab(params.get("tab"));
+  const go = (t: LabTab) => { setParam("tab", t, "overview"); window.scrollTo({ top: 0 }); };
+  const [studies, setStudies] = useState<StudyCard[] | null>(null);
+  useEffect(() => { api<StudyCard[]>("/api/studies").then(setStudies).catch(() => setStudies([])); }, []);
 
   return (
     <div className="page-column xl2" data-testid="xenolab-page">
       <header className="xl2-head">
         <h1>XenoLab</h1>
-        <p className="home-dim">Study sound. Share what you find.</p>
+        <p className="home-dim">Study sound, measure it, share what you find.</p>
       </header>
-      <div className="xl2-start">
-        <input value={newTitle} onChange={(e) => setNewTitle(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") startStudy(); }} placeholder="Start a new study..." aria-label="Title of a new study" />
-        <button className="btn btn-primary" onClick={startStudy}>Start a study</button>
-      </div>
+      <nav className="xl-tabs" aria-label="XenoLab sections">
+        {LAB_TABS.map((t) => <button key={t.id} className={`xl-tab${tab === t.id ? " on" : ""}`} aria-current={tab === t.id ? "page" : undefined} onClick={() => go(t.id)} data-testid={`xl-tab-${t.id}`}>{t.label}</button>)}
+      </nav>
 
-      <div className="xl2-grid">
-        <section id="xl-research" className="xl2-card" aria-labelledby="xl-research-h" data-testid="xenolab-research">
-          <header className="xl-head"><h2 id="xl-research-h">Research</h2><span className="xl-kind xl-kind-knowledge">Knowledge</span></header>
-          <ul className="xl2-list">
-            {studies.slice(0, 6).map((s) => (
-              <li key={s.slug}><Link to={`/study/${s.slug}`}><b>{s.title}</b></Link><span className="home-dim"> <Username name={s.owner} /> · {s.status === "COMPLETE" ? "complete" : "in progress"}</span></li>
-            ))}
-          </ul>
-          {studies.length === 0 && <p className="home-dim">No studies yet. Yours could be the first.</p>}
-          <p className="xl-links"><Link to="/studies">All studies</Link><Link to="/wiki">Read the Log</Link></p>
-        </section>
-
-        <div className="xl2-tools">
-          <section id="xl-processing" className="xl2-card" aria-labelledby="xl-processing-h" data-testid="xenolab-processing">
-            <header className="xl-head"><h2 id="xl-processing-h">Audio processing</h2><span className="xl-kind xl-kind-tool">Tool · changes sound</span></header>
-            <Link className="xl2-tool" to="/lab/voice"><b>Voice lab</b><span className="home-dim">Clean up and level a recording</span></Link>
-          </section>
-
-          <section id="xl-analysis" className="xl2-card" aria-labelledby="xl-analysis-h" data-testid="xenolab-analysis">
-            <header className="xl-head"><h2 id="xl-analysis-h">Analysis</h2><span className="xl-kind xl-kind-tool">Tool · measures sound</span></header>
-            <ul className="xl2-list xl2-small">
-              <li><b>Analyze this clip</b> <span className="home-dim">pitch, loudness and more, inside a study</span></li>
-              <li><b>Import labels</b> <span className="home-dim">from Audacity, REAPER or Praat</span></li>
-            </ul>
-            <details className="xl2-demo" data-testid="xenolab-chart-tool">
-              <summary>Plot your own data</summary>
-              <p className="xl2-demo-note">{usingRealData ? "Live data from a recent study. Edit it yourself:" : "Paste numbers and watch the chart draw:"}</p>
-              <select value={demoKind} onChange={(e) => setDemoKind(e.target.value as typeof demoKind)} aria-label="Chart type" style={{ marginBottom: "0.4rem" }}>
-                <option value="LINE">Line</option>
-                <option value="BAR">Bar</option>
-                <option value="SCATTER">Scatter</option>
-              </select>
-              <textarea value={demoCsv} onChange={(e) => { setDemoCsv(e.target.value); setUsingRealData(false); }} rows={6} aria-label="Chart data" style={{ width: "100%", fontFamily: "var(--font-mono)", fontSize: "0.8rem" }} />
-              <StudyChartView kind={demoKind} xLabel={null} yLabel={null} dataCsv={demoCsv} />
-            </details>
-          </section>
+      {tab === "overview" && <Overview studies={studies} go={go} />}
+      {tab === "studies" && <StudiesPanel studies={studies} />}
+      {tab === "analyze" && (
+        <div>
+          <SoundAnalyzer />
+          <PlotTool latestSlug={studies?.[0]?.slug ?? null} />
+          <p className="home-dim xl2-note">Inside a study you can also analyze a clip and import labels from Audacity, REAPER or Praat.</p>
         </div>
-      </div>
-      <p className="home-dim xl2-note">What the tools produce can go straight into a study.</p>
+      )}
+      {tab === "voice" && <Suspense fallback={<p className="home-dim">Loading…</p>}><VoiceLab embedded /></Suspense>}
+      {tab === "samples" && <SamplesPanel onAnalyze={() => go("analyze")} />}
+      {tab === "challenges" && <ChallengesPanel />}
+      {tab === "log" && <LogPanel />}
     </div>
   );
 }

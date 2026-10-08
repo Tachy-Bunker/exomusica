@@ -78,10 +78,10 @@ export function CommunityPage() {
         <Link to="/my-music" className="btn">
           Manage my music
         </Link>
-        <Link to="/sample-bank" className="btn">
+        <Link to="/xenolab?tab=samples" className="btn">
           Sample Bank
         </Link>
-        <Link to="/challenges" className="btn">
+        <Link to="/xenolab?tab=challenges" className="btn">
           Challenges
         </Link>
       </p>
