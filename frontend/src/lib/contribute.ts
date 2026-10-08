@@ -3,6 +3,9 @@ import { fold } from "./spaceHubs";
 
 export type SubmissionStateKey = "started" | "waiting" | "approved" | "not-accepted";
 export interface MySubmission { slug: string; title: string; trackCount: number; state: SubmissionStateKey }
+export type ContributeSample =
+  | { kind: "track"; source: "official" | "community"; trackId: number; albumSlug: string; title: string; detail: string }
+  | { kind: "attachment"; url: string; title: string; origin: { label: string; href: string } | null };
 export interface ContributeBranch {
   slug: string;
   name: string;
@@ -12,6 +15,9 @@ export interface ContributeBranch {
   backgroundUrl: string | null;
   backgroundOpacity: number;
   previewUrl: string | null;
+  image?: string | null; // the branch's main image: the background of its row
+  secondaryImage?: string | null; // its secondary image: the background of its opened panel
+  sample?: ContributeSample | null;
   sketchCount: number;
   mySubmissions: MySubmission[];
 }

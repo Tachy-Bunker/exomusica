@@ -75,13 +75,13 @@ export const useAudioStore = create<AudioState>((set, get) => ({
 
   play: (track) => {
     resumeAnalyserContextIfNeeded();
-    const isSameTrack = get().currentTrack?.id === track.id;
+    const isSameTrack = get().currentTrack?.id === track.id && get().currentTrack?.source === track.source;
     const el = audioEl;
     if (!isSameTrack) {
       set({ currentTrack: track, currentTime: 0, duration: 0 });
       if (el) el.src = track.fileUrl;
       setReplayGainDb(track.replayGainDb);
-      if (track.replayGainDb === null) analyzeAndSubmitReplayGain({ id: track.id, fileUrl: track.fileUrl, source: track.source });
+      if (track.replayGainDb === null && track.id > 0) analyzeAndSubmitReplayGain({ id: track.id, fileUrl: track.fileUrl, source: track.source });
     }
     set({ isPlaying: true });
     el?.play().catch((err) => {

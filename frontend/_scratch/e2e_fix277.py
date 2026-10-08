@@ -40,7 +40,9 @@ DATA["/api/home"] = {"stats": {"members": 5, "tracks": 3, "studies": 2, "branche
     {"kind": "member", "label": "Member", "title": "newbie", "by": None, "text": "", "detail": "joined", "href": "/u/newbie", "at": now},
     {"kind": "album", "label": "Album", "title": "Night Album", "by": None, "text": "", "detail": "", "href": "/album/x", "at": now}]}
 DATA["/api/branches/b2/albums"] = [{"slug": "al1", "title": "First", "coverArtUrl": None, "trackCount": 2, "composer": "x"}, {"slug": "al2", "title": "Second", "coverArtUrl": None, "trackCount": 3, "composer": "y"}]
-DATA["/api/branches/b2/images"] = []
+DATA["/api/branches/b2/images"] = [{"url": "/uploads/pic1.png", "kind": "gallery", "label": "Pic one", "albumSlug": None}]
+DATA["/api/branches/b2/tracks/shuffle"] = [{"id": 1, "title": "Rain Piece", "fileUrl": "/uploads/rain.wav", "format": "WAV", "durationSeconds": 6, "position": 0, "albumTitle": "First", "albumSlug": "al1", "coverArtUrl": "/uploads/cover.png", "composer": "Ghost", "branchSlug": "b2", "bookmarks": [], "replayGainDb": 0, "source": "official", "genres": []}]
+DATA["/api/contribute/branches"] = [{"slug": "b2", "name": "Full Branch", "description": "d", "coverArtUrl": None, "hasBrief": True, "backgroundUrl": None, "backgroundOpacity": 0, "image": "/uploads/pic1.png", "secondaryImage": "/uploads/pic1.png", "previewUrl": "/uploads/rain.wav", "sample": {"kind": "attachment", "url": "/uploads/rain.wav", "title": "rain on tin", "origin": {"label": "The Hall", "href": "/topic/hall#m-9"}}, "sketchCount": 0, "mySubmissions": []}]
 DATA["/api/branches/b1/images"] = []
 DATA["/api/branches/b1/albums"] = []
 DATA["/api/site-settings"]["playHighlightColor"] = "#7fdcff"
@@ -49,7 +51,6 @@ DATA["/api/users/old/stats"] = {"signals": 1234, "trace": [0,0,1,3,0,0,0,2,5,0,0
 DATA["/api/blog"] = []
 DATA["/api/channels?kind=DISCUSSION"] = [{"id": 1, "slug": "art", "name": "Art You Like", "description": None, "contentMarkdown": None, "category": "Off", "position": 0, "fontId": None, "discordChannelId": None, "discordWebhookUrl": None},
                                           {"id": 2, "slug": "sci", "name": "Science", "description": None, "contentMarkdown": None, "category": "Off", "position": 1, "fontId": None, "discordChannelId": None, "discordWebhookUrl": None}]
-DATA["/api/contribute/branches"] = []
 DATA["/api/fonts"] = []
 DATA["/api/admin/join-requests"] = []
 DATA["/api/playlists"] = []
@@ -59,7 +60,7 @@ ADMIN = {"id": 1, "username": "tachy", "isAdmin": True}
 calls = []
 
 def run(playwright):
-    browser = playwright.chromium.launch()
+    browser = playwright.chromium.launch(args=["--autoplay-policy=no-user-gesture-required"])
     results = []
     def check(cond, msg):
         results.append((bool(cond), msg)); print(("ok   " if cond else "FAIL ") + msg)
@@ -99,7 +100,7 @@ def run(playwright):
     ctx = new_ctx(); page = ctx.new_page(); watch(page)
     page.goto(f"{BASE}/xenolab"); page.wait_for_selector("[data-testid=xenolab-page]")
     labels = [t.strip() for t in page.locator(".xl-tab").all_inner_texts()]
-    check(labels == ["Studies", "Resources", "Analyze", "Effects", "Open calls", "Contribute"], f"tabs in the requested order, no Overview/Log: {labels}")
+    check(labels == ["Studies", "Contribute", "Resources", "Analyze", "Effects", "Open calls"], f"tabs in the requested order, no Overview/Log: {labels}")
     check(page.locator("[data-testid=studies-panel] .xl-card").count() == 2, "Studies is the default tab")
     page.goto(f"{BASE}/xenolab?tab=overview"); page.wait_for_selector("[data-testid=studies-panel]")
     check(page.locator("[data-testid=studies-panel]").count() == 1, "old ?tab=overview lands on Studies")
@@ -235,6 +236,46 @@ def run(playwright):
     page.goto(f"{BASE}/telemetry"); page.wait_for_selector("[data-testid=conv-list]")
     o = page.evaluate("() => [document.querySelector('[data-testid=conv-list]').getBoundingClientRect().top, document.querySelector('[data-testid=inst-scope]').getBoundingClientRect().top]")
     check(o[0] < o[1], f"phone: Scope sits below the list {o}")
+    ctx.close()
+
+    # ---------- fix279 checks
+    ctx = browser.new_context(viewport={"width": 1100, "height": 800}, args=None) if False else new_ctx()
+    page = ctx.new_page(); watch(page)
+    page.goto(f"{BASE}/?branch=b2"); page.wait_for_selector("[data-testid=explore-play]")
+    check("Play" in page.locator("[data-testid=explore-play]").get_attribute("aria-label"), "Explore: play icon before playing")
+    page.click("[data-testid=explore-play]", force=True); page.wait_for_timeout(1500)
+    check(page.locator("[data-testid=explore-play]").get_attribute("aria-label").startswith("Pause"), "Explore: becomes Pause while the branch plays")
+    md = page.evaluate("() => navigator.mediaSession && navigator.mediaSession.metadata ? [navigator.mediaSession.metadata.title, navigator.mediaSession.metadata.artist, navigator.mediaSession.metadata.album, navigator.mediaSession.metadata.artwork.length] : null")
+    check(md and md[0] == "Rain Piece" and md[1] == "Ghost" and md[2] == "First" and md[3] > 0, f"Media Session metadata published: {md}")
+    page.click("[data-testid=explore-play]", force=True); page.wait_for_timeout(500)
+    check(page.locator("[data-testid=explore-play]").get_attribute("aria-label").startswith("Play"), "Explore: click pauses (back to Play)")
+    page.goto(f"{BASE}/xenolab?tab=contribute&branch=b2"); page.wait_for_selector("[data-testid=sample-play]")
+    check(page.locator("[data-testid=contribute-panel] audio").count() == 0, "Contribute: no browser audio player")
+    check(page.locator(".ct2-row .ct2-bg").count() == 1 and page.locator(".ct-panel .ct2-bg").count() == 1, "Contribute: row and panel carry branch pictures")
+    page.click("[data-testid=sample-play]"); page.wait_for_timeout(1200)
+    check(page.locator("[data-testid=sample-play]").get_attribute("aria-label").startswith("Pause"), "Contribute: sample plays through the site player")
+    check(page.locator(".player-bar-docked a[href='/topic/hall#m-9']").count() >= 1, "Player links a chat file back to its message")
+    ctx.close()
+    ctx = new_ctx(); page = ctx.new_page(); watch(page)
+    DATA["/api/studies"][0]["backgroundUrl"] = "/uploads/pic1.png"
+    page.goto(f"{BASE}/xenolab"); page.wait_for_selector("[data-testid=studies-panel] .xl-card")
+    check(page.locator(".xl-card-text").count() == 0 and page.locator(".xl-card-bg").count() == 1, "Studies: no text preview, background picture on the card")
+    page.goto(f"{BASE}/telemetry?view=instrument"); page.wait_for_selector("[data-testid=conv-sort]")
+    check([o.strip() for o in page.locator("[data-testid=conv-sort] option").all_inner_texts()] == ["Recent", "Busiest", "A to Z"], "Instrument sort names")
+    page.goto(f"{BASE}/soundbay"); page.wait_for_selector("[data-testid=sb-sort]")
+    check([o.strip() for o in page.locator("[data-testid=sb-sort] option").all_inner_texts()] == ["Recent", "A to Z", "Tracks"], "Soundbay sort names")
+    ctx.close()
+    for logged in (True, False):
+        ctx = new_ctx(logged_in=logged, viewport={"width": 390, "height": 800}); page = ctx.new_page(); watch(page)
+        page.goto(f"{BASE}/soundbay"); page.wait_for_selector("[data-testid=soundbay-page]")
+        a = page.locator(".mobile-acct")
+        check(a.count() == 1 and a.bounding_box()["x"] < 60, f"phone: account (logged_in={logged}) sits top-left")
+        check(page.locator(".sb-head h1").bounding_box()["width"] <= 2, "phone: Soundbay title hidden")
+        if not logged: check("Log in" in a.inner_text(), "phone: guest gets a Log in bubble")
+        ctx.close()
+    ctx = new_ctx(viewport={"width": 390, "height": 800}); page = ctx.new_page(); watch(page)
+    page.goto(f"{BASE}/xenolab?tab=contribute&branch=b2"); page.wait_for_selector("[data-testid=contribute-panel]")
+    check(not page.locator(".ct-panel-title").is_visible(), "phone: branch name not repeated inside the opened panel")
     ctx.close()
 
     # ---------- mobile overflow

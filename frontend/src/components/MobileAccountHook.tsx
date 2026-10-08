@@ -24,6 +24,11 @@ export function MobileAccountHook(props: LoggedInProps | LoggedOutProps) {
   }
 
   return (
+    <>
+    {/* Top-left, mirroring the bell on the right */}
+    {props.loggedIn
+      ? <Link to="/account" className="mobile-acct" title={props.username} aria-label="Account"><Avatar url={props.avatarUrl} /></Link>
+      : <Link to="/login" className="mobile-acct mobile-acct-login">Log in</Link>}
     <div className="mobile-hook-wrap">
       <button className="mobile-hook-tab" onClick={() => setOpen((v) => !v)} aria-label="Account">
         ⌄
@@ -41,18 +46,12 @@ export function MobileAccountHook(props: LoggedInProps | LoggedOutProps) {
               <Link to="/pms" onClick={() => setOpen(false)} style={{ color: "var(--accent-forum)", display: "inline-flex" }}>
                 {props.hasUnreadPms ? <MailNotificationIcon /> : <MailIcon />}
               </Link>
-              <Link to="/account" onClick={() => setOpen(false)} title={props.username}>
-                <Avatar url={props.avatarUrl} />
-              </Link>
               <button className="btn" onClick={openDonate}>
                 💛 Donate
               </button>
             </>
           ) : (
             <>
-              <Link to="/login" onClick={() => setOpen(false)}>
-                Log in
-              </Link>
               <button className="btn" onClick={openDonate}>
                 💛 Donate
               </button>
@@ -61,5 +60,6 @@ export function MobileAccountHook(props: LoggedInProps | LoggedOutProps) {
         </div>
       )}
     </div>
+    </>
   );
 }

@@ -144,3 +144,13 @@ Tracks are normalised to **−11 LUFS** (`lib/replayGain.ts`). A quieter track i
 - Telemetry List view on a phone: the list first, the Scope after it.
 - Fireflies: four per glowing button; with reduced motion they still show but drift at a quarter speed and the button does not pulse.
 - `.hb-item` must stay `position: relative`: the whole-card link uses `::after { inset: 0 }` and otherwise covers the nearest positioned ancestor (it made a homepage activity link cover the page).
+
+## fix279
+- Play highlight: default on (icy blue `#8fd8ff`); `playHighlightColor = "off"` disables it. Fireflies also show under reduced motion (slow).
+- Pause icon on the Explore module, Soundbay, album, community album, branch and playlist buttons when that item is the one playing; click toggles.
+- Media Session (`lib/mediaSession.ts`): title/artist/album/artwork + play/pause/prev/next/seek handlers.
+- Explore perf on mobile: memo tiles, `startTransition`, async image decoding, simplified hover-less CSS.
+- XenoLab: Contribute right after Studies. Study cards use a background image (`Study.backgroundUrl`; link, upload `POST /api/studies/:slug/background`, or a connected branch's image); no excerpt.
+- Contribute: rows/panels use the branch's primary/secondary image; the sample is any site track (Branch.sampleTrackId / sampleCommunityTrackId, set in Admin → Branch → Contribution) or a chat attachment, played via the site player with a provenance link.
+- Sort labels: Telemetry Recent/Busiest/A to Z; Soundbay Recent/A to Z/Tracks.
+- Mobile: page titles hidden, Account button top-left (guest: "Log in" bubble).

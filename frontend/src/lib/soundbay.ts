@@ -3,11 +3,11 @@ import type { HomeBranch } from "./home";
 import { fold } from "./spaceHubs";
 
 export type BranchFilterKey = "all" | "recent" | "chat" | "albums";
-export type SoundbaySort = "active" | "az" | "albums";
+export type SoundbaySort = "active" | "az" | "tracks";
 const DAY = 86_400_000;
 
 export const FILTER_LABEL: Record<BranchFilterKey, string> = { all: "All", recent: "Active this month", chat: "Has a discussion", albums: "Has albums" };
-export const SORT_LABEL: Record<SoundbaySort, string> = { active: "Most recently active", az: "A to Z", albums: "Most albums" };
+export const SORT_LABEL: Record<SoundbaySort, string> = { active: "Recent", az: "A to Z", tracks: "Tracks" };
 
 const matchesQuery = (text: string, query: string) => {
   const h = fold(text);
@@ -27,7 +27,7 @@ export function sortBranches(list: HomeBranch[], sort: SoundbaySort): HomeBranch
   const byName = (a: HomeBranch, b: HomeBranch) => a.name.localeCompare(b.name, undefined, { sensitivity: "base" });
   const copy = [...list];
   if (sort === "az") return copy.sort(byName);
-  if (sort === "albums") return copy.sort((a, b) => b.albums - a.albums || (b.lastActiveAt ?? 0) - (a.lastActiveAt ?? 0) || byName(a, b));
+  if (sort === "tracks") return copy.sort((a, b) => b.tracks - a.tracks || b.albums - a.albums || (b.lastActiveAt ?? 0) - (a.lastActiveAt ?? 0) || byName(a, b));
   return copy.sort((a, b) => (b.lastActiveAt ?? -1) - (a.lastActiveAt ?? -1) || byName(a, b)); // branches nobody has touched come last
 }
 

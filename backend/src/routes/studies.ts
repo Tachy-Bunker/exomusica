@@ -2,7 +2,6 @@ import { createReadStream } from "node:fs";
 import { stat } from "node:fs/promises";
 import path from "node:path";
 import { UPLOADS_DIR } from "../lib/storage.js";
-import { studyExcerpt } from "../lib/studyExcerpt.js";
 import { isTextFile, readTextPreview } from "../lib/textFiles.js";
 import type { FastifyInstance } from "fastify";
 import { prisma } from "../lib/prisma.js";
@@ -37,13 +36,13 @@ export async function studiesRoutes(app: FastifyInstance): Promise<void> {
 
   app.get("/api/studies", async () => {
     const studies = await prisma.study.findMany({
-      select: { slug: true, title: true, body: true, status: true, createdAt: true, updatedAt: true, owner: { select: { username: true } }, channel: { select: { slug: true } }, branches: { select: { slug: true, name: true, visibility: true } } },
+      select: { slug: true, title: true, backgroundUrl: true, status: true, createdAt: true, updatedAt: true, owner: { select: { username: true } }, channel: { select: { slug: true } }, branches: { select: { slug: true, name: true, visibility: true } } },
       orderBy: { updatedAt: "desc" },
     });
     return studies.map((s) => ({
       slug: s.slug,
       title: s.title,
-      excerpt: studyExcerpt(s.body),
+      backgroundUrl: s.backgroundUrl,
       status: s.status,
       createdAt: s.createdAt,
       updatedAt: s.updatedAt,
@@ -85,7 +84,7 @@ export async function studiesRoutes(app: FastifyInstance): Promise<void> {
     return reply.code(201).send(study);
   });
 
-  app.patch<{ Params: { slug: string }; Body: Partial<{ title: string; body: string; status: "IN_PROGRESS" | "COMPLETE"; channelSlug: string | null; newChat: boolean; branchSlugs: string[] }> }>(
+  app.patch<{ Params: { slug: string }; Body: Partial<{ title: string; body: string; status: "IN_PROGRESS" | "COMPLETE"; channelSlug: string | null; newChat: boolean; branchSlugs: string[]; backgroundUrl: string | null }> }>(
     "/api/studies/:slug",
     { preHandler: requireAuth },
     async (req, reply) => {
@@ -95,13 +94,19 @@ export async function studiesRoutes(app: FastifyInstance): Promise<void> {
 
       // Only these fields may be changed through this route. (Passing the raw
       // body through would let an owner rewrite ownerId, slug, channelId...)
-      const { title, body, status, channelSlug, newChat, branchSlugs } = req.body ?? {};
-      const data: { title?: string; body?: string; status?: "IN_PROGRESS" | "COMPLETE"; channelId?: number | null; branches?: { set: { id: number }[] } } = {};
+      const { title, body, status, channelSlug, newChat, branchSlugs, backgroundUrl } = req.body ?? {};
+      const data: { backgroundUrl?: string | null; title?: string; body?: string; status?: "IN_PROGRESS" | "COMPLETE"; channelId?: number | null; branches?: { set: { id: number }[] } } = {};
       // The branches the study is about: none, one or several. Hidden branches can only be picked by an admin.
       if (Array.isArray(branchSlugs)) {
         const slugs = [...new Set(branchSlugs.filter((x): x is string => typeof x === "string"))].slice(0, 20);
         const found = await prisma.branch.findMany({ where: { slug: { in: slugs }, ...(req.user!.isAdmin ? {} : { visibility: { not: "HIDDEN" } }) }, select: { id: true } });
         data.branches = { set: found.map((b) => ({ id: b.id })) };
+      }
+      if (backgroundUrl !== undefined) {
+        const bg = typeof backgroundUrl === "string" ? backgroundUrl.trim() : "";
+        if (bg === "") data.backgroundUrl = null;
+        else if (bg.length <= 1000 && /^(https?:\/\/|\/uploads\/)/i.test(bg)) data.backgroundUrl = bg;
+        else return reply.code(400).send({ error: "the background must be a web link (https://...) or one of the site's pictures" });
       }
       if (typeof title === "string") {
         if (!title.trim()) return reply.code(400).send({ error: "title can't be empty" });
@@ -189,6 +194,40 @@ export async function studiesRoutes(app: FastifyInstance): Promise<void> {
       throw err;
     }
     return reply.code(201).send({ id: attachment.id, url: attachment.storagePath, filename: attachment.filename, mimeType: attachment.mimeType, sizeBytes: Number(attachment.sizeBytes) });
+  });
+
+  // The picture behind the study's card and page, uploaded from the owner's device. Kept with the study, so deleting it cleans the file up.
+  app.post<{ Params: { slug: string } }>("/api/studies/:slug/background", { preHandler: requireAuth }, async (req, reply) => {
+    const study = await prisma.study.findUnique({ where: { slug: req.params.slug } });
+    if (!study) return reply.code(404).send({ error: "no such study" });
+    if (study.ownerId !== req.user!.id && !req.user!.isAdmin) return reply.code(403).send({ error: "not your study" });
+    const file = await req.file();
+    if (!file) return reply.code(400).send({ error: "no file uploaded" });
+    if (!["image/png", "image/jpeg", "image/webp", "image/gif"].includes(file.mimetype)) {
+      file.file.resume();
+      return reply.code(400).send({ error: "choose a PNG, JPEG, WebP or GIF picture" });
+    }
+    const buffer = await file.toBuffer();
+    if (buffer.length > 8 * 1024 * 1024) return reply.code(400).send({ error: "that picture is over 8 MB" });
+    let attachment;
+    try {
+      attachment = await saveMessageAttachment(req.user!.id, file.filename || "background", file.mimetype, buffer);
+    } catch (err) {
+      return reply.code(400).send({ error: err instanceof Error ? err.message : "upload failed" });
+    }
+    try {
+      await prisma.attachment.update({ where: { id: attachment.id }, data: { studyId: study.id } });
+    } catch (err) {
+      await deleteAttachmentAndReclaim(attachment.id).catch(() => undefined);
+      throw err;
+    }
+    // the previous uploaded background (if it was one of ours) is no longer needed
+    if (study.backgroundUrl?.startsWith("/uploads/")) {
+      const old = await prisma.attachment.findFirst({ where: { studyId: study.id, storagePath: study.backgroundUrl }, select: { id: true } });
+      if (old) await deleteAttachmentAndReclaim(old.id).catch(() => undefined);
+    }
+    await prisma.study.update({ where: { id: study.id }, data: { backgroundUrl: attachment.storagePath } });
+    return reply.code(201).send({ backgroundUrl: attachment.storagePath });
   });
 
   // --- Files in a study: download, and a text preview ---

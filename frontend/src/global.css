@@ -206,6 +206,9 @@ button {
     right: 0.5rem;
     top: 0.35rem;
   }
+  /* The account sits top-left, the mirror of the bell. A guest gets a "Log in" bubble there. */
+  .nav-tools > .mobile-acct { right: auto; left: 0.5rem; display: inline-flex; align-items: center; justify-content: center; min-width: 40px; min-height: 40px; }
+  .nav-tools > .mobile-acct-login { min-height: 0; min-width: 0; height: 32px; padding: 0 0.85rem; margin-top: 0.1rem; border: 1px solid var(--accent-forum-dim); border-radius: 999px; font-size: 0.82rem; color: var(--accent-forum); text-decoration: none; background: color-mix(in srgb, var(--accent-forum) 10%, transparent); }
 }
 
 .main-content {
@@ -4610,10 +4613,12 @@ th {
 .explore-bg {
   position: absolute;
   inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
   z-index: -1;
   border-radius: inherit;
-  background-size: cover;
-  background-position: center;
   opacity: 0.17; /* dim enough that everything on top stays legible */
   animation: explore-bg-in 0.8s ease both;
   pointer-events: none;
@@ -4660,10 +4665,13 @@ th {
 .gtile-bg {
   position: absolute;
   inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
   z-index: 0;
-  background-size: cover;
-  background-position: center;
   opacity: 0.3;
+  pointer-events: none;
 }
 .gtile > :not(.gtile-bg) { position: relative; z-index: 1; }
 .explore-pics {
@@ -5160,3 +5168,58 @@ th {
 .ct2-none { font-size: 0.85rem; color: var(--text-dim); }
 .ct2-next { display: flex; gap: 0.6rem 1rem; align-items: center; justify-content: space-between; flex-wrap: wrap; border-left: 3px solid var(--accent-audio); padding: 0.45rem 0.8rem; background: color-mix(in srgb, var(--accent-audio) 7%, transparent); border-radius: var(--radius); margin-top: 0.9rem; }
 .ct2-more { margin: 0.8rem 0 0; font-size: 0.85rem; }
+
+/* Phones and other touch screens: no hover, so no looping glow; fewer things repainted while the camera travels. */
+@media (hover: none) {
+  .gtile { transition: none; contain: layout paint; }
+  .gtile:hover, .gtile:focus-visible { animation: none; }
+  .gtile.on { box-shadow: 0 0 0 1px var(--emb); }
+  .explore-bg { animation: none; opacity: 0.17; }
+  .explore-pics img { filter: none; transition: none; }
+  .explore-pics li:hover, .explore-pics li:has(a:focus-visible) { animation: none; }
+  .gridwin::before, .gridwin::after { display: none; }
+}
+
+/* Phones: the page titles go (the top bar already says where you are), the content moves up. A screen reader still gets them. */
+@media (max-width: 760px) {
+  .sb-head h1, .xl2-head, .conv-head h1 { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+  .sb-head { justify-content: flex-end; }
+  .ct-list .ct-panel-title { display: none; } /* the branch's name is already the row above its panel */
+}
+@media (max-width: 760px) { .conv-head { display: flex; justify-content: space-between; } }
+@media (max-width: 760px) {
+  .space-page { gap: 0.8rem; } /* the 2rem between sections is a lot on a phone */
+  .space-page .space-controls { margin-bottom: 0; }
+  .space-page .tlist { margin-top: 0; }
+}
+
+/* Studies: cards carry the study's background picture instead of a text preview */
+.xl-card { position: relative; overflow: hidden; min-height: 84px; justify-content: space-between; }
+.xl-card-bg { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; opacity: 0.32; z-index: 0; pointer-events: none; }
+.xl-card.has-bg::before { content: ""; position: absolute; inset: 0; z-index: 0; pointer-events: none; background: linear-gradient(180deg, color-mix(in srgb, var(--bg-elevated) 55%, transparent), var(--bg-elevated) 115%); }
+.xl-card > :not(.xl-card-bg) { position: relative; z-index: 1; }
+.xl-sep { border: 0; border-top: 1px solid var(--border); margin: 1.6rem 0 1.2rem; }
+/* Study page background */
+.study-page { position: relative; isolation: isolate; }
+.study-bg { position: absolute; left: 50%; top: -1.5rem; width: min(100vw, 1100px); height: 300px; transform: translateX(-50%); object-fit: cover; opacity: 0.22; z-index: -1; pointer-events: none; -webkit-mask-image: linear-gradient(180deg, #000 30%, transparent); mask-image: linear-gradient(180deg, #000 30%, transparent); }
+.study-bgpick { margin: 0.4rem 0 1rem; display: flex; flex-wrap: wrap; align-items: center; gap: 0.4rem; }
+.study-bgpick-thumb { width: 44px; height: 28px; object-fit: cover; border-radius: 4px; border: 1px solid var(--border); }
+.study-bgpick-panel { flex: 1 1 100%; display: flex; flex-direction: column; gap: 0.6rem; border: 1px solid var(--border); border-radius: var(--radius); padding: 0.7rem; }
+.study-bgpick-grid { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(84px, 1fr)); gap: 0.4rem; }
+.study-bgpick-grid button { padding: 0; border: 2px solid transparent; border-radius: 6px; background: none; cursor: pointer; display: block; width: 100%; }
+.study-bgpick-grid button.on, .study-bgpick-grid button:hover { border-color: var(--accent-audio); }
+.study-bgpick-grid img { width: 100%; aspect-ratio: 16 / 10; object-fit: cover; display: block; border-radius: 4px; }
+.study-bgpick-row { display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: center; }
+.study-bgpick-row input { flex: 1 1 220px; }
+
+/* Contribute: branch pictures as backgrounds (main image on the row, secondary image behind the opened panel) and the sample's Play button */
+.ct2-row, .ct-panel { position: relative; overflow: hidden; isolation: isolate; }
+.ct2-bg { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; z-index: -1; pointer-events: none; opacity: 0.32; }
+.ct2-row.has-bg::after, .ct-panel.has-bg::after { content: ""; position: absolute; inset: 0; z-index: -1; pointer-events: none; background: linear-gradient(90deg, color-mix(in srgb, var(--bg-elevated) 70%, transparent), transparent 85%); }
+.ct-panel.has-bg .ct2-bg { opacity: 0.22; }
+.ct2-play { display: inline-flex; align-items: center; gap: 0.55rem; min-width: 0; max-width: 100%; padding: 0.2rem 0.55rem 0.2rem 0.2rem; border: 1px solid var(--border); border-radius: 999px; background: var(--bg-inset); color: var(--text); font: inherit; cursor: pointer; text-align: left; }
+.ct2-play:hover { border-color: var(--accent-forum-dim); }
+.ct2-play-icon { flex: none; width: 28px; height: 28px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; background: var(--accent-forum-dim); }
+.ct2-play-text { display: flex; flex-direction: column; min-width: 0; line-height: 1.2; }
+.ct2-play-text b, .ct2-play-text small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 0.82rem; }
+.ct2-play-text small { color: var(--text-dim); font-size: 0.7rem; font-weight: 400; }

@@ -2,11 +2,11 @@
 export type LabTab = "studies" | "resources" | "analyze" | "effects" | "open" | "contribute";
 export const LAB_TABS: { id: LabTab; label: string }[] = [
   { id: "studies", label: "Studies" },
+  { id: "contribute", label: "Contribute" },
   { id: "resources", label: "Resources" },
   { id: "analyze", label: "Analyze" },
   { id: "effects", label: "Effects" },
   { id: "open", label: "Open calls" },
-  { id: "contribute", label: "Contribute" },
 ];
 // Addresses from before the tabs were renamed keep working.
 const OLD_TABS: Record<string, LabTab> = { overview: "studies", samples: "resources", voice: "effects", challenges: "open", log: "studies" };
@@ -15,7 +15,7 @@ export function parseTab(value: string | null): LabTab {
   return (value && OLD_TABS[value]) || "studies";
 }
 
-export interface StudyCard { slug: string; title: string; excerpt?: string; status: "IN_PROGRESS" | "COMPLETE"; owner: string; updatedAt: string }
+export interface StudyCard { slug: string; title: string; excerpt?: string; backgroundUrl?: string | null; status: "IN_PROGRESS" | "COMPLETE"; owner: string; updatedAt: string }
 
 export type StudyFilter = "all" | "mine" | "progress" | "complete";
 export function filterStudies(list: StudyCard[], filter: StudyFilter, query: string, me: string | null): StudyCard[] {

@@ -3,6 +3,7 @@ import { createPortal } from "react-dom";
 import { Link } from "react-router-dom";
 import { bindAudioElement, useAudioStore } from "../lib/audioStore";
 import { initAnalyser } from "../lib/audioAnalyser";
+import { startMediaSession } from "../lib/mediaSession";
 import { useIsDesktop } from "../lib/useIsDesktop";
 import { useFixedPortalRoot } from "../lib/useFixedPortalRoot";
 import { PreviousIcon, NextIcon, LoopIcon, LoopOneIcon, ExpandIcon, CollapseIcon, ShuffleIcon, QueueIcon } from "./Icons";
@@ -14,7 +15,16 @@ function formatTime(seconds: number): string {
   return `${m}:${s.toString().padStart(2, "0")}`;
 }
 
+/** Where a playing track points: its message (for a chat file), its community album, or its album. */
+function trackHref(t: { origin?: { href: string } | null; source?: string; albumSlug: string }): string | null {
+  if (t.origin) return t.origin.href;
+  if (!t.albumSlug) return null;
+  return t.source === "community" ? `/community-album/${t.albumSlug}` : `/album/${t.albumSlug}`;
+}
+const trackLabel = (t: { origin?: { label: string } | null; albumTitle: string }) => (t.origin ? `from ${t.origin.label}` : t.albumTitle);
+
 export function PlayerBar() {
+  useEffect(() => { startMediaSession(); }, []); // lock screen / media keys / "now playing" in the OS
   const audioRef = useRef<HTMLAudioElement>(null);
   const wrapperRef = useRef<HTMLDivElement>(null);
 
@@ -240,7 +250,7 @@ export function PlayerBar() {
             onTouchEnd={handleTouchEnd}
           >
             <Link
-              to={`/album/${currentTrack.albumSlug}`}
+              to={trackHref(currentTrack) ?? "#"}
               className="player-cover"
               style={{ backgroundImage: currentTrack.coverArtUrl ? `url(${currentTrack.coverArtUrl})` : undefined }}
               onClick={(e) => e.stopPropagation()}
@@ -249,10 +259,8 @@ export function PlayerBar() {
               <div className="title">{currentTrack.title}</div>
               {isDesktop && (
                 <div className="origin">
-                  {currentTrack.composer} -{" "}
-                  <Link to={`/album/${currentTrack.albumSlug}`} onClick={(e) => e.stopPropagation()}>
-                    {currentTrack.albumTitle}
-                  </Link>
+                  {currentTrack.composer ? <>{currentTrack.composer} -{" "}</> : null}
+                  {trackHref(currentTrack) ? <Link to={trackHref(currentTrack)!} onClick={(e) => e.stopPropagation()}>{trackLabel(currentTrack)}</Link> : trackLabel(currentTrack)}
                 </div>
               )}
               {isDesktop && currentPlaylist && (
@@ -324,10 +332,8 @@ export function PlayerBar() {
             />
             <h2 style={{ marginBottom: "0.2rem" }}>{currentTrack.title}</h2>
             <p style={{ color: "var(--text-dim)" }}>
-              {currentTrack.composer} -{" "}
-              <Link to={`/album/${currentTrack.albumSlug}`} onClick={() => setExpanded(false)}>
-                {currentTrack.albumTitle}
-              </Link>
+              {currentTrack.composer ? <>{currentTrack.composer} -{" "}</> : null}
+              {trackHref(currentTrack) ? <Link to={trackHref(currentTrack)!} onClick={() => setExpanded(false)}>{trackLabel(currentTrack)}</Link> : trackLabel(currentTrack)}
             </p>
             {currentPlaylist && (
               <p style={{ color: "var(--text-dim)", marginTop: "-0.4rem" }}>

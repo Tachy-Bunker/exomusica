@@ -278,8 +278,8 @@ export async function siteSettingsRoutes(app: FastifyInstance): Promise<void> {
     if (body.usernameColor !== undefined && body.usernameColor !== null && !isHexColor(body.usernameColor)) {
       return reply.code(400).send({ error: "usernameColor must be a colour like #e8b86f" });
     }
-    if (body.playHighlightColor !== undefined && body.playHighlightColor !== null && !isHexColor(body.playHighlightColor)) {
-      return reply.code(400).send({ error: "playHighlightColor must be a colour like #8fd8ff" });
+    if (body.playHighlightColor !== undefined && body.playHighlightColor !== null && body.playHighlightColor !== "off" && !isHexColor(body.playHighlightColor)) {
+      return reply.code(400).send({ error: "playHighlightColor must be a colour like #8fd8ff, or off" });
     }
     for (const key of [
       "defaultFontId",

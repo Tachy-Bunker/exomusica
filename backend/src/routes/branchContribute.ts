@@ -5,6 +5,7 @@ import { createReadStream, existsSync } from "node:fs";
 import { prisma } from "../lib/prisma.js";
 import { requireAdmin, verifyToken } from "../lib/auth.js";
 import { submissionState } from "../lib/submissionState.js";
+import { sampleOf, sampleUrl } from "../lib/contributeSample.js";
 
 const UPLOADS_DIR = path.join(process.cwd(), "uploads");
 
@@ -21,7 +22,11 @@ export async function branchContributeRoutes(app: FastifyInstance): Promise<void
         briefMarkdown: true,
         contributeBackgroundUrl: true,
         contributeBackgroundOpacity: true,
-        previewAttachment: { select: { storagePath: true } },
+        identityImageUrl: true,
+        identitySecondaryImageUrl: true,
+        previewAttachment: { select: { storagePath: true, filename: true, message: { select: { id: true, dayKey: true, channel: { select: { slug: true, name: true, branchId: true, branch: { select: { visibility: true } } } } } } } },
+        sampleTrack: { select: { id: true, title: true, fileUrl: true, album: { select: { slug: true, title: true } } } },
+        sampleCommunityTrack: { select: { id: true, title: true, externalUrl: true, attachment: { select: { storagePath: true } }, album: { select: { slug: true, title: true } } } },
         _count: { select: { sketches: true } },
       },
       orderBy: { name: "asc" },
@@ -44,7 +49,10 @@ export async function branchContributeRoutes(app: FastifyInstance): Promise<void
       hasBrief: !!b.briefMarkdown,
       backgroundUrl: b.contributeBackgroundUrl,
       backgroundOpacity: b.contributeBackgroundOpacity,
-      previewUrl: b.previewAttachment ? b.previewAttachment.storagePath : null,
+      image: b.identityImageUrl, // the branch's main image: the row's background
+      secondaryImage: b.identitySecondaryImageUrl, // its secondary image: the background of the opened panel
+      previewUrl: sampleUrl(b),
+      sample: sampleOf(b),
       sketchCount: b._count.sketches,
       mySubmissions: mine
         .filter((a) => a.targetBranch?.slug === b.slug)

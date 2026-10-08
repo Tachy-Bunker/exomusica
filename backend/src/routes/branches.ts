@@ -211,6 +211,8 @@ export async function branchRoutes(app: FastifyInstance): Promise<void> {
       ogImageUrl: string | null;
       briefMarkdown: string | null;
       previewAttachmentId: number | null;
+      sampleTrackId: number | null;
+      sampleCommunityTrackId: number | null;
       contributeBackgroundUrl: string | null;
       contributeBackgroundOpacity: number;
       identityColor: string | null;

@@ -268,9 +268,9 @@ export async function albumRoutes(app: FastifyInstance): Promise<void> {
     const q = (req.query.q ?? "").trim();
     if (q.length < 2) return [];
     const [tracks, attachments, community] = await Promise.all([
-      prisma.track.findMany({ where: { title: { contains: q, mode: "insensitive" } }, take: 15, orderBy: { id: "desc" }, select: { title: true, fileUrl: true, format: true, durationSeconds: true, album: { select: { title: true } } } }),
-      prisma.attachment.findMany({ where: { filename: { contains: q, mode: "insensitive" }, mimeType: { startsWith: "audio/" } }, take: 15, orderBy: { id: "desc" }, select: { filename: true, storagePath: true, mimeType: true } }),
-      prisma.communityTrack.findMany({ where: { title: { contains: q, mode: "insensitive" } }, take: 15, orderBy: { id: "desc" }, select: { title: true, externalUrl: true, attachment: { select: { storagePath: true, filename: true } }, album: { select: { title: true } } } }),
+      prisma.track.findMany({ where: { title: { contains: q, mode: "insensitive" } }, take: 15, orderBy: { id: "desc" }, select: { id: true, title: true, fileUrl: true, format: true, durationSeconds: true, album: { select: { title: true } } } }),
+      prisma.attachment.findMany({ where: { filename: { contains: q, mode: "insensitive" }, mimeType: { startsWith: "audio/" } }, take: 15, orderBy: { id: "desc" }, select: { id: true, filename: true, storagePath: true, mimeType: true } }),
+      prisma.communityTrack.findMany({ where: { title: { contains: q, mode: "insensitive" } }, take: 15, orderBy: { id: "desc" }, select: { id: true, title: true, externalUrl: true, attachment: { select: { storagePath: true, filename: true } }, album: { select: { title: true } } } }),
     ]);
     return shapeTrackHits({ tracks, attachments, community });
   });

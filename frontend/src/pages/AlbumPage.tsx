@@ -1,5 +1,5 @@
 import { PlayGlow } from "../components/PlayGlow";
-import { PlayIcon } from "../components/Icons";
+import { PauseIcon, PlayIcon } from "../components/Icons";
 import { branchHref } from "../lib/branchLinks";
 import { useEffect, useState } from "react";
 import { useParams, Link, useNavigate, useSearchParams } from "react-router-dom";
@@ -46,6 +46,10 @@ export function AlbumPage() {
   const addToQueue = useAudioStore((s) => s.addToQueue);
   const clearQueue = useAudioStore((s) => s.clearQueue);
   const setCurrentPlaylist = useAudioStore((s) => s.setCurrentPlaylist);
+  const cur = useAudioStore((s) => s.currentTrack);
+  const audioPlaying = useAudioStore((s) => s.isPlaying);
+  const toggleAudio = useAudioStore((s) => s.toggle);
+  const albumOn = !!album && cur?.albumSlug === album.slug && cur.source !== "community";
   const [searchParams] = useSearchParams();
   const [shareOpen, setShareOpen] = useState(false);
 
@@ -169,7 +173,7 @@ export function AlbumPage() {
       <div style={{ display: "flex", alignItems: "center", gap: "0.6rem", marginTop: "1.5rem" }}>
         <h2 style={{ fontSize: "1rem", margin: 0 }}>Tracks</h2>
         <PlayGlow>
-          <button className="btn btn-primary icon-btn" onClick={() => { const [first, ...rest] = album.tracks; if (!first) return; play(first); clearQueue(); addToQueue(rest); setCurrentPlaylist(null); }} disabled={album.tracks.length === 0} aria-label="Play the album" title="Play the album" data-testid="album-play-all"><PlayIcon size={16} /></button>
+          <button className="btn btn-primary icon-btn" onClick={() => { if (albumOn) { toggleAudio(); return; } const [first, ...rest] = album.tracks; if (!first) return; play(first); clearQueue(); addToQueue(rest); setCurrentPlaylist(null); }} disabled={album.tracks.length === 0} aria-label={albumOn && audioPlaying ? "Pause" : "Play the album"} title={albumOn && audioPlaying ? "Pause" : "Play the album"} data-testid="album-play-all">{albumOn && audioPlaying ? <PauseIcon size={16} /> : <PlayIcon size={16} />}</button>
         </PlayGlow>
         <button className="btn" onClick={() => addToQueue(album.tracks)}>
           Add all to queue
@@ -213,8 +217,8 @@ export function AlbumPage() {
             }}
           >
             <PlayGlow when="hover" hostSelector=".track-hl-host">
-              <button className="btn" onClick={() => { play(t); setCurrentPlaylist(null); }}>
-                ▶
+              <button className="btn" onClick={() => { if (cur?.id === t.id && cur.albumSlug === t.albumSlug && cur.source !== "community") { toggleAudio(); return; } play(t); setCurrentPlaylist(null); }} aria-label={cur?.id === t.id && audioPlaying ? `Pause ${t.title}` : `Play ${t.title}`}>
+                {cur?.id === t.id && cur.albumSlug === t.albumSlug && cur.source !== "community" && audioPlaying ? <PauseIcon size={13} /> : "▶"}
               </button>
             </PlayGlow>
             <button className="btn" onClick={() => addToQueue([t])} title="Add to queue">

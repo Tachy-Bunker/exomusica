@@ -5,7 +5,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { AlbumIcon, ChatIcon, MapIcon } from "../components/ActivityIcons";
 import { Username } from "../components/Username";
 import { BranchEmblem } from "../components/BranchEmblem";
-import { PlayIcon } from "../components/Icons";
+import { PauseIcon, PlayIcon } from "../components/Icons";
 import { api } from "../lib/api";
 import { useAudioStore } from "../lib/audioStore";
 import { identityOf } from "../lib/branchIdentity";
@@ -52,6 +52,11 @@ function BranchRow({ b, open, onToggle, playing }: { b: HomeBranch; open: boolea
   const play = useAudioStore((s) => s.play);
   const addToQueue = useAudioStore((s) => s.addToQueue);
   const clearQueue = useAudioStore((s) => s.clearQueue);
+  const audioPlaying = useAudioStore((s) => s.isPlaying);
+  const nowBranch = useAudioStore((s) => s.currentTrack?.branchSlug ?? null);
+  const nowAlbum = useAudioStore((s) => s.currentTrack?.albumSlug ?? null);
+  const toggleAudio = useAudioStore((s) => s.toggle);
+  const branchOn = audioPlaying && nowBranch === b.slug;
   const [albums, setAlbums] = useState<AlbumLite[] | null>(null);
   const [pictures, setPictures] = useState<BranchPicture[] | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
@@ -77,9 +82,10 @@ function BranchRow({ b, open, onToggle, playing }: { b: HomeBranch; open: boolea
       addToQueue(rest);
     } finally { setBusy(null); }
   }
-  const shuffle = () => start("shuffle", `/api/branches/${b.slug}/tracks/shuffle`, (r) => r as PlayableTrackDTO[]);
+  const shuffle = () => (nowBranch === b.slug ? toggleAudio() : start("shuffle", `/api/branches/${b.slug}/tracks/shuffle`, (r) => r as PlayableTrackDTO[]));
   // Playing an album also lines up the branch's other albums behind it (the ones after it first, then the ones before), so the music carries on in context.
   const playAlbum = async (slug: string) => {
+    if (nowAlbum === slug) { toggleAudio(); return; } // already the loaded album: pause / resume
     await start(slug, `/api/albums/${slug}`, (r) => (r as { tracks: PlayableTrackDTO[] }).tracks);
     const list = albums ?? [];
     const at = list.findIndex((a) => a.slug === slug);
@@ -113,7 +119,7 @@ function BranchRow({ b, open, onToggle, playing }: { b: HomeBranch; open: boolea
         </div>
         <div className="sb-actions">
           {/* No albums: nothing to play, so no button. Open with albums: the albums below are the way in, so the shuffle fades out (and comes back when closed). */}
-          {b.albums > 0 && <PlayGlow when="hover" hostSelector=".sb-row" active={!open}><button type="button" className={`sb-act sb-play${open ? " sb-play-faded" : ""}`} onClick={shuffle} disabled={busy !== null || b.tracks === 0} tabIndex={open ? -1 : undefined} aria-hidden={open ? true : undefined} aria-label={`Play a shuffle of ${b.name}`} title="Play shuffle" data-testid="row-play"><PlayIcon size={13} /></button></PlayGlow>}
+          {b.albums > 0 && <PlayGlow when="hover" hostSelector=".sb-row" active={!open}><button type="button" className={`sb-act sb-play${open ? " sb-play-faded" : ""}`} onClick={shuffle} disabled={busy !== null || b.tracks === 0} tabIndex={open ? -1 : undefined} aria-hidden={open ? true : undefined} aria-label={branchOn ? `Pause ${b.name}` : `Play a shuffle of ${b.name}`} title={branchOn ? "Pause" : "Play shuffle"} data-testid="row-play">{branchOn ? <PauseIcon size={13} /> : <PlayIcon size={13} />}</button></PlayGlow>}
           {b.chatSlug && <button type="button" className="sb-act sb-extra" onClick={discuss} data-testid="row-discuss"><ChatIcon size={13} /> Discussion</button>}
           <Link className="sb-act sb-extra" to={`/?branch=${b.slug}`} data-testid="row-map"><MapIcon size={13} /> Map</Link>
         </div>
@@ -135,7 +141,7 @@ function BranchRow({ b, open, onToggle, playing }: { b: HomeBranch; open: boolea
                       <Link to={`/album/${a.slug}`}>{a.title}</Link>
                       <span className="home-dim">{a.trackCount ?? 0} track{a.trackCount === 1 ? "" : "s"}{a.composer ? ` · ${a.composer}` : ""}</span>
                     </span>
-                    <button type="button" className="btn icon-btn sb-album-play" onClick={() => playAlbum(a.slug)} disabled={busy !== null || !a.trackCount} aria-label={`Play ${a.title}`} title={`Play ${a.title}`} data-testid="album-play"><PlayIcon size={15} /></button>
+                    <button type="button" className="btn icon-btn sb-album-play" onClick={() => playAlbum(a.slug)} disabled={busy !== null || !a.trackCount} aria-label={audioPlaying && nowAlbum === a.slug ? `Pause ${a.title}` : `Play ${a.title}`} title={audioPlaying && nowAlbum === a.slug ? "Pause" : `Play ${a.title}`} data-testid="album-play">{audioPlaying && nowAlbum === a.slug ? <PauseIcon size={15} /> : <PlayIcon size={15} />}</button>
                   </li>
                 ))}
               </ul>
@@ -176,7 +182,7 @@ export function SoundbayPage() {
   const openList = useMemo(() => parseOpenList(openRaw), [openRaw]);
   const openSlugs = useMemo(() => new Set(openList), [openList]);
   const sortParam = params.get("sort");
-  const sort: SoundbaySort = sortParam === "az" || sortParam === "albums" ? sortParam : "active";
+  const sort: SoundbaySort = sortParam === "az" ? "az" : sortParam === "tracks" || sortParam === "albums" ? "tracks" : "active";
   const query = params.get("q") ?? "";
 
   const all = home?.branches ?? [];

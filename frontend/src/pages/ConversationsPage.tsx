@@ -29,8 +29,8 @@ const FILTERS: { id: ConversationFilter; label: string }[] = [
   { id: "study", label: "Studies" },
 ];
 const SORTS: { id: ConversationSort; label: string }[] = [
-  { id: "recent", label: "Most recent" },
-  { id: "busy", label: "Busiest this week" },
+  { id: "recent", label: "Recent" },
+  { id: "busy", label: "Busiest" },
   { id: "az", label: "A to Z" },
 ];
 const HOUR = 3_600_000;

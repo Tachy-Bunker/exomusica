@@ -2,6 +2,7 @@ import { PlayGlow } from "../components/PlayGlow";
 import { useEffect, useState } from "react";
 import { useParams, Link, useSearchParams } from "react-router-dom";
 import { api } from "../lib/api";
+import { PauseIcon } from "../components/Icons";
 import { useAudioStore } from "../lib/audioStore";
 import { useAuth } from "../lib/auth";
 import { useDocumentTitle } from "../lib/useDocumentTitle";
@@ -51,6 +52,10 @@ export function PlaylistPage() {
   const addToQueue = useAudioStore((s) => s.addToQueue);
   const clearQueue = useAudioStore((s) => s.clearQueue);
   const setCurrentPlaylist = useAudioStore((s) => s.setCurrentPlaylist);
+  const cur = useAudioStore((s) => s.currentTrack);
+  const audioPlaying = useAudioStore((s) => s.isPlaying);
+  const toggleAudio = useAudioStore((s) => s.toggle);
+  const isCur = (i: { trackId: number; source: string }) => !!cur && cur.id === i.trackId && cur.source === i.source;
 
   function reload() {
     if (!slug) return;
@@ -261,8 +266,8 @@ export function PlaylistPage() {
             {album.items.map((item) => (
               <div key={item.id} className="track-hl-host" style={{ display: "flex", alignItems: "center", gap: "0.5rem", fontSize: "0.9rem", padding: "0.15rem 0" }}>
                 <PlayGlow when="hover" hostSelector=".track-hl-host">
-                  <button className="btn" style={{ padding: "0.1rem 0.4rem" }} onClick={() => playTrack(item)} title="Play">
-                    ▶
+                  <button className="btn" style={{ padding: "0.1rem 0.4rem" }} onClick={() => (isCur(item) ? toggleAudio() : playTrack(item))} title={isCur(item) && audioPlaying ? "Pause" : "Play"} aria-label={isCur(item) && audioPlaying ? `Pause ${item.title}` : `Play ${item.title}`}>
+                    {isCur(item) && audioPlaying ? <PauseIcon size={12} /> : "▶"}
                   </button>
                 </PlayGlow>
                 <span style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{item.title}</span>

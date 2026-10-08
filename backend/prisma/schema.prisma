@@ -164,6 +164,10 @@ model Branch {
   identityImageUrl    String?     // the branch's MAIN image: shown in place of the emblem (an album cover or gallery picture, or an upload)
   identitySecondaryImageUrl String? // the branch's SECONDARY image: the soft background of its tile and of the homepage module when it is chosen
   previewAttachmentId Int?        @unique
+  sampleTrackId       Int?        // a track already on the site, offered as the branch's sample (instead of a chat file)
+  sampleTrack         Track?      @relation("BranchSampleTrack", fields: [sampleTrackId], references: [id], onDelete: SetNull)
+  sampleCommunityTrackId Int?
+  sampleCommunityTrack   CommunityTrack? @relation("BranchSampleCommunityTrack", fields: [sampleCommunityTrackId], references: [id], onDelete: SetNull)
   previewAttachment   Attachment? @relation("BranchPreview", fields: [previewAttachmentId], references: [id])
   sketches            BranchSketch[]
   submissions         CommunityAlbum[] @relation("BranchSubmissions")
@@ -387,6 +391,7 @@ model Track {
   bookmarks    AudioBookmark[]
   collaborators TrackCollaborator[] // per-track composer/credit override, checkbox-selected from the album's collaborators
   playlistItems PlaylistItem[]
+  sampleForBranches Branch[] @relation("BranchSampleTrack")
 }
 
 // Multi-select ("checkboxes") credit per track - a track can have more than
@@ -662,7 +667,7 @@ model SiteSettings {
   scanSfxUrl     String? // spacemap text-reveal loop (branch lock-on + F/E/T hint)
   defaultWikiPageId Int?
   defaultWikiPage   WikiPage? @relation(fields: [defaultWikiPageId], references: [id])
-  playHighlightColor String? // glow + drifting firefly on the Play buttons visitors should reach for; null = no highlight
+  playHighlightColor String? // glow + drifting firefly on the Play buttons visitors should reach for; null = icy blue (#8fd8ff, the default); "off" = no highlight
   usernameColor      String? // the colour every username is shown in outside chat (and the link to their page)
   textColorPrimary   String? // overrides --text site-wide
   textColorSecondary String? // overrides --text-dim site-wide
@@ -797,6 +802,7 @@ model Study {
   title       String
   body        String            @db.Text
   status      StudyStatus       @default(IN_PROGRESS)
+  backgroundUrl String?         // the picture behind the study's card and page: a link, an upload, or one of its branches' images
   channelId   Int?              // the study's discussion chat: its own auto-created one, or any existing branch/topic chat the owner picked. Several studies may share one chat.
   channel     ForumChannel?     @relation(fields: [channelId], references: [id], onDelete: SetNull)
   createdAt   DateTime          @default(now())
@@ -1029,6 +1035,7 @@ model CommunityTrack {
   remixOf       CommunityTrack?  @relation("Remixes", fields: [remixOfId], references: [id], onDelete: SetNull)
   remixes       CommunityTrack[] @relation("Remixes")
   challengeSubmissions ChallengeSubmission[]
+  sampleForBranches Branch[] @relation("BranchSampleCommunityTrack")
 }
 
 // A lightweight "resonate" signal - deliberately simpler than the full

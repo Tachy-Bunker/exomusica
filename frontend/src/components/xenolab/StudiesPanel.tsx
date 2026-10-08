@@ -9,13 +9,13 @@ import { Username } from "../Username";
 
 export function StudyCardView({ s }: { s: StudyCard }) {
   return (
-    <li className="xl-card">
+    <li className={`xl-card${s.backgroundUrl ? " has-bg" : ""}`}>
+      {s.backgroundUrl && <img className="xl-card-bg" src={s.backgroundUrl} alt="" loading="lazy" decoding="async" draggable={false} />}
       <Link className="xl-card-link" to={`/study/${s.slug}`}>
         <div className="xl-card-top">
           <b>{s.title}</b>
           <span className={`xl-status ${s.status === "COMPLETE" ? "xl-status-done" : ""}`}>{s.status === "COMPLETE" ? "complete" : "in progress"}</span>
         </div>
-        {s.excerpt ? <p className="xl-card-text xl-clamp">{s.excerpt}</p> : <p className="xl-card-text home-dim">No writing yet.</p>}
       </Link>
       <div className="home-dim xl-card-meta"><Username name={s.owner} /> · {timeAgo(Date.parse(s.updatedAt))}</div>
     </li>
@@ -63,6 +63,7 @@ export function StudiesPanel({ studies }: { studies: StudyCard[] | null }) {
         <input type="search" value={query} onChange={(e) => { setQuery(e.target.value); setShown(12); }} placeholder="Search studies" aria-label="Search studies" className="xl-search" />
       </div>
 
+      <hr className="xl-sep" aria-hidden="true" />
       {user ? (
         <div className="xl-form" data-testid="xenolab-start">
           <div className="xl-form-row">

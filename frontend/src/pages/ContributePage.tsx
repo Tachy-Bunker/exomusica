@@ -3,13 +3,64 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { api } from "../lib/api";
 import { useAuth } from "../lib/auth";
-import { filterBranches, sortBranches, STATE_LABEL, type ContributeBranch, type SubmissionStateKey } from "../lib/contribute";
+import { PauseIcon, PlayIcon } from "../components/Icons";
+import { useAudioStore } from "../lib/audioStore";
+import type { PlayableTrackDTO } from "../lib/types";
+import { filterBranches, sortBranches, STATE_LABEL, type ContributeBranch, type ContributeSample, type SubmissionStateKey } from "../lib/contribute";
 import { renderMarkdown } from "../lib/markdown";
 import { useDocumentTitle } from "../lib/useDocumentTitle";
 import { useIsDesktop } from "../lib/useIsDesktop";
 import { useUrlParams } from "../lib/useUrlParams";
 
 interface BranchDetail { briefMarkdown: string | null }
+
+/** A stable negative id for a chat file, so it can never be mistaken for a track of an album. */
+function fileId(url: string): number {
+  let h = 0;
+  for (let i = 0; i < url.length; i++) h = (Math.imul(h, 31) + url.charCodeAt(i)) | 0;
+  return -(Math.abs(h) + 1);
+}
+
+/** The branch's sample: one Play button (no browser player). A track of the site plays as itself; a chat file plays with a link back to its message. */
+function SamplePlay({ sample, branchSlug }: { sample: ContributeSample; branchSlug: string }) {
+  const cur = useAudioStore((s) => s.currentTrack);
+  const playing = useAudioStore((s) => s.isPlaying);
+  const play = useAudioStore((s) => s.play);
+  const toggle = useAudioStore((s) => s.toggle);
+  const clearQueue = useAudioStore((s) => s.clearQueue);
+  const setCurrentPlaylist = useAudioStore((s) => s.setCurrentPlaylist);
+  const [busy, setBusy] = useState(false);
+  const [failed, setFailed] = useState(false);
+  const on = !!cur && (sample.kind === "track" ? cur.id === sample.trackId && cur.source === sample.source : cur.fileUrl === sample.url);
+
+  async function press() {
+    if (on) { toggle(); return; }
+    setBusy(true); setFailed(false);
+    try {
+      let track: PlayableTrackDTO | undefined;
+      if (sample.kind === "track") {
+        const path = sample.source === "community" ? `/api/community-albums/${encodeURIComponent(sample.albumSlug)}` : `/api/albums/${encodeURIComponent(sample.albumSlug)}`;
+        const album = await api<{ tracks: PlayableTrackDTO[] }>(path);
+        track = album.tracks.find((t) => t.id === sample.trackId);
+      } else {
+        track = {
+          id: fileId(sample.url), title: sample.title, fileUrl: sample.url, format: "MP3", durationSeconds: null, position: 0,
+          albumTitle: "", albumSlug: "", coverArtUrl: null, composer: "", branchSlug, bookmarks: [], replayGainDb: null, source: "official", genres: [], origin: sample.origin,
+        };
+      }
+      if (!track) { setFailed(true); return; }
+      clearQueue(); setCurrentPlaylist(null); play(track);
+    } catch { setFailed(true); } finally { setBusy(false); }
+  }
+  const label = sample.kind === "track" ? sample.title : sample.title;
+  const sub = sample.kind === "track" ? sample.detail : sample.origin ? `from ${sample.origin.label}` : "";
+  return (
+    <button type="button" className="ct2-play" onClick={press} disabled={busy} aria-label={on && playing ? `Pause ${label}` : `Play ${label}`} data-testid="sample-play">
+      <span className="ct2-play-icon">{on && playing ? <PauseIcon size={15} /> : <PlayIcon size={15} />}</span>
+      <span className="ct2-play-text"><b>{failed ? "Couldn't play it" : label}</b>{sub && <small>{sub}</small>}</span>
+    </button>
+  );
+}
 const STEPS = ["Pick a branch", "Make a piece", "Submit · the team listens"];
 const SEARCH_FROM = 8; // a search box only earns its place once the list is long
 
@@ -71,7 +122,8 @@ export function ContributePage({ embedded = false }: { embedded?: boolean } = {}
     const next = nextAction(!!user, selected);
     const blurb = selected.description;
     return (
-      <div className="ct-panel" ref={panelRef} tabIndex={-1} aria-label={`About ${selected.name}`} data-testid="contribute-panel">
+      <div className={`ct-panel${selected.secondaryImage ? " has-bg" : ""}`} ref={panelRef} tabIndex={-1} aria-label={`About ${selected.name}`} data-testid="contribute-panel">
+        {selected.secondaryImage && <img className="ct2-bg" src={selected.secondaryImage} alt="" loading="lazy" decoding="async" draggable={false} />}
         <h2 className="ct-panel-title">{selected.name}</h2>
         {blurb && <p className="ct2-blurb">{blurb}</p>}
 
@@ -87,7 +139,7 @@ export function ContributePage({ embedded = false }: { embedded?: boolean } = {}
           </div>
           <div className={`ct2-tile${selected.previewUrl ? "" : " off"}`} data-testid="tile-sample">
             <span className="ct2-tile-h">Sample</span>
-            {selected.previewUrl ? <audio controls preload="none" src={selected.previewUrl} aria-label={`Sample from ${selected.name}`} /> : <span className="ct2-none">none yet</span>}
+            {selected.sample ? <SamplePlay sample={selected.sample} branchSlug={selected.slug} /> : selected.previewUrl ? <SamplePlay sample={{ kind: "attachment", url: selected.previewUrl, title: "Sample", origin: null }} branchSlug={selected.slug} /> : <span className="ct2-none">none yet</span>}
           </div>
           <div className={`ct2-tile${selected.sketchCount > 0 ? "" : " off"}`} data-testid="tile-sketches">
             <span className="ct2-tile-h">Sketches</span>
@@ -140,7 +192,8 @@ export function ContributePage({ embedded = false }: { embedded?: boolean } = {}
                   const latest = b.mySubmissions[0];
                   return (
                     <li key={b.slug} className={on ? "on" : ""}>
-                      <button type="button" className="ct-row ct2-row" aria-pressed={on} aria-controls="ct-detail" onClick={() => choose(b.slug)} data-slug={b.slug}>
+                      <button type="button" className={`ct-row ct2-row${b.image ? " has-bg" : ""}`} aria-pressed={on} aria-controls="ct-detail" onClick={() => choose(b.slug)} data-slug={b.slug}>
+                        {b.image && <img className="ct2-bg" src={b.image} alt="" loading="lazy" decoding="async" draggable={false} />}
                         <span className="ct-row-name">{b.name}</span>
                         <span className="ct2-dots" aria-label={[b.hasBrief && "has a brief", b.previewUrl && "has a sample", b.sketchCount > 0 && "has sketches"].filter(Boolean).join(", ") || "nothing to start from yet"}>
                           <i className={b.hasBrief ? "on" : ""} title="Brief" /><i className={b.previewUrl ? "on" : ""} title="Sample" /><i className={b.sketchCount > 0 ? "on" : ""} title="Sketches" />

@@ -9,9 +9,12 @@ interface BranchDetail {
   name: string;
   briefMarkdown: string | null;
   previewAttachmentId: number | null;
+  sampleTrackId?: number | null;
+  sampleCommunityTrackId?: number | null;
   contributeBackgroundUrl: string | null;
   contributeBackgroundOpacity: number;
 }
+interface Hit { source: "album" | "upload" | "community"; trackId?: number; communityTrackId?: number; attachmentId?: number; title: string; detail: string }
 interface Sketch {
   id: number;
   attachment: { id: number; filename: string; storagePath: string; mimeType: string };
@@ -31,6 +34,8 @@ export function BranchContributeAdminPage() {
   const [bgUrlDraft, setBgUrlDraft] = useState("");
   const [bgOpacityDraft, setBgOpacityDraft] = useState(0.3);
   const [sketches, setSketches] = useState<Sketch[]>([]);
+  const [hitQuery, setHitQuery] = useState("");
+  const [hits, setHits] = useState<Hit[] | null>(null);
   const [channelAttachments, setChannelAttachments] = useState<ChannelAttachment[] | null>(null);
   useDocumentTitle(branch ? `${branch.name} - Contribution settings` : "Contribution settings");
 
@@ -64,10 +69,19 @@ export function BranchContributeAdminPage() {
     load();
   }
 
-  async function setPreview(attachmentId: number | null) {
-    await api(`/api/admin/branches/${id}`, { method: "PATCH", body: JSON.stringify({ previewAttachmentId: attachmentId }) });
-    useToastStore.getState().showToast(attachmentId ? "Preview set ✓" : "Preview cleared");
+  // One sample per branch: choosing any kind clears the others.
+  async function setSample(pick: { sampleTrackId?: number; sampleCommunityTrackId?: number; previewAttachmentId?: number } | null) {
+    await api(`/api/admin/branches/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify({ sampleTrackId: pick?.sampleTrackId ?? null, sampleCommunityTrackId: pick?.sampleCommunityTrackId ?? null, previewAttachmentId: pick?.previewAttachmentId ?? null }),
+    });
+    useToastStore.getState().showToast(pick ? "Sample set ✓" : "Sample cleared");
     load();
+  }
+  const setPreview = (attachmentId: number | null) => setSample(attachmentId ? { previewAttachmentId: attachmentId } : null);
+  async function searchHits() {
+    if (hitQuery.trim().length < 2) return;
+    setHits(await api<Hit[]>(`/api/admin/track-search?q=${encodeURIComponent(hitQuery.trim())}`));
   }
 
   async function loadChannelAttachments() {
@@ -116,16 +130,28 @@ export function BranchContributeAdminPage() {
         Save background
       </button>
 
-      <h2 style={{ fontSize: "1rem", marginTop: "1.5rem" }}>Preview audio</h2>
-      {branch.previewAttachmentId ? (
+      <h2 style={{ fontSize: "1rem", marginTop: "1.5rem" }}>Sample</h2>
+      <p style={{ fontSize: "0.8rem", color: "var(--text-dim)" }}>Any track on the website (album or community), or a file from a chat. Contributors hear it with a Play button, and the player names where it came from.</p>
+      {branch.sampleTrackId || branch.sampleCommunityTrackId || branch.previewAttachmentId ? (
         <p style={{ fontSize: "0.85rem" }}>
-          Attachment #{branch.previewAttachmentId} set.{" "}
-          <button className="btn btn-danger" style={{ fontSize: "0.75rem" }} onClick={() => setPreview(null)}>
-            clear
-          </button>
+          {branch.sampleTrackId ? `Site track #${branch.sampleTrackId}` : branch.sampleCommunityTrackId ? `Community track #${branch.sampleCommunityTrackId}` : `Chat file #${branch.previewAttachmentId}`} is set.{" "}
+          <button className="btn btn-danger" style={{ fontSize: "0.75rem" }} onClick={() => setSample(null)}>clear</button>
         </p>
-      ) : (
-        <p style={{ fontSize: "0.85rem", color: "var(--text-dim)" }}>None set - pick one from the channel attachments below.</p>
+      ) : <p style={{ fontSize: "0.85rem", color: "var(--text-dim)" }}>None set.</p>}
+      <div style={{ display: "flex", gap: "0.4rem", flexWrap: "wrap" }}>
+        <input value={hitQuery} onChange={(e) => setHitQuery(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") searchHits(); }} placeholder="Search tracks by title" aria-label="Search tracks" style={{ flex: "1 1 240px" }} data-testid="sample-search" />
+        <button className="btn" onClick={searchHits}>Search</button>
+      </div>
+      {hits && (
+        <div style={{ marginTop: "0.4rem", maxHeight: 260, overflowY: "auto", border: "1px solid var(--border)", borderRadius: "var(--radius)", padding: "0.5rem" }}>
+          {hits.length === 0 && <p style={{ fontSize: "0.8rem", color: "var(--text-dim)" }}>No track matches.</p>}
+          {hits.map((h, i) => (
+            <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "0.5rem", fontSize: "0.82rem", padding: "0.2rem 0" }}>
+              <span><b>{h.title}</b> <span style={{ color: "var(--text-dim)" }}>{h.detail}</span></span>
+              <button className="btn" style={{ fontSize: "0.7rem" }} onClick={() => setSample(h.trackId ? { sampleTrackId: h.trackId } : h.communityTrackId ? { sampleCommunityTrackId: h.communityTrackId } : h.attachmentId ? { previewAttachmentId: h.attachmentId } : null)}>use as sample</button>
+            </div>
+          ))}
+        </div>
       )}
 
       <h2 style={{ fontSize: "1rem", marginTop: "1.5rem" }}>Sketches ({sketches.length})</h2>

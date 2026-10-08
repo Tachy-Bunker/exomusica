@@ -1,5 +1,5 @@
 import { PlayGlow } from "../components/PlayGlow";
-import { PlayIcon } from "../components/Icons";
+import { PauseIcon, PlayIcon } from "../components/Icons";
 import { Username } from "../components/Username";
 import { useEffect, useState } from "react";
 import { useParams, Link, useSearchParams } from "react-router-dom";
@@ -42,6 +42,11 @@ export function CommunityAlbumPage() {
   const addToQueue = useAudioStore((s) => s.addToQueue);
   const clearQueue = useAudioStore((s) => s.clearQueue);
   const setCurrentPlaylist = useAudioStore((s) => s.setCurrentPlaylist);
+  const cur = useAudioStore((s) => s.currentTrack);
+  const audioPlaying = useAudioStore((s) => s.isPlaying);
+  const toggleAudio = useAudioStore((s) => s.toggle);
+  const isCur = (id: number) => cur?.source === "community" && cur.id === id;
+  const albumOn = !!album && cur?.source === "community" && album.tracks.some((t) => t.id === cur.id);
 
   function playTrack(track: CommunityTrackPlayable) {
     if (!album) return;
@@ -116,7 +121,7 @@ export function CommunityAlbumPage() {
         <h2 style={{ fontSize: "1rem", margin: 0 }}>Tracks</h2>
         {album.tracks.length > 0 && (
           <PlayGlow>
-            <button className="btn btn-primary icon-btn" onClick={() => playTrack(album.tracks[0])} aria-label="Play the album" title="Play the album" data-testid="album-play-all"><PlayIcon size={16} /></button>
+            <button className="btn btn-primary icon-btn" onClick={() => (albumOn ? toggleAudio() : playTrack(album.tracks[0]))} aria-label={albumOn && audioPlaying ? "Pause" : "Play the album"} title={albumOn && audioPlaying ? "Pause" : "Play the album"} data-testid="album-play-all">{albumOn && audioPlaying ? <PauseIcon size={16} /> : <PlayIcon size={16} />}</button>
           </PlayGlow>
         )}
         {album.tracks.length > 0 && (
@@ -156,8 +161,8 @@ export function CommunityAlbumPage() {
             <div key={t.id} className="track-hl-host" style={{ border: "1px solid var(--border)", borderRadius: "var(--radius)" }}>
               <div style={{ display: "flex", alignItems: "center", gap: "0.6rem", padding: "0.4rem 0.6rem" }}>
                 <PlayGlow when="hover" hostSelector=".track-hl-host">
-                  <button className="btn" onClick={() => playTrack(t)}>
-                    ▶
+                  <button className="btn" onClick={() => (isCur(t.id) ? toggleAudio() : playTrack(t))} aria-label={isCur(t.id) && audioPlaying ? `Pause ${t.title}` : `Play ${t.title}`}>
+                    {isCur(t.id) && audioPlaying ? <PauseIcon size={13} /> : "▶"}
                   </button>
                 </PlayGlow>
                 <button className="btn" onClick={() => addToQueue([t])} title="Add to queue">

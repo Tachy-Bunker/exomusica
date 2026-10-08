@@ -1,0 +1,14 @@
+import { sampleOf, sampleUrl, originOf } from "../src/lib/contributeSample";
+const ok=(c:boolean,m:string)=>{console.log(c?"ok  ":"FAIL",m); if(!c) process.exitCode=1;};
+const none={sampleTrack:null,sampleCommunityTrack:null,previewAttachment:null};
+ok(sampleOf(none)===null&&sampleUrl(none)===null,"nothing set");
+const t={id:5,title:"Rain",fileUrl:"/uploads/r.mp3",album:{slug:"al",title:"Album"}};
+const att={storagePath:"/uploads/messages/x.wav",filename:"field_rec.wav",message:{id:9,dayKey:new Date("2026-01-02T00:00:00Z"),channel:{slug:"hall",name:"The Hall",branchId:null,branch:null}}};
+const s1=sampleOf({...none,sampleTrack:t,previewAttachment:att}) as any;
+ok(s1.kind==="track"&&s1.trackId===5&&s1.detail==="Album","a site track wins over a chat file");
+const s2=sampleOf({...none,previewAttachment:att}) as any;
+ok(s2.kind==="attachment"&&s2.title==="field rec"&&s2.origin.label==="The Hall","attachment: title + origin");
+ok(s2.origin.href==="/topic/hall?day=2026-01-02#m-9","origin link names the day and message: "+s2.origin.href);
+ok(originOf({...att.message,dayKey:new Date("2026-03-04T00:00:00Z")},new Date("2026-03-04T10:00:00Z"))!.href==="/topic/hall#m-9","today needs no day");
+ok(originOf({...att.message,channel:{slug:"b",name:"B",branchId:3,branch:{visibility:"HIDDEN"}}})===null,"a hidden branch's chat is never named");
+ok(sampleUrl({...none,sampleCommunityTrack:{id:1,title:"c",externalUrl:"https://x/y.mp3",attachment:null,album:{slug:"a",title:"A"}}})==="https://x/y.mp3","community external url");

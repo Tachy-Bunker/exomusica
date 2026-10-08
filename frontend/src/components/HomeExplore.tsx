@@ -1,6 +1,6 @@
 import { PlayGlow } from "./PlayGlow";
 import { BranchStudies } from "./BranchStudies";
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { memo, startTransition, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../lib/api";
 import { useAudioStore } from "../lib/audioStore";
@@ -13,11 +13,25 @@ import { timeAgo } from "../lib/relativeTime";
 import type { Branch, PlayableTrackDTO } from "../lib/types";
 import { AlbumIcon } from "./ActivityIcons";
 import { BranchEmblem } from "./BranchEmblem";
-import { ExpandIcon, PlayIcon, ShuffleIcon } from "./Icons";
+import { ExpandIcon, PauseIcon, PlayIcon, ShuffleIcon } from "./Icons";
 import { SpaceMap } from "./SpaceMap";
 
 const CYCLE_MS = 7000;
 const prefersReducedMotion = () => typeof window !== "undefined" && !!window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+
+
+/** One branch on the grid. Memoised: choosing a branch re-renders the two tiles that changed, not all of them (this matters on a phone). */
+const GridTile = memo(function GridTile({ b, x, y, on, onChoose }: { b: HomeBranch; x: number; y: number; on: boolean; onChoose: (slug: string) => void }) {
+  const i = identityOf({ slug: b.slug, color: b.color, glyph: b.glyph, seed: b.seed });
+  return (
+    <button type="button" className={`gtile${on ? " on" : ""}${b.seed ? " seed" : ""}`} style={{ left: x, top: y, width: TILE_W, height: TILE_H, ["--emb" as string]: i.color }} data-slug={b.slug} aria-pressed={on} onClick={() => onChoose(b.slug)} onFocus={(e) => { if (e.currentTarget.matches(":focus-visible")) onChoose(b.slug); }}>
+      {b.secondaryImage && <img className="gtile-bg" src={b.secondaryImage} alt="" loading="lazy" decoding="async" draggable={false} />}
+      <BranchEmblem glyph={i.glyph} color={i.color} size={30} imageUrl={b.image} />
+      <span className="gtile-name">{b.name}</span>
+      <span className="gtile-meta">{b.tracks} track{b.tracks === 1 ? "" : "s"}</span>
+    </button>
+  );
+});
 
 /**
  * Every branch on a grid bigger than the window that shows it. Choosing a branch (or shuffling) sends the camera travelling to it, fast at first
@@ -30,6 +44,8 @@ export function HomeExplore({ branches, openFull = false, initialSlug = null }: 
   const addToQueue = useAudioStore((s) => s.addToQueue);
   const clearQueue = useAudioStore((s) => s.clearQueue);
   const nowSlug = useAudioStore((s) => s.currentTrack?.branchSlug ?? null);
+  const isPlayingNow = useAudioStore((s) => s.isPlaying);
+  const toggle = useAudioStore((s) => s.toggle);
 
   const slugKey = branches.map((b) => b.slug).join("|");
   const shuffle = useMemo(() => makeShuffler(branches.map((b) => b.slug)), [slugKey]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -110,7 +126,7 @@ export function HomeExplore({ branches, openFull = false, initialSlug = null }: 
     if (cached) { setPictures(cached); return; }
     setPictures(null);
     let alive = true;
-    api<BranchPicture[]>(`/api/branches/${selected}/images`).then((p) => { picCache.current.set(selected, p); if (alive) setPictures(p); }).catch(() => { if (alive) setPictures([]); });
+    api<BranchPicture[]>(`/api/branches/${selected}/images`).then((p) => { picCache.current.set(selected, p); if (alive) startTransition(() => setPictures(p)); }).catch(() => { if (alive) setPictures([]); });
     return () => { alive = false; };
   }, [selected]);
   const choose = useCallback((slug: string) => { setTouched(true); setSelected(slug); }, []);
@@ -118,6 +134,7 @@ export function HomeExplore({ branches, openFull = false, initialSlug = null }: 
 
   async function playBranch() {
     if (!current || playing) return;
+    if (nowSlug === current.slug) { toggle(); return; } // this branch is already the one loaded: pause / resume it, don't start over
     setTouched(true);
     setPlaying(true);
     try {
@@ -172,6 +189,7 @@ export function HomeExplore({ branches, openFull = false, initialSlug = null }: 
     );
   }
 
+  const branchOn = !!current && nowSlug === current.slug && isPlayingNow;
   const idn = current ? identityOf({ slug: current.slug, color: current.color, glyph: current.glyph, seed: current.seed }) : null;
   const bg = current?.secondaryImage ?? null;
   // Pictures that aren't already doing a job (the main image is the logo, the secondary is the background).
@@ -180,23 +198,11 @@ export function HomeExplore({ branches, openFull = false, initialSlug = null }: 
     <section id="home-explore" className="home-section" aria-labelledby="home-explore-h" onPointerDown={() => setTouched(true)} onFocus={() => setTouched(true)}>
       <h2 id="home-explore-h" className="sr-only">Explore the branches</h2>
       <div className="explore-module" data-testid="explore-module" style={{ ["--emb" as string]: idn?.color }}>
-        {bg && <div className="explore-bg" key={bg} style={{ backgroundImage: `url("${bg}")` }} data-testid="explore-bg" aria-hidden="true" />}
+        {bg && <img className="explore-bg" key={bg} src={bg} alt="" decoding="async" draggable={false} data-testid="explore-bg" aria-hidden="true" />}
         <div className="explore">
           <div className="gridwin" ref={winRef} data-testid="explore-map" role="group" aria-label="The branches, laid out on a grid">
             <div className="gridcam" ref={camRef} style={{ width: grid.width, height: grid.height }}>
-              {grid.tiles.map((t) => {
-                const b = bySlug.get(t.slug)!;
-                const i = identityOf({ slug: b.slug, color: b.color, glyph: b.glyph, seed: b.seed });
-                const on = t.slug === selected;
-                return (
-                  <button key={t.slug} type="button" className={`gtile${on ? " on" : ""}${b.seed ? " seed" : ""}`} style={{ left: t.x, top: t.y, width: TILE_W, height: TILE_H, ["--emb" as string]: i.color }} data-slug={t.slug} aria-pressed={on} onClick={() => choose(t.slug)} onFocus={(e) => { if (e.currentTarget.matches(":focus-visible")) choose(t.slug); }}>
-                    {b.secondaryImage && <span className="gtile-bg" style={{ backgroundImage: `url("${b.secondaryImage}")` }} aria-hidden="true" />}
-                    <BranchEmblem glyph={i.glyph} color={i.color} size={30} imageUrl={b.image} />
-                    <span className="gtile-name">{b.name}</span>
-                    <span className="gtile-meta">{b.tracks} track{b.tracks === 1 ? "" : "s"}</span>
-                  </button>
-                );
-              })}
+              {grid.tiles.map((t) => <GridTile key={t.slug} b={bySlug.get(t.slug)!} x={t.x} y={t.y} on={t.slug === selected} onChoose={choose} />)}
             </div>
             <button type="button" className="btn gridwin-full" onClick={openFullScreen} data-testid="explore-full"><ExpandIcon size={14} /> Full screen</button>
           </div>
@@ -217,7 +223,7 @@ export function HomeExplore({ branches, openFull = false, initialSlug = null }: 
               </p>
               <div className="explore-actions">
                 <button type="button" className="btn icon-btn" onClick={shuffleNow} aria-label="Pick another branch at random" title="Shuffle branches" data-testid="explore-shuffle"><ShuffleIcon size={18} /></button>
-                <PlayGlow><button type="button" className="btn btn-primary icon-btn" onClick={playBranch} disabled={playing} aria-label={`Play a shuffle of ${current.name}`} title={`Play a shuffle of ${current.name}`} data-testid="explore-play"><PlayIcon size={18} /></button></PlayGlow>
+                <PlayGlow><button type="button" className="btn btn-primary icon-btn" onClick={playBranch} disabled={playing} aria-label={branchOn ? `Pause ${current.name}` : `Play a shuffle of ${current.name}`} title={branchOn ? "Pause" : `Play a shuffle of ${current.name}`} data-testid="explore-play">{branchOn ? <PauseIcon size={18} /> : <PlayIcon size={18} />}</button></PlayGlow>
               </div>
             </article>
           )}
@@ -227,7 +233,7 @@ export function HomeExplore({ branches, openFull = false, initialSlug = null }: 
             {unused.map((p) => (
               <li key={p.url} data-kind={p.kind}>
                 <Link to={p.albumSlug ? `/album/${p.albumSlug}` : `/soundbay?open=${current.slug}`} title={p.label} aria-label={p.albumSlug ? `${p.label} (album)` : p.label}>
-                  <img src={p.url} alt="" loading="lazy" />
+                  <img src={p.url} alt="" loading="lazy" decoding="async" />
                   {p.kind === "album-cover" && <span className="pic-album-icon" data-testid="pic-album-icon"><AlbumIcon size={15} /></span>}
                 </Link>
               </li>

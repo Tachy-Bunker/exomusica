@@ -14,6 +14,8 @@ export interface PlayableTrackDTO {
   replayGainDb: number | null;
   source: "official" | "community";
   genres: string[];
+  /** For a file that is not a track of an album (a chat attachment): where it came from, as a link the player can show. */
+  origin?: { label: string; href: string } | null;
 }
 
 export interface MessageDTO {

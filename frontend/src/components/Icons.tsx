@@ -128,6 +128,15 @@ export function PlayIcon({ size = 20, className }: IconProps) {
   );
 }
 
+export function PauseIcon({ size = 20, className }: IconProps) {
+  return (
+    <svg className={className} width={size} height={size} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false">
+      <rect x="6" y="4.5" width="4.2" height="15" rx="1.2" />
+      <rect x="13.8" y="4.5" width="4.2" height="15" rx="1.2" />
+    </svg>
+  );
+}
+
 export function RefreshIcon({ size = 18, className }: IconProps) {
   return (
     <svg className={className} width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false">

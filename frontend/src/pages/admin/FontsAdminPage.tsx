@@ -531,9 +531,10 @@ export function FontsAdminPage() {
           {usernameColor && <button type="button" className="btn" onClick={() => setUsernameColor(null)} data-testid="username-color-clear">Use the default</button>}
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.4rem", flexWrap: "wrap" }}>
-          <input type="color" value={playHighlightColor ?? "#8fd8ff"} onChange={(e) => setPlayHighlightColor(e.target.value)} aria-label="Play highlight colour" data-testid="play-highlight-color" />
-          <span style={{ fontSize: "0.8rem" }}>Play highlight (a glow with a drifting firefly on the Play buttons visitors should reach for; try icy blue)</span>
-          {playHighlightColor && <button type="button" className="btn" onClick={() => setPlayHighlightColor(null)} data-testid="play-highlight-clear">No highlight</button>}
+          <input type="color" value={playHighlightColor && playHighlightColor !== "off" ? playHighlightColor : "#8fd8ff"} disabled={playHighlightColor === "off"} onChange={(e) => setPlayHighlightColor(e.target.value)} aria-label="Play highlight colour" data-testid="play-highlight-color" />
+          <span style={{ fontSize: "0.8rem" }}>Play highlight (a glow with a drifting firefly on the Play buttons visitors should reach for; on by default in icy blue)</span>
+          {playHighlightColor !== "off" ? <button type="button" className="btn" onClick={() => setPlayHighlightColor("off")} data-testid="play-highlight-clear">Turn off</button> : null}
+          {(playHighlightColor === "off" || playHighlightColor) && <button type="button" className="btn" onClick={() => setPlayHighlightColor(null)} data-testid="play-highlight-default">Use icy blue (default)</button>}
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.4rem" }}>
           <input type="color" value={accentPrimaryColor} onChange={(e) => setAccentPrimaryColor(e.target.value)} />

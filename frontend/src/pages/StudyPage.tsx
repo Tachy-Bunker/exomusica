@@ -1,4 +1,5 @@
 import { StudyBranches } from "../components/StudyBranches";
+import { StudyBackground } from "../components/StudyBackground";
 import { branchHref } from "../lib/branchLinks";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
@@ -52,6 +53,7 @@ interface StudyDetail {
   title: string;
   body: string;
   status: "IN_PROGRESS" | "COMPLETE";
+  backgroundUrl?: string | null;
   owner: { id: number; username: string };
   channel: { slug: string; name: string; kind: "BRANCH" | "DISCUSSION"; branch: { slug: string } | null } | null;
   branches?: { slug: string; name: string }[];
@@ -366,7 +368,8 @@ export function StudyPage() {
   );
 
   return (
-    <div className="page-column" style={{ maxWidth: editing ? 1280 : 720 }}>
+    <div className="page-column study-page" style={{ maxWidth: editing ? 1280 : 720 }}>
+      {study.backgroundUrl && <img className="study-bg" src={study.backgroundUrl} alt="" decoding="async" draggable={false} data-testid="study-bg" />}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "1rem" }}>
         {editing ? (
           <input value={draftTitle} onChange={(e) => setDraftTitle(e.target.value)} style={{ fontSize: "1.4rem", flex: 1, minWidth: 0 }} />
@@ -413,6 +416,7 @@ export function StudyPage() {
       </p>
 
       <StudyBranches studySlug={study.slug} linked={study.branches ?? []} canEdit={isOwner} onChange={reload} />
+      {isOwner && <StudyBackground studySlug={study.slug} current={study.backgroundUrl ?? null} branches={study.branches ?? []} onChange={reload} />}
 
       {!isOwner && <div style={{ display: "flex", gap: "0.4rem", marginBottom: "1rem" }}>{qrButton}</div>}
 
