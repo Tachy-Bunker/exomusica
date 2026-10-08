@@ -123,7 +123,7 @@ export function ContributePage({ embedded = false }: { embedded?: boolean } = {}
     const blurb = selected.description;
     return (
       <div className={`ct-panel${selected.secondaryImage ? " has-bg" : ""}`} ref={panelRef} tabIndex={-1} aria-label={`About ${selected.name}`} data-testid="contribute-panel">
-        {selected.secondaryImage && <img className="ct2-bg" src={selected.secondaryImage} alt="" loading="lazy" decoding="async" draggable={false} />}
+        {selected.secondaryImage && <img className="ct2-bg" style={selected.bgOpacity != null ? { ["--bgo" as string]: selected.bgOpacity } : undefined} src={selected.secondaryImage} alt="" loading="lazy" decoding="async" draggable={false} />}
         <h2 className="ct-panel-title">{selected.name}</h2>
         {blurb && <p className="ct2-blurb">{blurb}</p>}
 
@@ -193,8 +193,8 @@ export function ContributePage({ embedded = false }: { embedded?: boolean } = {}
                   return (
                     <li key={b.slug} className={on ? "on" : ""}>
                       <button type="button" className={`ct-row ct2-row${b.image ? " has-bg" : ""}`} aria-pressed={on} aria-controls="ct-detail" onClick={() => choose(b.slug)} data-slug={b.slug}>
-                        {b.image && <img className="ct2-bg" src={b.image} alt="" loading="lazy" decoding="async" draggable={false} />}
-                        <span className="ct-row-name">{b.name}</span>
+                        {b.image && <img className="ct2-bg" style={b.bgOpacity != null ? { ["--bgo" as string]: b.bgOpacity } : undefined} src={b.image} alt="" loading="lazy" decoding="async" draggable={false} />}
+                        <span className="ct-row-name">{b.name}{b.seed && <small className="ct-seedtag">growing seed</small>}</span>
                         <span className="ct2-dots" aria-label={[b.hasBrief && "has a brief", b.previewUrl && "has a sample", b.sketchCount > 0 && "has sketches"].filter(Boolean).join(", ") || "nothing to start from yet"}>
                           <i className={b.hasBrief ? "on" : ""} title="Brief" /><i className={b.previewUrl ? "on" : ""} title="Sample" /><i className={b.sketchCount > 0 ? "on" : ""} title="Sketches" />
                         </span>

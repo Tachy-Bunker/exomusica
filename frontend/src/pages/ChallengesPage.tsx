@@ -3,13 +3,33 @@ import { Link } from "react-router-dom";
 import { api } from "../lib/api";
 import { useAuth } from "../lib/auth";
 import { Username } from "../components/Username";
+import { SeoFieldsEditor } from "../components/SeoFieldsEditor";
 
-interface ChallengeSummary { id: number; title: string; prompt: string; active: boolean; submissionCount: number }
+interface ChallengeSummary { id: number; title: string; prompt: string; active: boolean; submissionCount: number; ogTitle?: string | null; ogDescription?: string | null; ogImageUrl?: string | null }
+
+/** The admin's SEO box of one open call: how a link to it looks. */
+function CallSeo({ c, onSaved }: { c: ChallengeSummary; onSaved: () => void }) {
+  const [v, setV] = useState({ ogTitle: c.ogTitle ?? "", ogDescription: c.ogDescription ?? "", ogImageUrl: c.ogImageUrl ?? "" });
+  const [msg, setMsg] = useState<string | null>(null);
+  async function save() {
+    try {
+      await api(`/api/admin/challenges/${c.id}`, { method: "PATCH", body: JSON.stringify({ ogTitle: v.ogTitle || null, ogDescription: v.ogDescription || null, ogImageUrl: v.ogImageUrl || null }) });
+      setMsg("Saved."); onSaved();
+    } catch (e) { setMsg(e instanceof Error ? e.message : "Couldn't save"); }
+  }
+  return (
+    <details className="study-seo" data-testid="call-seo">
+      <summary>Embed / SEO <span className="home-dim">(admin)</span></summary>
+      <SeoFieldsEditor value={v} onChange={(p) => { setMsg(null); setV((cur) => ({ ...cur, ...Object.fromEntries(Object.entries(p).map(([k, val]) => [k, val ?? ""])) })); }} page={{ title: c.title, body: c.prompt, path: `/open-call/${c.id}` }} defaultNote="Blank = the call's title and the start of its prompt." />
+      <p><button type="button" className="btn btn-primary" onClick={save}>Save</button> {msg && <span role="status" className="home-dim">{msg}</span>}</p>
+    </details>
+  );
+}
 interface Submission { id: number; username: string; trackTitle: string; albumTitle: string; albumSlug: string; coverArtUrl: string | null }
 interface ChallengeDetail { id: number; title: string; prompt: string; active: boolean; submissions: Submission[] }
 
 /** A recurring constraint and a thread of what people made of it. Lives in XenoLab's Challenges tab. The newest open one starts open. */
-export function ChallengesPanel() {
+export function ChallengesPanel({ focusId = null }: { focusId?: number | null } = {}) {
   const { user } = useAuth();
   const [challenges, setChallenges] = useState<ChallengeSummary[] | null>(null);
   const [openId, setOpenId] = useState<number | null>(null);
@@ -23,7 +43,7 @@ export function ChallengesPanel() {
   function loadChallenges(autoOpen = false) {
     api<ChallengeSummary[]>("/api/challenges").then((list) => {
       setChallenges(list);
-      if (autoOpen) { const first = list.find((c) => c.active) ?? list[0]; if (first) openChallenge(first.id); }
+      if (autoOpen) { const first = (focusId !== null ? list.find((c) => c.id === focusId) : undefined) ?? list.find((c) => c.active) ?? list[0]; if (first) { openChallenge(first.id); if (focusId === first.id) window.setTimeout(() => document.getElementById(`call-${first.id}`)?.scrollIntoView({ block: "center" }), 150); } }
     }).catch(() => setChallenges([]));
   }
   useEffect(() => loadChallenges(true), []);
@@ -85,7 +105,7 @@ export function ChallengesPanel() {
       {challenges === null ? <p className="home-dim">Loading…</p> : challenges.length === 0 ? <p className="home-dim">No challenges yet.</p> : (
         <ul className="xl-cards">
           {challenges.map((c) => (
-            <li key={c.id} className={`xl-card${c.active ? "" : " xl-card-closed"}`}>
+            <li key={c.id} id={`call-${c.id}`} className={`xl-card${c.active ? "" : " xl-card-closed"}${focusId === c.id ? " xl-card-focus" : ""}`}>
               <div className="xl-card-top">
                 <b>{c.title}</b>
                 <span className="home-dim">{c.active ? "open" : "closed"} · {c.submissionCount} submission{c.submissionCount !== 1 ? "s" : ""}</span>
@@ -94,7 +114,9 @@ export function ChallengesPanel() {
               <div className="xl-card-actions">
                 <button className="btn" aria-expanded={openId === c.id} onClick={() => (openId === c.id ? (setOpenId(null), setDetail(null)) : openChallenge(c.id))}>{openId === c.id ? "Hide" : c.active ? "Take it on" : "View"}</button>
                 {user?.isAdmin && <button className="btn" onClick={() => toggleActive(c.id, !c.active)}>{c.active ? "Close" : "Reopen"}</button>}
+                <button className="btn" onClick={() => { void navigator.clipboard?.writeText(`${window.location.origin}/open-call/${c.id}`).catch(() => {}); }} aria-label={`Copy a link to ${c.title}`}>Copy link</button>
               </div>
+              {user?.isAdmin && <CallSeo c={c} onSaved={() => loadChallenges()} />}
 
               {openId === c.id && detail && (
                 <div className="xl-card-open">

@@ -41,6 +41,12 @@ export function AdminLayout() {
         <NavLink to="/admin/studies" className={({ isActive }) => (isActive ? "active" : "")}>
           Studies
         </NavLink>
+        <NavLink to="/admin/resources" className={({ isActive }) => (isActive ? "active" : "")}>
+          Resources
+        </NavLink>
+        <NavLink to="/admin/featured" className={({ isActive }) => (isActive ? "active" : "")}>
+          Featured
+        </NavLink>
         <NavLink to="/admin/submissions" className={({ isActive }) => (isActive ? "active" : "")}>
           Submissions
         </NavLink>

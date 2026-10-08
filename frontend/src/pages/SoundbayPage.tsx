@@ -19,6 +19,7 @@ import { ShareAutoplay } from "../components/ShareAutoplay";
 import { openListParam, parseAutoplay, parseOpenList } from "../lib/shareState";
 import { useToastStore } from "../lib/toastStore";
 import { useIsDesktop } from "../lib/useIsDesktop";
+import { MAP_VIEW_ENABLED } from "../lib/features";
 import { useUrlParams } from "../lib/useUrlParams";
 
 interface PlaylistRow { slug: string; title: string; owner: string; description: string | null }
@@ -182,7 +183,7 @@ export function SoundbayPage() {
   const openList = useMemo(() => parseOpenList(openRaw), [openRaw]);
   const openSlugs = useMemo(() => new Set(openList), [openList]);
   const sortParam = params.get("sort");
-  const sort: SoundbaySort = sortParam === "az" ? "az" : sortParam === "tracks" || sortParam === "albums" ? "tracks" : "active";
+  const sort: SoundbaySort = sortParam === "az" ? "az" : sortParam === "active" ? "active" : "tracks"; // Tracks is the default
   const query = params.get("q") ?? "";
 
   const all = home?.branches ?? [];
@@ -270,17 +271,22 @@ export function SoundbayPage() {
     </section>
   );
 
-  return (
-    <div className="home-page space-page" data-testid="soundbay-page">
-      <header className="home-hero sb-head">
-        <h1>Soundbay</h1>
+  const desktopPage = useIsDesktop();
+  const actions = (
         <div className="sb-head-actions">
           <button type="button" className="btn icon-btn title-btn" onClick={copyLink} aria-label="Copy a link to this view" title="Copy a link to this view: the branches that are open, the search and the filter are all in it" data-testid="copy-link">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M10 13a5 5 0 0 0 7.07 0l3-3a5 5 0 0 0-7.07-7.07l-1.7 1.7" /><path d="M14 11a5 5 0 0 0-7.07 0l-3 3a5 5 0 0 0 7.07 7.07l1.7-1.7" /></svg>
           </button>
           <PlayGlow active={!isPlaying}><button type="button" className="btn btn-primary icon-btn title-btn" onClick={shuffleAll} disabled={busy} aria-label="Shuffle everything" title="Shuffle everything" data-testid="shuffle-all"><PlayIcon size={18} /></button></PlayGlow>
-          <Link className="btn title-btn" to="/?map=full" data-testid="open-map"><MapIcon size={15} /> Explore the map</Link>
+          {MAP_VIEW_ENABLED && <Link className="btn title-btn" to="/?map=full" data-testid="open-map"><MapIcon size={15} /> Explore the map</Link>}
         </div>
+  );
+
+  return (
+    <div className="home-page space-page" data-testid="soundbay-page">
+      <header className="home-hero sb-head">
+        <h1>Soundbay</h1>
+        {desktopPage && actions}
       </header>
 
       <div className="sb-toolbar" data-testid="sb-toolbar">
@@ -290,13 +296,16 @@ export function SoundbayPage() {
             {(["albums", "all"] as BranchFilterKey[]).map((k) => <button key={k} type="button" className="space-chip" aria-pressed={filter === k} onClick={() => setParam("show", k, "albums")} data-testid={`sb-filter-${k}`}>{FILTER_LABEL[k]}</button>)}
           </div>
           <label className="space-sort"><span className="home-dim">Sort</span>
-            <select value={sort} onChange={(e) => setParam("sort", e.target.value, "active")} aria-label="Sort Soundbay" data-testid="sb-sort">
+            <select value={sort} onChange={(e) => setParam("sort", e.target.value, "tracks")} aria-label="Sort Soundbay" data-testid="sb-sort">
               {(Object.keys(SORT_LABEL) as SoundbaySort[]).map((k) => <option key={k} value={k}>{SORT_LABEL[k]}</option>)}
             </select></label>
         </div>
-        <nav className="sb-jump" aria-label="Sections">
-          {SECTIONS.map((s) => <button key={s.id} type="button" className="sb-jump-btn" aria-current={current === s.id ? "location" : undefined} onClick={() => jump(s.id)} disabled={counts[s.id] === 0} data-testid={`jump-${s.id}`}>{s.label} <span className="space-chip-n">{ready ? counts[s.id] : "…"}</span></button>)}
-        </nav>
+        <div className="sb-jumprow">
+          <nav className="sb-jump" aria-label="Sections">
+            {SECTIONS.map((s) => <button key={s.id} type="button" className="sb-jump-btn" aria-current={current === s.id ? "location" : undefined} onClick={() => jump(s.id)} disabled={counts[s.id] === 0} data-testid={`jump-${s.id}`}>{s.label} <span className="space-chip-n">{ready ? counts[s.id] : "…"}</span></button>)}
+          </nav>
+          {!desktopPage && actions /* on a phone the two buttons sit at the far right of the section bar, which gains back the header row */}
+        </div>
       </div>
 
       {!ready && <div className="home-placeholder" aria-busy={!failed}>{failed ? "Couldn't load the branches. Reload to try again." : "Loading…"}</div>}

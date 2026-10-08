@@ -36,6 +36,7 @@ export async function branchRoutes(app: FastifyInstance): Promise<void> {
         identityGlyph: true,
         identityImageUrl: true,
         identitySecondaryImageUrl: true,
+        identityBgOpacity: true,
         channel: { select: { id: true, slug: true } },
       },
       orderBy: { id: "asc" },
@@ -219,6 +220,7 @@ export async function branchRoutes(app: FastifyInstance): Promise<void> {
       identityGlyph: string | null;
       identityImageUrl: string | null;
       identitySecondaryImageUrl: string | null;
+      identityBgOpacity: number | null;
     }>;
   }>("/api/admin/branches/:id", { preHandler: requireAdmin }, async (req, reply) => {
     const problem = identityProblem(req.body ?? {});

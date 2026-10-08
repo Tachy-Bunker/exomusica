@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { ACTIVITY_ICON } from "../components/ActivityIcons";
 import { HomeExplore } from "../components/HomeExplore";
+import { FeaturedArticles } from "../components/FeaturedArticles";
 import { api } from "../lib/api";
 import { useAuth } from "../lib/auth";
 import { useHome, type HomeActivity } from "../lib/home";
@@ -122,8 +123,10 @@ export function HomePage() {
         <section className="home-section"><h2 className="sr-only">Explore the branches</h2><div className="home-placeholder" aria-busy={!failed}>{failed ? "Couldn't load the branches. Reload to try again." : "Loading…"}</div></section>
       )}
 
+      {home && <FeaturedArticles />}
+
       <section className="home-section" aria-labelledby="home-now-h">
-        <div className="home-h2-row"><h2 id="home-now-h" className="home-h2">Happening now</h2></div>
+        <h2 id="home-now-h" className="sr-only">Happening now</h2>
         {home ? <HappeningNow activity={home.activity} members={home.stats.members} /> : <div className="home-placeholder" aria-busy={!failed}>{failed ? "Couldn't load the latest activity." : "Loading…"}</div>}
       </section>
 

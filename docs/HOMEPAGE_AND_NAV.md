@@ -154,3 +154,13 @@ Tracks are normalised to **−11 LUFS** (`lib/replayGain.ts`). A quieter track i
 - Contribute: rows/panels use the branch's primary/secondary image; the sample is any site track (Branch.sampleTrackId / sampleCommunityTrackId, set in Admin → Branch → Contribution) or a chat attachment, played via the site player with a provenance link.
 - Sort labels: Telemetry Recent/Busiest/A to Z; Soundbay Recent/A to Z/Tracks.
 - Mobile: page titles hidden, Account button top-left (guest: "Log in" bubble).
+
+## fix280
+
+- **Background strength**: `--bgo` sliders for Study backgrounds (`Study.backgroundOpacity`) and branch pictures (`Branch.identityBgOpacity`). Default 0.17, range 0.05–0.9.
+- **Map hidden**: `lib/features.ts` → `MAP_VIEW_ENABLED = false` hides Soundbay "Explore the map", Explore "Full screen" and `/?map=full`. Flip to `true` to bring it back.
+- **Featured articles**: `FeaturedArticle` model, `routes/featured.ts` (public list cached 30 s), `components/FeaturedArticles.tsx` (single exponential camera, one rAF loop only while moving, idle advance every 6.5 s, paused 12 s after a touch / hover / off-screen / hidden tab / reduced motion). Admin: `/admin/featured`.
+- **Resources**: paid flag + PayPal link + coupons (`ResourceCoupon`, `ResourceUnlock`). File URL withheld while locked; redeem is rate-limited (8 per 10 min). Admin: `/admin/resources`. Protection is by URL secrecy.
+- **SEO**: studies, resources, open calls have og fields and `/embed/study/:slug`, `/embed/resource/:id`, `/embed/open-call/:id`. Deep links `/resource/:id`, `/open-call/:id`.
+- **News/Wiki** use the Study editor (`ArticleEditor`) and `SeoFieldsEditor`. Same markdown, no data migration. Edit links: `/admin/blog?edit=slug`, `/admin/wiki?edit=slug`.
+- **Log**: Studies folder in the tree, "Recent studies" on the Log home.

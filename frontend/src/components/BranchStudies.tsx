@@ -1,4 +1,5 @@
 import { Link } from "react-router-dom";
+import { StudyIcon } from "./ActivityIcons";
 
 /** The studies connected to a branch: a short list under its pictures (Explore) or albums (Soundbay). Nothing is drawn when there are none. */
 export function BranchStudies({ studies }: { studies: { slug: string; title: string; complete: boolean }[] }) {
@@ -7,7 +8,7 @@ export function BranchStudies({ studies }: { studies: { slug: string; title: str
     <div className="branch-studies" data-testid="branch-studies">
       <p className="sb-prev-label">Studies</p>
       <ul>
-        {studies.map((s) => <li key={s.slug}><Link to={`/study/${s.slug}`}>{s.title}</Link>{s.complete && <span className="home-dim"> · complete</span>}</li>)}
+        {studies.map((s) => <li key={s.slug}><StudyIcon size={14} className="branch-study-icon" /> <Link to={`/study/${s.slug}`}>{s.title}</Link>{s.complete && <span className="home-dim"> · complete</span>}</li>)}
       </ul>
     </div>
   );

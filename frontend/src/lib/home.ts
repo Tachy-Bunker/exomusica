@@ -16,6 +16,7 @@ export interface HomeBranch {
   details: string | null; // the longer description, shown when the branch is expanded in Soundbay
   image: string | null; // the main image: shown instead of the emblem
   secondaryImage: string | null; // the background of its tile, and of the module when it is chosen
+  bgOpacity?: number | null; // how strongly the branch's images show as backgrounds (null = the soft default)
   albums: number;
   tracks: number;
   chatSlug: string | null;

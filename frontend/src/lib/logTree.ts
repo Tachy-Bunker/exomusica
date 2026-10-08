@@ -66,7 +66,7 @@ export function searchTree(nodes: WikiNode[], query: string): { visible: Set<num
 
 export interface Row {
   key: string;
-  kind: "news-folder" | "post" | "page" | "studies";
+  kind: "news-folder" | "post" | "page" | "studies" | "study";
   depth: number;
   open?: boolean; // for folders
   hasChildren?: boolean;
@@ -76,11 +76,15 @@ export interface Row {
 }
 
 export interface PostLite { id: number; slug: string; title: string; publishedAt: string }
+export interface StudyLite { slug: string; title: string; owner?: string; updatedAt?: string }
 export const NEWS_FOLDER_LIMIT = 8;
+export const STUDIES_FOLDER_LIMIT = 8;
 
-/** The rows to draw, top to bottom: News (with its newest posts), then the wiki's pages, then Studies. */
-export function visibleRows(opts: { nodes: WikiNode[]; posts: PostLite[]; open: Set<number>; newsOpen: boolean; query: string }): Row[] {
+/** The rows to draw, top to bottom: News (with its newest posts), then the wiki's pages, then Studies (with the most recently updated ones). */
+export function visibleRows(opts: { nodes: WikiNode[]; posts: PostLite[]; open: Set<number>; newsOpen: boolean; query: string; studies?: StudyLite[]; studiesOpen?: boolean }): Row[] {
   const { nodes, posts, open, newsOpen, query } = opts;
+  const studies = opts.studies ?? [];
+  const studiesOpen = opts.studiesOpen ?? false;
   const rows: Row[] = [];
   const searching = query.trim().length > 0;
   const { visible } = searchTree(nodes, query);
@@ -97,6 +101,13 @@ export function visibleRows(opts: { nodes: WikiNode[]; posts: PostLite[]; open: 
     if (isOpen) n.children.forEach(walk);
   };
   nodes.forEach(walk);
-  if (!searching || fold("studies").includes(fold(query).trim())) rows.push({ key: "studies", kind: "studies", depth: 0, to: "/studies", label: "Studies" });
+  // Studies: a folder like News. A search looks inside the studies' titles (and their owners').
+  const words = fold(query).split(/\s+/).filter(Boolean);
+  const matchedStudies = searching ? studies.filter((st) => words.every((w) => fold(`${st.title} ${st.owner ?? ""}`).includes(w))) : studies;
+  if (!searching || matchedStudies.length > 0 || fold("studies").includes(fold(query).trim())) {
+    const isOpen = searching ? matchedStudies.length > 0 : studiesOpen;
+    rows.push({ key: "studies", kind: "studies", depth: 0, open: isOpen, hasChildren: studies.length > 0, to: "/xenolab?tab=studies", label: "Studies" });
+    if (isOpen) for (const st of matchedStudies.slice(0, searching ? 50 : STUDIES_FOLDER_LIMIT)) rows.push({ key: `study-${st.slug}`, kind: "study", depth: 1, to: `/study/${st.slug}`, label: st.title });
+  }
   return rows;
 }

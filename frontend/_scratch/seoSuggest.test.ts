@@ -1,0 +1,10 @@
+import assert from "node:assert/strict";
+import { imagesIn, lengthVerdict, plainText, suggestSeo } from "../src/lib/seoSuggest.ts";
+const ok = (n: string) => console.log("ok  ", n);
+assert.deepEqual(imagesIn("![a](/uploads/x.png) text ![b](https://e.com/y.jpg){w=40} ![a](/uploads/x.png) ![c](data:image/png;base64,AA)"), ["/uploads/x.png", "https://e.com/y.jpg"]); ok("pictures: uploads and https only, once each");
+assert.equal(plainText("# Title\n\nSome **bold** [link](http://x.y) text.\n@audio(/uploads/a.mp3)\n![i](/uploads/i.png)", 100), "Title Some bold link text."); ok("plain text drops markup and blocks");
+const long = "word ".repeat(80);
+const cut = plainText(long, 50); assert.ok(cut.length <= 51 && cut.endsWith("…") && !cut.includes("wor…")); ok("cut at a word with an ellipsis");
+const s = suggestSeo({ title: "A study", body: "Intro text here.\n![p](/uploads/p.png)" }, { ogTitle: "Mine", ogDescription: "", ogImageUrl: null });
+assert.equal(s.ogTitle, "Mine"); assert.equal(s.ogDescription, "Intro text here."); assert.equal(s.ogImageUrl, "/uploads/p.png"); ok("only blanks are filled");
+assert.equal(lengthVerdict("", 60), "empty"); assert.equal(lengthVerdict("x".repeat(61), 60), "long"); assert.equal(lengthVerdict("x".repeat(10), 60), "good"); ok("verdicts");

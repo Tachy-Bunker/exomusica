@@ -90,9 +90,9 @@ export async function blogRoutes(app: FastifyInstance): Promise<void> {
   });
 
   app.post<{
-    Body: { slug: string; title: string; contentMarkdown: string; coverImageUrl?: string; publish?: boolean };
+    Body: { slug: string; title: string; contentMarkdown: string; coverImageUrl?: string; publish?: boolean; fontId?: number | null; ogTitle?: string | null; ogDescription?: string | null; ogImageUrl?: string | null };
   }>("/api/admin/blog", { preHandler: requireAdmin }, async (req, reply) => {
-    const { slug, title, contentMarkdown, coverImageUrl, publish } = req.body ?? {};
+    const { slug, title, contentMarkdown, coverImageUrl, publish, fontId, ogTitle, ogDescription, ogImageUrl } = req.body ?? {};
     if (!slug || !title || !contentMarkdown) {
       return reply.code(400).send({ error: "slug, title, and contentMarkdown are required" });
     }
@@ -102,6 +102,10 @@ export async function blogRoutes(app: FastifyInstance): Promise<void> {
         title,
         contentMarkdown,
         coverImageUrl,
+        fontId: fontId ?? null,
+        ogTitle: ogTitle || null,
+        ogDescription: ogDescription || null,
+        ogImageUrl: ogImageUrl || null,
         authorId: req.user!.id,
         publishedAt: publish ? new Date() : null,
       },

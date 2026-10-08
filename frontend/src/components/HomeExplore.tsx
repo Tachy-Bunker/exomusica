@@ -15,6 +15,7 @@ import { AlbumIcon } from "./ActivityIcons";
 import { BranchEmblem } from "./BranchEmblem";
 import { ExpandIcon, PauseIcon, PlayIcon, ShuffleIcon } from "./Icons";
 import { SpaceMap } from "./SpaceMap";
+import { MAP_VIEW_ENABLED } from "../lib/features";
 
 const CYCLE_MS = 7000;
 const prefersReducedMotion = () => typeof window !== "undefined" && !!window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
@@ -25,7 +26,7 @@ const GridTile = memo(function GridTile({ b, x, y, on, onChoose }: { b: HomeBran
   const i = identityOf({ slug: b.slug, color: b.color, glyph: b.glyph, seed: b.seed });
   return (
     <button type="button" className={`gtile${on ? " on" : ""}${b.seed ? " seed" : ""}`} style={{ left: x, top: y, width: TILE_W, height: TILE_H, ["--emb" as string]: i.color }} data-slug={b.slug} aria-pressed={on} onClick={() => onChoose(b.slug)} onFocus={(e) => { if (e.currentTarget.matches(":focus-visible")) onChoose(b.slug); }}>
-      {b.secondaryImage && <img className="gtile-bg" src={b.secondaryImage} alt="" loading="lazy" decoding="async" draggable={false} />}
+      {b.secondaryImage && <img className="gtile-bg" style={b.bgOpacity != null ? { ["--bgo" as string]: b.bgOpacity } : undefined} src={b.secondaryImage} alt="" loading="lazy" decoding="async" draggable={false} />}
       <BranchEmblem glyph={i.glyph} color={i.color} size={30} imageUrl={b.image} />
       <span className="gtile-name">{b.name}</span>
       <span className="gtile-meta">{b.tracks} track{b.tracks === 1 ? "" : "s"}</span>
@@ -52,7 +53,7 @@ export function HomeExplore({ branches, openFull = false, initialSlug = null }: 
   const startOn = initialSlug && branches.some((b) => b.slug === initialSlug) ? initialSlug : null;
   const [selected, setSelected] = useState<string | null>(() => startOn ?? shuffle(null));
   const [touched, setTouched] = useState(!!startOn); // once the person takes over, the map stops moving on by itself
-  const [full, setFull] = useState(openFull);
+  const [full, setFull] = useState<boolean>(openFull && MAP_VIEW_ENABLED);
   const [fullBranches, setFullBranches] = useState<Branch[] | null>(null);
   const [playing, setPlaying] = useState(false);
 
@@ -198,16 +199,17 @@ export function HomeExplore({ branches, openFull = false, initialSlug = null }: 
     <section id="home-explore" className="home-section" aria-labelledby="home-explore-h" onPointerDown={() => setTouched(true)} onFocus={() => setTouched(true)}>
       <h2 id="home-explore-h" className="sr-only">Explore the branches</h2>
       <div className="explore-module" data-testid="explore-module" style={{ ["--emb" as string]: idn?.color }}>
-        {bg && <img className="explore-bg" key={bg} src={bg} alt="" decoding="async" draggable={false} data-testid="explore-bg" aria-hidden="true" />}
+        {bg && <img className="explore-bg" key={bg} style={current?.bgOpacity != null ? { ["--bgo" as string]: current.bgOpacity } : undefined} src={bg} alt="" decoding="async" draggable={false} data-testid="explore-bg" aria-hidden="true" />}
         <div className="explore">
           <div className="gridwin" ref={winRef} data-testid="explore-map" role="group" aria-label="The branches, laid out on a grid">
             <div className="gridcam" ref={camRef} style={{ width: grid.width, height: grid.height }}>
               {grid.tiles.map((t) => <GridTile key={t.slug} b={bySlug.get(t.slug)!} x={t.x} y={t.y} on={t.slug === selected} onChoose={choose} />)}
             </div>
-            <button type="button" className="btn gridwin-full" onClick={openFullScreen} data-testid="explore-full"><ExpandIcon size={14} /> Full screen</button>
+            {MAP_VIEW_ENABLED && <button type="button" className="btn gridwin-full" onClick={openFullScreen} data-testid="explore-full"><ExpandIcon size={14} /> Full screen</button>}
           </div>
           {current && idn && (
             <article className="explore-card" data-testid="explore-card" aria-live="off">
+              {current.seed && <Link className="explore-needs" to={`/xenolab?tab=contribute&branch=${current.slug}`} data-testid="explore-needs">needs contribution</Link>}
               <Link className="explore-head" to={`/soundbay?open=${current.slug}`} data-testid="explore-head" title={`Open ${current.name} in Soundbay`}>
                 <BranchEmblem glyph={idn.glyph} color={idn.color} size={56} imageUrl={current.image} />
                 <h3 className="explore-name">{current.name}</h3>

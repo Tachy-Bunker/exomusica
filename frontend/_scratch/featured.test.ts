@@ -1,0 +1,13 @@
+import assert from "node:assert/strict";
+import { RESUME_MS, cardLook, clampCamera, nearestIndex, settleIndex, shouldAutoplay, stepIndex } from "../src/lib/featured.ts";
+const ok = (n: string) => console.log("ok  ", n);
+assert.equal(stepIndex(2, 3), 0); assert.equal(stepIndex(0, 3, -1), 2); assert.equal(stepIndex(0, 0), 0); ok("slides wrap round");
+assert.equal(nearestIndex(0, 200, 5), 0); assert.equal(nearestIndex(310, 200, 5), 2); assert.equal(nearestIndex(9999, 200, 5), 4); assert.equal(nearestIndex(-400, 200, 5), 0); ok("nearest card stays in the row");
+assert.equal(clampCamera(-500, 200, 5), -70); assert.equal(clampCamera(5000, 200, 5), 870); assert.equal(clampCamera(300, 200, 5), 300); ok("the camera may stretch a little past the ends");
+const c = cardLook(0), n = cardLook(1), f = cardLook(5);
+assert.deepEqual(c, { scale: 1, opacity: 1 }); assert.ok(n.scale < 1 && n.opacity < 1 && f.scale < n.scale && f.opacity < n.opacity); assert.ok(f.scale > 0.7 && f.opacity > 0.3); ok("chosen card is biggest; far cards stay readable");
+assert.equal(cardLook(-1).scale, cardLook(1).scale); ok("symmetric");
+assert.equal(settleIndex(190, 0, 200, 5), 1); assert.equal(settleIndex(190, 1500, 200, 5), 2); assert.equal(settleIndex(190, -1500, 200, 5), 0); ok("a flick carries on");
+const base = { count: 4, reducedMotion: false, hidden: false, inView: true, sinceTouchMs: RESUME_MS, hovering: false };
+assert.ok(shouldAutoplay(base)); ok("idle: it moves on");
+assert.ok(!shouldAutoplay({ ...base, count: 1 })); assert.ok(!shouldAutoplay({ ...base, reducedMotion: true })); assert.ok(!shouldAutoplay({ ...base, hidden: true })); assert.ok(!shouldAutoplay({ ...base, inView: false })); assert.ok(!shouldAutoplay({ ...base, hovering: true })); assert.ok(!shouldAutoplay({ ...base, sinceTouchMs: 500 })); ok("it waits for one slide, reduced motion, a hidden tab, off-screen, hover and recent touch");

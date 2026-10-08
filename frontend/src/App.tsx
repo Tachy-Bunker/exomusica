@@ -1,5 +1,5 @@
 import { Suspense, lazy } from "react";
-import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate, useLocation, useParams } from "react-router-dom";
 import { ChromaticAberrationLayer } from "./components/ChromaticAberrationLayer";
 import { MoireLayer } from "./components/MoireLayer";
 import { useSiteEffectsStore } from "./lib/siteEffectsStore";
@@ -45,6 +45,8 @@ import { AlbumsAdminPage } from "./pages/admin/AlbumsAdminPage";
 import { WikiAdminPage } from "./pages/admin/WikiAdminPage";
 import { AllTracksAdminPage } from "./pages/admin/AllTracksAdminPage";
 import { StudiesAdminPage } from "./pages/admin/StudiesAdminPage";
+import { ResourcesAdminPage } from "./pages/admin/ResourcesAdminPage";
+import { FeaturedAdminPage } from "./pages/admin/FeaturedAdminPage";
 import { BranchContributeAdminPage } from "./pages/admin/BranchContributeAdminPage";
 import { SubmissionsAdminPage } from "./pages/admin/SubmissionsAdminPage";
 import { ContributorPointsAdminPage } from "./pages/admin/ContributorPointsAdminPage";
@@ -75,6 +77,10 @@ function ConversationsRedirect() {
 }
 
 const VoiceLabPage = lazy(() => import("./pages/VoiceLabPage").then((m) => ({ default: m.VoiceLabPage })));
+
+/** A resource or open call has its own address (for sharing and for link previews); it opens in XenoLab, scrolled to that card. */
+function ResourceRedirect() { const { id } = useParams(); return <Navigate to={`/xenolab?tab=resources&item=${encodeURIComponent(id ?? "")}`} replace />; }
+function OpenCallRedirect() { const { id } = useParams(); return <Navigate to={`/xenolab?tab=open&call=${encodeURIComponent(id ?? "")}`} replace />; }
 
 export default function App() {
   const isDesktop = useIsDesktop();
@@ -124,6 +130,8 @@ export default function App() {
             <Route path="my-music" element={<MyMusicPage />} />
             <Route path="sample-bank" element={<Navigate to="/xenolab?tab=resources" replace />} />
             <Route path="challenges" element={<Navigate to="/xenolab?tab=open" replace />} />
+            <Route path="resource/:id" element={<ResourceRedirect />} />
+            <Route path="open-call/:id" element={<OpenCallRedirect />} />
             <Route path="playlist/:slug" element={<PlaylistSpaceMapPage />} />
             <Route path="playlist/:slug/list" element={<PlaylistPage />} />
             <Route path="collaborator/:slug" element={<CollaboratorPage />} />
@@ -145,6 +153,8 @@ export default function App() {
                 <Route path="wiki" element={<WikiAdminPage />} />
                 <Route path="all-tracks" element={<AllTracksAdminPage />} />
                 <Route path="studies" element={<StudiesAdminPage />} />
+                <Route path="resources" element={<ResourcesAdminPage />} />
+                <Route path="featured" element={<FeaturedAdminPage />} />
                 <Route path="branches/:id/contribute" element={<BranchContributeAdminPage />} />
                 <Route path="branches/:id/identity" element={<BranchIdentityAdminPage />} />
                 <Route path="submissions" element={<SubmissionsAdminPage />} />

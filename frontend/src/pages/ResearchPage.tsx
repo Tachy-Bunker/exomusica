@@ -32,7 +32,7 @@ export function ResearchPage() {
       </nav>
 
       {tab === "studies" && <StudiesPanel studies={studies} />}
-      {tab === "resources" && <SamplesPanel onAnalyze={() => go("analyze")} />}
+      {tab === "resources" && <SamplesPanel onAnalyze={() => go("analyze")} focusId={Number(params.get("item")) || null} />}
       {tab === "analyze" && (
         <div>
           <SoundAnalyzer />
@@ -40,7 +40,7 @@ export function ResearchPage() {
         </div>
       )}
       {tab === "effects" && <Suspense fallback={<p className="home-dim">Loading…</p>}><VoiceLab embedded /></Suspense>}
-      {tab === "open" && <ChallengesPanel />}
+      {tab === "open" && <ChallengesPanel focusId={Number(params.get("call")) || null} />}
       {tab === "contribute" && <Suspense fallback={<p className="home-dim">Loading…</p>}><Contribute embedded /></Suspense>}
     </div>
   );

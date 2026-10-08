@@ -36,13 +36,14 @@ export async function studiesRoutes(app: FastifyInstance): Promise<void> {
 
   app.get("/api/studies", async () => {
     const studies = await prisma.study.findMany({
-      select: { slug: true, title: true, backgroundUrl: true, status: true, createdAt: true, updatedAt: true, owner: { select: { username: true } }, channel: { select: { slug: true } }, branches: { select: { slug: true, name: true, visibility: true } } },
+      select: { slug: true, title: true, backgroundUrl: true, backgroundOpacity: true, status: true, createdAt: true, updatedAt: true, owner: { select: { username: true } }, channel: { select: { slug: true } }, branches: { select: { slug: true, name: true, visibility: true } } },
       orderBy: { updatedAt: "desc" },
     });
     return studies.map((s) => ({
       slug: s.slug,
       title: s.title,
       backgroundUrl: s.backgroundUrl,
+      backgroundOpacity: s.backgroundOpacity,
       status: s.status,
       createdAt: s.createdAt,
       updatedAt: s.updatedAt,
@@ -84,7 +85,7 @@ export async function studiesRoutes(app: FastifyInstance): Promise<void> {
     return reply.code(201).send(study);
   });
 
-  app.patch<{ Params: { slug: string }; Body: Partial<{ title: string; body: string; status: "IN_PROGRESS" | "COMPLETE"; channelSlug: string | null; newChat: boolean; branchSlugs: string[]; backgroundUrl: string | null }> }>(
+  app.patch<{ Params: { slug: string }; Body: Partial<{ title: string; body: string; status: "IN_PROGRESS" | "COMPLETE"; channelSlug: string | null; newChat: boolean; branchSlugs: string[]; backgroundUrl: string | null; backgroundOpacity: number | null; ogTitle: string | null; ogDescription: string | null; ogImageUrl: string | null }> }>(
     "/api/studies/:slug",
     { preHandler: requireAuth },
     async (req, reply) => {
@@ -94,13 +95,30 @@ export async function studiesRoutes(app: FastifyInstance): Promise<void> {
 
       // Only these fields may be changed through this route. (Passing the raw
       // body through would let an owner rewrite ownerId, slug, channelId...)
-      const { title, body, status, channelSlug, newChat, branchSlugs, backgroundUrl } = req.body ?? {};
-      const data: { backgroundUrl?: string | null; title?: string; body?: string; status?: "IN_PROGRESS" | "COMPLETE"; channelId?: number | null; branches?: { set: { id: number }[] } } = {};
+      const { title, body, status, channelSlug, newChat, branchSlugs, backgroundUrl, backgroundOpacity } = req.body ?? {};
+      const data: { ogTitle?: string | null; ogDescription?: string | null; ogImageUrl?: string | null; backgroundOpacity?: number | null; backgroundUrl?: string | null; title?: string; body?: string; status?: "IN_PROGRESS" | "COMPLETE"; channelId?: number | null; branches?: { set: { id: number }[] } } = {};
       // The branches the study is about: none, one or several. Hidden branches can only be picked by an admin.
       if (Array.isArray(branchSlugs)) {
         const slugs = [...new Set(branchSlugs.filter((x): x is string => typeof x === "string"))].slice(0, 20);
         const found = await prisma.branch.findMany({ where: { slug: { in: slugs }, ...(req.user!.isAdmin ? {} : { visibility: { not: "HIDDEN" } }) }, select: { id: true } });
         data.branches = { set: found.map((b) => ({ id: b.id })) };
+      }
+      // Embed / SEO overrides (blank clears them)
+      for (const key of ["ogTitle", "ogDescription"] as const) {
+        const v = req.body?.[key];
+        if (v === undefined) continue;
+        data[key] = typeof v === "string" && v.trim() ? v.trim().slice(0, key === "ogTitle" ? 200 : 400) : null;
+      }
+      if (req.body?.ogImageUrl !== undefined) {
+        const v = typeof req.body.ogImageUrl === "string" ? req.body.ogImageUrl.trim() : "";
+        if (v === "") data.ogImageUrl = null;
+        else if (v.length <= 1000 && /^(https?:\/\/|\/uploads\/)\S+$/i.test(v)) data.ogImageUrl = v;
+        else return reply.code(400).send({ error: "the embed image must be a web link (https://...) or one of the site's pictures" });
+      }
+      if (backgroundOpacity !== undefined) {
+        if (backgroundOpacity === null) data.backgroundOpacity = null;
+        else if (typeof backgroundOpacity === "number" && backgroundOpacity >= 0.05 && backgroundOpacity <= 0.9) data.backgroundOpacity = Math.round(backgroundOpacity * 100) / 100;
+        else return reply.code(400).send({ error: "backgroundOpacity must be a number from 0.05 to 0.9" });
       }
       if (backgroundUrl !== undefined) {
         const bg = typeof backgroundUrl === "string" ? backgroundUrl.trim() : "";

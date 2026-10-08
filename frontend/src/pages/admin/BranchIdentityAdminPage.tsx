@@ -6,6 +6,7 @@ import { GLYPHS, GLYPH_LABEL, PALETTE, derivedColor, identityOf, isHexColor, typ
 import type { BranchPicture } from "../../lib/home";
 import { colorFromImageUrl } from "../../lib/imageColor";
 import type { Branch } from "../../lib/types";
+import { OpacitySlider } from "../../components/OpacitySlider";
 
 /** Choose how a branch looks around the site: an accent colour, an emblem or a main image (its colour then follows the image), and a secondary image for backgrounds. */
 export function BranchIdentityAdminPage() {
@@ -16,6 +17,7 @@ export function BranchIdentityAdminPage() {
   const [glyph, setGlyph] = useState<Glyph | null>(null);
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [secondaryUrl, setSecondaryUrl] = useState<string | null>(null);
+  const [bgOpacity, setBgOpacity] = useState<number | null>(null);
   const [pictures, setPictures] = useState<BranchPicture[]>([]);
   const [uploading, setUploading] = useState(false);
   const [status, setStatus] = useState<{ kind: "ok" | "error"; text: string } | null>(null);
@@ -30,6 +32,7 @@ export function BranchIdentityAdminPage() {
       setGlyph((b?.identityGlyph as Glyph | null) ?? null);
       setImageUrl(b?.identityImageUrl ?? null);
       setSecondaryUrl(b?.identitySecondaryImageUrl ?? null);
+      setBgOpacity(b?.identityBgOpacity ?? null);
       // every picture this branch has: its cover, its albums' covers and their gallery images
       if (b) api<BranchPicture[]>(`/api/branches/${b.slug}/images`).then((p) => setPictures(p.slice(0, 40))).catch(() => {});
     });
@@ -72,7 +75,7 @@ export function BranchIdentityAdminPage() {
     if (!branch) return;
     if (hexText && !isHexColor(hexText)) { setStatus({ kind: "error", text: "A colour looks like #4fa8e0: a # and six letters or digits." }); return; }
     try {
-      await api(`/api/admin/branches/${branch.id}`, { method: "PATCH", body: JSON.stringify({ identityColor: color, identityGlyph: glyph, identityImageUrl: imageUrl, identitySecondaryImageUrl: secondaryUrl }) });
+      await api(`/api/admin/branches/${branch.id}`, { method: "PATCH", body: JSON.stringify({ identityColor: color, identityGlyph: glyph, identityImageUrl: imageUrl, identitySecondaryImageUrl: secondaryUrl, identityBgOpacity: bgOpacity }) });
       setStatus({ kind: "ok", text: "Saved. It shows on Soundbay, the homepage map and the branch page." });
     } catch (e) {
       setStatus({ kind: "error", text: e instanceof ApiError ? e.message : "Couldn't save." });
@@ -138,12 +141,13 @@ export function BranchIdentityAdminPage() {
             </button>
           ))}
         </div>
+        <OpacitySlider value={bgOpacity} onChange={(v) => { setBgOpacity(v); setStatus(null); }} label="Background strength (all places the branch pictures are used as backgrounds)" />
         {pictures.length === 0 && <p className="home-dim">This branch has no pictures yet: add album covers or gallery images to its albums and they appear here.</p>}
       </fieldset>
 
       <h2 className="home-h2">Preview</h2>
       <div className="idn-preview" data-testid="identity-preview" style={{ ["--emb" as string]: shown.color, position: "relative", isolation: "isolate" }}>
-        {secondaryUrl && <div aria-hidden="true" data-testid="identity-preview-bg" style={{ position: "absolute", inset: 0, zIndex: -1, borderRadius: "inherit", backgroundImage: `url("${secondaryUrl}")`, backgroundSize: "cover", backgroundPosition: "center", opacity: 0.17 }} />}
+        {secondaryUrl && <div aria-hidden="true" data-testid="identity-preview-bg" style={{ position: "absolute", inset: 0, zIndex: -1, borderRadius: "inherit", backgroundImage: `url("${secondaryUrl}")`, backgroundSize: "cover", backgroundPosition: "center", opacity: bgOpacity ?? 0.17 }} />}
         <BranchEmblem glyph={shown.glyph} color={shown.color} size={44} imageUrl={imageUrl} />
         <div><strong>{branch.name}</strong><div className="home-dim" style={{ fontSize: "0.85rem" }}>{branch.description || "The branch description appears here."}</div></div>
         <svg viewBox="0 0 30 30" width="36" height="36" aria-label="Its dot on the map" role="img"><circle cx="15" cy="15" r="7" fill={shown.color} /><circle cx="15" cy="15" r="12" fill="none" stroke={shown.color} strokeOpacity="0.6" /></svg>

@@ -44,6 +44,9 @@ DATA["/api/branches/b2/images"] = [{"url": "/uploads/pic1.png", "kind": "gallery
 DATA["/api/branches/b2/tracks/shuffle"] = [{"id": 1, "title": "Rain Piece", "fileUrl": "/uploads/rain.wav", "format": "WAV", "durationSeconds": 6, "position": 0, "albumTitle": "First", "albumSlug": "al1", "coverArtUrl": "/uploads/cover.png", "composer": "Ghost", "branchSlug": "b2", "bookmarks": [], "replayGainDb": 0, "source": "official", "genres": []}]
 DATA["/api/contribute/branches"] = [{"slug": "b2", "name": "Full Branch", "description": "d", "coverArtUrl": None, "hasBrief": True, "backgroundUrl": None, "backgroundOpacity": 0, "image": "/uploads/pic1.png", "secondaryImage": "/uploads/pic1.png", "previewUrl": "/uploads/rain.wav", "sample": {"kind": "attachment", "url": "/uploads/rain.wav", "title": "rain on tin", "origin": {"label": "The Hall", "href": "/topic/hall#m-9"}}, "sketchCount": 0, "mySubmissions": []}]
 DATA["/api/branches/b1/images"] = []
+DATA["/api/branches/b3/images"] = []
+DATA["/api/branches/b3/albums"] = []
+DATA["/api/branches/b3/tracks/shuffle"] = []
 DATA["/api/branches/b1/albums"] = []
 DATA["/api/site-settings"]["playHighlightColor"] = "#7fdcff"
 DATA["/api/users/old"] = {"id": 2, "username": "old", "avatarUrl": None, "bio": "elder", "links": None, "isGhost": False, "createdAt": "2026-01-01T00:00:00Z"}
@@ -56,6 +59,15 @@ DATA["/api/admin/join-requests"] = []
 DATA["/api/playlists"] = []
 DATA["/api/community-albums"] = []
 DATA["/api/studies/mine-1"] = {"slug":"mine-1","title":"x","body":"","status":"IN_PROGRESS","owner":{"username":"tachy"},"branches":[],"files":[],"annotations":[],"charts":[],"channel":None}
+DATA["/api/featured"] = [
+  {"id": 1, "kind": "study", "refSlug": "mine-1", "title": "Beating tones in a cave", "text": "Two close sines, and the slow throb between.", "imageUrl": "/uploads/pic1.png", "imageOpacity": 0.4, "href": "/study/mine-1", "by": "tachy"},
+  {"id": 2, "kind": "news", "refSlug": "hello", "title": "Hello world", "text": "First post.", "imageUrl": None, "imageOpacity": None, "href": "/log/hello", "by": "tachy"},
+  {"id": 3, "kind": "wiki", "refSlug": "gear", "title": "Gear notes", "text": "", "imageUrl": None, "imageOpacity": None, "href": "/wiki/gear", "by": None}]
+DATA["/api/admin/featured"] = [{"id": 1, "kind": "study", "refSlug": "mine-1", "text": None, "imageUrl": None, "imageOpacity": None, "active": True, "title": "Beating tones in a cave", "missing": False}]
+DATA["/api/admin/resources"] = [{"id": 7, "title": "Rain on tin", "description": "field", "owner": "ghost9", "kind": "AUDIO", "cover": None, "paid": True, "price": "5 USD", "payNote": None, "paypalUrl": None, "ogTitle": None, "ogDescription": None, "ogImageUrl": None, "couponCount": 1, "unlockCount": 0}]
+DATA["/api/admin/resource-coupons"] = [{"id": 1, "code": "ABCDE-FGHJK", "itemId": None, "itemTitle": None, "note": "ghost9", "maxUses": 3, "uses": 0, "expiresAt": None, "active": True}]
+DATA["/api/admin/featured/article"] = {"title": "Beating tones in a cave", "excerpt": "I recorded two close sines.", "images": ["/uploads/pic1.png"]}
+DATA["/api/admin/blog"] = [{"id": 1, "slug": "hello", "title": "Hello world", "body": "# Hi\n\ntext", "published": True, "createdAt": "2026-10-01T10:00:00Z"}]
 ADMIN = {"id": 1, "username": "tachy", "isAdmin": True}
 calls = []
 
@@ -153,7 +165,7 @@ def run(playwright):
 
     # ---------- Soundbay
     ctx = new_ctx(); page = ctx.new_page(); watch(page)
-    page.goto(f"{BASE}/soundbay"); page.wait_for_selector("[data-testid=branch-row]")
+    page.goto(f"{BASE}/soundbay?sort=az"); page.wait_for_selector("[data-testid=branch-row]")
     page.click("[data-testid=sb-filter-all]"); page.wait_for_timeout(200)
     rows = page.locator("[data-testid=branch-row]")
     check(rows.count() == 2, "two branches")
@@ -276,6 +288,101 @@ def run(playwright):
     ctx = new_ctx(viewport={"width": 390, "height": 800}); page = ctx.new_page(); watch(page)
     page.goto(f"{BASE}/xenolab?tab=contribute&branch=b2"); page.wait_for_selector("[data-testid=contribute-panel]")
     check(not page.locator(".ct-panel-title").is_visible(), "phone: branch name not repeated inside the opened panel")
+    ctx.close()
+
+
+    # ---------- fix280 checks
+    ctx = new_ctx(); page = ctx.new_page(); watch(page)
+    page.goto(f"{BASE}/"); page.wait_for_selector("[data-testid=featured]")
+    check(page.locator("[data-testid=featured-card]").count() == 3, "Featured: three cards in the row")
+    check("Beating tones in a cave" in page.locator(".feat-body").inner_text() and page.locator(".feat-bg-in").count() == 1, "Featured: top shows the first article and its picture")
+    order = page.evaluate("() => { const a=document.querySelector('[data-testid=explore-module]'), b=document.querySelector('[data-testid=featured]'); return !!(a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING); }")
+    check(order, "Featured sits right below Explore")
+    page.locator("[data-testid=featured-card]").nth(1).click(); page.wait_for_timeout(300)
+    check("Hello world" in page.locator(".feat-body").inner_text(), "Featured: clicking a card selects it")
+    page.wait_for_timeout(1800)
+    check(page.locator("[data-testid=featured-card]").nth(1).evaluate("e => +e.style.opacity") > 0.9, "Featured: selected card is fully opaque after glide")
+    check(page.evaluate("() => { const h=[...document.querySelectorAll('h2')].find(e=>e.textContent.trim()==='Happening now'); if(!h) return true; const b=h.getBoundingClientRect(); return b.width<=2 && b.height<=2; }"), "Home: 'Happening now' not visible")
+    ctx.close()
+    ctx = new_ctx(); page = ctx.new_page(); watch(page)
+    page.goto(f"{BASE}/"); page.wait_for_selector("[data-testid=featured]")
+    page.locator("[data-testid=featured]").scroll_into_view_if_needed(); page.wait_for_timeout(8200)
+    check("Beating tones" not in page.locator(".feat-body").inner_text(), "Featured: idle mode moves on by itself")
+    ctx.close()
+    # seed branch in Explore
+    DATA["/api/home"]["branches"].append(dict(hb("b3", "Seedling", 0, []), seed=True))
+    ctx = new_ctx(); page = ctx.new_page(); watch(page)
+    page.goto(f"{BASE}/?branch=b3"); page.wait_for_selector("[data-testid=explore-needs]")
+    check("contribute" in page.locator("[data-testid=explore-needs]").get_attribute("href") and "branch=b3" in page.locator("[data-testid=explore-needs]").get_attribute("href"), "Explore: seed shows 'needs contribution' linking to Contribute")
+    page.goto(f"{BASE}/?branch=b2"); page.wait_for_selector("[data-testid=explore-play]")
+    check(page.locator("[data-testid=explore-needs]").count() == 0, "Explore: no link on a normal branch")
+    check(page.locator("[data-testid=explore-full]").count() == 0 and page.locator("[data-testid=explore-head] [data-testid=explore-full]").count() == 0, "Explore: Full screen hidden")
+    ctx.close()
+    DATA["/api/home"]["branches"].pop()
+    # paid resource
+    DATA["/api/sample-bank"].append({"id": 8, "title": "Locked kit", "description": "d", "tags": [], "kind": "AUDIO", "fileUrl": None, "filename": "kit.wav", "owner": "ghost9", "paid": True, "locked": True, "price": "5 USD", "payNote": None, "paypalUrl": "https://www.paypal.com/donate/?hosted_button_id=X"})
+    redeem = {"ok": 0}
+    ctx = new_ctx()
+    ctx.route(re.compile(r".*/api/sample-bank/8/redeem"), lambda r: (redeem.update(ok=redeem["ok"] + 1), r.fulfill(status=200, content_type="application/json", body=json.dumps({"fileUrl": "/uploads/rain.wav"})))[1])
+    page = ctx.new_page(); watch(page)
+    page.goto(f"{BASE}/xenolab?tab=resources"); page.wait_for_selector("[data-testid=res-unlock]")
+    check(page.locator("[data-testid=res-paypal]").get_attribute("href").startswith("https://www.paypal.com/"), "Paid: PayPal link shown")
+    check(page.locator("#resource-8 a[download]").count() == 0, "Paid: no download while locked")
+    page.fill("[data-testid=res-code]", "abcde-fghjk"); page.click("[data-testid=res-redeem]"); page.wait_for_timeout(500)
+    check(redeem["ok"] == 1 and page.locator("[data-testid=res-unlock]").count() == 0 and page.locator("#resource-8 a[download]").count() == 1, "Paid: code unlocks the file")
+    ctx.close()
+    DATA["/api/sample-bank"].pop()
+    # Soundbay / Members
+    ctx = new_ctx(); page = ctx.new_page(); watch(page)
+    page.goto(f"{BASE}/soundbay"); page.wait_for_selector("[data-testid=sb-sort]")
+    check(page.locator("[data-testid=sb-sort]").input_value() == "tracks", "Soundbay: sorted by Tracks by default")
+    check(page.locator("[data-testid=open-map]").count() == 0, "Soundbay: map button hidden")
+    page.goto(f"{BASE}/members"); page.wait_for_selector("[data-testid=members-sort]")
+    check(page.locator("[data-testid=members-sort]").input_value() == "active", "Members: Most active by default")
+    check("Everyone aboard" not in page.inner_text("body"), "Members: subtitle removed")
+    ctx.close()
+    ctx = new_ctx(viewport={"width": 390, "height": 800}); page = ctx.new_page(); watch(page)
+    page.goto(f"{BASE}/soundbay"); page.wait_for_selector("[data-testid=branch-row]")
+    inrow = page.evaluate("() => { const r=document.querySelector('.sb-jumprow'); return r ? [...r.querySelectorAll('button,a')].map(b=>(b.textContent+' '+(b.getAttribute('aria-label')||b.title||'')).trim()) : null; }")
+    check(inrow and any("Copy" in t for t in inrow) and any("Play" in t for t in inrow), f"phone: Copy link and Play live in the section bar {inrow}")
+    ctx.close()
+    # Studies bar
+    for vp, name in [({"width": 1200, "height": 900}, "desktop"), ({"width": 390, "height": 800}, "phone")]:
+        ctx = new_ctx(viewport=vp); page = ctx.new_page(); watch(page)
+        page.goto(f"{BASE}/xenolab"); page.wait_for_selector("[data-testid=studies-panel] .xl-card")
+        ys = page.evaluate("""() => { const y = s => document.querySelector(s).getBoundingClientRect().top; const seps=[...document.querySelectorAll('.xl-sep')].map(e=>e.getBoundingClientRect().top);
+            return [y('.xl-cards'), seps[0], y('.xl-bar'), seps[1], y('[data-testid=xenolab-start]')]; }""")
+        check(all(ys[i] is not None for i in range(5)) and ys == sorted(ys), f"Studies ({name}): list, divider, bar, divider, form {ys}")
+        if name == "phone":
+            pos = page.evaluate("() => { const c=document.querySelector('.xl-bar .xl-chips').getBoundingClientRect(), f=document.querySelector('.xl-bar-find .xl-search').getBoundingClientRect(); return [c.top, f.top, c.right, f.left]; }")
+            check(abs(pos[0] - pos[1]) < 20 and pos[3] >= pos[2] - 2, f"phone: search sits right of the chips {pos}")
+        ctx.close()
+    # Contribute lists seeds
+    DATA["/api/contribute/branches"].append(dict(DATA["/api/contribute/branches"][0], slug="b3", name="Seedling", seed=True, bgOpacity=0.5))
+    ctx = new_ctx(); page = ctx.new_page(); watch(page)
+    page.goto(f"{BASE}/xenolab?tab=contribute"); page.wait_for_selector(".ct-seedtag")
+    check(page.locator(".ct-seedtag").count() >= 1, "Contribute: Growing seeds listed")
+    ctx.close()
+    DATA["/api/contribute/branches"].pop()
+    # Log: studies folder
+    ctx = new_ctx(); page = ctx.new_page(); watch(page)
+    page.goto(f"{BASE}/wiki"); page.wait_for_selector("[data-testid=log-tree]")
+    t = page.locator("[data-testid=log-tree]").inner_text()
+    check("Studies" in t, "Log: Studies folder in the tree")
+    check("Recent studies" in page.inner_text("body") or "Beating tones" in page.inner_text("body"), "Log: studies reachable from the Log")
+    ctx.close()
+    # Admin
+    ctx = new_ctx(user=ADMIN); page = ctx.new_page(); watch(page)
+    page.goto(f"{BASE}/admin/featured"); page.wait_for_selector("[data-testid=featured-admin]")
+    page.click("[data-testid=featured-entry] button:has-text('Edit')"); page.wait_for_selector(".feat-admin-edit")
+    check(page.locator(".feat-admin-edit input[type=range]").count() >= 1, "Admin featured: opacity slider")
+    page.goto(f"{BASE}/admin/resources"); page.wait_for_selector("[data-testid=resources-admin]")
+    check("ABCDE-FGHJK" in page.inner_text("[data-testid=resources-admin]"), "Admin resources: coupon listed")
+    page.click("button:has-text('Price & SEO')"); page.wait_for_selector("[data-testid=res-edit]")
+    check(page.locator("[data-testid=res-edit] .seo-pics, [data-testid=res-edit] input[maxlength]").count() >= 1, "Admin resources: SEO tool present")
+    page.goto(f"{BASE}/admin/blog"); page.wait_for_timeout(800)
+    check(page.locator(".study-editor, [data-testid=study-editor], .se-root").count() >= 1 or "Hello world" in page.inner_text("body"), "Admin blog loads")
+    page.goto(f"{BASE}/admin/wiki"); page.wait_for_timeout(800)
     ctx.close()
 
     # ---------- mobile overflow

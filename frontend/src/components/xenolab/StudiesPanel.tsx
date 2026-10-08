@@ -10,7 +10,7 @@ import { Username } from "../Username";
 export function StudyCardView({ s }: { s: StudyCard }) {
   return (
     <li className={`xl-card${s.backgroundUrl ? " has-bg" : ""}`}>
-      {s.backgroundUrl && <img className="xl-card-bg" src={s.backgroundUrl} alt="" loading="lazy" decoding="async" draggable={false} />}
+      {s.backgroundUrl && <img className="xl-card-bg" style={s.backgroundOpacity != null ? { ["--bgo" as string]: s.backgroundOpacity } : undefined} src={s.backgroundUrl} alt="" loading="lazy" decoding="async" draggable={false} />}
       <Link className="xl-card-link" to={`/study/${s.slug}`}>
         <div className="xl-card-top">
           <b>{s.title}</b>
@@ -56,7 +56,8 @@ export function StudiesPanel({ studies }: { studies: StudyCard[] | null }) {
           {list.length > shown && <button className="btn" onClick={() => setShown((n) => n + 12)}>Show more ({list.length - shown})</button>}
         </>
       )}
-      <div className="xl-bar">
+      <hr className="xl-sep xl-sep-top" aria-hidden="true" />
+      <div className="xl-bar xl-bar-find">
         <div className="xl-chips" role="group" aria-label="Show">
           {FILTERS.map(([id, label]) => <button key={id} className={`xl-chip${filter === id ? " on" : ""}`} aria-pressed={filter === id} onClick={() => { setFilter(id); setShown(12); }}>{label}</button>)}
         </div>

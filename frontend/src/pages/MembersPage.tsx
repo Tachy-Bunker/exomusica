@@ -38,7 +38,7 @@ export function MembersPage() {
   const filterParam = params.get("show");
   const filter: MemberFilter = filterParam === "new" || filterParam === "active" || filterParam === "chat" ? filterParam : "all";
   const sortParam = params.get("sort");
-  const sort: MemberSort = SORTS.some((s) => s.id === sortParam) ? (sortParam as MemberSort) : "newest";
+  const sort: MemberSort = SORTS.some((s) => s.id === sortParam) ? (sortParam as MemberSort) : "active"; // most active first by default
   const query = params.get("q") ?? "";
   const setParam = (key: string, value: string, fallback: string) => {
     setLimit(PAGE); // a different view starts again at the first page
@@ -63,8 +63,6 @@ export function MembersPage() {
     <div className="home-page space-page" data-testid="members-page">
       <header className="home-hero">
         <h1>Members</h1>
-        <p className="home-lede">Everyone aboard. Say hello.</p>
-        <p className="home-stats" data-testid="members-summary">{data ? <><span>{data.count.toLocaleString()} members</span>{inChat.size > 0 && <span>{inChat.size} in chat now</span>}</> : "\u00a0"}</p>
         {!user && data && <p className="home-dim" data-testid="members-login-note"><Link to="/login">Log in</Link> to send a message.</p>}
       </header>
 
@@ -73,7 +71,7 @@ export function MembersPage() {
           <input type="search" className="space-search" placeholder="Search by name or bio" aria-label="Search members" value={query} onChange={(e) => setParam("q", e.target.value, "")} data-testid="members-search" />
           <label className="space-sort">
             <span className="home-dim">Sort</span>
-            <select value={sort} onChange={(e) => setParam("sort", e.target.value, "newest")} aria-label="Sort members" data-testid="members-sort">
+            <select value={sort} onChange={(e) => setParam("sort", e.target.value, "active")} aria-label="Sort members" data-testid="members-sort">
               {SORTS.map((s) => <option key={s.id} value={s.id}>{s.label}</option>)}
             </select>
           </label>

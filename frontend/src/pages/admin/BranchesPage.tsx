@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { Link } from "react-router-dom";
 import { api, ApiError } from "../../lib/api";
 import type { Branch } from "../../lib/types";
@@ -10,7 +10,10 @@ interface Font {
 }
 
 export function BranchesPage() {
-  const [branches, setBranches] = useState<Branch[]>([]);
+  const [branches, setBranchesRaw] = useState<Branch[]>([]);
+  const setBranches = (b: Branch[]) => setBranchesRaw(b);
+  const [order, setOrder] = useState<"az" | "created">("az");
+  const sorted = useMemo(() => (order === "az" ? [...branches].sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base", numeric: true })) : branches), [branches, order]);
   const [fonts, setFonts] = useState<Font[]>([]);
   const [form, setForm] = useState({ slug: "", name: "", description: "", parentId: "" });
   const [error, setError] = useState<string | null>(null);
@@ -186,7 +189,7 @@ export function BranchesPage() {
             onChange={(e) => setForm((f) => ({ ...f, parentId: e.target.value }))}
           >
             <option value="">- none, top-level -</option>
-            {branches.map((b) => (
+            {sorted.map((b) => (
               <option key={b.id} value={b.id}>
                 {b.name}
               </option>
@@ -199,6 +202,7 @@ export function BranchesPage() {
         </button>
       </form>
 
+      <p className="home-dim" style={{ margin: "0.6rem 0 0.3rem" }}>Order: <button type="button" className="link-btn" aria-pressed={order === "az"} onClick={() => setOrder("az")} style={{ fontWeight: order === "az" ? 700 : 400 }}>A to Z</button> · <button type="button" className="link-btn" aria-pressed={order === "created"} onClick={() => setOrder("created")} style={{ fontWeight: order === "created" ? 700 : 400 }}>Oldest first</button></p>
       <table>
         <thead>
           <tr>
@@ -210,7 +214,7 @@ export function BranchesPage() {
           </tr>
         </thead>
         <tbody>
-          {branches.map((b) => (
+          {sorted.map((b) => (
             <tr key={b.id}>
               {editingId === b.id ? (
                 <td colSpan={2}>

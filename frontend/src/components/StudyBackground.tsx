@@ -1,9 +1,20 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { OpacitySlider } from "./OpacitySlider";
 import { api, ApiError } from "../lib/api";
 import type { BranchPicture } from "../lib/home";
 
 /** The picture behind a study's card and page. The owner picks one: from the pictures of the branches the study is connected to, from a link, or from their device. */
-export function StudyBackground({ studySlug, current, branches, onChange }: { studySlug: string; current: string | null; branches: { slug: string; name: string }[]; onChange: () => void }) {
+export function StudyBackground({ studySlug, current, opacity, branches, onChange, onPreview }: { studySlug: string; current: string | null; opacity?: number | null; branches: { slug: string; name: string }[]; onChange: () => void; onPreview?: (v: number | null) => void }) {
+  const [strength, setStrength] = useState<number | null>(opacity ?? null);
+  const saveTimer = useRef<number | undefined>(undefined);
+  useEffect(() => setStrength(opacity ?? null), [opacity]);
+  useEffect(() => () => window.clearTimeout(saveTimer.current), []);
+  function changeStrength(v: number | null) {
+    setStrength(v);
+    onPreview?.(v);
+    window.clearTimeout(saveTimer.current);
+    saveTimer.current = window.setTimeout(() => { api(`/api/studies/${studySlug}`, { method: "PATCH", body: JSON.stringify({ backgroundOpacity: v }) }).catch(() => setError("Couldn't save the picture strength")); }, 500);
+  }
   const [open, setOpen] = useState(false);
   const [pics, setPics] = useState<{ url: string; label: string }[] | null>(null);
   const [link, setLink] = useState("");
@@ -49,6 +60,7 @@ export function StudyBackground({ studySlug, current, branches, onChange }: { st
               </ul>
             ) : <p className="home-dim">The connected branches have no pictures yet.</p>
           ) : <p className="home-dim">Connect a branch to choose from its pictures.</p>}
+          {current && <OpacitySlider value={strength} onChange={changeStrength} />}
           <div className="study-bgpick-row">
             <input type="url" value={link} onChange={(e) => setLink(e.target.value)} placeholder="Or paste a link to a picture" aria-label="Link to a picture" />
             <button type="button" className="btn" disabled={busy || !link.trim()} onClick={() => set(link.trim())}>Use link</button>

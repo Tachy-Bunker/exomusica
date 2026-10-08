@@ -16,16 +16,16 @@ export async function wikiRoutes(app: FastifyInstance): Promise<void> {
     return page;
   });
 
-  app.post<{ Body: { slug: string; title: string; contentMarkdown: string; parentId?: number } }>(
+  app.post<{ Body: { slug: string; title: string; contentMarkdown: string; parentId?: number; fontId?: number | null; ogTitle?: string | null; ogDescription?: string | null; ogImageUrl?: string | null } }>(
     "/api/admin/wiki",
     { preHandler: requireAdmin },
     async (req, reply) => {
-      const { slug, title, contentMarkdown, parentId } = req.body ?? {};
+      const { slug, title, contentMarkdown, parentId, fontId, ogTitle, ogDescription, ogImageUrl } = req.body ?? {};
       if (!slug || !title || !contentMarkdown) {
         return reply.code(400).send({ error: "slug, title, and contentMarkdown are required" });
       }
       const page = await prisma.wikiPage.create({
-        data: { slug, title, contentMarkdown, parentId, updatedById: req.user!.id },
+        data: { slug, title, contentMarkdown, parentId, fontId: fontId ?? null, ogTitle: ogTitle || null, ogDescription: ogDescription || null, ogImageUrl: ogImageUrl || null, updatedById: req.user!.id },
       });
       return reply.code(201).send(page);
     },

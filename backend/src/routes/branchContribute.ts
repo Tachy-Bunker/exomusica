@@ -13,10 +13,11 @@ export async function branchContributeRoutes(app: FastifyInstance): Promise<void
   // Public: every branch's contribution info for "Choose your next project"
   app.get("/api/contribute/branches", async (req) => {
     const branches = await prisma.branch.findMany({
-      where: { visibility: "VISIBLE" },
+      where: { visibility: { in: ["VISIBLE", "BABY_CRYSTALS"] } }, // growing seeds are open to contributions too
       select: {
         slug: true,
         name: true,
+        visibility: true,
         description: true,
         coverArtUrl: true,
         briefMarkdown: true,
@@ -24,6 +25,7 @@ export async function branchContributeRoutes(app: FastifyInstance): Promise<void
         contributeBackgroundOpacity: true,
         identityImageUrl: true,
         identitySecondaryImageUrl: true,
+        identityBgOpacity: true,
         previewAttachment: { select: { storagePath: true, filename: true, message: { select: { id: true, dayKey: true, channel: { select: { slug: true, name: true, branchId: true, branch: { select: { visibility: true } } } } } } } },
         sampleTrack: { select: { id: true, title: true, fileUrl: true, album: { select: { slug: true, title: true } } } },
         sampleCommunityTrack: { select: { id: true, title: true, externalUrl: true, attachment: { select: { storagePath: true } }, album: { select: { slug: true, title: true } } } },
@@ -44,6 +46,7 @@ export async function branchContributeRoutes(app: FastifyInstance): Promise<void
     return branches.map((b) => ({
       slug: b.slug,
       name: b.name,
+      seed: b.visibility === "BABY_CRYSTALS",
       description: b.description,
       coverArtUrl: b.coverArtUrl,
       hasBrief: !!b.briefMarkdown,
@@ -51,6 +54,7 @@ export async function branchContributeRoutes(app: FastifyInstance): Promise<void
       backgroundOpacity: b.contributeBackgroundOpacity,
       image: b.identityImageUrl, // the branch's main image: the row's background
       secondaryImage: b.identitySecondaryImageUrl, // its secondary image: the background of the opened panel
+      bgOpacity: b.identityBgOpacity,
       previewUrl: sampleUrl(b),
       sample: sampleOf(b),
       sketchCount: b._count.sketches,

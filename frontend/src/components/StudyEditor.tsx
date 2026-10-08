@@ -56,13 +56,15 @@ interface Props {
   renderFile: (url: string, label: string | undefined) => ReactNode;
   onAddNote: (text: string) => Promise<void>;
   onNavigate: (path: string) => void;
+  /** News and wiki articles have no footnote notes: the notes tray is left out. */
+  hideNotes?: boolean;
 }
 
 const ALIGN_GLYPH: Record<Align, string> = { left: "⇤", center: "↔", right: "⇥" };
 const hasFiles = (e: { dataTransfer: DataTransfer | null }) => !!e.dataTransfer && Array.from(e.dataTransfer.types).includes("Files");
 const altFor = (f: File) => f.name.replace(/\.[^.]+$/, "").replace(/[\[\]\n]/g, " ").trim() || "image";
 
-export function StudyEditor({ body, onBodyChange, notes, charts, renderAudio, uploadFile, uploadFileInfo, renderFile, onAddNote, onNavigate }: Props) {
+export function StudyEditor({ body, onBodyChange, notes, charts, renderAudio, uploadFile, uploadFileInfo, renderFile, onAddNote, onNavigate, hideNotes = false }: Props) {
   const taRef = useRef<HTMLTextAreaElement>(null);
   // The latest text, kept current even between renders: uploads finish at unpredictable moments and must edit what is there NOW.
   const bodyRef = useRef(body);
@@ -472,7 +474,7 @@ export function StudyEditor({ body, onBodyChange, notes, charts, renderAudio, up
     <div className="study-editor">
       {/* pinned under the nav on desktop, so a note or figure can be dragged to a word however far down the paper it is */}
       <div className="study-trays">
-      <div className="study-notes-tray">
+      {!hideNotes && <div className="study-notes-tray">
         <span className="study-tray-label">Notes</span>
         {notes.length === 0 && <span className="study-tray-empty">Add a note, then drag its [n] onto a word in the preview.</span>}
         {notes.map((n, i) => (
@@ -522,7 +524,7 @@ export function StudyEditor({ body, onBodyChange, notes, charts, renderAudio, up
           </button>
         </span>
         {newNote.trim() && <div className="note-add-preview">{renderInlineMarkdown(newNote)}</div>}
-      </div>
+      </div>}
 
       {figures.numbered.length > 0 && (
         <div className="study-notes-tray">

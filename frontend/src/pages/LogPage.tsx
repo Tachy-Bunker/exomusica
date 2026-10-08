@@ -3,10 +3,11 @@ import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import { BranchIndexList } from "../components/BranchIndexList";
 import { CollaboratorIndexList } from "../components/CollaboratorIndexList";
 import { api } from "../lib/api";
-import { loadPosts, loadWikiPages, useLoaded } from "../lib/hubs";
+import { loadPosts, loadStudies, loadWikiPages, useLoaded } from "../lib/hubs";
+import { useAuth } from "../lib/auth";
+import { renderArticle } from "../components/ArticleView";
 import { isTypingTarget } from "../lib/isTypingTarget";
 import { ancestorIds, buildTree, folderIds, visibleRows, type Row } from "../lib/logTree";
-import { renderMarkdown } from "../lib/markdown";
 import { useContentScaleStore } from "../lib/contentScaleStore";
 import { useCustomFont, type FontInfo } from "../lib/useCustomFont";
 import { useDocumentTitle } from "../lib/useDocumentTitle";
@@ -51,6 +52,8 @@ export function LogPage() {
   const isNews = location.pathname.startsWith("/news");
   const { data: pages } = useLoaded(loadWikiPages);
   const { data: posts } = useLoaded(loadPosts);
+  const { data: studies } = useLoaded(loadStudies);
+  const { user } = useAuth();
   const [page, setPage] = useState<WikiFull | null>(null);
   const [post, setPost] = useState<PostFull | null>(null);
   const font = useCustomFont((isNews ? post : page)?.font);
@@ -73,6 +76,7 @@ export function LogPage() {
   const nodes = useMemo(() => buildTree(pages ?? []), [pages]);
   const [open, setOpen] = useState<Set<number>>(new Set());
   const [newsOpen, setNewsOpen] = useState(true);
+  const [studiesOpen, setStudiesOpen] = useState(true);
   const [query, setQuery] = useState("");
   const [initialised, setInitialised] = useState(false);
   useEffect(() => {
@@ -86,7 +90,7 @@ export function LogPage() {
     if (above.length) setOpen((o) => (above.every((id) => o.has(id)) ? o : new Set([...o, ...above])));
   }, [pages, isNews, slug]);
 
-  const rows = useMemo(() => visibleRows({ nodes, posts: posts ?? [], open, newsOpen, query }), [nodes, posts, open, newsOpen, query]);
+  const rows = useMemo(() => visibleRows({ nodes, posts: posts ?? [], open, newsOpen, query, studies: studies ?? [], studiesOpen }), [nodes, posts, open, newsOpen, query, studies, studiesOpen]);
   const currentKey = isNews ? (slug ? `post-${posts?.find((p) => p.slug === slug)?.id}` : "news") : slug ? `page-${pages?.find((p) => p.slug === slug)?.id}` : "";
   const [selectedKey, setSelectedKey] = useState("");
   useEffect(() => { if (currentKey) setSelectedKey(currentKey); }, [currentKey]);
@@ -104,17 +108,17 @@ export function LogPage() {
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [isDesktop, rows, selectedKey, navigate]);
 
-  const toggle = (r: Row) => (r.kind === "news-folder" ? setNewsOpen((v) => !v) : setOpen((o) => { const n = new Set(o); if (n.has(r.id!)) n.delete(r.id!); else n.add(r.id!); return n; }));
+  const toggle = (r: Row) => (r.kind === "news-folder" ? setNewsOpen((v) => !v) : r.kind === "studies" ? setStudiesOpen((v) => !v) : setOpen((o) => { const n = new Set(o); if (n.has(r.id!)) n.delete(r.id!); else n.add(r.id!); return n; }));
   const searching = query.trim().length > 0;
-  const total = (pages?.length ?? 0) + (posts?.length ?? 0);
+  const total = (pages?.length ?? 0) + (posts?.length ?? 0) + (studies?.length ?? 0);
 
   const tree = (
     <nav className="log-tree" aria-label="Log contents">
       <div className="log-tree-tools">
         <input type="search" className="log-tree-search" placeholder="Search the Log" aria-label="Search the Log" value={query} onChange={(e) => setQuery(e.target.value)} data-testid="log-search" />
         <span className="log-tree-buttons">
-          <button type="button" className="btn" onClick={() => { setOpen(new Set(folderIds(nodes))); setNewsOpen(true); }} disabled={searching} data-testid="log-expand">Open all</button>
-          <button type="button" className="btn" onClick={() => { setOpen(new Set()); setNewsOpen(false); }} disabled={searching} data-testid="log-collapse">Close all</button>
+          <button type="button" className="btn" onClick={() => { setOpen(new Set(folderIds(nodes))); setNewsOpen(true); setStudiesOpen(true); }} disabled={searching} data-testid="log-expand">Open all</button>
+          <button type="button" className="btn" onClick={() => { setOpen(new Set()); setNewsOpen(false); setStudiesOpen(false); }} disabled={searching} data-testid="log-collapse">Close all</button>
         </span>
       </div>
       {rows.length === 0 ? (
@@ -132,7 +136,7 @@ export function LogPage() {
                   <span className="log-chev log-chev-none" aria-hidden="true" />
                 )}
                 <Link to={r.to} aria-current={current ? "page" : undefined}>{r.label}</Link>
-                {r.kind === "studies" && <span className="home-dim log-hint"> <Link to="/xenolab" data-testid="log-xenolab-link">from XenoLab</Link></span>}
+                {r.kind === "studies" && <span className="home-dim log-hint"> {studies ? `${studies.length} · ` : ""}<Link to="/xenolab?tab=studies" data-testid="log-xenolab-link">from XenoLab</Link></span>}
                 {r.kind === "news-folder" && posts && <span className="home-dim log-hint"> {posts.length}</span>}
               </li>
             );
@@ -167,7 +171,8 @@ export function LogPage() {
             <>
               <h1>{post.title}</h1>
               <p className="mono home-dim">{new Date(post.publishedAt).toLocaleDateString()}</p>
-              {renderMarkdown(post.contentMarkdown, navigate)}
+              {user?.isAdmin && <p><Link className="home-dim" to={`/admin/blog?edit=${post.slug}`} data-testid="log-edit">Edit this post</Link></p>}
+              {renderArticle(post.contentMarkdown, navigate)}
             </>
           )}
         </>
@@ -176,6 +181,12 @@ export function LogPage() {
         <>
           <h1>Log</h1>
           <p className="home-dim">The wiki and the news, in one place. Pick a page from the list{isDesktop ? "" : " above"}.</p>
+          {(studies ?? []).length > 0 && (
+            <>
+              <h2 className="home-h2" style={{ marginTop: "1.5rem" }}>Recent studies</h2>
+              <div className="log-posts">{(studies ?? []).slice(0, 3).map((st) => <Link key={st.slug} to={`/study/${st.slug}`} className="log-post"><h2>{st.title}</h2><p className="mono home-dim">{st.owner ? `${st.owner} · ` : ""}{st.updatedAt ? new Date(st.updatedAt).toLocaleDateString() : ""}</p></Link>)}</div>
+            </>
+          )}
           {latest.length > 0 && (
             <>
               <h2 className="home-h2" style={{ marginTop: "1.5rem" }}>Latest news</h2>
@@ -188,7 +199,7 @@ export function LogPage() {
         !page ? <p>Loading…</p>
         : page.contentMarkdown.trim() === "@branch-index" ? <BranchIndexList />
         : page.contentMarkdown.trim() === "@collaborator-index" ? <CollaboratorIndexList />
-        : renderMarkdown(page.contentMarkdown, navigate)
+        : <>{user?.isAdmin && <p><Link className="home-dim" to={`/admin/wiki?edit=${page.slug}`} data-testid="log-edit">Edit this page</Link></p>}{renderArticle(page.contentMarkdown, navigate)}</>
       )}
     </div>
   );

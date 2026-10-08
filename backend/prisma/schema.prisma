@@ -90,6 +90,7 @@ model User {
   communityTrackLikes CommunityTrackLike[]
   playlistCollaborations PlaylistCollaborator[]
   sampleBankItems SampleBankItem[]
+  resourceUnlocks ResourceUnlock[]
   studies         Study[]
   studyRevisions  StudyRevision[] @relation("StudyRevisionAuthor")
   challengeSubmissions ChallengeSubmission[]
@@ -163,6 +164,7 @@ model Branch {
   identityGlyph       String?     // admin-chosen emblem, one of a fixed set (see lib/branchIdentity.ts)
   identityImageUrl    String?     // the branch's MAIN image: shown in place of the emblem (an album cover or gallery picture, or an upload)
   identitySecondaryImageUrl String? // the branch's SECONDARY image: the soft background of its tile and of the homepage module when it is chosen
+  identityBgOpacity   Float?      // how strongly the branch's images show as backgrounds (0.05 - 0.9). null = each place's own soft default
   previewAttachmentId Int?        @unique
   sampleTrackId       Int?        // a track already on the site, offered as the branch's sample (instead of a chat file)
   sampleTrack         Track?      @relation("BranchSampleTrack", fields: [sampleTrackId], references: [id], onDelete: SetNull)
@@ -803,6 +805,10 @@ model Study {
   body        String            @db.Text
   status      StudyStatus       @default(IN_PROGRESS)
   backgroundUrl String?         // the picture behind the study's card and page: a link, an upload, or one of its branches' images
+  backgroundOpacity Float?      // how strongly that picture shows (0.05 - 0.9); null = the soft default
+  ogTitle       String?         // embed / SEO overrides (blank = the study's own title and first words)
+  ogDescription String?
+  ogImageUrl    String?
   channelId   Int?              // the study's discussion chat: its own auto-created one, or any existing branch/topic chat the owner picked. Several studies may share one chat.
   channel     ForumChannel?     @relation(fields: [channelId], references: [id], onDelete: SetNull)
   createdAt   DateTime          @default(now())
@@ -924,6 +930,60 @@ model SampleBankItem {
   imageAttachmentIds Int[] // their files, so they are removed (and the quota given back) with the resource
   createdAt    DateTime   @default(now())
   mapNode      ForumMapNode?
+  // Paid resources: the file is only handed out to someone who holds a coupon (the artist is given one). Free ones are open to everyone.
+  paid         Boolean    @default(false)
+  price        String?    // shown as typed, e.g. "5 USD"
+  payNote      String?    @db.Text // how to pay, in the admin's words (the PayPal donation button instruction)
+  paypalUrl    String?    // the donation button / link for this resource; blank = the site's donate link
+  ogTitle       String?
+  ogDescription String?
+  ogImageUrl    String?
+  coupons      ResourceCoupon[]
+  unlocks      ResourceUnlock[]
+}
+
+// A code that opens paid resources: for one resource, or (itemId null) for every paid one. The admin makes them and hands them to the contributing artists.
+model ResourceCoupon {
+  id        Int      @id @default(autoincrement())
+  code      String   @unique // stored upper-case
+  itemId    Int?
+  item      SampleBankItem? @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  note      String?  // who it was made for
+  maxUses   Int?     // null = unlimited
+  uses      Int      @default(0)
+  expiresAt DateTime?
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  unlocks   ResourceUnlock[]
+}
+
+// A member who has redeemed a coupon keeps the resource unlocked. (Visitors without an account just get the file for that visit.)
+model ResourceUnlock {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  itemId    Int
+  item      SampleBankItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  couponId  Int?
+  coupon    ResourceCoupon? @relation(fields: [couponId], references: [id], onDelete: SetNull)
+  createdAt DateTime @default(now())
+
+  @@unique([userId, itemId])
+}
+
+// The homepage's "Featured articles": a study, news post or wiki page, picked by the admin with its own preview text and a background picture.
+model FeaturedArticle {
+  id         Int      @id @default(autoincrement())
+  kind       String   // "study" | "news" | "wiki"
+  refSlug    String   // the article's slug
+  text       String?  @db.Text // the custom preview text
+  imageUrl   String?  // chosen from the article's own pictures (or a link)
+  imageOpacity Float? // 0.05 - 0.9; null = soft default
+  sortOrder  Int      @default(0)
+  active     Boolean  @default(true)
+  createdAt  DateTime @default(now())
+
+  @@unique([kind, refSlug])
 }
 
 // --- Prompt-based challenges: a recurring constraint with a submission
@@ -935,6 +995,9 @@ model Challenge {
   title       String
   prompt      String   @db.Text
   active      Boolean  @default(true)
+  ogTitle       String?
+  ogDescription String?
+  ogImageUrl    String?
   createdAt   DateTime @default(now())
 
   submissions ChallengeSubmission[]

@@ -10,8 +10,13 @@ interface SampleItem {
   description: string | null;
   tags: string[];
   kind: string;
-  fileUrl: string;
+  fileUrl: string | null; // null while a paid resource is still locked
   filename: string;
+  paid?: boolean;
+  locked?: boolean;
+  price?: string | null;
+  payNote?: string | null;
+  paypalUrl?: string | null;
   owner: string;
   cover?: string | null;
   gallery?: string[];
@@ -19,7 +24,35 @@ interface SampleItem {
 }
 
 /** Raw material to build with. Lives in XenoLab's Samples tab. Audio plays right on the card and can be sent to the Analyzer. */
-export function SamplesPanel({ onAnalyze }: { onAnalyze: () => void }) {
+const DEFAULT_DONATE = "https://paypal.me/tachybunker";
+
+/** The unlock box of a paid resource: how to pay, then the code the artist (or the team) hands out. */
+function UnlockBox({ item, onUnlocked }: { item: SampleItem; onUnlocked: (fileUrl: string) => void }) {
+  const [code, setCode] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  async function redeem() {
+    if (!code.trim()) return;
+    setBusy(true); setError(null);
+    try {
+      const r = await api<{ fileUrl: string }>(`/api/sample-bank/${item.id}/redeem`, { method: "POST", body: JSON.stringify({ code }) });
+      onUnlocked(r.fileUrl);
+    } catch (e) { setError(e instanceof Error ? e.message : "That code didn't work."); } finally { setBusy(false); }
+  }
+  return (
+    <div className="res-unlock" data-testid="res-unlock">
+      <p className="home-dim res-pay-note">{item.payNote?.trim() || `This resource is paid${item.price ? ` (${item.price})` : ""}. Support its artist with a PayPal donation, then enter the code you are given.`}</p>
+      <div className="xl-form-row">
+        <a className="btn" href={item.paypalUrl || DEFAULT_DONATE} target="_blank" rel="noreferrer" data-testid="res-paypal">Donate with PayPal{item.price ? ` · ${item.price}` : ""}</a>
+        <input value={code} onChange={(e) => setCode(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") void redeem(); }} placeholder="Have a code?" aria-label={`Code for ${item.title}`} autoComplete="off" spellCheck={false} style={{ flex: "1 1 120px", minWidth: 0 }} data-testid="res-code" />
+        <button className="btn btn-primary" disabled={busy || !code.trim()} onClick={() => void redeem()} data-testid="res-redeem">Unlock</button>
+      </div>
+      {error && <p className="an-err" role="alert">{error}</p>}
+    </div>
+  );
+}
+
+export function SamplesPanel({ onAnalyze, focusId = null }: { onAnalyze: () => void; focusId?: number | null }) {
   const { user } = useAuth();
   const [items, setItems] = useState<SampleItem[] | null>(null);
   const [allTags, setAllTags] = useState<string[]>([]);
@@ -33,6 +66,15 @@ export function SamplesPanel({ onAnalyze }: { onAnalyze: () => void }) {
   const galleryInputRef = useRef<HTMLInputElement>(null);
   const [error, setError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<number | null>(null);
+  const [copied, setCopied] = useState<number | null>(null);
+  useEffect(() => { // a linked resource (/resource/12) is brought into view
+    if (focusId === null || !items) return;
+    document.getElementById(`resource-${focusId}`)?.scrollIntoView({ block: "center" });
+  }, [focusId, items === null]); // eslint-disable-line react-hooks/exhaustive-deps
+  const unlock = (id: number, fileUrl: string) => setItems((list) => (list ?? []).map((i) => (i.id === id ? { ...i, fileUrl, locked: false } : i)));
+  async function copyLink(id: number) {
+    try { await navigator.clipboard.writeText(`${window.location.origin}/resource/${id}`); setCopied(id); window.setTimeout(() => setCopied((c) => (c === id ? null : c)), 1800); } catch { /* the link is also the address of the card */ }
+  }
 
   function load() {
     api<SampleItem[]>(`/api/sample-bank${tagFilter ? `?tag=${encodeURIComponent(tagFilter)}` : ""}`).then((list) => {
@@ -72,6 +114,7 @@ export function SamplesPanel({ onAnalyze }: { onAnalyze: () => void }) {
   }
 
   async function analyze(item: SampleItem) {
+    if (!item.fileUrl) return;
     setBusyId(item.id); setError(null);
     try {
       const res = await fetch(item.fileUrl);
@@ -118,19 +161,21 @@ export function SamplesPanel({ onAnalyze }: { onAnalyze: () => void }) {
       ) : (
         <ul className="xl-cards">
           {items.map((item) => (
-            <li key={item.id} className="xl-card">
+            <li key={item.id} id={`resource-${item.id}`} className={`xl-card${focusId === item.id ? " xl-card-focus" : ""}`}>
               {item.cover && <img className="xl-cover" src={item.cover} alt="" loading="lazy" />}
               <div className="xl-card-top">
                 <b>{item.title}</b>
-                <span className="home-dim"><Username name={item.owner} /> · {item.kind.toLowerCase()}</span>
+                <span className="home-dim"><Username name={item.owner} /> · {item.kind.toLowerCase()}{item.paid && <> · <span className={`res-badge${item.locked ? "" : " open"}`}>{item.locked ? (item.price ? `paid · ${item.price}` : "paid") : "unlocked"}</span></>}</span>
               </div>
               {item.description && <p className="xl-card-text">{item.description}</p>}
               {item.gallery && item.gallery.length > 0 && <div className="xl-thumbs">{item.gallery.map((g) => <a key={g} href={g} target="_blank" rel="noreferrer"><img src={g} alt="" loading="lazy" /></a>)}</div>}
-              {item.kind === "AUDIO" && <audio controls preload="none" src={item.fileUrl} className="xl-audio" aria-label={`Preview ${item.title}`} />}
+              {item.kind === "AUDIO" && item.fileUrl && <audio controls preload="none" src={item.fileUrl} className="xl-audio" aria-label={`Preview ${item.title}`} />}
               {item.tags.length > 0 && <div className="xl-chips">{item.tags.map((t) => <button key={t} className="xl-chip" onClick={() => setTagFilter(t)}>{t}</button>)}</div>}
+              {item.locked && <UnlockBox item={item} onUnlocked={(url) => unlock(item.id, url)} />}
               <div className="xl-card-actions">
-                <a className="btn" href={item.fileUrl} download={item.filename}>Download</a>
-                {item.kind === "AUDIO" && <button className="btn" disabled={busyId === item.id} onClick={() => analyze(item)}>{busyId === item.id ? "Loading…" : "Analyze"}</button>}
+                {item.fileUrl && <a className="btn" href={item.fileUrl} download={item.filename}>Download</a>}
+                {item.kind === "AUDIO" && item.fileUrl && <button className="btn" disabled={busyId === item.id} onClick={() => analyze(item)}>{busyId === item.id ? "Loading…" : "Analyze"}</button>}
+                <button className="btn" onClick={() => void copyLink(item.id)} aria-label={`Copy a link to ${item.title}`}>{copied === item.id ? "Link copied" : "Copy link"}</button>
                 {user?.username === item.owner && <button className="btn btn-danger" onClick={() => remove(item.id)}>Delete</button>}
               </div>
             </li>

@@ -12,7 +12,7 @@ async function buildHome() {
       where: NOT_HIDDEN,
       select: {
         id: true, slug: true, name: true, description: true, longDescription: true, coverArtUrl: true, posX: true, posY: true, visibility: true, isAnchor: true,
-        identityColor: true, identityGlyph: true, identityImageUrl: true, identitySecondaryImageUrl: true,
+        identityColor: true, identityGlyph: true, identityImageUrl: true, identitySecondaryImageUrl: true, identityBgOpacity: true,
         parent: { select: { slug: true } },
         channel: { select: { id: true, slug: true } },
         albums: { select: { createdAt: true }, orderBy: { createdAt: "desc" }, take: 1 },
@@ -71,6 +71,7 @@ async function buildHome() {
     details: b.longDescription?.trim() || null,
     image: b.identityImageUrl,
     secondaryImage: b.identitySecondaryImageUrl,
+    bgOpacity: b.identityBgOpacity,
     albums: b._count.albums,
     tracks: tracksByBranch.get(b.id) ?? 0,
     chatSlug: b.channel?.slug ?? null,

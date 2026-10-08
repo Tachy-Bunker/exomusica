@@ -62,6 +62,7 @@ export interface Branch {
   identityImageUrl?: string | null;
   longDescription?: string | null;
   identitySecondaryImageUrl?: string | null;
+  identityBgOpacity?: number | null;
   channel: { id: number; slug: string; discordChannelId: string | null; discordWebhookUrl: string | null } | null;
 }
 

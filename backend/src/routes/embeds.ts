@@ -1,12 +1,14 @@
 import type { FastifyInstance } from "fastify";
 import { prisma } from "../lib/prisma.js";
+import { imagesInMarkdown } from "../lib/resourceAccess.js";
 
 function escapeHtml(s: string): string {
   return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 }
 
 function renderEmbedHtml(opts: { title: string; description: string; imageUrl: string | null; faviconUrl: string | null; url: string }): string {
-  const { title, description, imageUrl, faviconUrl, url } = opts;
+  const { title, description, faviconUrl, url } = opts;
+  const imageUrl = opts.imageUrl && opts.imageUrl.startsWith("/") ? `https://exomusica.com${opts.imageUrl}` : opts.imageUrl; // crawlers need an absolute address
   return `<!doctype html>
 <html>
 <head>
@@ -214,6 +216,62 @@ export async function embedRoutes(app: FastifyInstance): Promise<void> {
         imageUrl: collaborator.ogImageUrl ?? collaborator.pictureUrl ?? s?.ogCollaboratorDefaultImageUrl ?? null,
         faviconUrl: s?.faviconUrl ?? null,
         url: `${baseUrl}/collaborator/${collaborator.slug}`,
+      }),
+    );
+  });
+
+  // ---- studies, resources and open calls (each has its own address, so each can be linked and previewed)
+  const short = (text: string, n = 200) => (text.length > n ? `${text.slice(0, n - 1).trimEnd()}…` : text);
+
+  app.get<{ Params: { slug: string } }>("/embed/study/:slug", async (req, reply) => {
+    const [study, s] = await Promise.all([
+      prisma.study.findUnique({ where: { slug: req.params.slug }, select: { slug: true, title: true, body: true, backgroundUrl: true, ogTitle: true, ogDescription: true, ogImageUrl: true, owner: { select: { username: true } } } }),
+      prisma.siteSettings.findUnique({ where: { id: 1 } }),
+    ]);
+    if (!study) return reply.code(404).send("Not found");
+    const data = { title: study.title, content: stripMarkdown(study.body), author: study.owner.username };
+    reply.type("text/html").send(
+      renderEmbedHtml({
+        title: substitute(study.ogTitle ?? "{title}", data) || study.title,
+        description: substitute(study.ogDescription ?? "{content:160}", data) || `A study by ${study.owner.username} on Exomusica.`,
+        imageUrl: study.ogImageUrl ?? study.backgroundUrl ?? imagesInMarkdown(study.body, 1)[0] ?? null,
+        faviconUrl: s?.faviconUrl ?? null,
+        url: `${baseUrl}/study/${study.slug}`,
+      }),
+    );
+  });
+
+  app.get<{ Params: { id: string } }>("/embed/resource/:id", async (req, reply) => {
+    const [item, s] = await Promise.all([
+      prisma.sampleBankItem.findUnique({ where: { id: Number(req.params.id) || 0 }, select: { id: true, title: true, description: true, tags: true, paid: true, price: true, imageUrls: true, ogTitle: true, ogDescription: true, ogImageUrl: true } }),
+      prisma.siteSettings.findUnique({ where: { id: 1 } }),
+    ]);
+    if (!item) return reply.code(404).send("Not found");
+    const fallback = short([item.description, item.paid && item.price ? `Price: ${item.price}` : null, item.tags.length ? `Tags: ${item.tags.join(", ")}` : null].filter(Boolean).join(" · "));
+    reply.type("text/html").send(
+      renderEmbedHtml({
+        title: item.ogTitle || item.title,
+        description: item.ogDescription || fallback || "A resource from the Exomusica community.",
+        imageUrl: item.ogImageUrl ?? item.imageUrls[0] ?? null,
+        faviconUrl: s?.faviconUrl ?? null,
+        url: `${baseUrl}/resource/${item.id}`,
+      }),
+    );
+  });
+
+  app.get<{ Params: { id: string } }>("/embed/open-call/:id", async (req, reply) => {
+    const [call, s] = await Promise.all([
+      prisma.challenge.findUnique({ where: { id: Number(req.params.id) || 0 }, select: { id: true, title: true, prompt: true, ogTitle: true, ogDescription: true, ogImageUrl: true } }),
+      prisma.siteSettings.findUnique({ where: { id: 1 } }),
+    ]);
+    if (!call) return reply.code(404).send("Not found");
+    reply.type("text/html").send(
+      renderEmbedHtml({
+        title: call.ogTitle || call.title,
+        description: call.ogDescription || short(stripMarkdown(call.prompt), 200) || "An open call on Exomusica.",
+        imageUrl: call.ogImageUrl ?? null,
+        faviconUrl: s?.faviconUrl ?? null,
+        url: `${baseUrl}/open-call/${call.id}`,
       }),
     );
   });

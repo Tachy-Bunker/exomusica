@@ -36,6 +36,13 @@ export function NewsIcon({ size = 16, className }: IconProps) {
     </>
   ));
 }
+export function WikiIcon({ size = 16, className }: IconProps) {
+  return svg("0 0 24 24", size, className, (
+    <>
+      <path d="M6 2h9l5 5v13a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2zm8 1.5V8h4.5L14 3.5zM7 11v1.6h10V11H7zm0 3.4V16h10v-1.6H7zm0 3.4v1.6h6v-1.6H7z" />
+    </>
+  ));
+}
 export function AlbumIcon({ size = 16, className }: IconProps) {
   return svg("0 0 24 24", size, className, (
     <>

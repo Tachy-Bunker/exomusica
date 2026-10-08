@@ -15,7 +15,7 @@ export function parseTab(value: string | null): LabTab {
   return (value && OLD_TABS[value]) || "studies";
 }
 
-export interface StudyCard { slug: string; title: string; excerpt?: string; backgroundUrl?: string | null; status: "IN_PROGRESS" | "COMPLETE"; owner: string; updatedAt: string }
+export interface StudyCard { slug: string; title: string; excerpt?: string; backgroundUrl?: string | null; backgroundOpacity?: number | null; status: "IN_PROGRESS" | "COMPLETE"; owner: string; updatedAt: string }
 
 export type StudyFilter = "all" | "mine" | "progress" | "complete";
 export function filterStudies(list: StudyCard[], filter: StudyFilter, query: string, me: string | null): StudyCard[] {

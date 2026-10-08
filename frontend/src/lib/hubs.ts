@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { api } from "./api";
 import type { ConversationsData, MembersData } from "./spaceHubs";
-import type { PostLite, WikiSummary } from "./logTree";
+import type { PostLite, StudyLite, WikiSummary } from "./logTree";
 
 // Same idea as the homepage data: moving between pages inside a short window reuses the request instead of repeating it.
 function shared<T>(url: string, ttl = 20_000) {
@@ -28,5 +28,6 @@ export function useLoaded<T>(load: () => Promise<T>): { data: T | null; failed: 
   }, [load]);
   return { data, failed };
 }
+export const loadStudies = shared<StudyLite[]>("/api/studies");
 export const loadWikiPages = shared<WikiSummary[]>("/api/wiki");
 export const loadPosts = shared<(PostLite & { coverImageUrl: string | null })[]>("/api/blog");

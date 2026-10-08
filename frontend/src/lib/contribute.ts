@@ -17,6 +17,8 @@ export interface ContributeBranch {
   previewUrl: string | null;
   image?: string | null; // the branch's main image: the background of its row
   secondaryImage?: string | null; // its secondary image: the background of its opened panel
+  bgOpacity?: number | null;
+  seed?: boolean; // a Growing seed
   sample?: ContributeSample | null;
   sketchCount: number;
   mySubmissions: MySubmission[];
