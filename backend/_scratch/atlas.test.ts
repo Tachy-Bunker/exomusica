@@ -1,0 +1,16 @@
+import { parseKey, keyOf, hrefOf, cleanEdges, topPaths, mergeNeighbors, type Neighbor } from "../src/lib/atlas.js";
+let fails = 0;
+const ok = (c: boolean, m: string) => { console.log((c ? "ok   " : "FAIL ") + m); if (!c) fails++; };
+ok(parseKey("study:beating-tones")?.id === "beating-tones", "parses a key");
+ok(parseKey("study:Beating") === null && parseKey("nope:x") === null && parseKey("study:") === null && parseKey(5) === null, "rejects malformed keys");
+ok(parseKey("study:../etc") === null, "rejects path tricks");
+ok(keyOf("resource", 12) === "resource:12" && hrefOf("call", "3") === "/open-call/3", "key + href");
+const e = cleanEdges([["study:a", "branch:b"], ["study:a", "branch:b"], ["study:a", "study:a"], ["x", "y"], ["wiki:p", "news:q"], "bad"]);
+ok(e.length === 2, "edges: deduped, self-loops and junk dropped");
+ok(cleanEdges(Array.from({ length: 40 }, (_, i) => [`study:s${i}`, `study:t${i}`]), 10).length === 10, "edges capped");
+ok(cleanEdges("x").length === 0, "non-array edges");
+ok(JSON.stringify(topPaths([{ to: "a:x", n: 2 }, { to: "b:x", n: 9 }, { to: "c:x", n: 4 }, { to: "d:x", n: 3 }, { to: "e:x", n: 5 }])) === JSON.stringify(["b:x", "e:x", "c:x"]), "paths: threshold, order, limit");
+const N = (key: string): Neighbor => ({ type: "study", key, title: key, href: "/" });
+const m = mergeNeighbors([[N("study:a"), N("study:b")], [N("study:b"), N("study:self"), N("study:c")]], "study:self", 3);
+ok(m.map((x) => x.key).join() === "study:a,study:b,study:c", "merge: dedupe, drop self, cap");
+process.exit(fails ? 1 : 0);

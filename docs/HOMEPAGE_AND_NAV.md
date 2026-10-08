@@ -164,3 +164,13 @@ Tracks are normalised to **−11 LUFS** (`lib/replayGain.ts`). A quieter track i
 - **SEO**: studies, resources, open calls have og fields and `/embed/study/:slug`, `/embed/resource/:id`, `/embed/open-call/:id`. Deep links `/resource/:id`, `/open-call/:id`.
 - **News/Wiki** use the Study editor (`ArticleEditor`) and `SeoFieldsEditor`. Same markdown, no data migration. Edit links: `/admin/blog?edit=slug`, `/admin/wiki?edit=slug`.
 - **Log**: Studies folder in the tree, "Recent studies" on the Log home.
+
+## fix281: the shell
+
+- **Faceplate** (`components/Faceplate.tsx`, mounted by `AtlasShell` in `Layout`): sticky bar under the header. Shows the page's "frequency" (every thing has one, stable, derived from its name, each kind in its own amateur band: see `freqOf` in `lib/atlas.ts`), its name, what it belongs to ("in ‹branch›"), and the Around / Pocket / Terminal buttons. `--nav-height` now includes it.
+- **Margins** (`components/AtlasShell.tsx`, CSS in `global.css`): on screens 1340px+ the related things sit at the edges (left = where you came from, right = nearby, bottom = the conversation, up = the faceplate's "in" chips). Below that, the Around button opens the same lists as a panel. Data: `GET /api/atlas/around?key=study:slug` (branch, study, album, wiki, news, topic, resource, call). Clicking one slides the next page in from that edge.
+- **Desire paths**: `POST /api/atlas/trace` receives anonymous (from,to) pairs; `EdgeCount` stores counts only; a route appears in the margins only after 3+ people took it. Browsers sending Do-Not-Track / GPC send nothing.
+- **Pocket** (`lib/pocketStore.ts`): things you picked up, kept in localStorage (max 24). Items are draggable links: dropping one in a chat input pastes its address.
+- **Master Terminal** (`components/Terminal.tsx`, Ctrl/Cmd+K, or ` or : outside fields): type a name to go there, or a command. All commands live in `lib/actions.ts` (the registry); add an `Action` there and it exists in the terminal. `GET /api/atlas/index` feeds name matching (cached 60 s).
+- **Operator** (`lib/operator.ts`): the one voice for the site's small notices.
+- Not done yet (planned next): real View Transitions (the app uses `BrowserRouter`, which has no `viewTransition`; needs a data-router migration), GUI-action → command hints, terminal on/off setting, `play` command.

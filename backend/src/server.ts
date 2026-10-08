@@ -65,6 +65,7 @@ import { adminAllTracksRoutes } from "./routes/adminAllTracks.js";
 import { branchContributeRoutes } from "./routes/branchContribute.js";
 import { contributorPointsRoutes } from "./routes/contributorPoints.js";
 import { featuredRoutes } from "./routes/featured.js";
+import { atlasRoutes } from "./routes/atlas.js";
 
 // Fastify's own default body limit is 1MB, applied before multipart even
 // parses anything - this was the real ceiling blocking larger uploads
@@ -134,6 +135,7 @@ await app.register(adminAllTracksRoutes);
 await app.register(branchContributeRoutes);
 await app.register(contributorPointsRoutes);
 await app.register(featuredRoutes);
+await app.register(atlasRoutes);
 
 const port = Number(process.env.PORT ?? 3001);
 app.listen({ port, host: "0.0.0.0" }).catch((err) => {

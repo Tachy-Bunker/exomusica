@@ -5344,3 +5344,97 @@ th {
 /* weak devices and people who ask for calm: no floating, no crossfade work */
 @media (hover: none), (prefers-reduced-motion: reduce) { .feat-card-in { animation: none; } }
 @media (prefers-reduced-motion: reduce) { .feat-bg-in, .feat-bg-out, .feat-body { animation: none; } .feat-bg-out { display: none; } .feat-bg-in { opacity: var(--bgo, 0.35); } }
+
+/* ===== fix281: the shell — faceplate, margins, pocket, terminal ===== */
+.faceplate { position: sticky; top: 0; z-index: 44; display: flex; align-items: center; gap: 0.7rem; min-height: 34px; padding: 0.2rem 1.5rem; background: color-mix(in srgb, var(--bg-elevated) 94%, transparent); border-bottom: 1px solid var(--border); font-size: 0.82rem; }
+.fp-readout { font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace; font-size: 0.95rem; letter-spacing: 0.08em; color: var(--accent-audio); text-shadow: 0 0 8px color-mix(in srgb, var(--accent-audio) 55%, transparent); white-space: nowrap; }
+.fp-readout i { font-style: normal; font-size: 0.62rem; margin-left: 0.3rem; color: var(--text-dim); text-shadow: none; letter-spacing: 0.1em; }
+.fp-name { display: inline-flex; align-items: baseline; gap: 0.5rem; min-width: 0; overflow: hidden; white-space: nowrap; }
+.fp-name b { font-weight: 600; overflow: hidden; text-overflow: ellipsis; }
+.fp-kind { display: inline-flex; align-items: center; gap: 0.25rem; color: var(--text-dim); font-size: 0.74rem; text-transform: uppercase; letter-spacing: 0.08em; flex: none; }
+.fp-up { display: inline-flex; align-items: center; gap: 0.35rem; min-width: 0; overflow: hidden; }
+.fp-up-label { color: var(--text-dim); font-size: 0.72rem; }
+.fp-chip { padding: 0.05rem 0.55rem; border: 1px solid var(--border); border-radius: 999px; color: var(--text); text-decoration: none; font-size: 0.76rem; white-space: nowrap; max-width: 14rem; overflow: hidden; text-overflow: ellipsis; }
+.fp-chip:hover, .fp-chip:focus-visible { border-color: var(--accent-forum); color: var(--accent-forum); }
+.fp-spacer { flex: 1; }
+.fp-btn { display: inline-flex; align-items: center; gap: 0.3rem; padding: 0.15rem 0.55rem; background: transparent; color: var(--text-dim); border: 1px solid transparent; border-radius: var(--radius); font: inherit; cursor: pointer; }
+.fp-btn:hover:not(:disabled), .fp-btn:focus-visible, .fp-btn[aria-expanded="true"] { color: var(--text); border-color: var(--border); }
+.fp-btn:disabled { opacity: 0.4; cursor: default; }
+.fp-btn em { font-style: normal; font-size: 0.7rem; padding: 0 0.35rem; border-radius: 999px; background: var(--accent-forum-dim); color: var(--text); }
+.fp-prompt { font-family: ui-monospace, Menlo, Consolas, monospace; letter-spacing: 0.05em; }
+@media (max-width: 899px) {
+  .faceplate { padding: 0.2rem 0.6rem; gap: 0.45rem; }
+  .fp-btn-label, .fp-up, .fp-kind, .fp-readout i { display: none; }
+  .fp-readout { font-size: 0.85rem; }
+}
+
+/* the panels the faceplate opens (Around here, Pocket) */
+.fp-panel { position: fixed; z-index: 60; top: calc(34px + 0.3rem); right: 1rem; width: min(360px, calc(100vw - 1.2rem)); max-height: min(70vh, 560px); overflow: auto; padding: 0.6rem 0.7rem 0.8rem; background: var(--bg-elevated); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: 0 14px 36px rgba(0, 0, 0, 0.5); display: flex; flex-direction: column; gap: 0.4rem; }
+.fp-panel h3 { margin: 0.4rem 0 0; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.1em; color: var(--text-dim); font-weight: 600; }
+.fp-panel .dim, .term .dim { color: var(--text-dim); }
+.fp-hint { font-size: 0.74rem; margin: 0.2rem 0 0; }
+@media (max-width: 899px) { .fp-panel { right: 0.6rem; left: 0.6rem; width: auto; } }
+
+/* a plate: the one small card every kind of thing wears outside its own page */
+.plate { position: relative; display: flex; align-items: center; gap: 0.3rem; }
+.plate-link { flex: 1; min-width: 0; display: flex; align-items: center; gap: 0.6rem; padding: 0.3rem 0.45rem 0.3rem 0.3rem; border: 1px solid var(--border); border-radius: var(--radius); background: var(--bg-inset); color: var(--text); text-decoration: none; }
+.plate-link:hover, .plate-link:focus-visible { border-color: var(--accent-forum); }
+.plate-thumb { position: relative; flex: none; width: 36px; height: 36px; border-radius: 6px; overflow: hidden; background: color-mix(in srgb, var(--accent-forum) 14%, var(--bg-inset)); display: grid; place-items: center; }
+.plate-thumb img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; opacity: 0.8; }
+.plate-glyph { position: relative; display: grid; place-items: center; color: var(--text); filter: drop-shadow(0 0 3px rgba(0, 0, 0, 0.8)); }
+.plate-text { display: flex; flex-direction: column; min-width: 0; line-height: 1.2; }
+.plate-title { font-weight: 600; font-size: 0.86rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.plate-sub { font-size: 0.72rem; color: var(--text-dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.plate-freq { flex: none; margin-left: auto; font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 0.68rem; color: var(--accent-audio); opacity: 0.75; }
+.plate-take { flex: none; width: 26px; height: 26px; border: 1px solid var(--border); border-radius: 50%; background: transparent; color: var(--text-dim); cursor: pointer; line-height: 1; font-size: 0.95rem; }
+.plate-take:hover, .plate-take:focus-visible { color: var(--text); border-color: var(--accent-forum); }
+.plate-take[aria-pressed="true"] { color: var(--accent-audio); border-color: var(--accent-audio); }
+
+/* the margins: what is just outside the page. Only on wide screens, where there is room that no page uses. */
+.margins, .margin-chat { display: none; }
+@media (min-width: 1340px) {
+  .margins { display: flex; flex-direction: column; gap: 0.35rem; position: fixed; top: 50%; transform: translateY(-50%); z-index: 40; pointer-events: none; max-height: 70vh; }
+  .margins:empty { display: none; }
+  .margins-left { left: 0.5rem; align-items: flex-start; }
+  .margins-right { right: calc(var(--dock-offset, 0px) + 0.5rem); align-items: flex-end; }
+  .margins .plate { pointer-events: auto; }
+  .margins .plate-link { width: 48px; padding: 0.15rem; overflow: hidden; gap: 0.5rem; transition: width 0.18s ease-out, border-color 0.15s; opacity: 0.78; }
+  .margins-right .plate-link { flex-direction: row-reverse; margin-left: auto; }
+  .margins .plate-text, .margins .plate-freq { opacity: 0; transition: opacity 0.12s; white-space: nowrap; }
+  .margins .plate:hover .plate-link, .margins .plate:focus-within .plate-link { width: 250px; opacity: 1; background: var(--bg-elevated); }
+  .margins .plate:hover .plate-text, .margins .plate:focus-within .plate-text, .margins .plate:hover .plate-freq, .margins .plate:focus-within .plate-freq { opacity: 1; transition-delay: 0.06s; }
+  .margins .plate-take { position: absolute; top: -8px; width: 20px; height: 20px; font-size: 0.8rem; background: var(--bg-elevated); opacity: 0; }
+  .margins-left .plate-take { left: 38px; }
+  .margins-right .plate-take { right: 38px; }
+  .margins .plate:hover .plate-take, .margins .plate:focus-within .plate-take { opacity: 1; }
+  .margin-chat { display: inline-flex; align-items: center; gap: 0.4rem; position: fixed; z-index: 40; left: 50%; transform: translateX(-50%); bottom: calc(var(--player-height, 0px) + 0.7rem); max-width: 22rem; padding: 0.25rem 0.8rem; border: 1px solid var(--border); border-radius: 999px; background: color-mix(in srgb, var(--bg-elevated) 92%, transparent); color: var(--text-dim); font: inherit; font-size: 0.8rem; cursor: pointer; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+  .margin-chat:hover, .margin-chat:focus-visible { color: var(--text); border-color: var(--accent-forum); }
+}
+
+/* arriving from an edge: the page is revealed from the side it was reached from (clip only: no transform, so fixed things inside don't shift) */
+@keyframes arrive-reveal { from { opacity: 0.2; clip-path: var(--arrive-from, inset(0)); } to { opacity: 1; clip-path: inset(0); } }
+.main-content[data-arrive] { animation: arrive-reveal 0.34s cubic-bezier(0.2, 0.7, 0.2, 1); }
+.main-content[data-arrive="right"] { --arrive-from: inset(0 0 0 45%); }
+.main-content[data-arrive="left"] { --arrive-from: inset(0 45% 0 0); }
+.main-content[data-arrive="top"] { --arrive-from: inset(0 0 45% 0); }
+.main-content[data-arrive="bottom"] { --arrive-from: inset(45% 0 0 0); }
+@media (prefers-reduced-motion: reduce) { .main-content[data-arrive] { animation: none; } .margins .plate-link { transition: none; } }
+
+/* the Master Terminal */
+.term-backdrop { position: fixed; inset: 0; z-index: 90; background: rgba(0, 0, 0, 0.55); display: flex; align-items: flex-start; justify-content: center; padding: 12vh 0.8rem 0; }
+.term { width: min(640px, 100%); max-height: 70vh; display: flex; flex-direction: column; background: var(--bg-elevated); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6); font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace; font-size: 0.86rem; overflow: hidden; }
+.term-out { flex: 1; min-height: 3rem; overflow: auto; padding: 0.6rem 0.8rem; display: flex; flex-direction: column; gap: 0.2rem; }
+.term-line { white-space: pre-wrap; word-break: break-word; }
+.term-line.cmd { color: var(--text-dim); }
+.term-line.err { color: #ff9b8f; }
+.term-line.dim { color: var(--text-dim); }
+.term-line .plate-link { font-family: var(--font-body, inherit); }
+.term-sugg { list-style: none; margin: 0; padding: 0.25rem; border-top: 1px solid var(--border); max-height: 14rem; overflow: auto; }
+.term-sugg li { display: flex; align-items: baseline; gap: 0.6rem; padding: 0.3rem 0.55rem; border-radius: 6px; cursor: pointer; }
+.term-sugg li.on, .term-sugg li:hover { background: color-mix(in srgb, var(--accent-forum) 18%, transparent); }
+.term-sugg-kind { flex: none; width: 4.6rem; font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--accent-audio); }
+.term-sugg i { margin-left: auto; font-style: normal; color: var(--text-dim); font-size: 0.74rem; }
+.term-in { display: flex; align-items: center; gap: 0.5rem; padding: 0.55rem 0.8rem; border-top: 1px solid var(--border); }
+.term-in input { flex: 1; background: transparent; border: 0; outline: 0; color: var(--text); font: inherit; font-size: 1rem; padding: 0; box-shadow: none; }
+.term-foot { padding: 0.25rem 0.8rem 0.45rem; color: var(--text-dim); font-size: 0.7rem; }
+@media (max-width: 899px) { .term-backdrop { padding-top: 4vh; } .term-foot { display: none; } }

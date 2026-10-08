@@ -1156,3 +1156,15 @@ model PlaylistItem {
   communityTrack   CommunityTrack? @relation(fields: [communityTrackId], references: [id], onDelete: Cascade)
   position         Int             @default(0)
 }
+
+// How people actually move between things on the site: one row per ordered pair of entities (e.g. "study:beating-tones" -> "branch:ambient"),
+// counted in aggregate only (no per-person trail). The strongest routes out of a page are shown in its margins once enough people have taken them.
+model EdgeCount {
+  from      String
+  to        String
+  n         Int      @default(1)
+  updatedAt DateTime @updatedAt
+
+  @@id([from, to])
+  @@index([from, n])
+}

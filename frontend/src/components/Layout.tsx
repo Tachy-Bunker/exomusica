@@ -46,6 +46,8 @@ import { NotificationWidget } from "./NotificationWidget";
 import { OnlineOrbs } from "./OnlineOrbs";
 import { useGuestOnline } from "../lib/useGuestOnline";
 import { PlayerBar } from "./PlayerBar";
+import { AtlasShell } from "./AtlasShell";
+import { takeArrival } from "../lib/arrive";
 import { TrackPreloader } from "./TrackPreloader";
 import { resumeSharedContextIfNeeded } from "../lib/oneShotSfx";
 import { resumeAnalyserContextIfNeeded } from "../lib/audioAnalyser";
@@ -215,13 +217,24 @@ export function Layout() {
 
   const [siteFont, setSiteFont] = useState<{ familyName: string; fileUrl: string; format: string } | null>(null);
   const navRef = useRef<HTMLElement>(null);
-  useEffect(() => {
-    const el = navRef.current;
-    if (!el) return;
-    const observer = new ResizeObserver(() => {
-      document.documentElement.style.setProperty("--nav-height", `${el.getBoundingClientRect().height}px`);
-    });
-    observer.observe(el);
+  const mainRef = useRef<HTMLElement>(null);
+  useEffect(() => { // a jump from the margins / terminal / faceplate: the new page slides in from the side it was reached from
+    const edge = takeArrival();
+    const el = mainRef.current;
+    if (!edge || !el) return;
+    el.dataset.arrive = edge;
+    const id = window.setTimeout(() => { delete el.dataset.arrive; }, 380);
+    return () => window.clearTimeout(id);
+  }, [location.pathname, location.search]);
+  useEffect(() => { // --nav-height is everything pinned above the page: the header and the faceplate under it
+    const header = navRef.current;
+    if (!header) return;
+    const faceplate = document.querySelector<HTMLElement>(".faceplate");
+    const apply = () => document.documentElement.style.setProperty("--nav-height", `${header.getBoundingClientRect().height + (faceplate?.getBoundingClientRect().height ?? 0)}px`);
+    const observer = new ResizeObserver(apply);
+    observer.observe(header);
+    if (faceplate) observer.observe(faceplate);
+    apply();
     return () => observer.disconnect();
   }, []);
   useEffect(() => {
@@ -395,7 +408,9 @@ export function Layout() {
         </div>
       </header>
 
-      <main className="main-content" style={{ marginRight: dockOffset }}>
+      <AtlasShell />
+
+      <main className="main-content" ref={mainRef} style={{ marginRight: dockOffset }}>
         <Outlet />
       </main>
 
