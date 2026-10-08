@@ -2,7 +2,6 @@ import { useEffect, useRef, useState } from "react";
 import { CHAIN_PRESETS } from "../lib/dsp/voiceChain";
 import { EXPORT_FORMATS, type ExportFormat } from "../lib/dsp/encode";
 import { useToastStore } from "../lib/toastStore";
-import { VoiceNoteRecorder } from "../components/VoiceNoteRecorder";
 
 type Which = "original" | "processed";
 
@@ -30,7 +29,6 @@ export function VoiceLabPage({ embedded = false }: { embedded?: boolean } = {}) 
   const [error, setError] = useState<string | null>(null);
   const [dragging, setDragging] = useState(false);
   const [converting, setConverting] = useState<{ format: ExportFormat; progress: number } | null>(null);
-  const [tryNote, setTryNote] = useState(false);
 
   const ctxRef = useRef<AudioContext | null>(null);
   const workerRef = useRef<Worker | null>(null);
@@ -380,27 +378,6 @@ export function VoiceLabPage({ embedded = false }: { embedded?: boolean } = {}) 
             </p>
           )}
         </>
-      )}
-
-      <h2 style={{ fontSize: "1.1rem", marginTop: "2rem" }}>Voice notes</h2>
-      <p style={{ color: "var(--text-dim)", fontSize: "0.9rem" }}>Hear exactly what a voice note will sound like: enhanced, levelled to the same loudness as the songs, mono, with a short fade-out.</p>
-      {tryNote ? (
-        <VoiceNoteRecorder
-          doneLabel="Download .m4a"
-          onCancel={() => setTryNote(false)}
-          onDone={async ({ blob }) => {
-            const a = document.createElement("a");
-            a.href = URL.createObjectURL(blob);
-            a.download = "voice-note.m4a";
-            a.click();
-            setTimeout(() => URL.revokeObjectURL(a.href), 2000);
-            setTryNote(false);
-          }}
-        />
-      ) : (
-        <button className="btn" onClick={() => setTryNote(true)} data-testid="lab-try-note">
-          🎙 Try a voice note
-        </button>
       )}
     </div>
   );

@@ -50,7 +50,19 @@ export function StudiesPanel({ studies }: { studies: StudyCard[] | null }) {
 
   return (
     <div data-testid="studies-panel">
-      <p className="home-dim xl-bar-text">Documented phenomena and experiments. Each study has its own discussion beside the writing.</p>
+      {studies === null ? <p className="home-dim">Loading…</p> : list.length === 0 ? <p className="home-dim">{studies.length === 0 ? "No studies yet. Yours could be the first." : "No study matches."}</p> : (
+        <>
+          <ul className="xl-cards">{list.slice(0, shown).map((s) => <StudyCardView key={s.slug} s={s} />)}</ul>
+          {list.length > shown && <button className="btn" onClick={() => setShown((n) => n + 12)}>Show more ({list.length - shown})</button>}
+        </>
+      )}
+      <div className="xl-bar">
+        <div className="xl-chips" role="group" aria-label="Show">
+          {FILTERS.map(([id, label]) => <button key={id} className={`xl-chip${filter === id ? " on" : ""}`} aria-pressed={filter === id} onClick={() => { setFilter(id); setShown(12); }}>{label}</button>)}
+        </div>
+        <input type="search" value={query} onChange={(e) => { setQuery(e.target.value); setShown(12); }} placeholder="Search studies" aria-label="Search studies" className="xl-search" />
+      </div>
+
       {user ? (
         <div className="xl-form" data-testid="xenolab-start">
           <div className="xl-form-row">
@@ -65,19 +77,6 @@ export function StudiesPanel({ studies }: { studies: StudyCard[] | null }) {
         </div>
       ) : <p className="home-dim"><Link to="/login">Log in</Link> to start a study.</p>}
 
-      <div className="xl-bar">
-        <div className="xl-chips" role="group" aria-label="Show">
-          {FILTERS.map(([id, label]) => <button key={id} className={`xl-chip${filter === id ? " on" : ""}`} aria-pressed={filter === id} onClick={() => { setFilter(id); setShown(12); }}>{label}</button>)}
-        </div>
-        <input type="search" value={query} onChange={(e) => { setQuery(e.target.value); setShown(12); }} placeholder="Search studies" aria-label="Search studies" className="xl-search" />
-      </div>
-
-      {studies === null ? <p className="home-dim">Loading…</p> : list.length === 0 ? <p className="home-dim">{studies.length === 0 ? "No studies yet. Yours could be the first." : "No study matches."}</p> : (
-        <>
-          <ul className="xl-cards">{list.slice(0, shown).map((s) => <StudyCardView key={s.slug} s={s} />)}</ul>
-          {list.length > shown && <button className="btn" onClick={() => setShown((n) => n + 12)}>Show more ({list.length - shown})</button>}
-        </>
-      )}
     </div>
   );
 }

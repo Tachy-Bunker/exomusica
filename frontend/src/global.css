@@ -5007,7 +5007,7 @@ th {
 .xl-chip { font: inherit; font-size: 0.8rem; padding: 0.2rem 0.6rem; border: 1px solid var(--border); border-radius: 999px; background: none; color: var(--text-dim); cursor: pointer; }
 .xl-chip:hover, .xl-chip:focus-visible { color: var(--text); border-color: var(--text-dim); }
 .xl-chip.on { color: var(--text); border-color: var(--accent-audio); }
-.xl-bar { display: flex; gap: 0.8rem; align-items: center; justify-content: space-between; flex-wrap: wrap; margin: 0.4rem 0 0.7rem; }
+.xl-bar { display: flex; gap: 0.8rem; align-items: center; justify-content: space-between; flex-wrap: wrap; margin: 1rem 0 1rem; }
 .xl-bar-text { margin: 0; flex: 1 1 280px; }
 .xl-form { display: flex; flex-direction: column; gap: 0.45rem; border: 1px solid var(--border); border-radius: var(--radius); padding: 0.7rem 0.85rem; margin-bottom: 1rem; }
 .xl-form-row { display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: center; }
@@ -5076,7 +5076,7 @@ th {
 .play-hl { display: inline-flex; position: relative; vertical-align: middle; }
 .play-hl > :first-child { transition: box-shadow 0.4s, transform 0.4s; }
 .play-hl-on > :first-child { box-shadow: 0 0 10px 1px color-mix(in srgb, var(--hl) 60%, transparent), 0 0 22px 3px color-mix(in srgb, var(--hl) 28%, transparent); animation: play-breathe 3.6s ease-in-out infinite; }
-.play-fly { position: absolute; left: 50%; top: 50%; width: 5px; height: 5px; margin: -2.5px 0 0 -2.5px; border-radius: 50%; background: var(--hl); box-shadow: 0 0 6px 2px color-mix(in srgb, var(--hl) 80%, transparent); pointer-events: none; will-change: transform, opacity; }
+.play-fly { position: absolute; left: 50%; top: 50%; width: 6px; height: 6px; margin: -3px 0 0 -3px; border-radius: 50%; background: var(--hl); box-shadow: 0 0 8px 3px color-mix(in srgb, var(--hl) 85%, transparent); pointer-events: none; will-change: transform, opacity; }
 @keyframes play-breathe { 0%, 100% { transform: scale(1); box-shadow: 0 0 8px 1px color-mix(in srgb, var(--hl) 50%, transparent), 0 0 18px 2px color-mix(in srgb, var(--hl) 22%, transparent); } 50% { transform: scale(1.06); box-shadow: 0 0 14px 3px color-mix(in srgb, var(--hl) 75%, transparent), 0 0 30px 6px color-mix(in srgb, var(--hl) 34%, transparent); } }
 @media (prefers-reduced-motion: reduce) { .play-hl-on > :first-child { animation: none; } }
 
@@ -5120,7 +5120,7 @@ th {
 .hb-title a:hover { text-decoration: underline; }
 .hb-count { font-weight: 400; font-size: 0.85rem; }
 .hb-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
-.hb-item { display: flex; flex-direction: column; gap: 0.1rem; padding: 0.45rem 0; border-bottom: 1px solid var(--border); min-width: 0; overflow-wrap: anywhere; }
+.hb-item { position: relative; display: flex; flex-direction: column; gap: 0.1rem; padding: 0.45rem 0; border-bottom: 1px solid var(--border); min-width: 0; overflow-wrap: anywhere; }
 .hb-item:last-child { border-bottom: none; }
 
 /* Member page */
@@ -5136,3 +5136,27 @@ th {
 .profile-trace .pt-on { fill: var(--accent-forum, #7cf); }
 .profile-trace .pt-zero { fill: var(--text-dim); opacity: .35; }
 .ps-studies { margin: .4rem 0 0; padding-left: 1.1rem; font-size: .9rem; }
+
+/* Contribute, simplified: three steps, one row per branch, three tiles and one next action */
+.ct2-steps { list-style: none; display: flex; flex-wrap: wrap; gap: 0.4rem 1.2rem; margin: 0 0 1.1rem; padding: 0; color: var(--text-dim); font-size: 0.9rem; }
+.ct2-steps li { display: inline-flex; align-items: center; gap: 0.45rem; }
+.ct2-steps i { font-style: normal; width: 1.45rem; height: 1.45rem; border-radius: 50%; border: 1px solid var(--border); display: inline-flex; align-items: center; justify-content: center; font-size: 0.75rem; }
+.ct2-steps li.now { color: var(--text); }
+.ct2-steps li.now i { border-color: var(--accent-audio); color: var(--accent-audio); }
+.ct2-steps li.done i { background: color-mix(in srgb, var(--accent-audio) 25%, transparent); border-color: transparent; color: var(--text); }
+.ct2-row { flex-direction: row; align-items: center; gap: 0.6rem; flex-wrap: wrap; }
+.ct2-row .ct-row-name { flex: 1 1 8rem; min-width: 0; }
+.ct2-dots { display: inline-flex; gap: 0.3rem; }
+.ct2-dots i { width: 0.55rem; height: 0.55rem; border-radius: 50%; border: 1px solid var(--text-dim); opacity: 0.45; }
+.ct2-dots i.on { background: var(--accent-audio); border-color: var(--accent-audio); opacity: 1; }
+.ct2-blurb { margin: 0 0 0.8rem; color: var(--text-dim); display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.ct2-tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 0.5rem; margin-bottom: 0.9rem; }
+.ct2-tile { display: flex; flex-direction: column; gap: 0.4rem; justify-content: space-between; border: 1px solid var(--border); border-radius: var(--radius); padding: 0.55rem 0.65rem; min-width: 0; }
+.ct2-tile.off { opacity: 0.45; }
+.ct2-tile-h { font-size: 0.7rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-dim); }
+.ct2-tile-actions { display: flex; gap: 0.3rem; flex-wrap: nowrap; }
+.ct2-tile .btn { padding: 0.25rem 0.5rem; font-size: 0.82rem; white-space: nowrap; }
+.ct2-tile audio { width: 100%; height: 34px; }
+.ct2-none { font-size: 0.85rem; color: var(--text-dim); }
+.ct2-next { display: flex; gap: 0.6rem 1rem; align-items: center; justify-content: space-between; flex-wrap: wrap; border-left: 3px solid var(--accent-audio); padding: 0.45rem 0.8rem; background: color-mix(in srgb, var(--accent-audio) 7%, transparent); border-radius: var(--radius); margin-top: 0.9rem; }
+.ct2-more { margin: 0.8rem 0 0; font-size: 0.85rem; }

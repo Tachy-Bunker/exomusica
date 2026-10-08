@@ -1,9 +1,9 @@
 // Drives every visible Play glow from ONE animation loop, so the cost is the same whether one button glows or six.
-// The loop only runs while something is registered, the tab is visible, and the visitor has not asked for reduced motion.
+// The loop only runs while something is registered and the tab is visible. Reduced motion slows it down rather than switching it off.
 import { perlin1 } from "./noise";
 
 interface Fly { el: HTMLElement; seed: number }
-interface Glow { flies: Fly[]; host: HTMLElement }
+interface Glow { flies: Fly[]; host: HTMLElement; calm?: boolean }
 const glows = new Set<Glow>();
 let raf = 0;
 let last = 0;
@@ -25,10 +25,10 @@ function frame(now: number) {
     last = now;
     const t = now / 1000;
     for (const g of glows) {
-      const r = g.host.offsetWidth / 2 + 7; // the flies orbit just outside the button's edge
-      const rh = g.host.offsetHeight / 2 + 7;
+      const r = g.host.offsetWidth / 2 + 11; // the flies orbit just outside the button's edge
+      const rh = g.host.offsetHeight / 2 + 11;
       for (const f of g.flies) {
-        const p = flyPosition(f.seed, t);
+        const p = flyPosition(f.seed, g.calm ? t * 0.25 : t);
         f.el.style.transform = `translate(${(p.x * r).toFixed(1)}px, ${(p.y * rh).toFixed(1)}px)`;
         f.el.style.opacity = p.glow.toFixed(2);
       }

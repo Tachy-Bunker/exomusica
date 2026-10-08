@@ -206,6 +206,37 @@ def run(playwright):
     check(any(m == "DELETE" and p == "/api/admin/channels/1" for m, p in calls), "delete calls the API")
     ctx.close()
 
+
+    # ---------- fix278 checks
+    ctx = new_ctx(); page = ctx.new_page(); watch(page)
+    page.goto(f"{BASE}/xenolab"); page.wait_for_selector("[data-testid=studies-panel] .xl-card")
+    ys = page.evaluate("""() => { const y = s => document.querySelector(s).getBoundingClientRect().top;
+        return [y('.xl-cards'), y('.xl-bar'), y('[data-testid=xenolab-start]')]; }""")
+    check(ys[0] < ys[1] < ys[2], f"Studies: list, then filter bar, then start form {ys}")
+    page.goto(f"{BASE}/xenolab?tab=effects"); page.wait_for_selector("[data-testid=voice-lab]", timeout=15000)
+    check("Try a voice note" not in page.inner_text("body") and "Hear exactly what a voice note" not in page.inner_text("body"), "Effects: voice note block removed")
+    page.goto(f"{BASE}/xenolab?tab=contribute"); page.wait_for_selector("[data-testid=contribute-page]")
+    check(page.locator(".ct2-steps li").count() == 3, "Contribute: three-step strip")
+    ctx.close()
+    ctx = new_ctx(); page = ctx.new_page(); watch(page)
+    page.goto(f"{BASE}/"); page.wait_for_selector("[data-testid=activity]")
+    hit = page.evaluate("""() => { const e = document.elementFromPoint(innerWidth/2, 200); return e ? (e.closest('a') ? e.closest('a').getAttribute('href') : null) : null; }""")
+    check(hit is None or "/album/" not in hit, f"homepage: a click in the page body does not hit an album link ({hit})")
+    ctx.close()
+    for rm in ("no-preference", "reduce"):
+        ctx = browser.new_context(viewport={"width": 1100, "height": 800}, reduced_motion=rm); page = ctx.new_page()
+        ctx.route(re.compile(r".*/api/.*"), lambda r: r.fulfill(status=200, content_type="application/json", body=json.dumps(DATA.get(r.request.url.replace(BASE, "").split("?")[0], {}))))
+        page.goto(f"{BASE}/?branch=b2"); page.wait_for_selector("[data-testid=explore-play]"); page.wait_for_timeout(800)
+        t1 = page.locator(".play-fly").first.evaluate("e => e.style.transform"); page.wait_for_timeout(1200)
+        t2 = page.locator(".play-fly").first.evaluate("e => e.style.transform")
+        check(page.locator(".play-fly").count() == 4 and t1 and t1 != t2, f"fireflies present and moving with motion={rm}")
+        ctx.close()
+    ctx = new_ctx(viewport={"width": 390, "height": 900}); page = ctx.new_page(); watch(page)
+    page.goto(f"{BASE}/telemetry"); page.wait_for_selector("[data-testid=conv-list]")
+    o = page.evaluate("() => [document.querySelector('[data-testid=conv-list]').getBoundingClientRect().top, document.querySelector('[data-testid=inst-scope]').getBoundingClientRect().top]")
+    check(o[0] < o[1], f"phone: Scope sits below the list {o}")
+    ctx.close()
+
     # ---------- mobile overflow
     ctx = new_ctx(viewport={"width": 375, "height": 800}); page = ctx.new_page(); watch(page)
     for url in ["/xenolab", "/xenolab?tab=analyze", "/xenolab?tab=resources", "/telemetry", "/soundbay", "/", "/u/old"]:

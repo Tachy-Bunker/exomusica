@@ -12,6 +12,7 @@ import { usePresenceStore } from "../lib/presenceStore";
 import { timeAgo } from "../lib/relativeTime";
 import { countByKind, filterConversations, groupForList, KIND_LABEL, SIGNAL_LABEL, sortConversations, normalizeConversations, type ConversationFilter, type ConversationSort, type ConversationsData } from "../lib/spaceHubs";
 import { useDocumentTitle } from "../lib/useDocumentTitle";
+import { useIsDesktop } from "../lib/useIsDesktop";
 import { useLivePoll } from "../lib/livePoll";
 import { useOpenInDock } from "../lib/useOpenInDock";
 import { useUrlParams } from "../lib/useUrlParams";
@@ -36,6 +37,7 @@ const HOUR = 3_600_000;
 
 export function ConversationsPage() {
   useDocumentTitle("Telemetry");
+  const isDesktop = useIsDesktop();
   const { data: first, failed } = useLoaded(loadConversations);
   const [data, setData] = useState<ConversationsData | null>(null);
   const [refreshing, setRefreshing] = useState(false);
@@ -123,7 +125,7 @@ export function ConversationsPage() {
         <InstrumentView data={data} rows={shown} onRefresh={refreshNow} refreshing={refreshing} showAll={showAll} onShowAll={() => setShowAll(true)} now={now} onOpen={onOpen} />
       ) : (
         <>
-          <ScopePanel data={data} now={now} />
+          {isDesktop && <ScopePanel data={data} now={now} />}
           {groups.length === 0 ? (
             <p className="home-dim" data-testid="conv-empty">{all.length === 0 ? "No conversations yet." : "No signals match. Try fewer words."}</p>
           ) : (
@@ -156,6 +158,7 @@ export function ConversationsPage() {
               ))}
             </div>
           )}
+          {!isDesktop && <ScopePanel data={data} now={now} />}
         </>
       )}
     </div>

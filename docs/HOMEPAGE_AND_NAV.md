@@ -137,3 +137,10 @@ Tracks are normalised to **−11 LUFS** (`lib/replayGain.ts`). A quieter track i
 
 ## Tests added (fix277)
 `frontend/_scratch/e2e_fix277.py` (Playwright with a mocked API: 49 checks incl. phone-width overflow), `groupForList.test.ts`, `replayGain.test.ts`, `noise.test.ts`, `backend/_scratch/topicBackup.test.ts`. Earlier: `soundReport.test.ts`, `telemetryPins.test.ts`, `studyExcerpt.test.ts`. Run with `npx tsx`; the e2e needs `npx vite preview --port 4173`.
+
+## fix278 notes
+- Studies tab order: studies, filter/search bar, then the start-a-study form (or the log-in notice). Effects no longer has its own voice-note recorder block.
+- Contribute is three steps (a strip), one row per branch (name, three dots for brief/sample/sketches, your submission state), and per branch three tiles (Brief: read inline or download; Sample; Sketches) plus one next action. Search appears only with 8+ branches. `ContributeTimeline` was removed.
+- Telemetry List view on a phone: the list first, the Scope after it.
+- Fireflies: four per glowing button; with reduced motion they still show but drift at a quarter speed and the button does not pulse.
+- `.hb-item` must stay `position: relative`: the whole-card link uses `::after { inset: 0 }` and otherwise covers the nearest positioned ancestor (it made a homepage activity link cover the page).
