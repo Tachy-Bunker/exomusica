@@ -12,6 +12,7 @@ import { operator } from "../lib/operator";
 import { Faceplate } from "./Faceplate";
 import { Plate } from "./Plate";
 import { Terminal } from "./Terminal";
+import { Landmarks } from "./Landmarks";
 
 const SECTION_NAME: Record<string, string> = { soundbay: "Soundbay", xenolab: "XenoLab", telemetry: "Telemetry", log: "Log" };
 
@@ -101,6 +102,7 @@ export function AtlasShell() {
           <p className="dim fp-hint">Drag any item into a chat to share its link.</p>
         </Panel>
       )}
+      <Landmarks focusKey={focusKey} />
       <Terminal focus={focusEntity} />
     </>
   );

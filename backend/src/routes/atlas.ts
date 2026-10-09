@@ -35,7 +35,7 @@ const indexRows = ttlCache(60_000, async () => {
 });
 
 /** Titles for a list of entity keys (used for the routes people take between things). Anything that no longer exists is left out. */
-async function describe(keys: string[]): Promise<Neighbor[]> {
+export async function describe(keys: string[]): Promise<Neighbor[]> {
   const by: Record<string, string[]> = {};
   for (const k of keys) { const p = parseKey(k); if (p) (by[p.type] ??= []).push(p.id); }
   const out = new Map<string, Neighbor>();

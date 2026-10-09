@@ -218,3 +218,19 @@ Pages: `/hypotheses` (list, status filter, "Draw one", propose), `/hypothesis/:i
 **Known limits**: anonymous tokens can be reset by clearing storage (so a determined person can answer twice; this is a crowd poll, not a trial); the swap flag is client-supplied; hypotheses are not Atlas entities yet (no frequency/margins); the pipeline study draft → wiki claim is only the study link for now.
 
 Tests: `backend/_scratch/hypotheses.test.ts`, `frontend/_scratch/e2e_fix283.py` (18 checks).
+
+## fix284: letters, landmarks, the Trace lens
+
+**A letter** is a small drawing on a fixed 1000×700 sheet: ink strokes, text (placed, turned, sized, curved along an arc) and stamps (CQ, 73, QSL, TX, star, wave, eye, key), on paper / night / ink / grid. Stored as JSON; the server (`lib/letters.ts`, `cleanDoc`) rebuilds every field from a whitelist and clamps it (≤150 marks, ≤6000 ink points, ≤120 chars of text, palette colours only, ≤120 KB). Rendering is SVG made only from those fields, so a letter cannot carry markup or script.
+
+**Two destinations**
+- *To a member* (`/letters`, tab Write): optional **slow post** (held 6 h / 1 day / 3 days; the recipient can't see it earlier, the sender sees "in the post"). 10 per day. Recipients can delete a letter or **stop letters from a sender** (deletes theirs, and later sends silently go nowhere, so blocking can't be probed).
+- *On a place* (a **landmark**, a.k.a. dead drop): `mark` in the terminal, or "Leave one" in the lens panel. Needs a real entity (checked), fades after 30 days, max 20 per place, 5 per author per day, can be left unsigned (admins still see the author). Authors and admins can remove them.
+
+**The Trace lens** (faceplate button, terminal `lens [on|off]`; remembered per browser, off by default). With it off the page makes no request and shows nothing; with it on, `GET /api/landmarks?key=` loads the marks for the place you're at into a small panel. The faceplate also shows a **Letters** link with an unread count (polled every 2 min and after opening a letter).
+
+**Composer performance**: ink is written straight to one live `<path>` while the pointer moves (no React render per point), points closer than 4 units are skipped, and on release the stroke is thinned to ≤600 points and committed; each item is memoised so dragging one text doesn't redraw the ink.
+
+**Not yet**: images in letters, trails (routes between marks), notifications for new letters beyond the badge, a report button (admins can delete via the letter id for now).
+
+Tests: `backend/_scratch/letters.test.ts`, `frontend/_scratch/e2e_fix284.py` (21 checks).

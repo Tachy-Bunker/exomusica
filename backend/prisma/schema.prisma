@@ -93,6 +93,10 @@ model User {
   resourceUnlocks ResourceUnlock[]
   rewardClaims RewardClaim[]
   hypotheses   Hypothesis[]
+  lettersSent  Letter[]  @relation("LetterAuthor")
+  lettersGot   Letter[]  @relation("LetterTo")
+  letterBlocks LetterBlock[] @relation("Blocker")
+  letterBlocked LetterBlock[] @relation("Blocked")
   trials       Trial[]
   studies         Study[]
   studyRevisions  StudyRevision[] @relation("StudyRevisionAuthor")
@@ -1252,4 +1256,34 @@ model Trial {
 
   @@unique([hypothesisId, who])
   @@index([hypothesisId])
+}
+
+// A drawn letter (ink, placed text, stamps). Either sent to one member (optionally held back: slow post) or left on a place for whoever turns on the Trace lens there.
+model Letter {
+  id         Int       @id @default(autoincrement())
+  authorId   Int
+  author     User      @relation("LetterAuthor", fields: [authorId], references: [id], onDelete: Cascade)
+  toUserId   Int?
+  toUser     User?     @relation("LetterTo", fields: [toUserId], references: [id], onDelete: Cascade)
+  entityKey  String?   // "study:beating-tones" for a mark left on a place
+  doc        Json
+  unsigned   Boolean   @default(false) // a mark on a place may hide its author from readers (admins still see)
+  deliverAt  DateTime  @default(now())
+  openedAt   DateTime?
+  expiresAt  DateTime?
+  createdAt  DateTime  @default(now())
+
+  @@index([toUserId, deliverAt])
+  @@index([authorId, createdAt])
+  @@index([entityKey, expiresAt])
+}
+
+model LetterBlock {
+  blockerId Int
+  blocker   User @relation("Blocker", fields: [blockerId], references: [id], onDelete: Cascade)
+  blockedId Int
+  blocked   User @relation("Blocked", fields: [blockedId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@id([blockerId, blockedId])
 }

@@ -19,6 +19,7 @@ export interface ActionCtx {
   pocket: { items: { key: string; type: EntityType; id: string; title: string }[]; add: (e: Pick<Entity, "type" | "id" | "title">) => void; remove: (key: string) => void; clear: () => void };
   pathname: string;
   rand: () => number;
+  lens?: { on: boolean; set: (v: boolean) => void };
 }
 
 export interface Action {
@@ -49,6 +50,7 @@ export const PLACES: { names: string[]; to: string; label: string }[] = [
   { names: ["messages", "pms"], to: "/pms", label: "Messages" },
   { names: ["hypotheses", "basket", "hyp"], to: "/hypotheses", label: "Hypotheses" },
   { names: ["draw", "draw one"], to: "/hypotheses/draw", label: "Draw a hypothesis" },
+  { names: ["letters", "post", "mail"], to: "/letters", label: "Letters" },
   { names: ["rewards", "points"], to: "/rewards", label: "Rewards" },
   { names: ["account", "settings"], to: "/account", label: "Account" },
 ];
@@ -145,6 +147,24 @@ export const ACTIONS: Action[] = [
       if (!best) return [{ kind: "error", text: operator.nothing(rest) }];
       ctx.go(`/admin/${best.p}`);
       return [{ kind: "text", text: `→ admin/${best.p}` }];
+    },
+  },
+  {
+    id: "lens", verbs: ["lens", "trace"], summary: "Turn the Trace lens on or off (shows marks left on a place).", usage: "lens [on|off]",
+    run: (rest, ctx) => {
+      if (!ctx.lens) return [{ kind: "error", text: operator.unknown("lens") }];
+      const v = rest.trim().toLowerCase();
+      const next = v === "on" ? true : v === "off" ? false : !ctx.lens.on;
+      ctx.lens.set(next);
+      return [{ kind: "text", text: next ? "Trace lens on. Marks left on a place now show." : "Trace lens off." }];
+    },
+  },
+  {
+    id: "mark", verbs: ["mark"], summary: "Leave a drawn mark on the place you are at.", usage: "mark", needs: "auth",
+    run: (_r, ctx) => {
+      if (!ctx.focus) return [{ kind: "error", text: "Marks are left on a specific thing: go to a study, a branch, a page first." }];
+      ctx.go(`/letters?at=${encodeURIComponent(`${ctx.focus.type}:${ctx.focus.id}`)}`);
+      return [{ kind: "text", text: "→ the sheet" }];
     },
   },
   { id: "clear", verbs: ["clear", "cls"], summary: "Clear the screen.", usage: "clear", run: () => [{ kind: "clear" }] },
