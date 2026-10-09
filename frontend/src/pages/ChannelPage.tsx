@@ -8,6 +8,9 @@ import { ExportIcon } from "../components/Icons";
 import { useAuth } from "../lib/auth";
 import { useAudioStore } from "../lib/audioStore";
 import { renderMessageContent } from "../lib/formatMessage";
+import { KindCard } from "../components/MessageCards";
+import { hintFor, parseSlash } from "../lib/chatCommands";
+import { audible, LEVEL_NOTE, useSquelchStore } from "../lib/squelch";
 import { useMentionResolutionStore } from "../lib/mentionResolutionStore";
 import { EmojiPicker } from "../components/EmojiPicker";
 import { MentionPicker } from "../components/MentionPicker";
@@ -202,6 +205,7 @@ function MessageBody({
   if (message.isDeleted) {
     return <em style={{ color: "var(--text-dim)" }}>message deleted</em>;
   }
+  const structured = !!message.kind && message.kind !== "text";
 
   return (
     <div style={{ position: "relative" }}>
@@ -211,8 +215,8 @@ function MessageBody({
           ↪ {message.replyPreview.authorUsername}: {message.replyPreview.excerpt}
         </a>
       )}
-      <div style={{ paddingRight: "1.6rem" }}>{renderMessageContent(message.contentRaw, useContext(LinkClickContext), mentionCache)}</div>
-      {message.embeds.map((track) => (
+      {structured ? <div style={{ paddingRight: "1.6rem" }}><KindCard m={message} onReply={onQuote} /></div> : <div style={{ paddingRight: "1.6rem" }}>{renderMessageContent(message.contentRaw, useContext(LinkClickContext), mentionCache)}</div>}
+      {(message.kind === "clip" ? [] : message.embeds).map((track) => (
         <div className="track-embed" key={track.id} onClick={(e) => e.stopPropagation()}>
           <button onClick={() => play(track)}>▶</button>
           <span>
@@ -345,9 +349,13 @@ export function ChannelPage({ channelSlug, fillHeight, parentControlsHeight }: {
   const [showLiveChatButton, setShowLiveChatButton] = useState(false);
   const [archiveDays, setArchiveDays] = useState<{ day: string; messageCount: number }[]>([]);
   const [draft, setDraft] = useState("");
+  const [cmdError, setCmdError] = useState<string | null>(null);
+  const squelch = useSquelchStore();
   const [typingUsers, setTypingUsers] = useState<Record<string, number>>({});
   const lastTypingPingRef = useRef(0);
   const typingNames = Object.keys(typingUsers);
+  const shownMessages = mode === "search" ? messages : messages.filter((m) => audible(m, squelch.level, user));
+  const heldBack = messages.length - shownMessages.length;
   const typingLabel =
     typingNames.length === 0
       ? null
@@ -620,6 +628,8 @@ export function ChannelPage({ channelSlug, fillHeight, parentControlsHeight }: {
             document.getElementById(`m-${event.message.id}`)?.scrollIntoView({ block: "end" });
           });
         }
+      } else if (event.type === "poll.vote") {
+        window.dispatchEvent(new CustomEvent("exomusica:poll", { detail: event.messageId }));
       } else if (event.type === "message.delete") {
         setMessages((prev) =>
           prev.map((m) => (m.id === event.messageId ? { ...m, isDeleted: true, contentRaw: "", embeds: [] } : m)),
@@ -652,14 +662,24 @@ export function ChannelPage({ channelSlug, fillHeight, parentControlsHeight }: {
 
   async function sendMessage(extraAttachmentIds: number[] = []) {
     if ((!draft.trim() && pendingAttachments.length === 0 && extraAttachmentIds.length === 0) || !slug) return;
-    const dto = await api<MessageDTO>(`/api/channels/${slug}/messages`, {
+    const slash = parseSlash(draft);
+    setCmdError(null);
+    if (slash && !slash.ok) { setCmdError(slash.error); return; }
+    let dto: MessageDTO;
+    try {
+      dto = await api<MessageDTO>(`/api/channels/${slug}/messages`, {
       method: "POST",
       body: JSON.stringify({
         contentRaw: draft,
+        ...(slash && slash.ok ? { kind: slash.msg.kind, data: slash.msg.data } : {}),
         replyToId: replyTarget?.id,
         attachmentIds: [...pendingAttachments.map((a) => a.id), ...extraAttachmentIds],
       }),
     });
+    } catch (e) {
+      if (slash) { setCmdError(e instanceof Error ? e.message : "Couldn't send it"); return; }
+      throw e;
+    }
     setMessages((prev) => upsertMessage(prev, dto)); // in case the WS event is delayed/missed
     setDraft("");
     setEmojiQuery(null);
@@ -913,6 +933,13 @@ export function ChannelPage({ channelSlug, fillHeight, parentControlsHeight }: {
       )}
 
 
+      <div className="squelch" data-testid="squelch" role="group" aria-label="Squelch: how much of the room to hear">
+        <span className="squelch-label">Squelch</span>
+        {[0, 1, 2, 3].map((l) => (
+          <button key={l} type="button" className={`squelch-step${squelch.level === l ? " on" : ""}`} aria-pressed={squelch.level === l} title={LEVEL_NOTE[l]} onClick={() => squelch.set(l as 0 | 1 | 2 | 3)} data-testid={`squelch-${l}`}>{["open", "quiet", "signal", "calls"][l]}</button>
+        ))}
+        {squelch.level > 0 && <span className="home-dim squelch-note" data-testid="squelch-held">{heldBack} held back · {LEVEL_NOTE[squelch.level]}</span>}
+      </div>
       <div
         ref={messageListRef}
         className="message-list"
@@ -929,9 +956,9 @@ export function ChannelPage({ channelSlug, fillHeight, parentControlsHeight }: {
             </div>
           ))
         ) : displayMode === "standard" ? (
-          messages.map((m) => <StandardMessage key={m.id} message={m} onDelete={handleDelete} onQuote={handleQuote} onCopyLink={handleCopyLink} />)
+          shownMessages.map((m) => <StandardMessage key={m.id} message={m} onDelete={handleDelete} onQuote={handleQuote} onCopyLink={handleCopyLink} />)
         ) : (
-          groupMessages(messages).map((g) => (
+          groupMessages(shownMessages).map((g) => (
             <MessageGroup key={g[0].id} group={g} onDelete={handleDelete} onQuote={handleQuote} onCopyLink={handleCopyLink} />
           ))
         )}
@@ -1029,6 +1056,10 @@ export function ChannelPage({ channelSlug, fillHeight, parentControlsHeight }: {
                 </span>
               ))}
             </div>
+          )}
+          {cmdError && <p className="an-err cmd-error" role="alert" data-testid="cmd-error" style={{ whiteSpace: "pre-wrap" }}>{cmdError}</p>}
+          {!cmdError && hintFor(draft).length > 0 && (
+            <ul className="cmd-hints" data-testid="cmd-hints">{hintFor(draft).map((c) => <li key={c.verb}><code>{c.usage}</code> <span className="home-dim">{c.about}</span></li>)}</ul>
           )}
           <div style={{ display: "flex", gap: "0.5rem", position: "relative" }}>
             {emojiQuery !== null && <EmojiPicker filter={emojiQuery} onSelect={insertEmoji} />}

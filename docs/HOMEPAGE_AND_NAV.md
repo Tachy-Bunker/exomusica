@@ -234,3 +234,25 @@ Tests: `backend/_scratch/hypotheses.test.ts`, `frontend/_scratch/e2e_fix283.py` 
 **Not yet**: images in letters, trails (routes between marks), notifications for new letters beyond the badge, a report button (admins can delete via the letter id for now).
 
 Tests: `backend/_scratch/letters.test.ts`, `frontend/_scratch/e2e_fix284.py` (21 checks).
+
+## fix285: chat message types, slash commands, squelch
+
+**Structured messages**: `Message.kind` (`text` default, `cq`, `report`, `poll`, `ab`, `clip`) + `Message.data` (JSON). The server (`lib/chatKinds.ts`, `cleanKind`) rebuilds `data` from known fields and **writes `contentRaw` itself** as a readable fallback (`[CQ] …`, `[Report] … R5 S7 T6`, `[Poll] …`, `[A/B] …`, `[Clip] 0:12-0:20 <url>`), so Discord forwarding, search, the archive, exports, notifications and old clients keep working unchanged. Structured messages can't be edited (delete and resend).
+
+**Slash commands** (typing `/` lists them; bad usage is explained inline and nothing is sent; unknown `/words` are ordinary text):
+- `/cq <topic> [+listeners +feedback +collab +sample +answers]`: a call; the card has an Answer button (reply).
+- `/report <link or name> <R/S/T>`: signal report, Readability 1-5, Strength 1-9, Tone 1-9 (`5/7/6` or `576`) + optional note.
+- `/poll <question> | <option> | <option> …` (2-6).
+- `/ab <question> | <audio link A> | <audio link B>`: blind A/B; same vote mechanics as a poll.
+- `/clip <audio link> <from>-<to> [label]` (`0:12-0:20` or seconds; ≤ 2 min): plays only that span via a media fragment on a plain `<audio>` (no JS player, no extra load). A site track link plays from its own file.
+- Audio links must be `https://…` or `/uploads/…`.
+
+**Polls**: one changeable vote per member (`PollVote`). Counts are **hidden until you have voted** (author/admin always see them) so the numbers can't steer the vote; `GET /api/messages/:id/poll` is viewer-specific, the `poll.vote` socket event just tells open cards to refetch.
+
+**Squelch** (client-side, remembered): `open` / `quiet` (hides one-liners under 12 characters) / `signal` (keeps links, sound, calls, replies and mentions of you) / `calls` (only structured messages). Your own messages and anything addressed to you are never held back; the number held back is always shown. Nothing is deleted.
+
+**Already existed**: voice notes (the 🎙 recorder in the composer) cover most of push-to-talk.
+
+**Not yet**: structured cards in the mini-chat dock and PMs (they show the fallback text), squelch there, contextual chat per item, `/scope` and `/analyze`.
+
+Tests: `backend/_scratch/chatKinds.test.ts`, `frontend/_scratch/chat.test.ts`, `frontend/_scratch/e2e_fix285.py` (21 checks).

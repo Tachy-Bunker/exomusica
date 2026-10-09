@@ -5486,3 +5486,23 @@ th {
 .landmarks-list { list-style: none; padding: 0; margin: 0; display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.35rem; }
 .landmark-thumb { padding: 0; border: 0; background: none; cursor: pointer; width: 100%; } .landmark-thumb[aria-pressed=true] .letter-svg { outline: 2px solid var(--accent-audio); }
 .landmark-open { margin-top: 0.5rem; } .linklike { background: none; border: 0; padding: 0; color: inherit; text-decoration: underline; cursor: pointer; font: inherit; }
+
+/* fix285: structured chat messages, squelch, slash-command hints */
+.squelch { display: flex; flex-wrap: wrap; align-items: center; gap: 0.3rem; margin: 0.3rem 0; font-size: 0.8rem; }
+.squelch-label { font-family: ui-monospace, Menlo, Consolas, monospace; color: var(--text-dim); margin-right: 0.2rem; }
+.squelch-step { background: none; border: 1px solid var(--border); border-radius: 99px; padding: 0.05rem 0.55rem; color: inherit; cursor: pointer; font: inherit; }
+.squelch-step.on { border-color: var(--accent-audio); color: var(--accent-audio); }
+.cmd-hints { list-style: none; margin: 0 0 0.3rem; padding: 0.3rem 0.5rem; border: 1px dashed var(--border); border-radius: var(--radius); font-size: 0.8rem; display: grid; gap: 0.15rem; }
+.cmd-hints code { overflow-wrap: anywhere; }
+.kcard { padding: 0.5rem 0.7rem; border-left: 3px solid var(--accent-audio); background: var(--bg-inset); border-radius: 0 var(--radius) var(--radius) 0; display: grid; gap: 0.35rem; }
+.kcard-tag { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 0.72rem; letter-spacing: 0.06em; text-transform: uppercase; color: var(--accent-audio); }
+.kcard-chips { display: inline-flex; gap: 0.3rem; margin-left: 0.4rem; } .kcard-chips i { font-style: normal; font-size: 0.75rem; border: 1px solid var(--border); border-radius: 99px; padding: 0 0.45rem; }
+.kcard-act { justify-self: start; }
+.kcard-rst { display: inline-flex; gap: 0.15rem; margin: 0 0.5rem; font-family: ui-monospace, Menlo, Consolas, monospace; } .kcard-rst b { min-width: 1.5rem; text-align: center; padding: 0.05rem 0.3rem; border: 1px solid var(--border); border-radius: 4px; font-size: 1.05rem; }
+.kcard-target { overflow-wrap: anywhere; }
+.kcard-ab { display: grid; gap: 0.4rem; } .kcard-ab label { display: flex; align-items: center; gap: 0.5rem; } .kcard audio { width: 100%; max-width: 420px; min-width: 0; }
+.poll-opts { list-style: none; margin: 0.3rem 0 0; padding: 0; display: grid; gap: 0.3rem; }
+.poll-opt { position: relative; overflow: hidden; width: 100%; text-align: left; display: flex; justify-content: space-between; gap: 0.6rem; padding: 0.3rem 0.6rem; background: none; border: 1px solid var(--border); border-radius: var(--radius); color: inherit; cursor: pointer; font: inherit; }
+.poll-opt.mine { border-color: var(--accent-audio); } .poll-opt:disabled { cursor: default; }
+.poll-fill { position: absolute; inset: 0 auto 0 0; background: var(--accent-audio); opacity: 0.2; } .poll-label, .poll-n { position: relative; } .poll-n { font-variant-numeric: tabular-nums; }
+.poll-foot { margin: 0.2rem 0 0; font-size: 0.78rem; }

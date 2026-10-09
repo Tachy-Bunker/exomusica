@@ -63,5 +63,7 @@ export async function toMessageDTO(message: MessageWithRelations): Promise<Messa
       usernames: v.usernames,
     })),
     embeds: message.isDeleted ? [] : await resolveTrackEmbeds(message.contentRaw),
+    kind: message.isDeleted ? "text" : message.kind,
+    data: message.isDeleted ? null : message.data ?? null,
   };
 }

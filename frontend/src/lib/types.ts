@@ -33,6 +33,9 @@ export interface MessageDTO {
   editedAt: number | null;
   reactions: { emojiId: number; emojiName: string; usernames: string[] }[];
   embeds: PlayableTrackDTO[];
+  /** text | cq | report | poll | ab | clip. contentRaw always holds a readable version. */
+  kind?: string;
+  data?: unknown;
 }
 
 export interface Branch {

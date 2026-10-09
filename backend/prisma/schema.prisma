@@ -93,6 +93,7 @@ model User {
   resourceUnlocks ResourceUnlock[]
   rewardClaims RewardClaim[]
   hypotheses   Hypothesis[]
+  pollVotes    PollVote[]
   lettersSent  Letter[]  @relation("LetterAuthor")
   lettersGot   Letter[]  @relation("LetterTo")
   letterBlocks LetterBlock[] @relation("Blocker")
@@ -259,6 +260,9 @@ model Message {
   editedAt     DateTime?
   importedFrom String? // e.g. "discord:<author-id>:<timestamp>" for traceability
   discordMessageId String? @unique // set once forwarded to Discord - lets a Discord-side reply resolve back to this message
+  kind         String       @default("text") // text | cq | report | poll | ab | clip. contentRaw always holds a plain-text version, so Discord, search and exports keep working
+  data         Json?        // the structured part of a non-text message, rebuilt server-side from known fields
+  pollVotes    PollVote[]
 
   reactions   Reaction[]
   bookmarks   Bookmark[]
@@ -1286,4 +1290,16 @@ model LetterBlock {
   createdAt DateTime @default(now())
 
   @@id([blockerId, blockedId])
+}
+
+// One vote per member on a poll or A/B message (changeable). Counts stay hidden until you have voted.
+model PollVote {
+  messageId Int
+  message   Message  @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  userId    Int
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  option    Int
+  updatedAt DateTime @updatedAt
+
+  @@id([messageId, userId])
 }

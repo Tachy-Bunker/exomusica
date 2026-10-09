@@ -36,4 +36,6 @@ export interface MessageDTO {
   editedAt: number | null;
   reactions: { emojiId: number; emojiName: string; usernames: string[] }[];
   embeds: PlayableTrackDTO[];
+  kind: string;
+  data: unknown;
 }

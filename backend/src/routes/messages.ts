@@ -2,7 +2,7 @@ import { PUBLIC_CHANNEL_FILTER, isPublicChannel, plainExcerpt, attachmentOnlyLab
 import { deleteMessageAttachments } from "../lib/attachmentCleanup.js";
 import type { FastifyInstance } from "fastify";
 import { prisma } from "../lib/prisma.js";
-import { requireAuth } from "../lib/auth.js";
+import { requireAuth, verifyToken } from "../lib/auth.js";
 import { toDayKey } from "../lib/dayKey.js";
 import { toMessageDTO } from "../lib/messageDto.js";
 import { broadcast } from "../lib/chatHub.js";
@@ -11,6 +11,7 @@ import { createNotification } from "../lib/notify.js";
 import { resolveMentions, toDiscordMentions } from "../lib/mentions.js";
 import { parseSearchQuery } from "../lib/searchQuery.js";
 import { walkChannelHistoryInChunks } from "../lib/messageChunking.js";
+import { cleanKind, optionCountOf, pollTally } from "../lib/chatKinds.js";
 import { fillDiscordIds, forwardMessageToDiscord, sendDiscordDM, triggerDiscordTyping } from "../lib/discordBot.js";
 
 const messageInclude = {
@@ -181,11 +182,20 @@ export async function messageRoutes(app: FastifyInstance): Promise<void> {
     return days.map((d) => ({ day: d.dayKey.toISOString().slice(0, 10), messageCount: d._count.id }));
   });
 
-  app.post<{ Params: { slug: string }; Body: { contentRaw: string; replyToId?: number; attachmentIds?: number[] } }>(
+  app.post<{ Params: { slug: string }; Body: { contentRaw: string; replyToId?: number; attachmentIds?: number[]; kind?: string; data?: unknown } }>(
     "/api/channels/:slug/messages",
     { preHandler: requireAuth },
     async (req, reply) => {
-      const { contentRaw, replyToId, attachmentIds } = req.body ?? {};
+      const { replyToId, attachmentIds } = req.body ?? {};
+      let contentRaw = req.body?.contentRaw ?? "";
+      let kind = "text";
+      let data: object | null = null;
+      if (req.body?.kind && req.body.kind !== "text") {
+        // a structured message: the plain-text version is written here, never taken from the client
+        const c = cleanKind(req.body.kind, req.body.data);
+        if (!c.ok) return reply.code(400).send({ error: c.error });
+        kind = c.kind; data = c.data; contentRaw = c.text;
+      }
       if (!contentRaw?.trim() && (!attachmentIds || attachmentIds.length === 0)) {
         return reply.code(400).send({ error: "contentRaw or at least one attachment is required" });
       }
@@ -202,6 +212,8 @@ export async function messageRoutes(app: FastifyInstance): Promise<void> {
           dayKey: toDayKey(now),
           replyToId: replyToId ?? null,
           contentRaw,
+          kind,
+          ...(data ? { data } : {}),
         },
       });
 
@@ -297,6 +309,30 @@ export async function messageRoutes(app: FastifyInstance): Promise<void> {
     },
   );
 
+  // Poll / A/B results for the viewer. Counts stay hidden until you have voted (or wrote it), so the numbers can't steer the vote.
+  app.get<{ Params: { id: string } }>("/api/messages/:id/poll", async (req, reply) => {
+    const viewer = req.headers.authorization?.startsWith("Bearer ") ? verifyToken(req.headers.authorization.slice(7)) : null;
+    const m = await prisma.message.findUnique({ where: { id: Number(req.params.id) || 0 }, select: { id: true, kind: true, data: true, authorId: true, isDeleted: true } });
+    const n = m ? optionCountOf(m.kind, m.data) : 0;
+    if (!m || m.isDeleted || n === 0) return reply.code(404).send({ error: "no such poll" });
+    const votes = await prisma.pollVote.findMany({ where: { messageId: m.id }, select: { userId: true, option: true } });
+    const mine = viewer ? votes.find((v) => v.userId === viewer.id)?.option ?? null : null;
+    const t = pollTally(n, votes.map((v) => v.option));
+    const show = mine !== null || viewer?.id === m.authorId || !!viewer?.isAdmin;
+    return { mine, total: t.total, counts: show ? t.counts : null };
+  });
+
+  app.post<{ Params: { id: string }; Body: { option?: number } }>("/api/messages/:id/vote", { preHandler: requireAuth }, async (req, reply) => {
+    const m = await prisma.message.findUnique({ where: { id: Number(req.params.id) || 0 }, include: { channel: { select: { slug: true } } } });
+    const n = m ? optionCountOf(m.kind, m.data) : 0;
+    if (!m || m.isDeleted || n === 0) return reply.code(404).send({ error: "no such poll" });
+    const option = Number(req.body?.option);
+    if (!Number.isInteger(option) || option < 0 || option >= n) return reply.code(400).send({ error: "no such option" });
+    await prisma.pollVote.upsert({ where: { messageId_userId: { messageId: m.id, userId: req.user!.id } }, create: { messageId: m.id, userId: req.user!.id, option }, update: { option } });
+    broadcast(m.channel.slug, { type: "poll.vote", messageId: m.id });
+    return reply.code(204).send();
+  });
+
   app.patch<{ Params: { id: string }; Body: { contentRaw: string } }>(
     "/api/messages/:id",
     { preHandler: requireAuth },
@@ -309,6 +345,7 @@ export async function messageRoutes(app: FastifyInstance): Promise<void> {
       if (existing.authorId !== req.user!.id && !req.user!.isAdmin) {
         return reply.code(403).send({ error: "not your message" });
       }
+      if (existing.kind !== "text") return reply.code(400).send({ error: "A call, report, poll or clip can't be edited: delete it and send a new one." });
       const updated = await prisma.message.update({
         where: { id },
         data: { contentRaw, editedAt: new Date() },
