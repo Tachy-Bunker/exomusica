@@ -1,0 +1,3 @@
+-- AlterTable
+ALTER TABLE "Letter" ADD COLUMN     "posX" DOUBLE PRECISION,
+ADD COLUMN     "posY" DOUBLE PRECISION;
