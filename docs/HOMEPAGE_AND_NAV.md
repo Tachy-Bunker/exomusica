@@ -309,3 +309,20 @@ Tests: `frontend/_scratch/studio.test.ts` (font shape; text lands in the right p
 - **Trace lens:** hover/focus on the button explains it; the button shows "on"; on pages that can't hold marks it now says so (instead of showing nothing); where marks can be left the panel says what marks are and has "Turn lens off".
 - **Pocket → chat:** dropping a link on the composer was swallowed (the drop handler only knew files). Drops now insert a markdown link at the cursor. Plates carry `[title](absolute url)` when dragged. The pocket tray has a ↵ button per item that pastes into the chat composer on screen (`lib/chatInsert.ts`, event `exomusica:chat-insert`).
 - **Dock open (desktop):** the edge margins give way; "You were here" and "Nearby" sit in the middle of the faceplate and drop down on hover over everything (z 70), including the chat panel. The faceplate now stops at the dock's edge so its buttons are never covered.
+
+## fix290 — Chat redesign, phase 1: the composer knows the site
+
+Chat redesign roadmap (agreed; not built: squelch knob, RST reactions): 1 dial of rooms · 2 conversation spectrogram · 4 composer as terminal + pocket row + links to things · 5 tether · 6 peek-rail dock + presets · 7 sidebands · 8 voice strips · 9 mobile handset · 11 catch-up reel · 12 send receipts.
+
+Phase 1 (this delivery), idea 4:
+- `#name` (up to two words) or `~7.156` before the cursor opens a picker of Atlas things (by name / nearest frequency). Up/Down move, Tab or Enter picks (Enter does not send while it is open), Esc closes. `## headings` and `#12` are left alone. The Atlas index loads only when a trigger first appears.
+- A pick inserts a plain markdown link `[Title](https://site/path)`, so Discord relay, search and archive keep working unchanged.
+- Any in-site link to a thing renders as a chip everywhere messages render (chat, mini-chat, PMs): glyph, name, frequency. Other links stay links.
+- The pocket is a row of chips above the composer: tap to insert, drag to drop anywhere in the composer.
+- Slash-command hints are buttons that fill the command.
+
+## fix291 — Chat redesign, phase 2: the conversation as a spectrogram, and the catch-up reel
+
+- **Strip** (`ChatStrip`, `lib/chatStrip.ts`): a 12px strip beside the message list when the list scrolls itself (dock, phone, topic pages) with 8+ messages. Each message is painted where it sits in the list; brightness along the site gradient = loudness (length, reactions, structured cards, files, links to things); the left lane is orange for your messages. The lit window shows what is on screen; click or drag to travel. A white line marks the first unread. Measured and painted once per change (a rAF, one `getBoundingClientRect` pass, one 10×240 canvas), scrolling only moves one CSS box.
+- **Catch-up reel** (`CatchUp`): reopening a channel with 10+ new messages from others shows how many, who spoke, and three highlights (most reacted, structured, substantial; deterministic, no AI), plus First unread / Skip to live / dismiss.
+- **Where you left off** is stored per channel **on this device** (`exomusica_seen_<slug>`), advanced when you reach the bottom or leave. No schema change; it will not follow you across devices (a server read-state table is the follow-up if wanted). First visit shows no reel. Capped by the 100 loaded messages ("100+").

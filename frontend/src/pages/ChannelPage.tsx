@@ -3,7 +3,15 @@ import { uploadChatAttachment, voiceNoteFilename } from "../lib/voiceNoteUpload"
 import { useEffect, useRef, useState, useCallback, useContext, createContext, type ChangeEvent, type ClipboardEvent, type DragEvent, type FormEvent } from "react";
 import { Link, useParams, useSearchParams, useNavigate } from "react-router-dom";
 import { api } from "../lib/api";
-import { CHAT_INSERT, LINK_MIME, spliceAt } from "../lib/chatInsert";
+import { CHAT_INSERT, LINK_MIME, spliceAt, chatLinkText, dragPayload } from "../lib/chatInsert";
+import { entityHits, entityMarkdown, entityTrigger, type EntityTrigger } from "../lib/chatEntities";
+import { useIndex } from "../lib/useAtlas";
+import { usePocketStore } from "../lib/pocketStore";
+import { ChatStrip } from "../components/ChatStrip";
+import { CatchUp } from "../components/CatchUp";
+import { catchUp, getSeen, setSeen, type Reel } from "../lib/chatStrip";
+import { EntityPicker } from "../components/EntityPicker";
+import type { Entity } from "../lib/atlas";
 import { exportChatHistory } from "../lib/exportChat";
 import { ExportIcon } from "../components/Icons";
 import { useAuth } from "../lib/auth";
@@ -348,6 +356,7 @@ export function ChannelPage({ channelSlug, fillHeight, parentControlsHeight }: {
   const [loadingOlder, setLoadingOlder] = useState(false);
   const [hasMoreOlder, setHasMoreOlder] = useState(true);
   const [showLiveChatButton, setShowLiveChatButton] = useState(false);
+  const messagesRef = useRef<MessageDTO[]>([]);
   const [archiveDays, setArchiveDays] = useState<{ day: string; messageCount: number }[]>([]);
   const [draft, setDraft] = useState("");
   const [cmdError, setCmdError] = useState<string | null>(null);
@@ -355,8 +364,10 @@ export function ChannelPage({ channelSlug, fillHeight, parentControlsHeight }: {
   const [typingUsers, setTypingUsers] = useState<Record<string, number>>({});
   const lastTypingPingRef = useRef(0);
   const typingNames = Object.keys(typingUsers);
+  messagesRef.current = messages;
   const shownMessages = mode === "search" ? messages : messages.filter((m) => audible(m, squelch.level, user));
   const heldBack = messages.length - shownMessages.length;
+  const stripOn = effectiveFillHeight && mode === "live" && shownMessages.length >= 8;
   const typingLabel =
     typingNames.length === 0
       ? null
@@ -369,6 +380,12 @@ export function ChannelPage({ channelSlug, fillHeight, parentControlsHeight }: {
       : "The galaxy is typing…";
   const [emojiQuery, setEmojiQuery] = useState<string | null>(null);
   const [mentionQuery, setMentionQuery] = useState<string | null>(null);
+  const [reel, setReel] = useState<Reel | null>(null);
+  const [entTrig, setEntTrig] = useState<EntityTrigger | null>(null);
+  const [entSel, setEntSel] = useState(0);
+  const atlasIndex = useIndex(entTrig !== null);
+  const entHitsNow = entTrig ? entityHits(atlasIndex, entTrig) : [];
+  const pocketItems = usePocketStore((st) => st.items);
   const [following, setFollowing] = useState(false);
   const [channelName, setChannelName] = useState<string | null>(null);
   const [channelFont, setChannelFont] = useState<FontInfo | null>(null);
@@ -541,6 +558,10 @@ export function ChannelPage({ channelSlug, fillHeight, parentControlsHeight }: {
       if (mode === "live" && data.length < 100) setHasMoreOlder(false);
       if (mode === "live" && data.length > 0) {
         const last = data[data.length - 1];
+        // where you left off: the reel is worked out from what you had seen before this visit, then "seen" moves up to now
+        const seen = getSeen(slug);
+        setReel(seen !== null ? catchUp(data, seen, user?.id ?? null) : null);
+        setSeen(slug, last.id);
         // Wait a tick for the DOM to actually contain the new messages before scrolling to one.
         requestAnimationFrame(() => {
           document.getElementById(`m-${last.id}`)?.scrollIntoView({ block: "end" });
@@ -584,6 +605,7 @@ export function ChannelPage({ channelSlug, fillHeight, parentControlsHeight }: {
       // height varies with content/attachments, but "roughly 30 messages"
       // doesn't need to be exact to be useful here.
       setShowLiveChatButton(distanceFromBottom > 30 * 60);
+      if (distanceFromBottom < 120 && slug) { const last = messagesRef.current[messagesRef.current.length - 1]; if (last) setSeen(slug, last.id); }
     }
     container.addEventListener("scroll", handleScroll);
     return () => container.removeEventListener("scroll", handleScroll);
@@ -787,6 +809,7 @@ export function ChannelPage({ channelSlug, fillHeight, parentControlsHeight }: {
     setEmojiQuery(emojiMatch ? emojiMatch[1] : null);
     const mentionMatch = value.slice(0, cursor).match(/(?:^|\s)@([a-zA-Z0-9_.-]*)$/);
     setMentionQuery(mentionMatch ? mentionMatch[1] : null);
+    setEntTrig(entityTrigger(value, cursor)); setEntSel(0);
 
     if (value.trim().length > 0 && slug && mode === "live" && user) {
       const now = Date.now();
@@ -858,6 +881,15 @@ export function ChannelPage({ channelSlug, fillHeight, parentControlsHeight }: {
       const newCursor = start + username.length + 2;
       el.setSelectionRange(newCursor, newCursor);
     });
+  }
+
+  function pickEntity(e: Entity) {
+    const el = textareaRef.current;
+    if (!el || !entTrig) return;
+    const cursor = el.selectionStart ?? draft.length;
+    const r = spliceAt(draft, entTrig.start, cursor, entityMarkdown(e));
+    setDraft(r.value); setEntTrig(null);
+    requestAnimationFrame(() => { el.focus(); el.setSelectionRange(r.cursor, r.cursor); });
   }
 
   const isMobileWindow = !isDesktop && !fillHeight;
@@ -963,12 +995,20 @@ export function ChannelPage({ channelSlug, fillHeight, parentControlsHeight }: {
         ))}
         {squelch.level > 0 && <span className="home-dim squelch-note" data-testid="squelch-held">{heldBack} held back · {LEVEL_NOTE[squelch.level]}</span>}
       </div>
+      {reel && mode === "live" && <CatchUp reel={reel} onClose={() => setReel(null)}
+        onPick={(m) => { document.getElementById(`m-${m.id}`)?.scrollIntoView({ block: "center" }); setReel(null); }}
+        onFirst={() => { document.getElementById(`m-${reel.firstId}`)?.scrollIntoView({ block: "start" }); }}
+        onLive={() => { scrollToLive(); setReel(null); }} />}
+      <div className={stripOn ? "chat-list-wrap" : undefined} style={stripOn ? { position: "relative", display: "flex", flexDirection: "column", flex: 1, minHeight: 0 } : undefined}>
+      {stripOn && <ChatStrip listRef={messageListRef} messages={shownMessages} meId={user?.id ?? null} unreadFromId={reel?.firstId ?? null} />}
       <div
         ref={messageListRef}
+        id="chat-list"
         className="message-list"
         style={{
           fontSize: `${messageFontSize}%`,
           ...(effectiveFillHeight ? { flex: 1, minHeight: 0, overflowY: "auto" as const, maxWidth: "none" } : {}),
+          ...(stripOn ? { paddingRight: 18 } : {}),
         }}
       >
         {messages.length === 0 && <p style={{ color: "var(--text-dim)" }}>Nothing here yet.</p>}
@@ -985,6 +1025,7 @@ export function ChannelPage({ channelSlug, fillHeight, parentControlsHeight }: {
             <MessageGroup key={g[0].id} group={g} onDelete={handleDelete} onQuote={handleQuote} onCopyLink={handleCopyLink} />
           ))
         )}
+      </div>
       </div>
 
       {showLiveChatButton && (
@@ -1082,11 +1123,20 @@ export function ChannelPage({ channelSlug, fillHeight, parentControlsHeight }: {
           )}
           {cmdError && <p className="an-err cmd-error" role="alert" data-testid="cmd-error" style={{ whiteSpace: "pre-wrap" }}>{cmdError}</p>}
           {!cmdError && hintFor(draft).length > 0 && (
-            <ul className="cmd-hints" data-testid="cmd-hints">{hintFor(draft).map((c) => <li key={c.verb}><code>{c.usage}</code> <span className="home-dim">{c.about}</span></li>)}</ul>
+            <ul className="cmd-hints" data-testid="cmd-hints">{hintFor(draft).map((c) => <li key={c.verb}><button type="button" className="cmd-hint-btn" onClick={() => { setDraft(`/${c.verb} `); textareaRef.current?.focus(); }}><code>{c.usage}</code> <span className="home-dim">{c.about}</span></button></li>)}</ul>
+          )}
+          {pocketItems.length > 0 && (
+            <div className="pocket-row" data-testid="pocket-row" aria-label="Your pocket: tap to put a link in your message">
+              <span className="pocket-row-h" aria-hidden="true">Pocket</span>
+              {pocketItems.map((p) => (
+                <button key={p.key} type="button" className="term-chip pocket-chip" draggable onDragStart={(e) => dragPayload(e, p.title, p.href)} onClick={() => putInDraft(chatLinkText(p.title, p.href))} title={`Put ${p.title} in your message`} data-testid="pocket-chip">{p.title}</button>
+              ))}
+            </div>
           )}
           <div style={{ display: "flex", gap: "0.5rem", position: "relative" }}>
             {emojiQuery !== null && <EmojiPicker filter={emojiQuery} onSelect={insertEmoji} />}
             {mentionQuery !== null && <MentionPicker filter={mentionQuery} onSelect={insertMention} />}
+            {entHitsNow.length > 0 && <EntityPicker hits={entHitsNow} sel={entSel} onPick={pickEntity} onHover={setEntSel} />}
             <input ref={fileInputRef} type="file" multiple onChange={handleFileSelect} style={{ display: "none" }} />
             <button type="button" className="btn" onClick={() => fileInputRef.current?.click()} title="Attach a file">
               📎
@@ -1101,6 +1151,11 @@ export function ChannelPage({ channelSlug, fillHeight, parentControlsHeight }: {
                 onChange={handleDraftChange}
                 onPaste={handlePaste}
                 onKeyDown={(e) => {
+                  if (entHitsNow.length > 0) {
+                    if (e.key === "ArrowDown" || e.key === "ArrowUp") { e.preventDefault(); setEntSel((i) => (i + (e.key === "ArrowDown" ? 1 : -1) + entHitsNow.length) % entHitsNow.length); return; }
+                    if (e.key === "Tab" || (e.key === "Enter" && !e.shiftKey)) { e.preventDefault(); pickEntity(entHitsNow[Math.min(entSel, entHitsNow.length - 1)]); return; }
+                    if (e.key === "Escape") { e.preventDefault(); setEntTrig(null); return; }
+                  }
                   if (e.key === "Enter" && !e.shiftKey && !e.ctrlKey && !e.metaKey) {
                     e.preventDefault();
                     void sendMessage();

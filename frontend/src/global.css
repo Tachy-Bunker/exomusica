@@ -5593,3 +5593,34 @@ th {
 .explore-below-in { min-height: 0; overflow: hidden; }
 .explore-below:not(.open) .explore-below-in { visibility: hidden; transition: visibility 0s 0.32s; }
 @media (prefers-reduced-motion: reduce) { .explore-below { transition: none; } }
+
+/* Chat: linkable things, the pocket row, clickable commands */
+.ent-chip { display: inline-flex; align-items: center; gap: 0.3rem; padding: 0 0.45rem; border: 1px solid var(--border); border-radius: 999px; background: var(--bg-inset); color: var(--text); text-decoration: none; font-size: 0.92em; line-height: 1.5; vertical-align: baseline; max-width: 100%; }
+.ent-chip:hover, .ent-chip:focus-visible { border-color: var(--accent-forum); }
+.ent-chip-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 18em; }
+.ent-chip i { font-style: normal; font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 0.74em; color: var(--accent-audio); }
+.ent-picker { position: absolute; bottom: 100%; left: 0; right: 0; margin: 0 0 0.3rem; padding: 0.25rem; list-style: none; background: var(--bg-elevated); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: 0 6px 18px rgba(0,0,0,0.4); z-index: 25; max-height: 14rem; overflow: auto; }
+.ent-picker li { display: flex; align-items: center; gap: 0.5rem; padding: 0.3rem 0.5rem; border-radius: 6px; cursor: pointer; }
+.ent-picker li.on, .ent-picker li:hover { background: color-mix(in srgb, var(--accent-forum) 18%, transparent); }
+.ent-picker b { font-weight: 600; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ent-picker span { color: var(--text-dim); font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.06em; }
+.ent-picker i { font-style: normal; font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 0.74rem; color: var(--accent-audio); }
+.pocket-row { display: flex; gap: 0.3rem; align-items: center; overflow-x: auto; scrollbar-width: none; padding-bottom: 0.1rem; }
+.pocket-row::-webkit-scrollbar { display: none; }
+.pocket-row-h { flex: none; font-size: 0.66rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--accent-audio); }
+.pocket-chip { flex: none; max-width: 12rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; cursor: grab; }
+.cmd-hint-btn { background: none; border: 0; padding: 0; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.cmd-hint-btn:hover code { color: var(--accent-forum); }
+
+/* Chat: conversation spectrogram + catch-up reel */
+.chat-strip { position: absolute; right: 3px; top: 0; bottom: 0; width: 12px; z-index: 5; cursor: pointer; touch-action: none; border-radius: 3px; background: color-mix(in srgb, var(--bg-inset) 80%, transparent); }
+.chat-strip canvas { position: absolute; inset: 1px; width: calc(100% - 2px); height: calc(100% - 2px); display: block; border-radius: 2px; }
+.chat-strip-view { position: absolute; left: -2px; right: -2px; border: 1px solid rgba(255,255,255,0.7); border-radius: 3px; background: rgba(255,255,255,0.08); pointer-events: none; min-height: 6px; }
+.chat-strip-unread { position: absolute; left: -4px; right: -4px; height: 2px; background: #fff; box-shadow: 0 0 6px var(--accent-forum); pointer-events: none; }
+.catchup { flex: none; margin: 0 0 0.4rem; padding: 0.5rem 0.7rem; border: 1px solid var(--border); border-left: 3px solid var(--accent-audio); border-radius: var(--radius); background: var(--bg-elevated); font-size: 0.85rem; }
+.catchup header { display: flex; align-items: baseline; gap: 0.4rem; }
+.catchup-x { margin-left: auto; background: none; border: 0; color: var(--text-dim); cursor: pointer; font-size: 1.1rem; line-height: 1; }
+.catchup ul { list-style: none; margin: 0.35rem 0; padding: 0; display: flex; flex-direction: column; gap: 0.15rem; }
+.catchup li button { display: block; width: 100%; text-align: left; background: none; border: 0; padding: 0.15rem 0; color: var(--text); font: inherit; cursor: pointer; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.catchup li button:hover { color: var(--accent-forum); }
+.catchup-actions { display: flex; gap: 0.4rem; }

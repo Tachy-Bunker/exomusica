@@ -1,5 +1,7 @@
 import { useState, type ReactNode } from "react";
 import { useEmojiStore } from "./emojiStore";
+import { entityOfPath } from "./chatEntities";
+import { EntityChip } from "../components/EntityChip";
 
 function Spoiler({ children }: { children: ReactNode }) {
   const [revealed, setRevealed] = useState(false);
@@ -78,6 +80,8 @@ function renderInline(
     else if (strike !== undefined) nodes.push(<s key={key}>{renderInline(strike, key, onLinkClick, mentionCache)}</s>);
     else if (code !== undefined) nodes.push(<code key={key}>{code}</code>);
     else if (spoiler !== undefined) nodes.push(<Spoiler key={key}>{renderInline(spoiler, key, onLinkClick, mentionCache)}</Spoiler>);
+    else if (linkText !== undefined && linkUrl !== undefined && internalPathOf(linkUrl) && entityOfPath(internalPathOf(linkUrl)!))
+      nodes.push(<EntityChip key={key} type={entityOfPath(internalPathOf(linkUrl)!)!.type} freq={entityOfPath(internalPathOf(linkUrl)!)!.freq} href={linkUrl} onClick={linkClickHandler(linkUrl)}>{linkText}</EntityChip>);
     else if (linkText !== undefined && linkUrl !== undefined)
       nodes.push(
         <a key={key} href={linkUrl} target="_blank" rel="noreferrer" onClick={linkClickHandler(linkUrl)}>
