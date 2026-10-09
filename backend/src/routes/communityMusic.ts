@@ -1,3 +1,4 @@
+import { probeAudioTags, titleFor } from "../lib/audioTags.js";
 import type { FastifyInstance } from "fastify";
 import type { Prisma } from "@prisma/client";
 import { prisma } from "../lib/prisma.js";
@@ -324,15 +325,18 @@ export async function communityMusicRoutes(app: FastifyInstance): Promise<void> 
       const file = await req.file();
       if (!file) return reply.code(400).send({ error: "no file uploaded" });
       const titleField = file.fields.title;
-      const title = titleField && "value" in titleField ? String(titleField.value) : null;
+      const titleTyped = titleField && "value" in titleField ? String(titleField.value).trim() : "";
       const permissionField = file.fields.permission;
       const permission = permissionField && "value" in permissionField ? String(permissionField.value) : "LISTEN_ONLY";
       const remixOfField = file.fields.remixOfId;
       const remixOfId = remixOfField && "value" in remixOfField && remixOfField.value ? Number(remixOfField.value) : null;
       const composerField = file.fields.composer;
-      const composer = composerField && "value" in composerField && composerField.value ? String(composerField.value) : null;
-      if (!title) return reply.code(400).send({ error: "title is required" });
+      const composerTyped = composerField && "value" in composerField && composerField.value ? String(composerField.value) : null;
       const buffer = await file.toBuffer();
+      // What the person typed wins; blanks are filled from the file's own tags, then its name.
+      const tags = await probeAudioTags(buffer);
+      const title = titleTyped || titleFor(tags, file.filename);
+      const composer = composerTyped ?? tags.artist;
       let attachment;
       try {
         attachment = await saveCommunityTrackAudio(req.user!.id, file.filename, file.mimetype, buffer);

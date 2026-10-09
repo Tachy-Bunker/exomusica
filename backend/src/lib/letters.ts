@@ -60,3 +60,11 @@ export const deliverAtFor = (hours: unknown, now = new Date()): Date => new Date
 export const expiryFor = (days: unknown, now = new Date()): Date => new Date(now.getTime() + Math.round(num(days, 1, 90, 30)) * 86_400_000);
 
 export const LIMITS = { toUserPerDay: 10, marksPerDay: 5, marksPerPlace: 20 };
+
+/** Where a visor note sits on the page: x as a fraction of the page width, y in pixels from the top. Both or neither. */
+export function cleanPos(x: unknown, y: unknown): { posX: number; posY: number } | null {
+  if (x === undefined || x === null || y === undefined || y === null) return null;
+  const nx = Number(x), ny = Number(y);
+  if (!Number.isFinite(nx) || !Number.isFinite(ny)) return null;
+  return { posX: Math.round(Math.min(1, Math.max(0, nx)) * 10_000) / 10_000, posY: Math.round(Math.min(20_000, Math.max(0, ny))) };
+}

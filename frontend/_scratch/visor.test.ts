@@ -1,0 +1,11 @@
+import { noteDoc, noteText, pageSpot, spotOf, opensLeft, NOTE_MAX } from "../src/lib/visor";
+let n = 0; const ok = (c: boolean, m: string) => { if (!c) { console.log("FAIL", m); process.exitCode = 1; } else { n++; console.log("ok  ", m); } };
+const d = noteDoc("  hello   world  "); ok(d.items.length === 1 && (d.items[0] as any).v === "hello world" && d.bg === "night", "a note is one tidy text line");
+ok((noteDoc("x".repeat(400)).items[0] as any).v.length === NOTE_MAX, "notes are capped");
+ok(noteText(d) === "hello world" && noteText({ bg: "paper", items: [{ t: "m", x: 1, y: 1, r: 0, s: 20, c: "#fff", g: "cq" }] }) === null, "noteText reads notes, not drawings");
+ok(pageSpot(500, 300, 1000).x === 0.5 && pageSpot(5000, -4, 1000).x === 1 && pageSpot(5000, -4, 1000).y === 0, "spot is clamped");
+const a = spotOf({ id: 3, x: 0.25, y: 900 }); ok(a.placed && a.left === 25 && a.top === 900, "a placed note keeps its spot");
+const b1 = spotOf({ id: 3 }), b2 = spotOf({ id: 3 }), b3 = spotOf({ id: 4 }); ok(!b1.placed && b1.left === b2.left && b1.top === b2.top && (b1.left !== b3.left || b1.top !== b3.top), "unplaced marks scatter stably, apart");
+ok(b1.left >= 8 && b1.left <= 92 && b1.top >= 150 && b1.top <= 670, "the scatter stays on the first screens");
+ok(opensLeft(80) && !opensLeft(30), "cards open away from the right edge");
+console.log(n, "passed");

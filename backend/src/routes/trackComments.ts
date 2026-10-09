@@ -5,7 +5,7 @@ import { prisma } from "../lib/prisma.js";
 import { requireAuth } from "../lib/auth.js";
 import { makeLimiter } from "../lib/resourceAccess.js";
 import { UPLOADS_DIR } from "../lib/storage.js";
-import { normalizeStrip, runFfmpeg, stripCacheName, stripSource } from "../lib/specStrip.js";
+import { normalizeStrip, packPoints, runFfmpeg, stripCacheName, stripSource, toPoints } from "../lib/specStrip.js";
 import { cleanCommentBody, clampAt, MAX_COMMENTS_PER_TRACK } from "../lib/trackComments.js";
 
 const limiter = makeLimiter(8, 60_000);
@@ -13,7 +13,7 @@ const inflight = new Map<number, Promise<Uint8Array | "missing" | null>>();
 let queue: Promise<unknown> = Promise.resolve(); // one drawing at a time: weak VPS friendly
 
 export async function trackCommentRoutes(app: FastifyInstance): Promise<void> {
-  // The strip. Drawn once per track on first request, then served from disk forever.
+  // The strip, as 2500 bytes of measured points. Measured once per track on first request, then served from disk forever.
   app.get<{ Params: { id: string } }>("/api/tracks/:id/spectrogram", async (req, reply) => {
     const id = Number(req.params.id) || 0;
     const t = await prisma.track.findUnique({ where: { id }, select: { id: true, fileUrl: true } });
@@ -34,11 +34,13 @@ export async function trackCommentRoutes(app: FastifyInstance): Promise<void> {
     }
     const raw = await job;
     if (raw === "missing") return reply.code(501).send({ error: "the server has no ffmpeg" });
-    const strip = raw ? normalizeStrip(raw) : null;
-    if (!strip) return reply.code(422).send({ error: "this track's audio can't be drawn" });
+    const norm = raw ? normalizeStrip(raw) : null;
+    const pts = norm ? toPoints(norm) : null;
+    if (!pts) return reply.code(422).send({ error: "this track's audio can't be drawn" });
+    const packed = packPoints(pts);
     await mkdir(dir, { recursive: true });
-    await writeFile(file, strip);
-    return reply.header("cache-control", "public, max-age=31536000, immutable").type("application/octet-stream").send(Buffer.from(strip));
+    await writeFile(file, packed);
+    return reply.header("cache-control", "public, max-age=31536000, immutable").type("application/octet-stream").send(Buffer.from(packed));
   });
 
   app.get<{ Params: { id: string } }>("/api/tracks/:id/comments", async (req) => {

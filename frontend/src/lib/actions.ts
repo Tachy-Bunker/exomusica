@@ -188,13 +188,13 @@ export const ACTIONS: Action[] = [
     },
   },
   {
-    id: "lens", verbs: ["lens", "trace"], summary: "Turn the Trace lens on or off (shows marks left on a place).", usage: "lens [on|off]",
+    id: "lens", verbs: ["scan", "visor", "lens", "trace"], summary: "Turn the Scan Visor on or off (shows what travellers left on a place).", usage: "scan [on|off]",
     run: (rest, ctx) => {
       if (!ctx.lens) return [{ kind: "error", text: operator.unknown("lens") }];
       const v = rest.trim().toLowerCase();
       const next = v === "on" ? true : v === "off" ? false : !ctx.lens.on;
       ctx.lens.set(next);
-      return [{ kind: "text", text: next ? "Trace lens on. Marks left on a place now show." : "Trace lens off." }];
+      return [{ kind: "text", text: next ? "Scan Visor on. Traces left on this place now show." : "Scan Visor off." }];
     },
   },
   {

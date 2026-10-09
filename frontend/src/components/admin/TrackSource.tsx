@@ -39,7 +39,8 @@ export function TrackSource({ onPick }: { onPick: (t: PickedTrack) => void }) {
       const body = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(body.error ?? "Couldn't upload that file.");
       onPick({ title: body.title, fileUrl: body.url, format: body.format });
-      setMsg({ kind: "ok", text: `Uploaded${body.durationSeconds ? ` (${Math.floor(body.durationSeconds / 60)}:${String(body.durationSeconds % 60).padStart(2, "0")})` : ""}. Check the title, then press Add track.` });
+      const tagBits = [body.artist, body.album, body.trackNo ? `track ${body.trackNo}` : null, body.year].filter(Boolean).join(" · ");
+      setMsg({ kind: "ok", text: `Uploaded${tagBits ? ` · tags: ${tagBits}` : ""}${body.durationSeconds ? ` (${Math.floor(body.durationSeconds / 60)}:${String(body.durationSeconds % 60).padStart(2, "0")})` : ""}. Check the title, then press Add track.` });
     } catch (e) {
       setMsg({ kind: "error", text: e instanceof Error ? e.message : "Couldn't upload that file." });
     } finally {

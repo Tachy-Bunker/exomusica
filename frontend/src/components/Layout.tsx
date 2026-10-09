@@ -29,7 +29,6 @@ function darkenHex(hex: string, amount: number): string {
 
 
 import { Avatar } from "./Avatar";
-import { MailIcon, MailNotificationIcon } from "./Icons";
 import { MobileAccountHook } from "./MobileAccountHook";
 import { useAudioStore } from "../lib/audioStore";
 import { useEmojiStore } from "../lib/emojiStore";
@@ -153,7 +152,6 @@ export function Layout() {
   }, [user, connectPresence]);
 
   const avatarUrl = useProfileStore((s) => s.avatarUrl);
-  const hasUnreadPms = useProfileStore((s) => s.hasUnreadPms);
   const refreshProfile = useProfileStore((s) => s.refresh);
   useEffect(() => {
     if (!user) return;
@@ -370,13 +368,6 @@ export function Layout() {
                     </Link>
                   )}
                   <NotificationWidget inline offsetRight={dockOffset} />
-                  <Link
-                    to="/pms"
-                    style={{ position: "relative", display: "inline-flex", color: "var(--accent-forum)" }}
-                    title="Messages"
-                  >
-                    {hasUnreadPms ? <MailNotificationIcon /> : <MailIcon />}
-                  </Link>
                   <Link to="/account" title={user.username}>
                     <Avatar url={avatarUrl} />
                   </Link>
@@ -396,7 +387,7 @@ export function Layout() {
             ) : user ? (
               <>
                 <NotificationWidget inline />
-                <MobileAccountHook loggedIn avatarUrl={avatarUrl} hasUnreadPms={hasUnreadPms} username={user.username} isAdmin={user.isAdmin} />
+                <MobileAccountHook loggedIn avatarUrl={avatarUrl} username={user.username} isAdmin={user.isAdmin} />
               </>
             ) : (
               <>

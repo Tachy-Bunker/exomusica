@@ -77,17 +77,20 @@ export function SubmitWorkPage() {
   }
 
   async function uploadTrack() {
-    const file = fileInputRef.current?.files?.[0];
-    if (!album || !file || !trackTitle.trim()) return;
+    const files = [...(fileInputRef.current?.files ?? [])].sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
+    if (!album || files.length === 0) return;
     setUploadError(null);
-    const formData = new FormData();
-    formData.append("title", trackTitle.trim());
-    formData.append("permission", "LISTEN_ONLY");
-    if (trackComposer.trim()) formData.append("composer", trackComposer.trim());
-    formData.append("file", file);
     try {
-      const track = await api<SubmissionTrack>(`/api/community-albums/${album.id}/tracks`, { method: "POST", body: formData });
-      setTracks((t) => [...t, track]);
+      // Blank title/composer: the server fills them from each file's own tags (then its name). A typed title only applies to a single file.
+      for (const file of files) {
+        const formData = new FormData();
+        if (files.length === 1 && trackTitle.trim()) formData.append("title", trackTitle.trim());
+        formData.append("permission", "LISTEN_ONLY");
+        if (trackComposer.trim()) formData.append("composer", trackComposer.trim());
+        formData.append("file", file);
+        const track = await api<SubmissionTrack>(`/api/community-albums/${album.id}/tracks`, { method: "POST", body: formData });
+        setTracks((t) => [...t, track]);
+      }
       setTrackTitle("");
       setTrackComposer("");
       if (fileInputRef.current) fileInputRef.current.value = "";
@@ -164,11 +167,11 @@ export function SubmitWorkPage() {
 
           <div style={{ border: "1px solid var(--border)", borderRadius: "var(--radius)", padding: "0.6rem", display: "flex", flexDirection: "column", gap: "0.4rem" }}>
             <label htmlFor="sub-track-title">Track title</label>
-            <input id="sub-track-title" value={trackTitle} onChange={(e) => setTrackTitle(e.target.value)} placeholder="Track title" />
+            <input id="sub-track-title" value={trackTitle} onChange={(e) => setTrackTitle(e.target.value)} placeholder="Optional: taken from the file's tags" />
             <label htmlFor="sub-track-artist">Track artist (if different from the album artist)</label>
             <input id="sub-track-artist" value={trackComposer} onChange={(e) => setTrackComposer(e.target.value)} placeholder="Track artist (if different from album artist)" />
             <label htmlFor="sub-track-file">Audio file</label>
-            <input id="sub-track-file" ref={fileInputRef} type="file" accept="audio/*" />
+            <input id="sub-track-file" ref={fileInputRef} type="file" accept="audio/*" multiple />
             {uploadError && <p style={{ color: "var(--accent-danger, #e2703f)", fontSize: "0.8rem" }}>{uploadError}</p>}
             <button className="btn" onClick={uploadTrack}>
               Add track

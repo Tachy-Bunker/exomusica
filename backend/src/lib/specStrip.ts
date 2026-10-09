@@ -31,9 +31,39 @@ export function normalizeStrip(raw: Uint8Array): Uint8Array | null {
   return out;
 }
 
+/** What is stored and sent: measured points, not a picture. The 1000x40 drawing is boiled down to POINT_COLS x POINT_ROWS averages, each kept to 4 bits
+ *  (16 levels), two to a byte: 2500 bytes instead of 40000. The browser paints it, stretched smooth, in whatever colour it likes. */
+export const POINT_COLS = 250;
+export const POINT_ROWS = 20;
+export const POINT_BYTES = (POINT_COLS * POINT_ROWS) / 2;
+
+/** Block averages of a normalized strip, 0..15 each, row-major like the strip. */
+export function toPoints(strip: Uint8Array): Uint8Array | null {
+  if (strip.length !== STRIP_BYTES) return null;
+  const bx = STRIP_W / POINT_COLS, by = STRIP_H / POINT_ROWS, out = new Uint8Array(POINT_COLS * POINT_ROWS);
+  for (let r = 0; r < POINT_ROWS; r++) for (let c = 0; c < POINT_COLS; c++) {
+    let t = 0;
+    for (let y = 0; y < by; y++) for (let x = 0; x < bx; x++) t += strip[(r * by + y) * STRIP_W + c * bx + x];
+    out[r * POINT_COLS + c] = Math.min(15, Math.round((t / (bx * by) / 255) * 15));
+  }
+  return out;
+}
+/** Two 4-bit points per byte, the first in the high half. */
+export function packPoints(p: Uint8Array): Uint8Array {
+  const out = new Uint8Array(Math.ceil(p.length / 2));
+  for (let i = 0; i < p.length; i += 2) out[i >> 1] = ((p[i] & 15) << 4) | ((p[i + 1] ?? 0) & 15);
+  return out;
+}
+export function unpackPoints(b: Uint8Array): Uint8Array | null {
+  if (b.length !== POINT_BYTES) return null;
+  const out = new Uint8Array(POINT_COLS * POINT_ROWS);
+  for (let i = 0; i < b.length; i++) { out[i * 2] = b[i] >> 4; out[i * 2 + 1] = b[i] & 15; }
+  return out;
+}
+
 /** Cache file name: changes when the track's audio address changes, so a replaced file is redrawn. */
 export function stripCacheName(trackId: number, fileUrl: string): string {
-  return `${trackId}-${createHash("sha1").update(fileUrl).digest("hex").slice(0, 10)}.spec`;
+  return `${trackId}-${createHash("sha1").update(fileUrl).digest("hex").slice(0, 10)}.pts`; // .pts = points; the old .spec pictures are no longer read and can be deleted
 }
 
 /** Where ffmpeg reads from: a file inside uploads (never outside it), or a web address. */

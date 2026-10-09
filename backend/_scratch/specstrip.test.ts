@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { STRIP_BYTES, STRIP_H, STRIP_W, ffmpegArgs, normalizeStrip, runFfmpeg, stripCacheName, stripSource } from "../src/lib/specStrip.js";
+import { POINT_BYTES, POINT_COLS, POINT_ROWS, STRIP_BYTES, STRIP_H, STRIP_W, ffmpegArgs, normalizeStrip, packPoints, runFfmpeg, stripCacheName, stripSource, toPoints, unpackPoints } from "../src/lib/specStrip.js";
 import { cleanCommentBody, clampAt, groupPins } from "../src/lib/trackComments.js";
 let n = 0; const ok = (name: string, f: () => void | Promise<void>) => Promise.resolve(f()).then(() => { n++; });
 
@@ -19,6 +19,16 @@ await ok("normalize stretches contrast and rejects wrong sizes", () => {
   const raw = new Uint8Array(STRIP_BYTES).fill(10); for (let i = 0; i < 400; i++) raw[i] = 90;
   const out = normalizeStrip(raw)!; assert.equal(out[0], 255); assert.equal(out[STRIP_BYTES - 1], 0);
 });
+await ok("points: block averages, 4 bits, 2500 bytes", () => {
+  assert.equal(toPoints(new Uint8Array(5)), null);
+  const strip = new Uint8Array(STRIP_BYTES); for (let y = 0; y < STRIP_H; y++) for (let x = 0; x < STRIP_W; x++) strip[y * STRIP_W + x] = x < 500 ? 255 : 0;
+  const pts = toPoints(strip)!; assert.equal(pts.length, POINT_COLS * POINT_ROWS);
+  assert.equal(pts[0], 15); assert.equal(pts[POINT_COLS - 1], 0); assert.equal(pts[(POINT_ROWS - 1) * POINT_COLS + 10], 15);
+  const packed = packPoints(pts); assert.equal(packed.length, POINT_BYTES); assert.equal(POINT_BYTES, 2500);
+  assert.deepEqual(Array.from(unpackPoints(packed)!), Array.from(pts));
+  assert.equal(unpackPoints(new Uint8Array(3)), null);
+});
+await ok("cache name says points", () => assert.ok(stripCacheName(1, "/x").endsWith(".pts")));
 await ok("comment text is one clean short line", () => {
   assert.equal(cleanCommentBody("  hi\n\n\tthere\u0000 "), "hi there");
   assert.equal(cleanCommentBody("x".repeat(999)).length, 240);

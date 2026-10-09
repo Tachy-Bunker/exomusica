@@ -4,6 +4,7 @@ import { api } from "../lib/api";
 import { useAuth } from "../lib/auth";
 import { useLensStore } from "../lib/lensStore";
 import { useProfileStore } from "../lib/profileStore";
+import { allowDrop, dropToPocket, useDragStore } from "./PocketPad";
 import { freqOf, showFreq, TYPE_LABEL, type Peek } from "../lib/atlas";
 import { setArrival } from "../lib/arrive";
 import { usePocketStore } from "../lib/pocketStore";
@@ -36,6 +37,7 @@ export function Faceplate({ focus, section, around, onAround, aroundCount, cente
     return () => { clearInterval(t); window.removeEventListener("exomusica:letters", ask); };
   }, [user]);
   const pocketCount = usePocketStore((s) => s.items.length);
+  const dragging = useDragStore((s) => !!s.active);
   const togglePocket = usePocketStore((s) => s.setOpen);
   const pocketOpen = usePocketStore((s) => s.open);
   const showTerminal = useTerminalStore((s) => s.show);
@@ -64,17 +66,17 @@ export function Faceplate({ focus, section, around, onAround, aroundCount, cente
         <span className="fp-btn-label">Around</span>{aroundCount > 0 && <em>{aroundCount}</em>}
       </button>
       <span className="fp-tipwrap">
-        <button type="button" className={`fp-btn${lens.on ? " fp-on" : ""}`} onClick={lens.toggle} aria-pressed={lens.on} aria-label="Trace lens: show the marks people left here" aria-describedby="fp-lens-tip" data-testid="fp-lens">
+        <button type="button" className={`fp-btn${lens.on ? " fp-on" : ""}`} onClick={lens.toggle} aria-pressed={lens.on} aria-label="Scan Visor: show what travellers left here" aria-describedby="fp-lens-tip" data-testid="fp-lens">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="9" /><circle cx="12" cy="12" r="4.5" opacity=".6" /><g className={lens.on ? "lens-pulse" : undefined}><path d="M12 12L12 3" /></g><circle cx="16.5" cy="8" r="1.1" fill="currentColor" stroke="none" /></svg>
-          <span className="fp-btn-label">Trace</span>{lens.on && <i className="fp-state">on</i>}
+          <span className="fp-btn-label">Scan</span>{lens.on && <i className="fp-state">on</i>}
         </button>
-        <span id="fp-lens-tip" role="tooltip" className="fp-tip" data-testid="fp-lens-tip"><b>Trace lens: long-range scan</b> Travellers drop small beacons (a drawing or a note) on a place: a branch, album, study, wiki page. Switch this on and a scope shows the beacons left in the sector you are in. They decay after a while. {lens.on ? "Scanning now." : "Off, so pages stay clean."}</span>
+        <span id="fp-lens-tip" role="tooltip" className="fp-tip" data-testid="fp-lens-tip"><b>Scan Visor</b> Travellers leave traces on places: notes written right on the page, or small drawings. Switch the visor on to see the traces in the sector you are in, and write your own anywhere. Traces fade after a while. {lens.on ? "Scanning now." : "Off, so pages stay clean."}</span>
       </span>
       {user && <Link to="/pms" className="fp-btn" aria-label={`Post${unread + unreadPms ? ` (${unread + unreadPms} unread)` : ""}`} data-testid="fp-post">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" aria-hidden="true" focusable="false"><rect x="3" y="5" width="18" height="14" rx="2" /><path d="M3 7l9 6 9-6" /></svg>
         <span className="fp-btn-label">Post</span>{unread + unreadPms > 0 && <em>{unread + unreadPms}</em>}
       </Link>}
-      <button type="button" className="fp-btn" onClick={() => togglePocket(!pocketOpen)} aria-expanded={pocketOpen} aria-label={`Pocket (${pocketCount})`} data-testid="fp-pocket">
+      <button type="button" className={`fp-btn${dragging ? " fp-drop-hot" : ""}`} onDragOver={allowDrop} onDrop={dropToPocket} onClick={() => togglePocket(!pocketOpen)} aria-expanded={pocketOpen} aria-label={`Pocket (${pocketCount})`} data-testid="fp-pocket">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" aria-hidden="true" focusable="false"><path d="M5 4h14v9a7 7 0 0 1-14 0z M5 9h14" /></svg>
         <span className="fp-btn-label">Pocket</span>{pocketCount > 0 && <em>{pocketCount}</em>}
       </button>

@@ -120,16 +120,18 @@ export function MyMusicPage() {
   }
 
   async function uploadTrack(albumId: number) {
-    const file = fileInputRef.current?.files?.[0];
-    if (!file || !newTrackTitle.trim()) return;
+    const files = [...(fileInputRef.current?.files ?? [])].sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
+    if (files.length === 0) return;
     setUploadError(null);
-    const formData = new FormData();
-    formData.append("title", newTrackTitle.trim());
-    formData.append("permission", newTrackPermission);
-    if (remixOfId) formData.append("remixOfId", String(remixOfId));
-    formData.append("file", file);
     try {
-      await api(`/api/community-albums/${albumId}/tracks`, { method: "POST", body: formData });
+      for (const file of files) { // blank title: from the file's own tags, then its name
+        const formData = new FormData();
+        if (files.length === 1 && newTrackTitle.trim()) formData.append("title", newTrackTitle.trim());
+        formData.append("permission", newTrackPermission);
+        if (remixOfId) formData.append("remixOfId", String(remixOfId));
+        formData.append("file", file);
+        await api(`/api/community-albums/${albumId}/tracks`, { method: "POST", body: formData });
+      }
       setNewTrackTitle("");
       setRemixOfId(null);
       if (fileInputRef.current) fileInputRef.current.value = "";
@@ -502,7 +504,7 @@ export function MyMusicPage() {
                   </button>
                 </div>
                 <div style={{ display: "flex", gap: "0.4rem", alignItems: "center" }}>
-                  <input ref={fileInputRef} type="file" accept="audio/*" style={{ fontSize: "0.8rem" }} />
+                  <input ref={fileInputRef} type="file" accept="audio/*" multiple style={{ fontSize: "0.8rem" }} />
                   <button className="btn" onClick={() => uploadTrack(a.id)}>
                     Upload file
                   </button>

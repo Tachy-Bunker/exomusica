@@ -1,4 +1,5 @@
-import { shapeTrackHits, titleFromFilename } from "../lib/trackSearch.js";
+import { shapeTrackHits } from "../lib/trackSearch.js";
+import { probeAudioTags, titleFor } from "../lib/audioTags.js";
 import type { FastifyInstance } from "fastify";
 import { prisma } from "../lib/prisma.js";
 import { requireAdmin } from "../lib/auth.js";
@@ -257,7 +258,8 @@ export async function albumRoutes(app: FastifyInstance): Promise<void> {
     try {
       const { url, format } = await saveTrackFile(file.filename, file.mimetype, buffer);
       const durationSeconds = await probeAudioDurationOfBuffer(buffer);
-      return reply.code(201).send({ url, format, title: titleFromFilename(file.filename), durationSeconds: durationSeconds ?? null });
+      const tags = await probeAudioTags(buffer);
+      return reply.code(201).send({ url, format, title: titleFor(tags, file.filename), artist: tags.artist, album: tags.album, trackNo: tags.trackNo, year: tags.year, genre: tags.genre, durationSeconds: durationSeconds ?? null });
     } catch (err) {
       return reply.code(400).send({ error: err instanceof Error ? err.message : "upload failed" });
     }

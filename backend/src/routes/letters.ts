@@ -2,7 +2,7 @@ import type { FastifyInstance } from "fastify";
 import { prisma } from "../lib/prisma.js";
 import { requireAuth, verifyToken, type AuthedUser } from "../lib/auth.js";
 import { parseKey } from "../lib/atlas.js";
-import { LIMITS, cleanDoc, deliverAtFor, expiryFor } from "../lib/letters.js";
+import { LIMITS, cleanDoc, cleanPos, deliverAtFor, expiryFor } from "../lib/letters.js";
 import { describe } from "./atlas.js";
 
 const viewerOf = (h: string | undefined): AuthedUser | null => (h?.startsWith("Bearer ") ? verifyToken(h.slice(7)) : null);
@@ -12,7 +12,7 @@ export async function lettersRoutes(app: FastifyInstance): Promise<void> {
   // Send a letter to a member, or leave a mark on a place. Exactly one of `to` / `at`.
   app.post("/api/letters", { preHandler: requireAuth }, async (req, reply) => {
     const me = req.user!;
-    const b = (req.body ?? {}) as { doc?: unknown; to?: string; at?: string; hours?: unknown; days?: unknown; unsigned?: boolean };
+    const b = (req.body ?? {}) as { doc?: unknown; to?: string; at?: string; hours?: unknown; days?: unknown; unsigned?: boolean; x?: unknown; y?: unknown };
     const cleaned = cleanDoc(b.doc);
     if (!cleaned.ok) return reply.code(400).send({ error: cleaned.error });
     if (!!b.to === !!b.at) return reply.code(400).send({ error: "Say who it is for, or where to leave it." });
@@ -34,7 +34,7 @@ export async function lettersRoutes(app: FastifyInstance): Promise<void> {
     if ((await prisma.letter.count({ where: { authorId: me.id, entityKey: { not: null }, createdAt: { gte: today } } })) >= LIMITS.marksPerDay) return reply.code(429).send({ error: "You have left enough marks for today." });
     const here = await prisma.letter.count({ where: { entityKey: placeKey, expiresAt: { gt: new Date() } } });
     if (here >= LIMITS.marksPerPlace) return reply.code(409).send({ error: "This place is full of marks. Try again when some have faded." });
-    const l = await prisma.letter.create({ data: { authorId: me.id, entityKey: placeKey, doc: cleaned.doc as object, unsigned: !!b.unsigned, expiresAt: expiryFor(b.days) } });
+    const l = await prisma.letter.create({ data: { authorId: me.id, entityKey: placeKey, doc: cleaned.doc as object, unsigned: !!b.unsigned, expiresAt: expiryFor(b.days), ...(cleanPos(b.x, b.y) ?? {}) } });
     return reply.code(201).send({ ok: true, id: l.id });
   });
 
@@ -84,12 +84,12 @@ export async function lettersRoutes(app: FastifyInstance): Promise<void> {
     return reply.code(204).send();
   });
 
-  // Marks on a place. Only asked for when the Trace lens is on.
+  // Marks on a place. Only asked for when the Scan Visor is on.
   app.get<{ Querystring: { key?: string } }>("/api/landmarks", async (req, reply) => {
     const viewer = viewerOf(req.headers.authorization);
     const k = parseKey(req.query.key);
     if (!k) return reply.code(400).send({ error: "bad key" });
     const rows = await prisma.letter.findMany({ where: { entityKey: `${k.type}:${k.id}`, expiresAt: { gt: new Date() } }, orderBy: { createdAt: "desc" }, take: LIMITS.marksPerPlace, include: { author: { select: { username: true } } } });
-    return rows.map((l) => ({ id: l.id, doc: l.doc, by: l.unsigned && !viewer?.isAdmin ? null : l.author.username, mine: viewer?.id === l.authorId, at: l.createdAt, expiresAt: l.expiresAt }));
+    return rows.map((l) => ({ id: l.id, doc: l.doc, by: l.unsigned && !viewer?.isAdmin ? null : l.author.username, mine: viewer?.id === l.authorId, at: l.createdAt, expiresAt: l.expiresAt, x: l.posX, y: l.posY }));
   });
 }

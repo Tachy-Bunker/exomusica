@@ -2,8 +2,15 @@ import json, re, sys
 from playwright.sync_api import sync_playwright
 src = open(__file__.replace("e2e_fix288.py", "e2e_fix277.py")).read()
 exec(src.split("def run(playwright):")[0])
-W, H = 1000, 40
-STRIP = bytes(min(255, max(0, 255 - abs((x * H // W) - (H - 1 - y)) * 40)) if True else 0 for y in range(H) for x in range(W))  # a diagonal line, low-left to high-right
+import zlib, struct
+W, H = 250, 20
+def png(r, g, b, n=8):
+    raw = b"".join(b"\x00" + bytes([r, g, b]) * n for _ in range(n))
+    ch = lambda t, d: struct.pack(">I", len(d)) + t + d + struct.pack(">I", zlib.crc32(t + d) & 0xffffffff)
+    return b"\x89PNG\r\n\x1a\n" + ch(b"IHDR", struct.pack(">IIBBBBB", n, n, 8, 2, 0, 0, 0)) + ch(b"IDAT", zlib.compress(raw)) + ch(b"IEND", b"")
+RED = png(200, 40, 40)
+lv = [min(15, max(0, 15 - abs((x * H // W) - (H - 1 - y)) * 4)) for y in range(H) for x in range(W)]  # a diagonal line, low-left to high-right, 4-bit levels
+STRIP = bytes((lv[i] << 4) | lv[i + 1] for i in range(0, len(lv), 2))  # 2500 bytes: what the server sends
 comments = [{"id": 1, "atSeconds": 2.0, "body": "that low thump", "createdAt": "2026-10-01T00:00:00Z", "user": "Ghost", "avatarUrl": None, "userId": 99}]
 posted = []; deleted = []; mode = {"strip": "ok"}
 
@@ -27,6 +34,7 @@ def run(playwright):
             return ok(comments)
         m = re.match(r"/api/tracks/1/comments/(\d+)$", key)
         if m and req.method == "DELETE": deleted.append(int(m.group(1))); return ok({"ok": True})
+        if key.startswith("/uploads/") and key.endswith(".png"): return route.fulfill(status=200, content_type="image/png", body=RED)
         if key.startswith("/uploads/") and key.endswith(".wav"):
             return route.fulfill(status=200, content_type="audio/wav", body=open("/tmp/claude-0/-home-claude/79b8691e-ce21-54a4-9b06-b8ca9b258796/scratchpad/two.wav", "rb").read())
         if path in DATA: return ok(DATA[path])
@@ -44,8 +52,13 @@ def run(playwright):
     px = page.evaluate("""() => { const c = document.querySelector('.spec-canvas'); const d = c.getContext('2d').getImageData(0,0,c.width,c.height).data;
       const at = (x,y) => [d[(y*c.width+x)*4], d[(y*c.width+x)*4+1], d[(y*c.width+x)*4+2]];
       return {bright: at(500, 20), dark: at(500, 2)}; }""")
-    # the diagonal passes through the middle; away from it the gradient bottoms out dark, on it the bright blue end shows
-    check(px["bright"][2] > 180 and px["dark"][0] < 20, f"gradient: bright {px['bright']} on the line, dark {px['dark']} off it")
+    check(len(STRIP) == 2500 and page.evaluate("[document.querySelector('.spec-canvas').width, document.querySelector('.spec-canvas').height]") == [250, 20], "the strip is 250 x 20 measured points (2500 bytes), not a picture")
+    # the diagonal passes through the middle; the cover is red, so the line is red-ish and light, away from it dark
+    px = page.evaluate("""() => { const c = document.querySelector('.spec-canvas'); const d = c.getContext('2d').getImageData(0,0,c.width,c.height).data;
+      const at = (x,y) => [d[(y*c.width+x)*4], d[(y*c.width+x)*4+1], d[(y*c.width+x)*4+2]];
+      let best = [0,0,0], bi = -1; for (let y = 0; y < c.height; y++) { const p = at(125, y); const l = p[0]+p[1]+p[2]; if (l > bi) { bi = l; best = p; } }
+      return {bright: best, dark: at(125, 0)}; }""")
+    check(px["bright"][0] > px["bright"][2] + 40 and px["bright"][0] > 120 and sum(px["dark"]) < 120, f"colour: the strip takes the cover's red ({px['bright']} on the line, {px['dark']} off it)")
     check(page.locator(".spec-pin").count() == 1, "the existing comment is pinned on the strip")
     page.click(".player-bar-row .track-info"); page.wait_for_selector("[data-testid=spec-caption]")
     check(page.locator(".player-seek-strip--expanded.has-spec").count() == 1, "expanded: the strip is taller and still a spectrogram")

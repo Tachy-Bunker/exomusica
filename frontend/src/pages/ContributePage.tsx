@@ -67,7 +67,9 @@ export function ContributePage({ embedded = false }: { embedded?: boolean } = {}
     justChose.current = false;
     const el = panelRef.current;
     el?.focus({ preventScroll: true });
-    el?.scrollIntoView({ block: isDesktop ? "nearest" : "start", behavior: "smooth" });
+    // On a phone the panel opens under the branch's own row: bring that row (the name you tapped) to the top, not the panel below it.
+    const row = !isDesktop ? document.querySelector<HTMLElement>(`.ct-row[data-slug="${CSS.escape(selected.slug)}"]`) : null;
+    (row ?? el)?.scrollIntoView({ block: isDesktop ? "nearest" : "start", behavior: "smooth" });
   }, [selected?.slug]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const stepNow = !selected ? 0 : selected.mySubmissions.length > 0 ? 2 : 1;

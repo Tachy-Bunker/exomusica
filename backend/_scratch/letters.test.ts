@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { cleanDoc, deliverAtFor, expiryFor, MAX_ITEMS } from "../src/lib/letters.ts";
+import { cleanDoc, cleanPos, deliverAtFor, expiryFor, MAX_ITEMS } from "../src/lib/letters.ts";
 assert.equal(cleanDoc(null).ok, false); assert.equal(cleanDoc({ items: [] }).ok, false); assert.equal(cleanDoc({ items: "x" }).ok, false);
 const ok = cleanDoc({ bg: "weird", items: [
   { t: "s", c: "#ff0000", w: 99, p: [1, 2, 3, 4, 5000, -9, "a"] },
@@ -19,3 +19,8 @@ const now = new Date("2026-01-01T00:00:00Z");
 assert.equal(deliverAtFor(5, now).toISOString(), "2026-01-01T05:00:00.000Z"); assert.equal(deliverAtFor(999, now).getTime() - now.getTime(), 72 * 3600e3); assert.equal(deliverAtFor("x", now).getTime(), now.getTime());
 assert.equal(expiryFor(undefined, now).getTime() - now.getTime(), 30 * 86400e3);
 console.log("letters ok");
+assert.deepEqual(cleanPos(0.5, 300), { posX: 0.5, posY: 300 });
+assert.deepEqual(cleanPos(9, -5), { posX: 1, posY: 0 });
+assert.deepEqual(cleanPos(0.123456, 99999), { posX: 0.1235, posY: 20000 });
+assert.equal(cleanPos(undefined, 3), null); assert.equal(cleanPos("a", 3), null); assert.equal(cleanPos(null, null), null);
+console.log("letters positions ok");

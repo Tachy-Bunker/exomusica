@@ -1289,6 +1289,8 @@ model Letter {
   toUserId   Int?
   toUser     User?     @relation("LetterTo", fields: [toUserId], references: [id], onDelete: Cascade)
   entityKey  String?   // "study:beating-tones" for a mark left on a place
+  posX       Float?    // where on the page a mark was written with the Scan Visor: fraction of the page width (0..1)
+  posY       Float?    // ... and pixels from the top of the page (0..20000). Null for marks drawn on the sheet, which the visor scatters.
   doc        Json
   unsigned   Boolean   @default(false) // a mark on a place may hide its author from readers (admins still see)
   deliverAt  DateTime  @default(now())

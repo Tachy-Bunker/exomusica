@@ -1,12 +1,12 @@
 import { useEffect, useRef } from "react";
-import { STRIP_H, STRIP_W, paintStrip, type TrackComment } from "../lib/specStrip";
+import { STRIP_H, STRIP_W, paintStrip, rampFor, type TrackComment } from "../lib/specStrip";
 
 /** The spectrogram picture, a dimmed "not yet played" cover, and comment pins. Painted once; the playhead only moves a CSS transform. */
-export function SpecLayer({ strip, pct, comments, duration, onPin, activeId }: {
-  strip: Uint8Array; pct: number; comments: TrackComment[]; duration: number; onPin?: (c: TrackComment) => void; activeId?: number | null;
+export function SpecLayer({ strip, color, pct, comments, duration, onPin, activeId }: {
+  strip: Uint8Array; color?: string | null; pct: number; comments: TrackComment[]; duration: number; onPin?: (c: TrackComment) => void; activeId?: number | null;
 }) {
   const ref = useRef<HTMLCanvasElement>(null);
-  useEffect(() => { const c = ref.current?.getContext("2d"); if (c) paintStrip(c, strip); }, [strip]);
+  useEffect(() => { const c = ref.current?.getContext("2d"); if (c) paintStrip(c, strip, rampFor(color ?? null)); }, [strip, color]);
   return (
     <>
       <canvas ref={ref} className="spec-canvas" width={STRIP_W} height={STRIP_H} aria-hidden />

@@ -1,0 +1,10 @@
+import assert from "node:assert/strict";
+import { normalizeTags, titleFor } from "../src/lib/audioTags.js";
+const t = normalizeTags({ title: "  Low   Thump ", artist: "Tachy", album: "", track: { no: 3 }, year: 2026, genre: ["Drone", "x"] });
+assert.deepEqual(t, { title: "Low Thump", artist: "Tachy", album: null, trackNo: 3, year: 2026, genre: "Drone" });
+assert.deepEqual(normalizeTags(null), { title: null, artist: null, album: null, trackNo: null, year: null, genre: null });
+assert.equal(normalizeTags({ track: { no: 0 }, year: 12 }).trackNo, null);
+assert.equal(normalizeTags({ title: "x".repeat(500) }).title!.length, 200);
+assert.equal(titleFor(t, "a_b.mp3"), "Low Thump");
+assert.equal(titleFor(normalizeTags(null), "a_b.mp3"), "a b");
+console.log("audiotags ok");

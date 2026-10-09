@@ -343,8 +343,8 @@ def run(playwright):
     ctx.close()
     ctx = new_ctx(viewport={"width": 390, "height": 800}); page = ctx.new_page(); watch(page)
     page.goto(f"{BASE}/soundbay"); page.wait_for_selector("[data-testid=branch-row]")
-    inrow = page.evaluate("() => { const r=document.querySelector('.sb-jumprow'); return r ? [...r.querySelectorAll('button,a')].map(b=>(b.textContent+' '+(b.getAttribute('aria-label')||b.title||'')).trim()) : null; }")
-    check(inrow and any("Copy" in t for t in inrow) and any("Play" in t for t in inrow), f"phone: Copy link and Play live in the section bar {inrow}")
+    inrow = page.evaluate("() => { const r=document.querySelector('.sb-h2-actions'); return r ? [...r.querySelectorAll('button,a')].map(b=>(b.textContent+' '+(b.getAttribute('aria-label')||b.title||'')).trim()) : null; }")
+    check(inrow and any("Copy" in t for t in inrow) and any("Shuffle" in t or "Play" in t for t in inrow), f"phone: Copy link and Play live beside the Branches heading {inrow}")
     ctx.close()
     # Studies bar
     for vp, name in [({"width": 1200, "height": 900}, "desktop"), ({"width": 390, "height": 800}, "phone")]:

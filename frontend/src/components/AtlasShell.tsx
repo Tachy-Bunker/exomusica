@@ -15,6 +15,7 @@ import { Faceplate } from "./Faceplate";
 import { Plate } from "./Plate";
 import { Terminal } from "./Terminal";
 import { Landmarks } from "./Landmarks";
+import { PocketPad } from "./PocketPad";
 
 const SECTION_NAME: Record<string, string> = { soundbay: "Soundbay", xenolab: "XenoLab", telemetry: "Telemetry", log: "Log" };
 
@@ -128,6 +129,7 @@ export function AtlasShell() {
         </Panel>
       )}
       <Landmarks focusKey={focusKey} />
+      <PocketPad />
       <Terminal focus={focusEntity} />
     </>
   );

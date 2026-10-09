@@ -1,13 +1,11 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { usePresenceStore } from "../lib/presenceStore";
-import { MailIcon, MailNotificationIcon } from "./Icons";
 import { Avatar } from "./Avatar";
 
 interface LoggedInProps {
   loggedIn: true;
   avatarUrl: string | null;
-  hasUnreadPms: boolean;
   username: string;
   isAdmin: boolean;
 }
@@ -43,9 +41,6 @@ export function MobileAccountHook(props: LoggedInProps | LoggedOutProps) {
                   Admin
                 </Link>
               )}
-              <Link to="/pms" onClick={() => setOpen(false)} style={{ color: "var(--accent-forum)", display: "inline-flex" }}>
-                {props.hasUnreadPms ? <MailNotificationIcon /> : <MailIcon />}
-              </Link>
               <button className="btn" onClick={openDonate}>
                 💛 Donate
               </button>

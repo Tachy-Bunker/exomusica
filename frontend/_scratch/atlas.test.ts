@@ -1,3 +1,4 @@
+import "./winshim";
 import { focusOf, freqOf, showFreq, fuzzyScore, searchEntities, nearestFreq, pushTrail, parseCommand, hrefOf, type Entity } from "../src/lib/atlas";
 import { runCommand, helpText, suggest, type ActionCtx, type Out } from "../src/lib/actions";
 import { addToList, POCKET_MAX } from "../src/lib/pocketStore";

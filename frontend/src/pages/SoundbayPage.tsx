@@ -1,3 +1,5 @@
+import { dragPayload } from "../lib/chatInsert";
+import { branchHref } from "../lib/branchLinks";
 import { PlayGlow } from "../components/PlayGlow";
 import { BranchStudies } from "../components/BranchStudies";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -104,7 +106,7 @@ function BranchRow({ b, open, onToggle, playing }: { b: HomeBranch; open: boolea
   // Pictures not already shown another way: album covers are in the album list, the main image is the logo, the secondary one is a background.
   const gallery = (pictures ?? []).filter((p) => p.kind !== "album-cover" && p.url !== b.image && p.url !== b.secondaryImage).slice(0, 3);
   return (
-    <li className={`sb-row${open ? " open" : ""}${b.seed ? " seed" : ""}${playing ? " playing" : ""}`} style={{ ["--emb" as string]: idn.color }} data-slug={b.slug} data-testid="branch-row">
+    <li draggable onDragStart={(e) => dragPayload(e, b.name, branchHref(b.slug))} className={`sb-row${open ? " open" : ""}${b.seed ? " seed" : ""}${playing ? " playing" : ""}`} style={{ ["--emb" as string]: idn.color }} data-slug={b.slug} data-testid="branch-row">
       <div className="sb-row-main">
         {/* The whole row is the toggle: a real button under the text and links, so a click anywhere that isn't a link or button opens the branch. */}
         <button type="button" className="sb-toggle" aria-expanded={open} aria-controls={`sb-prev-${b.slug}`} aria-label={`${open ? "Collapse" : "Expand"} ${b.name}`} onClick={onToggle} data-testid="preview-toggle" />
@@ -264,13 +266,6 @@ export function SoundbayPage() {
       addToQueue(rest);
     } finally { setBusy(false); }
   }
-  const branchSection = (id: SectionId, title: string, rows: HomeBranch[]) => rows.length > 0 && (
-    <section id={id} className="sb-section" aria-labelledby={`${id}-h`}>
-      <div className="home-h2-row"><h2 id={`${id}-h`} className="home-h2">{title} <span className="home-dim sb-count">{rows.length}</span></h2></div>
-      <ul className="sb-list">{rows.map((b) => <BranchRow key={b.slug} b={b} open={openSlugs.has(b.slug)} onToggle={() => toggle(b.slug)} playing={b.slug === playingSlug} />)}</ul>
-    </section>
-  );
-
   const desktopPage = useIsDesktop();
   const actions = (
         <div className="sb-head-actions">
@@ -280,7 +275,14 @@ export function SoundbayPage() {
           <PlayGlow active={!isPlaying}><button type="button" className="btn btn-primary icon-btn title-btn" onClick={shuffleAll} disabled={busy} aria-label="Shuffle everything" title="Shuffle everything" data-testid="shuffle-all"><PlayIcon size={18} /></button></PlayGlow>
           {MAP_VIEW_ENABLED && <Link className="btn title-btn" to="/?map=full" data-testid="open-map"><MapIcon size={15} /> Explore the map</Link>}
         </div>
+  );  const branchSection = (id: SectionId, title: string, rows: HomeBranch[]) => rows.length > 0 && (
+    <section id={id} className="sb-section" aria-labelledby={`${id}-h`}>
+      <div className="home-h2-row"><h2 id={`${id}-h`} className="home-h2">{title} <span className="home-dim sb-count">{rows.length}</span></h2>{!desktopPage && id === (grown.length ? "sb-branches" : "sb-seeds") && <div className="sb-h2-actions">{actions}</div> /* on a phone the copy-link and shuffle buttons sit at the right of the first section's heading */}</div>
+      <ul className="sb-list">{rows.map((b) => <BranchRow key={b.slug} b={b} open={openSlugs.has(b.slug)} onToggle={() => toggle(b.slug)} playing={b.slug === playingSlug} />)}</ul>
+    </section>
   );
+
+
 
   return (
     <div className="home-page space-page" data-testid="soundbay-page">
@@ -304,7 +306,6 @@ export function SoundbayPage() {
           <nav className="sb-jump" aria-label="Sections">
             {SECTIONS.map((s) => <button key={s.id} type="button" className="sb-jump-btn" aria-current={current === s.id ? "location" : undefined} onClick={() => jump(s.id)} disabled={counts[s.id] === 0} data-testid={`jump-${s.id}`}>{s.label} <span className="space-chip-n">{ready ? counts[s.id] : "…"}</span></button>)}
           </nav>
-          {!desktopPage && actions /* on a phone the two buttons sit at the far right of the section bar, which gains back the header row */}
         </div>
       </div>
 

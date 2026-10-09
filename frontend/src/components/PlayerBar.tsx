@@ -9,7 +9,7 @@ import { useFixedPortalRoot } from "../lib/useFixedPortalRoot";
 import { api } from "../lib/api";
 import { useAuth } from "../lib/auth";
 import { SpecLayer } from "./SpecLayer";
-import { loadStrip, nearbyComments, type Strip, type TrackComment } from "../lib/specStrip";
+import { coverColor, loadStrip, nearbyComments, type Strip, type TrackComment } from "../lib/specStrip";
 import { PreviousIcon, NextIcon, LoopIcon, LoopOneIcon, ExpandIcon, CollapseIcon, ShuffleIcon, QueueIcon } from "./Icons";
 
 function formatTime(seconds: number): string {
@@ -204,6 +204,7 @@ export function PlayerBar() {
   const [pickAt, setPickAt] = useState<number | null>(null);
   const [draft, setDraft] = useState("");
   const [activeId, setActiveId] = useState<number | null>(null);
+  const [tint, setTint] = useState<string | null>(null); // the cover's average colour: the strip's main colour
   const [cErr, setCErr] = useState("");
   const { user } = useAuth();
   useEffect(() => {
@@ -211,6 +212,7 @@ export function PlayerBar() {
     if (trackId == null) return;
     let live = true;
     loadStrip(trackId).then((s) => { if (live) setStrip(s); });
+    setTint(null); void coverColor(currentTrack?.coverArtUrl).then((c) => { if (live) setTint(c); });
     api<TrackComment[]>(`/api/tracks/${trackId}/comments`).then((c) => { if (live) setComments(Array.isArray(c) ? c : []); }).catch(() => {});
     return () => { live = false; };
   }, [trackId]);
@@ -278,7 +280,7 @@ export function PlayerBar() {
         <div className="player-bar-docked">
           <div className={`player-seek-strip${spec ? " has-spec" : ""}`} onClick={handleSeekStripClick}>
             <div className="player-seek-track">
-              {spec ? <SpecLayer strip={spec} pct={progressPct} comments={comments} duration={effectiveDuration} activeId={activeId} onPin={pinClick} /> : <div className="player-seek-fill" style={{ width: `${progressPct}%` }} />}
+              {spec ? <SpecLayer strip={spec} color={tint} pct={progressPct} comments={comments} duration={effectiveDuration} activeId={activeId} onPin={pinClick} /> : <div className="player-seek-fill" style={{ width: `${progressPct}%` }} />}
             </div>
           </div>
           <div
@@ -387,7 +389,7 @@ export function PlayerBar() {
               <span className="mono">{formatTime(seekPreview ?? currentTime)}</span>
               <div className={`player-seek-strip player-seek-strip--expanded${spec ? " has-spec" : ""}`} onClick={(e) => { e.stopPropagation(); handleSeekStripClick(e); if (effectiveDuration) { const r = e.currentTarget.getBoundingClientRect(); setPickAt(Math.max(0, Math.min(1, (e.clientX - r.left) / r.width)) * effectiveDuration); setActiveId(null); } }}>
                 <div className="player-seek-track">
-                  {spec ? <SpecLayer strip={spec} pct={progressPct} comments={comments} duration={effectiveDuration} activeId={activeId} onPin={pinClick} /> : <div className="player-seek-fill" style={{ width: `${progressPct}%` }} />}
+                  {spec ? <SpecLayer strip={spec} color={tint} pct={progressPct} comments={comments} duration={effectiveDuration} activeId={activeId} onPin={pinClick} /> : <div className="player-seek-fill" style={{ width: `${progressPct}%` }} />}
                 </div>
               </div>
               <span className="mono">{formatTime(effectiveDuration)}</span>

@@ -103,20 +103,24 @@ def run(playwright):
     check(o <= 1, f"Phone: no horizontal overflow ({o}px)")
     ctx.close()
 
-    # ---- the Trace lens as a scan
+    # ---- the Scan Visor: no dialog, a grid over the page, write anywhere
     ctx = new_ctx(); page = ctx.new_page(); watch(page)
     page.evaluate("0"); page.goto(f"{BASE}/study/mine-1"); page.evaluate("localStorage.setItem('exomusica_lens','1')"); page.reload()
     page.wait_for_selector("[data-testid=landmarks]"); page.wait_for_selector("[data-testid=landmark]")
     t = page.locator("[data-testid=landmarks]").inner_text()
-    check("LONG-RANGE SCAN" in t and "MHz" in t and page.locator("[data-testid=lm-count]").inner_text() == "3", "Lens: scan header, sector frequency, contact count")
-    check(page.locator("[data-testid=landmarks] .scope-sweep").count() == 1 and page.locator("[data-testid=landmark]").count() == 3, "Lens: scope with a sweep and one blip per beacon")
-    xs = set(page.locator("[data-testid=landmark]").evaluate_all("els => els.map(e => e.style.left + e.style.top)"))
-    check(len(xs) == 3, "Lens: blips sit at different places")
-    page.locator("[data-testid=landmark]").nth(2).click()
-    check("decays in" in page.locator("[data-testid=landmark-open]").inner_text(), "Lens: opening a blip shows its decay time")
-    check(page.locator("[data-testid=leave-mark]").get_attribute("href").startswith("/pms?at=study%3Amine-1"), "Lens: dropping a beacon goes to the Post page")
+    check("SCAN VISOR" in t and page.locator("[data-testid=lm-count]").inner_text() == "3", "Visor: HUD with the sector's trace count")
+    check(page.locator("[data-testid=visor-grid]").count() == 1 and page.locator("[data-testid=landmark]").count() == 3, "Visor: a grid over the page and one beacon per trace")
+    xs = set(page.locator("[data-testid=landmark]").evaluate_all("els => els.map(e => e.parentElement.style.left + e.parentElement.style.top)"))
+    check(len(xs) == 3, "Visor: beacons sit at different places")
+    page.locator("[data-testid=landmark]").nth(2).dispatch_event("click")
+    check("fades in" in page.locator("[data-testid=landmark-open]").inner_text(), "Visor: opening a beacon shows when it fades")
+    check(page.locator("[data-testid=leave-mark]").get_attribute("href").startswith("/pms?at=study%3Amine-1"), "Visor: drawing one goes to the Post page")
+    page.click("[data-testid=visor-write]"); page.mouse.click(300, 420); page.wait_for_selector("[data-testid=visor-note-input]")
+    page.fill("[data-testid=visor-note-input]", "a low drone lives here"); page.click("[data-testid=visor-note-send]"); page.wait_for_timeout(300)
+    last = posts[-1]
+    check(last.get("at") == "study:mine-1" and isinstance(last.get("x"), (int, float)) and last["y"] > 300, f"Visor: writing anywhere posts the spot ({last.get('x')}, {last.get('y')})")
     page.click("[data-testid=leave-mark]"); page.wait_for_selector("[data-testid=comp-sheet]")
-    check(page.locator("[data-testid=mode-msg]").count() == 0, "Post: a beacon is letter-only (no message tab)")
+    check(page.locator("[data-testid=mode-msg]").count() == 0, "Post: a trace is letter-only (no message tab)")
     ctx.close()
 
     check(not errors, "no page errors: " + "; ".join(errors[:3]))

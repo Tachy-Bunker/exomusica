@@ -1,0 +1,15 @@
+import { unpackPoints, rampFor, STRIP_BYTES, STRIP_W, STRIP_H } from "../src/lib/specStrip";
+let n = 0; const ok = (c: boolean, m: string) => { if (!c) { console.log("FAIL", m); process.exitCode = 1; } else { n++; console.log("ok  ", m); } };
+ok(STRIP_BYTES === 2500 && STRIP_W * STRIP_H === 5000, "250 x 20 points, 2500 bytes");
+const b = new Uint8Array(STRIP_BYTES); b[0] = 0xf3; b[STRIP_BYTES - 1] = 0x0a;
+const u = unpackPoints(b)!; ok(u[0] === 15 && u[1] === 3 && u[4998] === 0 && u[4999] === 10, "two 4-bit points per byte, high half first");
+ok(unpackPoints(new Uint8Array(40000)) === null && unpackPoints(new Uint8Array(3)) === null, "the old picture size and junk are refused");
+const warm = rampFor("#c0392b"), grey = rampFor("#808080");
+const lum = (r: Uint8Array, i: number) => r[i * 3] * 0.3 + r[i * 3 + 1] * 0.59 + r[i * 3 + 2] * 0.11;
+let up = true; for (let i = 1; i < 16; i++) if (lum(warm, i) < lum(warm, i - 1)) up = false;
+ok(warm.length === 48 && up, "the ramp brightens level by level");
+ok(lum(warm, 0) < 30 && lum(warm, 15) > 120, "dark at 0, lit at the top");
+ok(warm[8 * 3] > warm[8 * 3 + 2], "a red cover gives a red-ish middle");
+ok(Math.abs(grey[8 * 3] - grey[8 * 3 + 1]) < 4 && Math.abs(grey[8 * 3 + 1] - grey[8 * 3 + 2]) < 4, "a grey cover stays neutral, not tinted");
+ok(rampFor("nonsense").length === 48 && rampFor(null).length === 48, "no usable colour: the site's own gradient");
+console.log(n, "passed");
