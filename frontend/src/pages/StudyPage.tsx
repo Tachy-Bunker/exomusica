@@ -26,6 +26,7 @@ import { VoiceNoteRecorder, type FinishedVoiceNote } from "../components/VoiceNo
 import { uploadedFileUrls } from "../lib/studyFiles";
 import { useDocumentTitle } from "../lib/useDocumentTitle";
 import { useToastStore } from "../lib/toastStore";
+import { LogLinks } from "../components/LogLinks";
 import { StudyChartView } from "../components/StudyChartView";
 
 interface Annotation {
@@ -376,6 +377,7 @@ export function StudyPage() {
   return (
     <div className="page-column study-page" style={{ maxWidth: editing ? 1280 : 720 }}>
       {study.backgroundUrl && <img className="study-bg" style={{ ["--bgo" as string]: bgPreview !== undefined ? (bgPreview ?? undefined) : (study.backgroundOpacity ?? undefined) }} src={study.backgroundUrl} alt="" decoding="async" draggable={false} data-testid="study-bg" />}
+      {!editing && slug && <LogLinks studySlug={slug} />}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "1rem" }}>
         {editing ? (
           <input value={draftTitle} onChange={(e) => setDraftTitle(e.target.value)} style={{ fontSize: "1.4rem", flex: 1, minWidth: 0 }} />

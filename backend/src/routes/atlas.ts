@@ -97,13 +97,15 @@ async function around(type: EntityType, id: string): Promise<Around | null> {
       });
       if (!s) return null;
       const branchIds = s.branches.map((b) => b.id);
+      // Log pages that link to this study, so you can step back into the Log from here (the page you came from is in the trail; these are the others)
+      const mentions = await prisma.wikiPage.findMany({ where: { contentMarkdown: { contains: `/study/${id}` } }, select: { slug: true, title: true }, take: 3, orderBy: { updatedAt: "desc" } });
       const [sameBranch, sameOwner] = await Promise.all([
         branchIds.length ? prisma.study.findMany({ where: { slug: { not: id }, branches: { some: { id: { in: branchIds } } } }, select: { slug: true, title: true, backgroundUrl: true }, take: 4, orderBy: { updatedAt: "desc" } }) : [],
         prisma.study.findMany({ where: { slug: { not: id }, ownerId: s.ownerId }, select: { slug: true, title: true, backgroundUrl: true }, take: 3, orderBy: { updatedAt: "desc" } }),
       ]);
       return {
         title: s.title,
-        context: s.branches.map((b) => mk("branch", b.slug, b.name, "branch", b.identityImageUrl ?? b.coverArtUrl)),
+        context: [...s.branches.map((b) => mk("branch", b.slug, b.name, "branch", b.identityImageUrl ?? b.coverArtUrl)), ...mentions.map((w) => mk("wiki", w.slug, w.title, "in the Log"))],
         conversation: [s.channel && chatRef(s.channel)].filter((x): x is ChatRef => !!x),
         neighbors: [
           ...sameBranch.map((x) => mk("study", x.slug, x.title, "same branch", x.backgroundUrl)),

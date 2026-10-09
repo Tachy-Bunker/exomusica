@@ -72,10 +72,10 @@ def run(playwright):
     # ---- Dock open: relations move into the faceplate; pocket → chat
     ctx = new_ctx(); page = ctx.new_page(); watch(page)
     page.goto(f"{BASE}/study/mine-1"); page.wait_for_selector("[data-testid=margin-chat]")
-    check(page.locator("[data-testid=margins-right]").count() == 1, "Dock closed: nearby sits at the screen edge")
+    check(page.locator("[data-testid=margins-right]").count() == 0 and page.locator("[data-testid=fp-rel-near]").count() == 1, "Dock closed: nearby is in the faceplate, not on the page edge")
     page.click("[data-testid=margin-chat]"); page.wait_for_selector("textarea.hud-reveal-textarea")
     page.wait_for_selector("[data-testid=fp-rels]")
-    check(page.locator("[data-testid=margins-right]").count() == 0 and page.locator("[data-testid=margins-left]").count() == 0, "Dock open: edge margins are gone")
+    check(page.locator("[data-testid=margins-right]").count() == 0, "Dock open: still no edge margins")
     near = page.locator("[data-testid=fp-rel-near]")
     check(near.count() == 1, "Dock open: Nearby is in the faceplate")
     page.hover("[data-testid=fp-rel-near] .fp-rel-btn"); page.wait_for_timeout(150)
@@ -85,7 +85,9 @@ def run(playwright):
     check(drop.is_visible() and top, "Hover: the list drops down and is on top of the page")
     if __import__("os").environ.get("SHOT"): page.screenshot(path="/tmp/shot_dock.png")
     fb = page.locator("[data-testid=fp-pocket]").bounding_box()
-    check(fb["x"] + fb["width"] <= dock_left + 2, f"Faceplate buttons stay left of the chat panel ({fb['x'] + fb['width']:.0f} <= {dock_left:.0f})")
+    fp = page.locator("[data-testid=faceplate]").bounding_box()
+    dock_top = page.evaluate("document.querySelector('textarea.hud-reveal-textarea').closest('div[style*=fixed]').getBoundingClientRect().top")
+    check(fp["width"] > 1300 and fp["y"] + fp["height"] <= dock_top + 2, f"Faceplate keeps its full width, and the dock starts below it (w {fp['width']:.0f}, bottom {fp['y'] + fp['height']:.0f} <= {dock_top:.0f})")
     page.mouse.move(10, 600); page.wait_for_timeout(150)
     check(not drop.is_visible(), "Moving away closes it")
     # pocket: paste button

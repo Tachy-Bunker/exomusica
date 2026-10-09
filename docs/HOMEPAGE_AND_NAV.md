@@ -326,3 +326,13 @@ Phase 1 (this delivery), idea 4:
 - **Strip** (`ChatStrip`, `lib/chatStrip.ts`): a 12px strip beside the message list when the list scrolls itself (dock, phone, topic pages) with 8+ messages. Each message is painted where it sits in the list; brightness along the site gradient = loudness (length, reactions, structured cards, files, links to things); the left lane is orange for your messages. The lit window shows what is on screen; click or drag to travel. A white line marks the first unread. Measured and painted once per change (a rAF, one `getBoundingClientRect` pass, one 10×240 canvas), scrolling only moves one CSS box.
 - **Catch-up reel** (`CatchUp`): reopening a channel with 10+ new messages from others shows how many, who spoke, and three highlights (most reacted, structured, substantial; deterministic, no AI), plus First unread / Skip to live / dismiss.
 - **Where you left off** is stored per channel **on this device** (`exomusica_seen_<slug>`), advanced when you reach the bottom or leave. No schema change; it will not follow you across devices (a server read-state table is the follow-up if wanted). First visit shows no reel. Capped by the 100 loaded messages ("100+").
+
+## fix292 — Seven fixes
+
+- **Squelch** is off screen by default; a ⌁ button in the chat toolbar opens it. It stays visible while a level other than "open" is set, and hides itself when set back to open.
+- **Faceplate with the dock open** keeps its full width (the fix289 padding was wasted space). The dock starts below it.
+- **"You were here" / "Nearby"** now live in the middle of the faceplate on every wide screen (hover to drop down), not on the page edges, so they can no longer sit over the Log's columns, admin columns or the collapsed chat latch. The edge margins are removed.
+- **Around / Pocket on a phone** are bottom sheets over a dimmed backdrop (tap it to close) with a visible "Close ×" in a sticky header. On wide screens the same header gives the dropdown a visible close.
+- **Telemetry on a phone:** List / Instrument / Map sit in the header row between the members button and the stats; the controls row loses a line. Wide screens unchanged.
+- **QR dialog** renders in `document.body` (z 200). Inside `main` it sat in the page's transformed stacking context, below the sticky bars.
+- **Study → Log:** a "← <Log page you came from>" chip, other Log pages that link to the study (found by the study's address in their text; `atlas/around` now returns them as context, so they also show in the faceplate "in" chips and the Around sheet), and "The Log". No schema change.

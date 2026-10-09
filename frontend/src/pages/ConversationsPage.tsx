@@ -13,6 +13,7 @@ import { timeAgo } from "../lib/relativeTime";
 import { countByKind, filterConversations, groupForList, KIND_LABEL, SIGNAL_LABEL, sortConversations, normalizeConversations, type ConversationFilter, type ConversationSort, type ConversationsData } from "../lib/spaceHubs";
 import { useDocumentTitle } from "../lib/useDocumentTitle";
 import { useIsDesktop } from "../lib/useIsDesktop";
+import { useNarrow } from "../lib/useNarrow";
 import { useLivePoll } from "../lib/livePoll";
 import { useOpenInDock } from "../lib/useOpenInDock";
 import { useUrlParams } from "../lib/useUrlParams";
@@ -38,6 +39,7 @@ const HOUR = 3_600_000;
 export function ConversationsPage() {
   useDocumentTitle("Telemetry");
   const isDesktop = useIsDesktop();
+  const phone = useNarrow(760); // on a phone the view switch sits in the header, between the members button and the stats
   const { data: first, failed } = useLoaded(loadConversations);
   const [data, setData] = useState<ConversationsData | null>(null);
   const [refreshing, setRefreshing] = useState(false);
@@ -77,19 +79,23 @@ export function ConversationsPage() {
   const hereNow = useMemo(() => [...viewers.values()].reduce((n, v) => n + v.length, 0), [viewers]);
   const now = tick;
 
+  const viewSwitch = (
+    <div className="view-switch" role="group" aria-label="How to show conversations">
+      {VIEWS.map((v) => <button key={v.id} type="button" aria-pressed={view === v.id} onClick={() => setParam("view", v.id, "list")} data-testid={`view-${v.id}`}>{v.label}</button>)}
+    </div>
+  );
   return (
     <div className="home-page space-page" data-testid="conversations-page">
       <header className="conv-head">
         <h1>Telemetry</h1>
         <Link className="conv-members" to="/members" aria-label="Members" title="Members" data-testid="conv-members"><MemberAddIcon size={22} /></Link>
+        {phone && viewSwitch}
         {data && <MissionStatus data={data} hereNow={hereNow} now={now} />}
       </header>
 
       <section aria-label="Find a conversation">
         <div className="space-controls conv-controls">
-          <div className="view-switch" role="group" aria-label="How to show conversations">
-            {VIEWS.map((v) => <button key={v.id} type="button" aria-pressed={view === v.id} onClick={() => setParam("view", v.id, "list")} data-testid={`view-${v.id}`}>{v.label}</button>)}
-          </div>
+          {!phone && viewSwitch}
           {view !== "map" && (
             <>
               <input type="search" className="space-search" placeholder="Search conversations" aria-label="Search conversations" value={query} onChange={(e) => setParam("q", e.target.value, "")} data-testid="conv-search" />

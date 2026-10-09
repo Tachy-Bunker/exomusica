@@ -5576,10 +5576,7 @@ th {
 .landmarks-what .linklike { margin-left: 0.4rem; }
 
 /* Faceplate centre: "you were here" / "nearby" while the chat dock holds the screen edge */
-@media (min-width: 900px) {
-  .faceplate { padding-right: calc(var(--dock-offset, 0px) + 1.5rem); }
-  .faceplate.has-center { z-index: 46; }
-}
+.faceplate.has-center { z-index: 46; }
 .fp-rels { display: inline-flex; gap: 0.3rem; }
 .fp-rel { position: relative; }
 .fp-rel-drop { display: none; position: absolute; top: 100%; left: 50%; transform: translateX(-50%); width: 280px; max-height: min(70vh, 480px); overflow: auto; padding: 0.4rem 0.5rem 0.5rem; margin-top: 2px; background: var(--bg-elevated); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: 0 14px 36px rgba(0,0,0,0.55); z-index: 70; flex-direction: column; gap: 0.35rem; }
@@ -5624,3 +5621,28 @@ th {
 .catchup li button { display: block; width: 100%; text-align: left; background: none; border: 0; padding: 0.15rem 0; color: var(--text); font: inherit; cursor: pointer; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .catchup li button:hover { color: var(--accent-forum); }
 .catchup-actions { display: flex; gap: 0.4rem; }
+
+/* Telemetry on a phone: List / Instrument / Map live in the header row, which gives the vertical space back */
+@media (max-width: 760px) {
+  .conv-head { gap: 0.4rem; }
+  .conv-head .view-switch { height: 2.2rem; flex: none; }
+  .conv-head .view-switch button { padding: 0.2rem 0.5rem; min-height: 0; font-size: 0.76rem; }
+}
+
+/* Around / Pocket: a visible way out. Phones get a bottom sheet over a dimmed backdrop. */
+.fp-backdrop { display: none; }
+.fp-panel-head { display: flex; align-items: center; justify-content: space-between; position: sticky; top: -0.6rem; margin: -0.6rem -0.7rem 0.2rem; padding: 0.5rem 0.7rem; background: var(--bg-elevated); border-bottom: 1px solid var(--border); z-index: 1; }
+.fp-panel-x { background: transparent; border: 1px solid var(--border); border-radius: 999px; color: var(--text); font: inherit; font-size: 0.8rem; padding: 0.2rem 0.7rem; min-height: 32px; cursor: pointer; }
+.fp-panel-x:hover, .fp-panel-x:focus-visible { border-color: var(--accent-forum); color: var(--accent-forum); }
+@media (max-width: 899px) {
+  .fp-backdrop { display: block; position: fixed; inset: 0; z-index: 59; background: rgba(0, 0, 0, 0.5); }
+  .fp-panel { top: auto; bottom: 0; left: 0; right: 0; width: 100%; max-height: 72vh; border-radius: 14px 14px 0 0; border-bottom: 0; padding-bottom: calc(0.8rem + env(safe-area-inset-bottom, 0px)); }
+  .fp-panel-x { min-height: 40px; padding: 0.3rem 0.9rem; }
+}
+
+/* Study → Log */
+.log-links { display: flex; flex-wrap: wrap; align-items: center; gap: 0.35rem; margin: 0 0 0.5rem; font-size: 0.8rem; }
+.log-back, .log-chip { padding: 0.15rem 0.65rem; border: 1px solid var(--border); border-radius: 999px; color: var(--text); text-decoration: none; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.log-back { border-color: var(--accent-forum); color: var(--accent-forum); }
+.log-all { color: var(--text-dim); }
+.log-back:hover, .log-chip:hover, .log-back:focus-visible, .log-chip:focus-visible { border-color: var(--accent-audio); color: var(--accent-audio); }

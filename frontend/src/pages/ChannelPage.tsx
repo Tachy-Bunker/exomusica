@@ -381,6 +381,7 @@ export function ChannelPage({ channelSlug, fillHeight, parentControlsHeight }: {
   const [emojiQuery, setEmojiQuery] = useState<string | null>(null);
   const [mentionQuery, setMentionQuery] = useState<string | null>(null);
   const [reel, setReel] = useState<Reel | null>(null);
+  const [showSquelch, setShowSquelch] = useState(false);
   const [entTrig, setEntTrig] = useState<EntityTrigger | null>(null);
   const [entSel, setEntSel] = useState(0);
   const atlasIndex = useIndex(entTrig !== null);
@@ -961,6 +962,7 @@ export function ChannelPage({ channelSlug, fillHeight, parentControlsHeight }: {
                 {following ? "Following ✓" : "Follow"}
               </button>
             )}
+            <button type="button" className={`btn${showSquelch || squelch.level > 0 ? " active" : ""}`} onClick={() => setShowSquelch((v) => !v)} aria-pressed={showSquelch || squelch.level > 0} title="Squelch: hear less of the room" aria-label="Squelch" data-testid="squelch-toggle">⌁</button>
             <button className="btn" onClick={toggleDisplayMode} title={displayMode === "grouped" ? "Switch to standard view" : "Switch to grouped view"}>
               👁
             </button>
@@ -988,13 +990,13 @@ export function ChannelPage({ channelSlug, fillHeight, parentControlsHeight }: {
       )}
 
 
-      <div className="squelch" data-testid="squelch" role="group" aria-label="Squelch: how much of the room to hear">
+      {(showSquelch || squelch.level > 0) && <div className="squelch" data-testid="squelch" role="group" aria-label="Squelch: how much of the room to hear">
         <span className="squelch-label">Squelch</span>
         {[0, 1, 2, 3].map((l) => (
           <button key={l} type="button" className={`squelch-step${squelch.level === l ? " on" : ""}`} aria-pressed={squelch.level === l} title={LEVEL_NOTE[l]} onClick={() => squelch.set(l as 0 | 1 | 2 | 3)} data-testid={`squelch-${l}`}>{["open", "quiet", "signal", "calls"][l]}</button>
         ))}
         {squelch.level > 0 && <span className="home-dim squelch-note" data-testid="squelch-held">{heldBack} held back · {LEVEL_NOTE[squelch.level]}</span>}
-      </div>
+      </div>}
       {reel && mode === "live" && <CatchUp reel={reel} onClose={() => setReel(null)}
         onPick={(m) => { document.getElementById(`m-${m.id}`)?.scrollIntoView({ block: "center" }); setReel(null); }}
         onFirst={() => { document.getElementById(`m-${reel.firstId}`)?.scrollIntoView({ block: "start" }); }}

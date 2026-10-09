@@ -63,7 +63,7 @@ def run(playwright):
     check(votes[-1] == {"option": 1} and page.locator("[data-testid=card-poll] .poll-n").all_inner_texts() == ["1", "3"], "Poll: vote sent, counts appear")
     # squelch
     n0 = page.locator(".message").count()
-    page.click("[data-testid=squelch-1]"); page.wait_for_timeout(200)
+    page.click("[data-testid=squelch-toggle]"); page.click("[data-testid=squelch-1]"); page.wait_for_timeout(200)
     t = page.locator(".message-list").inner_text()
     check("lol" not in t and "second movement" in t, "Squelch quiet: one-liners held back, real messages stay")
     check(page.locator("[data-testid=squelch-held]").inner_text().startswith("1 held back"), "Squelch: says how many are held back")

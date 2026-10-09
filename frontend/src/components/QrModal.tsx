@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { drawQr, qrToSvg, QR_DEFAULTS } from "../lib/qrStyle";
 import { useToastStore } from "../lib/toastStore";
 
@@ -127,8 +128,8 @@ export function QrModal({ url, title, candidateImages = [], onClose }: Props) {
     download(new Blob([svg], { type: "image/svg+xml" }), "exomusica-qr.svg");
   }
 
-  return (
-    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", zIndex: 50, display: "flex", alignItems: "center", justifyContent: "center", overflowY: "auto" }} onClick={onClose}>
+  return createPortal(
+    <div role="dialog" aria-modal="true" aria-label="QR code" data-testid="qr-modal" style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", zIndex: 200, display: "flex", alignItems: "center", justifyContent: "center", overflowY: "auto" }} onClick={onClose}>
       <div onClick={(e) => e.stopPropagation()} style={{ background: "var(--bg-elevated)", border: "1px solid var(--border)", borderRadius: "var(--radius)", padding: "1rem", maxWidth: 560, width: "92%", margin: "1rem" }}>
         <h3 style={{ marginTop: 0 }}>QR code · {title}</h3>
         <div style={{ display: "flex", gap: "1rem", flexWrap: "wrap" }}>
@@ -190,6 +191,7 @@ export function QrModal({ url, title, candidateImages = [], onClose }: Props) {
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

@@ -34,10 +34,19 @@ function Panel({ label, onClose, children, testid }: { label: string; onClose: (
     document.addEventListener("keydown", onKey);
     return () => { document.removeEventListener("mousedown", onDown); document.removeEventListener("keydown", onKey); };
   }, [onClose]);
-  return <div className="fp-panel" ref={ref} role="dialog" aria-label={label} data-testid={testid}>{children}</div>;
+  // On a phone this is a sheet from the bottom: a dimmed backdrop (tap it to close) and a close button that is always visible.
+  return (
+    <>
+      <div className="fp-backdrop" onClick={onClose} aria-hidden="true" data-testid="fp-backdrop" />
+      <div className="fp-panel" ref={ref} role="dialog" aria-label={label} data-testid={testid}>
+        <div className="fp-panel-head"><b>{label}</b><button type="button" className="fp-panel-x" onClick={onClose} aria-label={`Close ${label}`} data-testid="fp-panel-close">Close ×</button></div>
+        {children}
+      </div>
+    </>
+  );
 }
 
-/** With the chat dock open the screen edges are taken, so "you were here" and "nearby" move into the middle of the faceplate and drop down on hover, over everything. */
+/** "You were here" and "nearby", in the middle of the faceplate on wide screens; they drop down on hover, over everything, and never sit over a page's own columns. */
 function Relations({ there, neighbors }: { there: { type: Entity["type"]; id: string; title: string }[]; neighbors: Peek[] }) {
   const groups = [
     { id: "there", label: "You were here", n: there.length, body: there.map((t) => <Plate key={`${t.type}:${t.id}`} peek={peekOf({ type: t.type, id: t.id, title: t.title })} edge="left"><Take e={t} /></Plate>) },
@@ -69,7 +78,6 @@ export function AtlasShell() {
   const [sheet, setSheet] = useState(false);
   const section = sectionOf(loc.pathname);
   const isDesktop = useIsDesktop();
-  const docked = useChatDockStore((s) => !!s.openChannelSlug && !s.collapsed) && isDesktop;
 
   useEffect(() => { noteFocus(focusKey); }, [focusKey]);
   useEffect(() => {
@@ -86,15 +94,9 @@ export function AtlasShell() {
 
   return (
     <>
-      <Faceplate focus={focus} section={section ? SECTION_NAME[section] : null} around={around} aroundCount={aroundCount} onAround={() => { setSheet((s) => !s); pocket.setOpen(false); }} center={docked ? <Relations there={there.slice(0, 6)} neighbors={neighbors.slice(0, 8)} /> : undefined} />
+      <Faceplate focus={focus} section={section ? SECTION_NAME[section] : null} around={around} aroundCount={aroundCount} onAround={() => { setSheet((s) => !s); pocket.setOpen(false); }} center={isDesktop ? <Relations there={there.slice(0, 6)} neighbors={neighbors.slice(0, 8)} /> : undefined} />
 
-      {/* Wide screens: what is just outside this page sits at its edges. Left: where you came from. Right: what is nearby. Bottom: the conversation. */}
-      {!docked && <aside className="margins margins-left" aria-label="Where you came from" data-testid="margins-left">
-        {there.slice(0, 5).map((t) => <Plate key={`${t.type}:${t.id}`} peek={peekOf({ type: t.type, id: t.id, title: t.title })} note="you were here" edge="left"><Take e={t} /></Plate>)}
-      </aside>}
-      {!docked && <aside className="margins margins-right" aria-label="Nearby" data-testid="margins-right">
-        {neighbors.slice(0, 7).map((n) => <Plate key={n.key} peek={n} edge="right"><Take e={n} /></Plate>)}
-      </aside>}
+      {/* Wide screens: "you were here" and "nearby" sit in the middle of the faceplate (hover to drop them down); the conversation is the button at the bottom. */}
       {chat && (
         <button type="button" className="margin-chat" onClick={() => startChat(chat)} data-testid="margin-chat" aria-label={`Open the conversation: ${chat.name}`}>
           <span aria-hidden="true">💬</span> {chat.name}
@@ -112,7 +114,6 @@ export function AtlasShell() {
       )}
       {pocket.open && (
         <Panel label="Pocket" onClose={() => pocket.setOpen(false)} testid="pocket-tray">
-          <h3>Pocket</h3>
           {pocket.items.length === 0 ? <p className="dim">{operator.pocketEmpty}</p> : pocket.items.map((p) => (
             <Plate key={p.key} peek={peekOf({ type: p.type, id: p.id, title: p.title })} edge="top" onPick={() => { setArrival("top"); pocket.setOpen(false); }}>
               {hasComposer() && <button type="button" className="plate-take plate-send" onClick={() => insertIntoChat(chatLinkText(p.title, hrefOf(p.type, p.id)))} aria-label={`Paste ${p.title} into the chat`} title="Paste into the chat" data-testid="pocket-send">↵</button>}
