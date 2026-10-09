@@ -3,6 +3,7 @@ import { uploadChatAttachment, voiceNoteFilename } from "../lib/voiceNoteUpload"
 import { useEffect, useRef, useState, useCallback, useContext, createContext, type ChangeEvent, type ClipboardEvent, type DragEvent, type FormEvent } from "react";
 import { Link, useParams, useSearchParams, useNavigate } from "react-router-dom";
 import { api } from "../lib/api";
+import { useToastStore } from "../lib/toastStore";
 import { CHAT_INSERT, LINK_MIME, spliceAt, chatLinkText, dragPayload } from "../lib/chatInsert";
 import { entityHits, entityMarkdown, entityTrigger, type EntityTrigger } from "../lib/chatEntities";
 import { useIndex } from "../lib/useAtlas";
@@ -768,6 +769,24 @@ export function ChannelPage({ channelSlug, fillHeight, parentControlsHeight }: {
   }
   const putRef = useRef(putInDraft);
   putRef.current = putInDraft;
+  // "Send my draft to that room" from the room list or Alt+Shift+Enter: posts the unsent draft there and keeps you here.
+  const draftRef = useRef(draft); draftRef.current = draft;
+  useEffect(() => {
+    function onWhisper(ev: Event) {
+      const d = (ev as CustomEvent<{ slug: string; name: string; handled: boolean }>).detail;
+      if (d.handled || !textareaRef.current || textareaRef.current.offsetParent === null) return;
+      d.handled = true;
+      const text = draftRef.current;
+      const toast = useToastStore.getState().showToast;
+      if (!text.trim()) { toast("Nothing to send: write something first."); return; }
+      if (d.slug === slug) { toast("You are already in that room."); return; }
+      api(`/api/channels/${encodeURIComponent(d.slug)}/messages`, { method: "POST", body: JSON.stringify({ contentRaw: text }) })
+        .then(() => { setDraft(""); toast(`Sent to ${d.name}.`); })
+        .catch(() => toast(`Couldn't send it to ${d.name}.`));
+    }
+    window.addEventListener("exomusica:whisper", onWhisper);
+    return () => window.removeEventListener("exomusica:whisper", onWhisper);
+  }, [slug]);
   useEffect(() => {
     function onInsert(ev: Event) {
       const d = (ev as CustomEvent<{ text: string; handled: boolean }>).detail;

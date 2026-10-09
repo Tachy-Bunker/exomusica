@@ -2,6 +2,7 @@ import { useState, type ReactNode } from "react";
 import { useEmojiStore } from "./emojiStore";
 import { entityOfPath } from "./chatEntities";
 import { EntityChip } from "../components/EntityChip";
+import { parseBlocks, isAudioUrl, isLocalImage } from "./messageBlocks";
 
 function Spoiler({ children }: { children: ReactNode }) {
   const [revealed, setRevealed] = useState(false);
@@ -23,7 +24,7 @@ function Spoiler({ children }: { children: ReactNode }) {
 
 // Order matters: bold must be tried before italic since both use `*`.
 const INLINE_PATTERN =
-  /\*\*(.+?)\*\*|\*(.+?)\*|__(.+?)__|~~(.+?)~~|`([^`]+?)`|\|(.+?)\||\[(.+?)\]\((https?:\/\/[^\s)]+)\)|<t:(\d+)>|<@&(\d+)>|<@(\d+)>|<#(\d+)>|:([a-z0-9_]+):|(https?:\/\/[^\s<>()]+)/g;
+  /\*\*(.+?)\*\*|\*(.+?)\*|__(.+?)__|~~(.+?)~~|`([^`]+?)`|\|(.+?)\||\[(.+?)\]\((https?:\/\/[^\s)]+)\)|<t:(\d+)>|<@&(\d+)>|<@(\d+)>|<#(\d+)>|:([a-z0-9_]+):|(https?:\/\/[^\s<>()]+)|!\[([^\]]*)\]\(((?:https?:\/\/|\/)[^\s)]+)\)/g;
 
 // NOTE: mentions/channel refs render with the raw id for now - resolving
 // them to real names needs a bulk id->name lookup endpoint that doesn't
@@ -71,7 +72,7 @@ function renderInline(
     if (match.index === undefined) continue;
     if (match.index > lastIndex) nodes.push(text.slice(lastIndex, match.index));
     const key = `${keyPrefix}-${i++}`;
-    const [, bold, italic, underline, strike, code, spoiler, linkText, linkUrl, timestamp, roleId, userId, channelId, emojiName, bareUrl] =
+    const [, bold, italic, underline, strike, code, spoiler, linkText, linkUrl, timestamp, roleId, userId, channelId, emojiName, bareUrl, imgAlt, imgUrl] =
       match;
 
     if (bold !== undefined) nodes.push(<strong key={key}>{renderInline(bold, key, onLinkClick, mentionCache)}</strong>);
@@ -137,7 +138,13 @@ function renderInline(
           match[0]
         ),
       );
-    } else if (bareUrl !== undefined)
+    } else if (imgUrl !== undefined) {
+      nodes.push(isLocalImage(imgUrl, window.location.origin)
+        ? <img key={key} className="msg-img" src={imgUrl} alt={imgAlt ?? ""} loading="lazy" decoding="async" />
+        : <a key={key} href={imgUrl} target="_blank" rel="noreferrer noopener" onClick={linkClickHandler(imgUrl)}>{imgAlt || imgUrl}</a>);
+    } else if (bareUrl !== undefined && isAudioUrl(bareUrl))
+      nodes.push(<audio key={key} className="msg-audio" controls preload="none" src={bareUrl} />);
+    else if (bareUrl !== undefined)
       nodes.push(
         <a key={key} href={bareUrl} target="_blank" rel="noreferrer" onClick={linkClickHandler(bareUrl)}>
           {bareUrl}
@@ -155,42 +162,28 @@ export function renderMessageContent(
   onLinkClick?: (url: string) => void,
   mentionCache?: Map<string, { username: string; avatarUrl: string | null }>,
 ): ReactNode {
-  const lines = text.split("\n");
+  const blocks = parseBlocks(text);
+  const inl = (t: string, k: string) => renderInline(t, k, onLinkClick, mentionCache);
   return (
     <>
-      {lines.map((line, idx) => {
-        if (line.startsWith("## "))
-          return (
-            <h3 key={idx} style={{ margin: "0.3em 0", fontSize: "1.1rem" }}>
-              {renderInline(line.slice(3), `h${idx}`, onLinkClick, mentionCache)}
-            </h3>
-          );
-        if (line.startsWith("-# "))
-          return (
-            <p key={idx} style={{ fontSize: "0.75em", color: "var(--text-dim)", margin: "0.2em 0" }}>
-              {renderInline(line.slice(3), `s${idx}`, onLinkClick, mentionCache)}
-            </p>
-          );
-        if (line.startsWith("> "))
-          return (
-            <blockquote
-              key={idx}
-              style={{
-                borderLeft: "2px solid var(--border)",
-                margin: "0.2em 0",
-                paddingLeft: "0.6em",
-                color: "var(--text-dim)",
-              }}
-            >
-              {renderInline(line.slice(2), `q${idx}`, onLinkClick, mentionCache)}
-            </blockquote>
-          );
-        if (line.trim() === "") return <br key={idx} />;
-        return (
-          <p key={idx} style={{ margin: "0.2em 0" }}>
-            {renderInline(line, `p${idx}`, onLinkClick, mentionCache)}
-          </p>
-        );
+      {blocks.map((b, idx) => {
+        switch (b.t) {
+          case "code": return <pre key={idx} className="msg-code" data-lang={b.lang || undefined}><code>{b.text}</code></pre>;
+          case "hr": return <hr key={idx} className="msg-hr" />;
+          case "list": {
+            const Tag = b.ordered ? "ol" : "ul";
+            return <Tag key={idx} className="msg-list">{b.items.map((it, j) => <li key={j}>{inl(it, `l${idx}-${j}`)}</li>)}</Tag>;
+          }
+          case "head": {
+            const size = b.level === 1 ? "1.3rem" : b.level === 2 ? "1.1rem" : "1rem";
+            const H = b.level === 1 ? "h2" : b.level === 2 ? "h3" : "h4";
+            return <H key={idx} style={{ margin: "0.3em 0", fontSize: size }}>{inl(b.text, `h${idx}`)}</H>;
+          }
+          case "small": return <p key={idx} style={{ fontSize: "0.75em", color: "var(--text-dim)", margin: "0.2em 0" }}>{inl(b.text, `s${idx}`)}</p>;
+          case "quote": return <blockquote key={idx} style={{ borderLeft: "2px solid var(--border)", margin: "0.2em 0", paddingLeft: "0.6em", color: "var(--text-dim)" }}>{inl(b.text, `q${idx}`)}</blockquote>;
+          case "blank": return <br key={idx} />;
+          default: return <p key={idx} style={{ margin: "0.2em 0" }}>{inl(b.text, `p${idx}`)}</p>;
+        }
       })}
     </>
   );

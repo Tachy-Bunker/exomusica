@@ -46,6 +46,7 @@ model User {
   avatarUrl             String?
   contributorPointsEntries ContributorPointsEntry[]
   trackComments         TrackComment[]
+  dialJson              Json?        // the chat dock's dial: pinned rooms, scenes, sleeping slots (follows the member across devices)
   pointsAwarded             ContributorPointsEntry[] @relation("PointsAwardedBy")
   bio                   String?
   links                 Json?

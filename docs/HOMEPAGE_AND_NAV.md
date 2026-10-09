@@ -336,3 +336,27 @@ Phase 1 (this delivery), idea 4:
 - **Telemetry on a phone:** List / Instrument / Map sit in the header row between the members button and the stats; the controls row loses a line. Wide screens unchanged.
 - **QR dialog** renders in `document.body` (z 200). Inside `main` it sat in the page's transformed stacking context, below the sticky bars.
 - **Study → Log:** a "← <Log page you came from>" chip, other Log pages that link to the study (found by the study's address in their text; `atlas/around` now returns them as context, so they also show in the faceplate "in" chips and the Around sheet), and "The Log". No schema change.
+
+## fix293: Signal, Trace lens, Post
+
+**Signal ("transmissions").** `lib/signalUi.ts` + `SignalPage`: a short "How this works" (open on first visit), tabs To solve / Solved / All (opens on whichever has something), TX-007 labels, a "new" badge for ids not seen on the last visit (`exomusica_signal_seen`), "Already tried" chips per node (`exomusica_signal_tried`, device-local, tap to refill), audio gets "Analyze" (hands the file to the Xenolab analyzer), images get a zoom lightbox, and all media can be downloaded. Answers stay server-checked; nothing about them is stored in the page.
+
+**Trace lens = long-range scan.** `Landmarks.tsx`: header "LONG-RANGE SCAN", the sector's frequency (the same `freqOf` as the faceplate), a round scope with one blip per beacon (stable position from the id, `blipAt`), a sweep that is a single CSS transform (static under reduced motion), "signal decays in N d". The lens button icon is a scope whose needle turns while on. Test ids unchanged.
+
+**Post** replaces Messages and Letters. `/pms` and `/pms/:username` are the one page; `/letters` redirects there, keeping `?to=` (opens that person in letter mode) and `?at=` (drop a beacon on a place). The list merges PM partners and letter partners (`lib/post.ts`); a thread is one timeline of texts and letter stamps (a letter opens in place; slow-post letters show as "in the post"). The composer switches Message | Letter. Faceplate "Letters" is now "Post" with one badge (unread letters + unread conversations; `profileStore.unreadPms`).
+
+**Message markdown** (`lib/messageBlocks.ts`, used everywhere `renderMessageContent` is): fenced code with language, `-`/`*` and `1.` lists, `---`, `#`/`##`/`###`, `![alt](url)` for pictures **on this site only** (remote ones stay links, so nobody can track readers), a bare audio URL becomes an inline player. Discord habits (`-#`, `||spoiler||`, `>` ...) still work. The Post box (`MdBox`) adds a toolbar (`lib/mdEdit.ts`, Ctrl+B/I/K), live preview, `#name`/`~7.156` linking and the pocket's send button.
+
+## fix294: the dial of rooms (desktop dock)
+
+`lib/rooms.ts` is the shared logic (pure, tested): six fixed preset slots, a recents list (8), `dialOrder` (pinned by slot, then unpinned recents) and `tune` (wraps). `chatDockStore` persists `presets` and `recents` (localStorage `exomusica_chat_dock`, so device-local, no schema change) and gains `pinRoom`, `unpinRoom`, `tuneRoom`, `openSlot`; `openChat` records recents. `DialRail` sits under the dock title: ‹ frequency › (the room's own `freqOf`), six slots (click to tune, × to unpin, empty slot pins the current room), and up to three recent rooms. Keys, also with the dock closed or while typing: **Alt+1..6** tune, **Alt+Shift+1..6** pin the current room there, **Alt+[ / Alt+]** step. The phone sheet will reuse `rooms.ts`; the rail does not exist under desktop width.
+
+## fix295: the dial grows up
+
+**Schema:** `User.dialJson Json?` (migration `fix295_dial`). `GET/PUT /api/account/dial` store the member's pinned rooms, scenes and sleeping slots (cleaned by `backend/src/lib/dial.ts` on the way in and out, max 16 KB); the dock takes the account's copy on login, or pushes the device's if the account has none, then pushes changes 1.2 s after the last one (`useDialSync`). `GET /api/dial/pulse?slugs=&seen=` answers for up to 12 rooms: last message (author + text, 90 chars), messages in the last 30 min, and mentions of you since the last message you saw there (the per-room `exomusica_seen_<slug>` from fix291).
+
+**Lamps and pings.** `useDialPulse` asks once a minute while the tab is visible (and when the room list opens). Each slot has a lamp (0..3 by `heat`) and a dot when someone mentioned you there.
+
+**Room list (Q).** `RoomSwitcher`: every dial room with number, frequency, lamp, ping and the last line said. **Q** (not while typing), **Alt+Q** (also while typing) or the rail's *Rooms* button opens it; arrows or 1-6 pick, Enter tunes, Esc closes. Scenes (named sets of six slots, max 5) are at the bottom.
+
+**Other.** Sleep (`z` on a slot): stays pinned, tuning steps over it. Drop a topic or branch Plate on a slot to pin it, or on the frequency to tune to it (`lib/roomDrop.ts`). Whisper: **Alt+Shift+Enter** sends the unsent draft to the next room on the dial; the ↑ on a row of the list sends it to that room (`exomusica:whisper`, handled by the visible `ChannelPage`). Master Terminal: `room 2 | room lab | room next | rooms`, `pin [n]`, `unpin n`, `sleep n`, `scene`, `scene save <name>`, `scene <name>`, `scene rm <name>`. (`tune` stays the frequency command.)

@@ -1,0 +1,16 @@
+import { mergeInbox, mergeThread, unreadTotal } from "../src/lib/post";
+let n = 0; const ok = (c: boolean, m: string) => { if (!c) { console.log("FAIL", m); process.exitCode = 1; } else { n++; console.log("ok  ", m); } };
+const T = (s: string) => new Date(s).toISOString();
+const convs = [{ partner: "Ana", lastMessage: "hey", sentAt: 1000, unread: false }, { partner: "bo", lastMessage: "yo", sentAt: 500, unread: false }];
+const box = { got: [{ id: 1, from: "ana", at: T("1970-01-01T00:30:00Z"), opened: false }, { id: 2, from: "cy", at: T("1970-01-01T00:10:00Z"), opened: true }], sent: [{ id: 3, to: "bo", state: "in the post", deliverAt: T("1970-01-01T01:00:00Z") }] };
+const rows = mergeInbox(convs, box);
+ok(rows.length === 3, "letter-only partner gets a row, case-insensitive merge");
+ok(rows[0].partner === "bo" && rows[0].preview.includes("in the post"), "newest first, preview from the letter");
+const ana = rows.find((r) => r.partner === "Ana")!; ok(ana.unread && ana.unreadLetters === 1 && ana.letters === 1, "an unread letter makes the row unread");
+ok(unreadTotal(rows) === 1, "unread total");
+ok(mergeInbox([], null).length === 0, "empty");
+const msgs = [{ id: 9, fromMe: true, contentRaw: "x", sentAt: 1000, attachments: [] }, { id: 10, fromMe: false, contentRaw: "y", sentAt: 4000, attachments: [] }];
+const th = mergeThread("ana", msgs, box);
+ok(th.map((i) => i.key).join() === "m9,l1,m10", "texts and letters share one timeline");
+const th2 = mergeThread("bo", [], box); ok(th2.length === 1 && th2[0].kind === "letter" && (th2[0] as any).waiting && (th2[0] as any).mine, "a letter in the post is mine and waiting");
+console.log(n, "passed");

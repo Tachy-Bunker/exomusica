@@ -14,7 +14,7 @@ export function insertIntoChat(text: string): boolean {
   window.dispatchEvent(new CustomEvent(CHAT_INSERT, { detail }));
   return detail.handled;
 }
-export const hasComposer = (): boolean => typeof document !== "undefined" && !!document.querySelector("textarea.hud-reveal-textarea");
+export const hasComposer = (): boolean => typeof document !== "undefined" && !!document.querySelector("textarea.hud-reveal-textarea, textarea[data-composer]");
 /** Splice `text` into `value` at the selection, with a space around it when it would touch other words. */
 export function spliceAt(value: string, start: number, end: number, text: string): { value: string; cursor: number } {
   const before = value.slice(0, start), after = value.slice(end);

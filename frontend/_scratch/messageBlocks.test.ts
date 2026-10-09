@@ -1,0 +1,18 @@
+import { parseBlocks, isAudioUrl, isLocalImage } from "../src/lib/messageBlocks";
+let n = 0; const ok = (c: boolean, m: string) => { if (!c) { console.log("FAIL", m); process.exitCode = 1; } else { n++; console.log("ok  ", m); } };
+const b = parseBlocks("hi\n```js\nlet a = 1;\n# not a heading\n```\n- one\n- two\n1. x\n2. y\n---\n# Big\n-# tiny\n**bold** line\n* star item\n\n> q");
+ok(b[0].t === "line", "plain line");
+ok(b[1].t === "code" && (b[1] as any).lang === "js" && (b[1] as any).text === "let a = 1;\n# not a heading", "fenced code keeps its content raw");
+ok(b[2].t === "list" && (b[2] as any).items.length === 2 && !(b[2] as any).ordered, "bullet list");
+ok(b[3].t === "list" && (b[3] as any).ordered && (b[3] as any).items[1] === "y", "numbered list");
+ok(b[4].t === "hr", "rule");
+ok(b[5].t === "head" && (b[5] as any).level === 1, "h1");
+ok(b[6].t === "small", "-# stays small, not a list");
+ok(b[7].t === "line", "**bold** line is not a list");
+ok(b[8].t === "list", "* item is a list");
+ok(b[9].t === "blank" && b[10].t === "quote", "blank and quote");
+ok(parseBlocks("```\nopen").length === 1 && parseBlocks("```\nopen")[0].t === "code", "unterminated fence swallows the rest");
+ok(parseBlocks("```").length === 1, "lone fence does not crash");
+ok(isAudioUrl("https://x/y.MP3?a=1") && !isAudioUrl("https://x/y.html"), "audio urls");
+ok(isLocalImage("/uploads/a.png", "https://s") && isLocalImage("https://s/uploads/a.png", "https://s") && !isLocalImage("https://evil/uploads/a.png", "https://s"), "only local images");
+console.log(n, "passed");

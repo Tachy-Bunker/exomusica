@@ -1,0 +1,15 @@
+import { applyMd } from "../src/lib/mdEdit";
+let n = 0; const ok = (c: boolean, m: string) => { if (!c) { console.log("FAIL", m); process.exitCode = 1; } else { n++; console.log("ok  ", m); } };
+let r = applyMd("hello world", 6, 11, "bold");
+ok(r.value === "hello **world**" && r.value.slice(r.start, r.end) === "world", "bold wraps the selection");
+r = applyMd(r.value, r.start, r.end, "bold");
+ok(r.value === "hello world", "bold again takes it off");
+r = applyMd("", 0, 0, "italic"); ok(r.value === "*italic*" && r.value.slice(r.start, r.end) === "italic", "empty selection gets a placeholder, selected");
+r = applyMd("a\nb\nc", 0, 5, "ul"); ok(r.value === "- a\n- b\n- c", "list on every touched line");
+r = applyMd(r.value, r.start, r.end, "ul"); ok(r.value === "a\nb\nc", "list again removes it");
+r = applyMd("a\nb", 0, 3, "ol"); ok(r.value === "1. a\n2. b", "numbered");
+r = applyMd("x", 1, 1, "codeblock"); ok(r.value === "x\n```\ncode\n```\n" && r.value.slice(r.start, r.end) === "code", "code block starts on its own line");
+r = applyMd("see https://a.b/c", 4, 17, "link"); ok(r.value === "see [link](https://a.b/c)", "a selected url becomes the link target");
+r = applyMd("click", 0, 5, "link"); ok(r.value === "[click](https://)" && r.value.slice(r.start, r.end) === "https://", "link selects the url part");
+r = applyMd("mid line", 3, 3, "quote"); ok(r.value === "> mid line", "quote the line the cursor is on");
+console.log(n, "passed");

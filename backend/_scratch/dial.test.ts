@@ -1,0 +1,10 @@
+import { cleanDial, cleanRoom, isEmptyDial } from "../src/lib/dial";
+let n = 0; const ok = (c: boolean, m: string) => { if (!c) { console.log("FAIL", m); process.exitCode = 1; } else { n++; console.log("ok  ", m); } };
+ok(cleanRoom({ slug: "../x" }) === null && cleanRoom(null) === null && cleanRoom({ slug: "a b" }) === null, "bad slugs are dropped");
+ok(cleanRoom({ slug: "den", name: "  The\nDen  ", extra: 1, asleep: "yes" })!.name === "The Den" && !("asleep" in cleanRoom({ slug: "den", asleep: "yes" })!), "name cleaned, only asleep===true kept, extras gone");
+const d = cleanDial({ presets: [{ slug: "a" }, { slug: "a" }, "x", { slug: "b", branchSlug: "bb" }, 5, null, { slug: "overflow" }], scenes: [{ name: "Lab night", slots: [{ slug: "z" }] }, { name: "lab night", slots: [] }, { name: "", slots: [] }] });
+ok(d.presets.length === 6 && d.presets[0]!.slug === "a" && d.presets[1] === null && d.presets[3]!.branchSlug === "bb", "6 slots, duplicates removed, extra ignored");
+ok(d.scenes.length === 1 && d.scenes[0].slots.length === 6 && d.scenes[0].slots[0]!.slug === "z", "scenes: unique names, nameless dropped, slots normalised");
+ok(cleanDial(Array.from({ length: 9 }, () => 0)).scenes.length === 0 && isEmptyDial(cleanDial(null)), "garbage becomes an empty dial");
+ok(cleanDial({ scenes: Array.from({ length: 9 }, (_, i) => ({ name: "s" + i, slots: [] })) }).scenes.length === 5, "at most 5 scenes");
+console.log(n, "passed");

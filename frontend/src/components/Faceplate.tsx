@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { api } from "../lib/api";
 import { useAuth } from "../lib/auth";
 import { useLensStore } from "../lib/lensStore";
+import { useProfileStore } from "../lib/profileStore";
 import { freqOf, showFreq, TYPE_LABEL, type Peek } from "../lib/atlas";
 import { setArrival } from "../lib/arrive";
 import { usePocketStore } from "../lib/pocketStore";
@@ -25,9 +26,10 @@ export function Faceplate({ focus, section, around, onAround, aroundCount, cente
   const { user } = useAuth();
   const lens = useLensStore();
   const [unread, setUnread] = useState(0);
+  const unreadPms = useProfileStore((s) => s.unreadPms);
   useEffect(() => {
     if (!user) { setUnread(0); return; }
-    const ask = () => api<{ n: number }>("/api/letters/unread").then((r) => setUnread(r.n)).catch(() => {});
+    const ask = () => api<{ n: number }>("/api/letters/unread").then((r) => setUnread(Number(r?.n) || 0)).catch(() => {});
     void ask();
     const t = window.setInterval(ask, 120_000);
     window.addEventListener("exomusica:letters", ask);
@@ -63,14 +65,14 @@ export function Faceplate({ focus, section, around, onAround, aroundCount, cente
       </button>
       <span className="fp-tipwrap">
         <button type="button" className={`fp-btn${lens.on ? " fp-on" : ""}`} onClick={lens.toggle} aria-pressed={lens.on} aria-label="Trace lens: show the marks people left here" aria-describedby="fp-lens-tip" data-testid="fp-lens">
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true" focusable="false"><circle cx="10" cy="10" r="6" /><path d="M15 15l6 6" /></svg>
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="9" /><circle cx="12" cy="12" r="4.5" opacity=".6" /><g className={lens.on ? "lens-pulse" : undefined}><path d="M12 12L12 3" /></g><circle cx="16.5" cy="8" r="1.1" fill="currentColor" stroke="none" /></svg>
           <span className="fp-btn-label">Trace</span>{lens.on && <i className="fp-state">on</i>}
         </button>
-        <span id="fp-lens-tip" role="tooltip" className="fp-tip" data-testid="fp-lens-tip"><b>Trace lens</b> Members can leave small drawn marks on a place (a branch, an album, a study...). Switch this on to see the ones left on the page you are on. They fade after a while. {lens.on ? "It is on now." : "It is off, so pages stay clean."}</span>
+        <span id="fp-lens-tip" role="tooltip" className="fp-tip" data-testid="fp-lens-tip"><b>Trace lens: long-range scan</b> Travellers drop small beacons (a drawing or a note) on a place: a branch, album, study, wiki page. Switch this on and a scope shows the beacons left in the sector you are in. They decay after a while. {lens.on ? "Scanning now." : "Off, so pages stay clean."}</span>
       </span>
-      {user && <Link to="/letters" className="fp-btn" aria-label={`Letters${unread ? ` (${unread} unread)` : ""}`} data-testid="fp-letters">
+      {user && <Link to="/pms" className="fp-btn" aria-label={`Post${unread + unreadPms ? ` (${unread + unreadPms} unread)` : ""}`} data-testid="fp-post">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" aria-hidden="true" focusable="false"><rect x="3" y="5" width="18" height="14" rx="2" /><path d="M3 7l9 6 9-6" /></svg>
-        <span className="fp-btn-label">Letters</span>{unread > 0 && <em>{unread}</em>}
+        <span className="fp-btn-label">Post</span>{unread + unreadPms > 0 && <em>{unread + unreadPms}</em>}
       </Link>}
       <button type="button" className="fp-btn" onClick={() => togglePocket(!pocketOpen)} aria-expanded={pocketOpen} aria-label={`Pocket (${pocketCount})`} data-testid="fp-pocket">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" aria-hidden="true" focusable="false"><path d="M5 4h14v9a7 7 0 0 1-14 0z M5 9h14" /></svg>

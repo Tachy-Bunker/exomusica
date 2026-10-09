@@ -2,6 +2,8 @@
 // The runner is pure (it gets what it needs through `ctx`), so it is tested without a browser.
 import { fuzzyScore, freqOf, showFreq, searchEntities, nearestFreq, peekOf, TYPE_LABEL, ENTITY_TYPES, type Entity, type EntityType, type Peek } from "./atlas";
 import { operator } from "./operator";
+import { useChatDockStore } from "./chatDockStore";
+import { dialOrder } from "./rooms";
 
 export type Out =
   | { kind: "text"; text: string }
@@ -20,6 +22,8 @@ export interface ActionCtx {
   pathname: string;
   rand: () => number;
   lens?: { on: boolean; set: (v: boolean) => void };
+  /** the word that was typed, for actions that answer to several (pin / unpin / sleep) */
+  verb?: string;
 }
 
 export interface Action {
@@ -47,10 +51,9 @@ export const PLACES: { names: string[]; to: string; label: string }[] = [
   { names: ["wiki"], to: "/wiki", label: "Wiki" },
   { names: ["news"], to: "/news", label: "News" },
   { names: ["topics", "discussion", "forum"], to: "/discussion", label: "Topics" },
-  { names: ["messages", "pms"], to: "/pms", label: "Messages" },
+  { names: ["post", "messages", "pms", "letters", "mail"], to: "/pms", label: "Post" },
   { names: ["hypotheses", "basket", "hyp"], to: "/hypotheses", label: "Hypotheses" },
   { names: ["draw", "draw one"], to: "/hypotheses/draw", label: "Draw a hypothesis" },
-  { names: ["letters", "post", "mail"], to: "/letters", label: "Letters" },
   { names: ["signal", "station", "numbers"], to: "/signal", label: "Signal" },
   { names: ["rewards", "points"], to: "/rewards", label: "Rewards" },
   { names: ["account", "settings"], to: "/account", label: "Account" },
@@ -138,8 +141,42 @@ export const ACTIONS: Action[] = [
     },
   },
   { id: "new", verbs: ["new", "start"], summary: "Start something.", usage: "new study", run: (rest, ctx) => { if (/^stud/i.test(rest)) { ctx.go("/xenolab?tab=studies"); return [{ kind: "text", text: "→ Studies (the start form is at the bottom)" }]; } return [{ kind: "text", text: "Usage: new study" }]; } },
+  {
+    id: "room", verbs: ["room", "rooms", "dial"], summary: "Switch chat rooms on the dial.", usage: "room 2 | room lab | room next | room prev | rooms",
+    run: (rest) => {
+      const st = useChatDockStore.getState(), q = rest.trim().toLowerCase();
+      if (!q) { st.setSwitcher(true); return [{ kind: "text", text: "→ the room list" }]; }
+      if (q === "next" || q === "prev") { st.tuneRoom(q === "next" ? 1 : -1); return [{ kind: "text", text: "→ " + (useChatDockStore.getState().openChannelName ?? "no other room") }]; }
+      if (/^[1-6]$/.test(q)) { const r = st.presets[Number(q) - 1]; if (!r) return [{ kind: "error", text: `Slot ${q} is empty. Open a chat and type: pin ${q}` }]; st.openSlot(Number(q) - 1); return [{ kind: "text", text: `→ ${r.name}` }]; }
+      const best = dialOrder(st.presets, st.recents).map((r) => ({ r, s: fuzzyScore(q, r.name) })).filter((x) => x.s >= 0).sort((a, b) => b.s - a.s)[0];
+      if (!best) return [{ kind: "error", text: `No room on your dial matches "${rest}". Rooms you pinned or used lately are on it.` }];
+      st.openChat(best.r.slug, best.r.name, best.r.branchSlug); return [{ kind: "text", text: `→ ${best.r.name}` }];
+    },
+  },
+  {
+    id: "pin", verbs: ["pin", "unpin", "sleep"], summary: "Pin the room you are in to a slot, unpin, or put a slot to sleep.", usage: "pin [1-6] | unpin 2 | sleep 3",
+    run: (rest, ctx) => {
+      const st = useChatDockStore.getState(), verb = ctx.verb ?? "pin";
+      const n = Number(rest.trim());
+      if (verb === "pin") { if (!st.openChannelSlug) return [{ kind: "error", text: "Open a chat first." }]; st.pinRoom(rest.trim() && n >= 1 && n <= 6 ? n - 1 : -1); return [{ kind: "text", text: "Pinned." }]; }
+      if (!(n >= 1 && n <= 6)) return [{ kind: "error", text: `Usage: ${verb} 1-6` }];
+      if (verb === "unpin") st.unpinRoom(n - 1); else st.sleepSlot(n - 1);
+      return [{ kind: "text", text: verb === "unpin" ? `Slot ${n} cleared.` : `Slot ${n}: sleep toggled.` }];
+    },
+  },
+  {
+    id: "scene", verbs: ["scene", "scenes"], summary: "Save or load a set of six rooms.", usage: "scene | scene save <name> | scene <name> | scene rm <name>",
+    run: (rest) => {
+      const st = useChatDockStore.getState(), m = /^(save|rm)\s+(.+)$/i.exec(rest.trim());
+      if (m && m[1].toLowerCase() === "save") { st.saveSceneAs(m[2]); return [{ kind: "text", text: `Saved scene "${m[2].trim()}".` }]; }
+      if (m) { st.deleteScene(m[2].trim()); return [{ kind: "text", text: "Removed." }]; }
+      if (!rest.trim()) return [{ kind: "text", text: st.scenes.length ? "Scenes: " + st.scenes.map((x) => x.name).join(", ") : "No scenes yet. Pin rooms, then: scene save <name>" }];
+      if (!st.scenes.some((x) => x.name.toLowerCase() === rest.trim().toLowerCase())) return [{ kind: "error", text: `No scene called "${rest.trim()}".` }];
+      st.applyScene(rest.trim()); return [{ kind: "text", text: `Loaded "${rest.trim()}".` }];
+    },
+  },
   { id: "who", verbs: ["@", "who", "u"], summary: "Open a member's page.", usage: "@name", run: (rest, ctx) => { const n = rest.replace(/^@/, "").trim(); if (!n) return [{ kind: "text", text: "Usage: @name" }]; ctx.go(`/u/${encodeURIComponent(n)}`); return [{ kind: "text", text: `→ @${n}` }]; } },
-  { id: "pm", verbs: ["pm", "dm", "msg"], summary: "Write to a member.", usage: "pm <name>", needs: "auth", run: (rest, ctx) => { const n = rest.replace(/^@/, "").trim(); ctx.go(n ? `/pms/${encodeURIComponent(n)}` : "/pms"); return [{ kind: "text", text: n ? `→ messages with ${n}` : "→ Messages" }]; } },
+  { id: "pm", verbs: ["pm", "dm", "msg"], summary: "Write to a member (message or letter).", usage: "pm <name>", needs: "auth", run: (rest, ctx) => { const n = rest.replace(/^@/, "").trim(); ctx.go(n ? `/pms/${encodeURIComponent(n)}` : "/pms"); return [{ kind: "text", text: n ? `→ post with ${n}` : "→ Post" }]; } },
   {
     id: "admin", verbs: ["admin"], summary: "Jump to an admin page.", usage: "admin <page>   e.g. admin feat", needs: "admin",
     run: (rest, ctx) => {
@@ -161,11 +198,11 @@ export const ACTIONS: Action[] = [
     },
   },
   {
-    id: "mark", verbs: ["mark"], summary: "Leave a drawn mark on the place you are at.", usage: "mark", needs: "auth",
+    id: "mark", verbs: ["mark"], summary: "Drop a beacon on the place you are at.", usage: "mark", needs: "auth",
     run: (_r, ctx) => {
-      if (!ctx.focus) return [{ kind: "error", text: "Marks are left on a specific thing: go to a study, a branch, a page first." }];
-      ctx.go(`/letters?at=${encodeURIComponent(`${ctx.focus.type}:${ctx.focus.id}`)}`);
-      return [{ kind: "text", text: "→ the sheet" }];
+      if (!ctx.focus) return [{ kind: "error", text: "Beacons are left on a specific thing: go to a study, a branch, a page first." }];
+      ctx.go(`/pms?at=${encodeURIComponent(`${ctx.focus.type}:${ctx.focus.id}`)}`);
+      return [{ kind: "text", text: "→ the beacon sheet" }];
     },
   },
   { id: "clear", verbs: ["clear", "cls"], summary: "Clear the screen.", usage: "clear", run: () => [{ kind: "clear" }] },
@@ -197,7 +234,7 @@ export function runCommand(input: string, parsed: { verb: string; rest: string }
   if (action) {
     if (action.needs === "admin" && !ctx.user?.isAdmin) return [{ kind: "error", text: operator.needAdmin }];
     if (action.needs === "auth" && !ctx.user) return [{ kind: "error", text: operator.needLogin }];
-    return action.run(rest, ctx) ?? [];
+    return action.run(rest, { ...ctx, verb }) ?? [];
   }
   // Not a command: treat the whole line as a name to go to ("beating tones", "soundbay").
   return goOrList(input.trim(), ctx) ?? [];

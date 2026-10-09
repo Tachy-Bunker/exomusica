@@ -34,7 +34,7 @@ import { PlaylistSpaceMapPage } from "./pages/PlaylistSpaceMapPage";
 import { CollaboratorPage } from "./pages/CollaboratorPage";
 import { CollaboratorSpacemapPage } from "./pages/CollaboratorSpacemapPage";
 import { ProfilePage } from "./pages/ProfilePage";
-import { PMsPage } from "./pages/PMsPage";
+import { PostPage } from "./pages/PostPage";
 import { AccountSettingsPage } from "./pages/AccountSettingsPage";
 import { AdminLayout } from "./pages/admin/AdminLayout";
 import { JoinRequestsPage } from "./pages/admin/JoinRequestsPage";
@@ -50,7 +50,7 @@ import { FeaturedAdminPage } from "./pages/admin/FeaturedAdminPage";
 import { RewardsAdminPage } from "./pages/admin/RewardsAdminPage";
 import { HypothesesPage, HypothesisDrawPage } from "./pages/HypothesesPage";
 import { HypothesisPage } from "./pages/HypothesisPage";
-import { LettersPage } from "./pages/LettersPage";
+import { PostRedirect } from "./pages/PostRedirect";
 import { SignalPage } from "./pages/SignalPage";
 import { SignalStudioPage } from "./pages/admin/SignalStudioPage";
 import { SignalAdminPage } from "./pages/admin/SignalAdminPage";
@@ -146,12 +146,12 @@ export default function App() {
             <Route path="collaborator/:slug/spacemap" element={<CollaboratorSpacemapPage />} />
             <Route path="topic/:slug" element={<TopicPage />} />
             <Route path="u/:username" element={<ProfilePage />} />
-            <Route path="pms" element={<PMsPage />} />
-            <Route path="pms/:username" element={<PMsPage />} />
+            <Route path="pms" element={<PostPage />} />
+            <Route path="pms/:username" element={<PostPage />} />
             <Route path="account" element={<AccountSettingsPage />} />
             <Route path="rewards" element={<RewardsPage />} />
             <Route path="signal" element={<SignalPage />} />
-            <Route path="letters" element={<LettersPage />} />
+            <Route path="letters" element={<PostRedirect />} />
             <Route path="hypotheses" element={<HypothesesPage />} />
             <Route path="hypotheses/draw" element={<HypothesisDrawPage />} />
             <Route path="hypothesis/:id" element={<HypothesisPage />} />
