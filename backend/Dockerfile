@@ -18,6 +18,8 @@ RUN npm prune --omit=dev
 FROM node:20-alpine
 WORKDIR /app
 ENV NODE_ENV=production
+# ffmpeg draws the player's spectrogram strips (one per track, cached on disk). Without it the player just keeps its plain seek bar.
+RUN apk add --no-cache ffmpeg
 COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app/dist ./dist
 COPY --from=build /app/package*.json ./

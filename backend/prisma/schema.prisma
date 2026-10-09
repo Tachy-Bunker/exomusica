@@ -45,6 +45,7 @@ model User {
   passwordHash          String?      // null for any ghost (Discord-import never had one; deleted accounts have it cleared)
   avatarUrl             String?
   contributorPointsEntries ContributorPointsEntry[]
+  trackComments         TrackComment[]
   pointsAwarded             ContributorPointsEntry[] @relation("PointsAwardedBy")
   bio                   String?
   links                 Json?
@@ -403,6 +404,7 @@ model Track {
   lyrics          String?  @db.Text // also doubles as the constellation scan panel's logbook description
 
   bookmarks    AudioBookmark[]
+  comments     TrackComment[]
   collaborators TrackCollaborator[] // per-track composer/credit override, checkbox-selected from the album's collaborators
   playlistItems PlaylistItem[]
   sampleForBranches Branch[] @relation("BranchSampleTrack")
@@ -418,6 +420,20 @@ model TrackCollaborator {
   collaborator   Collaborator @relation(fields: [collaboratorId], references: [id])
 
   @@id([trackId, collaboratorId])
+}
+
+// A short note pinned to a moment in a track, written on the player's spectrogram strip.
+model TrackComment {
+  id        Int      @id @default(autoincrement())
+  trackId   Int
+  track     Track    @relation(fields: [trackId], references: [id], onDelete: Cascade)
+  userId    Int
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  atSeconds Float
+  body      String
+  createdAt DateTime @default(now())
+
+  @@index([trackId, atSeconds])
 }
 
 model AudioBookmark {

@@ -292,3 +292,12 @@ Page `/admin/signal-studio` (button on `/admin/signal`; terminal `admin signal-s
 Tests: `frontend/_scratch/studio.test.ts` (font shape; text lands in the right pitch/time cells of a real FFT; XY range and periodicity; WAV headers; FFT bin accuracy; gradient), `backend/_scratch/signal.test.ts` (media types), `frontend/_scratch/e2e_fix287.py` (9 checks, including reading the generated WAV and counting lit spectrogram pixels inside and outside the pitch band).
 
 **Also fixed in fix287**: the Master Terminal took focus a frame late, so keys typed right after Ctrl+K could be lost (the input now takes focus the moment it opens). It showed up as an intermittent failure in the fix281 e2e (~50% of runs); 8/8 clean after the fix.
+
+## fix288 — Spectrogram seek strip + track comments
+
+- The player's seek bar becomes a spectrogram in the site accent gradient (dark → orange → blue), docked (22px) and expanded (56px). The picture is painted once on a canvas; the playhead and the "unplayed" dimming are CSS transforms, so playback costs nothing per frame.
+- The server draws each track's strip once with **ffmpeg** (`showspectrumpic`, 1000×40, one thread, jobs queued one at a time), stretches the contrast by percentile, caches it under `uploads/spectro/<trackId>-<hash of fileUrl>.spec` (40 KB) and serves it with a one-year immutable cache. Replacing a track's file changes the hash, so it is redrawn. `GET /api/tracks/:id/spectrogram`: 501 if the server has no ffmpeg, 422 if the audio can't be drawn; the player then keeps its plain bar.
+- ffmpeg is restricted to `file,http,https,tcp,tls,crypto` and local sources never leave `uploads/`.
+- Comments live **on the strip**: click it to seek and choose the moment (`@m:ss`), type, Post. Pins sit on the strip; click one to jump and read it; comments within 4s of the playhead show as a live caption. Authors and admins can delete. 240 chars, one line, 8 posts/min/user, 400 per track. `TrackComment { trackId, userId, atSeconds, body, createdAt }`.
+- Docked bar shows pins and the gradient but not the composer (the expanded view is where you write).
+- Deployment: `backend/Dockerfile` now installs `ffmpeg` (alpine package, ~60 MB image growth). Needs `--build`.

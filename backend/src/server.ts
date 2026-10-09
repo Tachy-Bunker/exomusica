@@ -70,6 +70,7 @@ import { rewardsRoutes } from "./routes/rewards.js";
 import { hypothesesRoutes } from "./routes/hypotheses.js";
 import { lettersRoutes } from "./routes/letters.js";
 import { signalRoutes } from "./routes/signal.js";
+import { trackCommentRoutes } from "./routes/trackComments.js";
 
 // Fastify's own default body limit is 1MB, applied before multipart even
 // parses anything - this was the real ceiling blocking larger uploads
@@ -144,6 +145,7 @@ await app.register(rewardsRoutes);
 await app.register(hypothesesRoutes);
 await app.register(lettersRoutes);
 await app.register(signalRoutes);
+await app.register(trackCommentRoutes);
 
 const port = Number(process.env.PORT ?? 3001);
 app.listen({ port, host: "0.0.0.0" }).catch((err) => {

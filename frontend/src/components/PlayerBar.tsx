@@ -6,6 +6,10 @@ import { initAnalyser } from "../lib/audioAnalyser";
 import { startMediaSession } from "../lib/mediaSession";
 import { useIsDesktop } from "../lib/useIsDesktop";
 import { useFixedPortalRoot } from "../lib/useFixedPortalRoot";
+import { api } from "../lib/api";
+import { useAuth } from "../lib/auth";
+import { SpecLayer } from "./SpecLayer";
+import { loadStrip, nearbyComments, type Strip, type TrackComment } from "../lib/specStrip";
 import { PreviousIcon, NextIcon, LoopIcon, LoopOneIcon, ExpandIcon, CollapseIcon, ShuffleIcon, QueueIcon } from "./Icons";
 
 function formatTime(seconds: number): string {
@@ -193,6 +197,41 @@ export function PlayerBar() {
     seek(frac * effectiveDuration);
   }
 
+  // Spectrogram strip + comments for the current track.
+  const trackId = currentTrack?.id ?? null;
+  const [strip, setStrip] = useState<Strip | null>(null);
+  const [comments, setComments] = useState<TrackComment[]>([]);
+  const [pickAt, setPickAt] = useState<number | null>(null);
+  const [draft, setDraft] = useState("");
+  const [activeId, setActiveId] = useState<number | null>(null);
+  const [cErr, setCErr] = useState("");
+  const { user } = useAuth();
+  useEffect(() => {
+    setStrip(null); setComments([]); setPickAt(null); setActiveId(null); setCErr("");
+    if (trackId == null) return;
+    let live = true;
+    loadStrip(trackId).then((s) => { if (live) setStrip(s); });
+    api<TrackComment[]>(`/api/tracks/${trackId}/comments`).then((c) => { if (live) setComments(Array.isArray(c) ? c : []); }).catch(() => {});
+    return () => { live = false; };
+  }, [trackId]);
+  const spec = strip && strip !== "none" ? strip : null;
+  async function postComment(e: React.FormEvent) {
+    e.preventDefault();
+    if (trackId == null || !draft.trim()) return;
+    try {
+      const c = await api<TrackComment>(`/api/tracks/${trackId}/comments`, { method: "POST", body: JSON.stringify({ atSeconds: pickAt ?? currentTime, body: draft }) });
+      setComments((l) => [...l, c].sort((a, b) => a.atSeconds - b.atSeconds)); setDraft(""); setCErr(""); setActiveId(c.id);
+    } catch (err) { setCErr(err instanceof Error ? err.message : "Couldn't post."); }
+  }
+  async function removeComment(id: number) {
+    if (trackId == null) return;
+    await api(`/api/tracks/${trackId}/comments/${id}`, { method: "DELETE" }).catch(() => {});
+    setComments((l) => l.filter((c) => c.id !== id)); setActiveId(null);
+  }
+  function pinClick(c: TrackComment) { setActiveId(c.id); setPickAt(c.atSeconds); seek(c.atSeconds); }
+  const at = pickAt ?? currentTime;
+  const heard = activeId != null ? comments.filter((c) => c.id === activeId) : nearbyComments(comments, currentTime).slice(0, 2);
+
   const [seekPreview, setSeekPreview] = useState<number | null>(null);
   const progressPct = effectiveDuration ? ((seekPreview ?? currentTime) / effectiveDuration) * 100 : 0;
   const portalRoot = useFixedPortalRoot();
@@ -237,9 +276,9 @@ export function PlayerBar() {
 
       {currentTrack && !expanded && (
         <div className="player-bar-docked">
-          <div className="player-seek-strip" onClick={handleSeekStripClick}>
+          <div className={`player-seek-strip${spec ? " has-spec" : ""}`} onClick={handleSeekStripClick}>
             <div className="player-seek-track">
-              <div className="player-seek-fill" style={{ width: `${progressPct}%` }} />
+              {spec ? <SpecLayer strip={spec} pct={progressPct} comments={comments} duration={effectiveDuration} activeId={activeId} onPin={pinClick} /> : <div className="player-seek-fill" style={{ width: `${progressPct}%` }} />}
             </div>
           </div>
           <div
@@ -346,13 +385,26 @@ export function PlayerBar() {
 
             <div className="seek-row">
               <span className="mono">{formatTime(seekPreview ?? currentTime)}</span>
-              <div className="player-seek-strip player-seek-strip--expanded" onClick={(e) => { e.stopPropagation(); handleSeekStripClick(e); }}>
+              <div className={`player-seek-strip player-seek-strip--expanded${spec ? " has-spec" : ""}`} onClick={(e) => { e.stopPropagation(); handleSeekStripClick(e); if (effectiveDuration) { const r = e.currentTarget.getBoundingClientRect(); setPickAt(Math.max(0, Math.min(1, (e.clientX - r.left) / r.width)) * effectiveDuration); setActiveId(null); } }}>
                 <div className="player-seek-track">
-                  <div className="player-seek-fill" style={{ width: `${progressPct}%` }} />
+                  {spec ? <SpecLayer strip={spec} pct={progressPct} comments={comments} duration={effectiveDuration} activeId={activeId} onPin={pinClick} /> : <div className="player-seek-fill" style={{ width: `${progressPct}%` }} />}
                 </div>
               </div>
               <span className="mono">{formatTime(effectiveDuration)}</span>
             </div>
+            <div className="spec-caption" data-testid="spec-caption" onClick={(e) => e.stopPropagation()}>
+              {heard.map((c) => (
+                <div key={c.id}><b>{c.user}</b> <span className="mono">{formatTime(c.atSeconds)}</span> {c.body}
+                  {user && (user.id === c.userId || user.isAdmin) && <button onClick={() => removeComment(c.id)} aria-label="Delete comment" title="Delete">x</button>}
+                </div>
+              ))}
+            </div>
+            <form className="spec-comment" onClick={(e) => e.stopPropagation()} onSubmit={postComment}>
+              <span className="mono" title="Click the strip to choose the moment">@{formatTime(at)}</span>
+              <input className="input" value={draft} maxLength={240} disabled={!user} onChange={(e) => setDraft(e.target.value)} placeholder={user ? "Comment on this moment (click the strip to choose it)" : "Log in to comment"} aria-label="Comment on this moment" />
+              <button className="btn btn-primary" disabled={!user || !draft.trim()}>Post</button>
+            </form>
+            {cErr && <div className="spec-caption" role="alert">{cErr}</div>}
 
             <div className="player-transport" style={{ justifyContent: "center", marginTop: "0.8rem" }} onClick={(e) => e.stopPropagation()}>
               <button className={`btn ${shuffle ? "btn-primary" : ""}`} onClick={toggleShuffle} title="Shuffle (P)">
