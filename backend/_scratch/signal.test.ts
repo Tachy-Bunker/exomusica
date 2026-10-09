@@ -20,4 +20,7 @@ assert.deepEqual(air(10, []), [1, 6], "its day has come");
 assert.ok(!air(0, [], [[99, 1]]).includes(7), "missing requirement never opens");
 assert.ok(wouldLoop(1, [2], [{ id: 1, requires: [] }, { id: 2, requires: [1] }])); assert.ok(wouldLoop(1, [1], [{ id: 1, requires: [] }]));
 assert.ok(!wouldLoop(3, [1, 2], [{ id: 1, requires: [] }, { id: 2, requires: [1] }, { id: 3, requires: [] }]));
+import { mediaExt } from "../src/lib/signal.ts";
+assert.equal(mediaExt("a.wav", "audio/wav"), ".wav"); assert.equal(mediaExt("a.FLAC", "audio/flac"), ".flac"); assert.equal(mediaExt("a.jpeg", "image/jpeg"), ".jpg");
+assert.equal(mediaExt("a.wav", "text/html"), null); assert.equal(mediaExt("a.html", "audio/wav"), null); assert.equal(mediaExt("noext", "audio/wav"), null); assert.equal(mediaExt("a.svg", "image/svg+xml"), null);
 console.log("signal ok");

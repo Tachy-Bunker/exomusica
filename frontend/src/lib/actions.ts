@@ -56,7 +56,7 @@ export const PLACES: { names: string[]; to: string; label: string }[] = [
   { names: ["account", "settings"], to: "/account", label: "Account" },
 ];
 
-export const ADMIN_PAGES = ["join-requests", "branches", "channels", "users", "albums", "wiki", "all-tracks", "studies", "resources", "featured", "rewards", "signal", "submissions", "contributor-points", "blog", "emoji", "email-templates", "audit-log", "about", "fonts", "fx-settings", "newsletter", "discord-import", "storage", "discord-bridge", "collaborators", "embeds", "icon-library", "forum-map", "notifications", "guide-assets", "community-spotlight"];
+export const ADMIN_PAGES = ["join-requests", "branches", "channels", "users", "albums", "wiki", "all-tracks", "studies", "resources", "featured", "rewards", "signal", "signal-studio", "submissions", "contributor-points", "blog", "emoji", "email-templates", "audit-log", "about", "fonts", "fx-settings", "newsletter", "discord-import", "storage", "discord-bridge", "collaborators", "embeds", "icon-library", "forum-map", "notifications", "guide-assets", "community-spotlight"];
 
 const placeFor = (name: string) => PLACES.find((p) => p.names.includes(name.toLowerCase()));
 const peeks = (rows: Entity[], note?: (e: Entity) => string | undefined): Out[] => rows.map((e) => ({ kind: "peek", peek: peekOf(e), note: note?.(e) }));

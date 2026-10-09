@@ -276,3 +276,19 @@ Pages: `/signal` (players, login required; terminal `go signal`), `/admin/signal
 **Not yet** (the content tools that make puzzles): a "Signal studio" to generate Hellschreiber-style spectrogram text and XY-scope audio, SSTV, the UV lens, the foxhunt S-meter, spectrogram player bar; node reset/ban tools; a player-facing map; notifications when something new goes on the air.
 
 Tests: `backend/_scratch/signal.test.ts`, `frontend/_scratch/signal.test.ts`, `frontend/_scratch/e2e_fix286.py` (22 checks).
+
+## fix287: Signal studio (making the puzzle media)
+
+Page `/admin/signal-studio` (button on `/admin/signal`; terminal `admin signal-studio`). Everything is generated **in the browser**, in a Web Worker (falls back to the page's thread), and nothing leaves the machine until you press Upload.
+
+**Text in the spectrogram** (`lib/studioDsp.ts`): a 5×7 pixel font (A-Z, 0-9, `. , ! ? - : / + = '`, space; max 40 characters). Each lit pixel is a steady tone for its column's duration, top of a letter = highest pitch, time left to right, so the words read in any linear-frequency spectrogram. You set length (2-60 s), the pitch band, and boldness (tone spacing from 200 Hz down to 45 Hz; tighter = solid letters, more CPU). Tones are only computed while their pixel is lit; edges use a 2 ms smoothing so there are no clicks; peak-normalised to 0.9.
+
+**Drawing for an XY scope**: draw strokes on a pad; left channel = x, right channel = y; the pen walks the strokes in order and back to the start 10-120 times a second (the moves between strokes are drawn too: a scope has no pen-up). Stereo output.
+
+**Output**: lossless 16- or 24-bit WAV at 22.05 / 32 / 44.1 / 48 kHz, an in-page player, a **spectrogram preview in the site's accent gradient** (forum orange to audio blue, dark at the bottom) so you can check the result exactly as a solver would see it, a Download button, and **Upload for a transmission** → `POST /api/admin/signal/media` (admin only; WAV/FLAC/MP3/OGG audio or PNG/JPEG/WebP/GIF, ≤ 60 MB, extension must match type, stored under `uploads/signal/`) which returns the `/uploads/signal/…` path to paste into the node's media field.
+
+**Not yet**: SSTV encoding, the UV lens, the foxhunt S-meter, the solver-side spectrogram player bar, an image-to-XY tracer (draw by hand for now).
+
+Tests: `frontend/_scratch/studio.test.ts` (font shape; text lands in the right pitch/time cells of a real FFT; XY range and periodicity; WAV headers; FFT bin accuracy; gradient), `backend/_scratch/signal.test.ts` (media types), `frontend/_scratch/e2e_fix287.py` (9 checks, including reading the generated WAV and counting lit spectrogram pixels inside and outside the pitch band).
+
+**Also fixed in fix287**: the Master Terminal took focus a frame late, so keys typed right after Ctrl+K could be lost (the input now takes focus the moment it opens). It showed up as an intermittent failure in the fix281 e2e (~50% of runs); 8/8 clean after the fix.

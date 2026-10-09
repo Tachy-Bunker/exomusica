@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 import { api, ApiError } from "../../lib/api";
 import { MONTHS, dateOfIndex, indexOfDate, layoutGraph } from "../../lib/stationCalendar";
 
@@ -62,7 +63,7 @@ export function SignalAdminPage() {
             </g>); })}
         </svg>
       </div>
-      <div className="xl-form-row"><button className="btn btn-primary" onClick={() => pick("new")} data-testid="sa-new">New transmission</button><span className="home-dim">{nodes.length} in the graph</span></div>
+      <div className="xl-form-row"><button className="btn btn-primary" onClick={() => pick("new")} data-testid="sa-new">New transmission</button><Link className="btn" to="/admin/signal-studio" data-testid="sa-studio">Signal studio</Link><span className="home-dim">{nodes.length} in the graph</span></div>
       {sel !== null && (
         <div className="xl-form sig-edit" data-testid="sa-form">
           <input value={f.title} onChange={(e) => set("title", e.target.value)} placeholder="Title" aria-label="Title" maxLength={120} />

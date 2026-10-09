@@ -399,3 +399,12 @@ export async function saveGalleryFile(filename: string, mimeType: string, buffer
   const { url } = await saveSiteImage(filename, mimeType, buffer, "albums");
   return { url, kind: "image" };
 }
+
+/** Stores a transmission's audio or image under uploads/signal/. Lossless audio is welcome; the caller has already checked the type. */
+export async function saveSignalMedia(ext: string, buffer: Buffer): Promise<{ url: string }> {
+  const dir = path.join(UPLOADS_DIR, "signal");
+  await mkdir(dir, { recursive: true });
+  const diskName = `${randomUUID()}${ext}`;
+  await writeFile(path.join(dir, diskName), buffer);
+  return { url: `/uploads/signal/${diskName}` };
+}

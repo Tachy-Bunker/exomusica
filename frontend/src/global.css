@@ -5525,3 +5525,9 @@ th {
 /* fix286: the admin is usable on a phone: nav on top, content may shrink */
 .admin-layout { grid-template-columns: 200px minmax(0, 1fr); }
 @media (max-width: 760px) { .admin-layout { grid-template-columns: minmax(0, 1fr); gap: 1rem; } .admin-nav { flex-direction: row; flex-wrap: wrap; } }
+
+/* fix287: Signal studio */
+.studio-spec { display: block; width: 100%; max-width: 100%; height: 220px; border: 1px solid var(--border); border-radius: var(--radius); background: #07070a; }
+.studio-result { display: grid; gap: 0.6rem; margin-top: 1rem; }
+.studio-pad { touch-action: none; cursor: crosshair; user-select: none; -webkit-user-select: none; border: 1px solid var(--border); border-radius: var(--radius); background: #07070a; max-width: 560px; }
+.studio-pad-svg { display: block; width: 100%; height: auto; aspect-ratio: 10 / 7; } .studio-axis { stroke: #2a2a33; stroke-width: 1; fill: none; } .studio-ink { fill: none; stroke: var(--accent-audio); stroke-width: 4; stroke-linecap: round; stroke-linejoin: round; }

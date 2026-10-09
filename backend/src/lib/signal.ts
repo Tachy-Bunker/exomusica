@@ -56,3 +56,18 @@ export function wouldLoop(id: number, requires: number[], all: { id: number; req
   const walk = (x: number): boolean => { if (x === id && seen.size) return true; if (seen.has(x)) return false; seen.add(x); return (reqs.get(x) ?? []).some(walk); };
   return (reqs.get(id) ?? []).some(walk);
 }
+
+// ---- media: what an operator may upload for a transmission
+const MEDIA_TYPES: Record<string, string> = {
+  "audio/wav": ".wav", "audio/x-wav": ".wav", "audio/wave": ".wav", "audio/vnd.wave": ".wav", "audio/flac": ".flac", "audio/x-flac": ".flac",
+  "audio/mpeg": ".mp3", "audio/mp3": ".mp3", "audio/ogg": ".ogg", "application/ogg": ".ogg",
+  "image/png": ".png", "image/jpeg": ".jpg", "image/webp": ".webp", "image/gif": ".gif",
+};
+export const MEDIA_MAX_BYTES = 60 * 1024 * 1024;
+/** The extension to store under, or null if this isn't an allowed audio / image type. The type must agree with the file name's extension. */
+export function mediaExt(filename: string, mime: string): string | null {
+  const ext = MEDIA_TYPES[mime.toLowerCase()];
+  if (!ext) return null;
+  const given = (/\.[a-z0-9]+$/i.exec(filename)?.[0] ?? "").toLowerCase().replace(".jpeg", ".jpg");
+  return given === ext ? ext : null;
+}

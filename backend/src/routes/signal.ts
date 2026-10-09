@@ -3,7 +3,8 @@ import { prisma } from "../lib/prisma.js";
 import { requireAuth, requireAdmin } from "../lib/auth.js";
 import { makeLimiter } from "../lib/resourceAccess.js";
 import { isMediaUrl } from "../lib/chatKinds.js";
-import { checkAnswer, dayIndex, hashAnswer, isOnAir, newSalt, stationDate, wouldLoop, type NodeRules } from "../lib/signal.js";
+import { saveSignalMedia } from "../lib/storage.js";
+import { MEDIA_MAX_BYTES, mediaExt, checkAnswer, dayIndex, hashAnswer, isOnAir, newSalt, stationDate, wouldLoop, type NodeRules } from "../lib/signal.js";
 
 const limiter = makeLimiter(10, 60_000);
 const txt = (v: unknown, max: number): string | null => String(v ?? "").trim().slice(0, max) || null;
@@ -140,5 +141,18 @@ export async function signalRoutes(app: FastifyInstance): Promise<void> {
     const n = await prisma.puzzleNode.findUnique({ where: { id: Number(req.params.id) || 0 }, select: { answerHash: true, answerSalt: true } });
     if (!n) return reply.code(404).send({ error: "no such transmission" });
     return { correct: n.answerHash && n.answerSalt ? checkAnswer(n.answerSalt, n.answerHash, String(req.body?.answer ?? "")) : null };
+  });
+
+  // An operator's audio or image for a transmission (the Signal studio exports WAV straight here). Returns the /uploads path to put in the node.
+  app.post("/api/admin/signal/media", { preHandler: requireAdmin }, async (req, reply) => {
+    const file = await req.file();
+    if (!file) return reply.code(400).send({ error: "no file uploaded" });
+    const ext = mediaExt(file.filename, file.mimetype);
+    if (!ext) return reply.code(400).send({ error: "Use WAV, FLAC, MP3 or OGG audio, or a PNG / JPEG / WebP / GIF image." });
+    const buffer = await file.toBuffer();
+    if (buffer.length > MEDIA_MAX_BYTES) return reply.code(400).send({ error: "That file is over 60 MB." });
+    const { url } = await saveSignalMedia(ext, buffer);
+    await prisma.auditLog.create({ data: { actorId: req.user!.id, action: "signal.media", targetType: "Upload", targetId: 0, meta: { url, bytes: buffer.length } } });
+    return reply.code(201).send({ url });
   });
 }

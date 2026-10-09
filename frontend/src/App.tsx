@@ -52,6 +52,7 @@ import { HypothesesPage, HypothesisDrawPage } from "./pages/HypothesesPage";
 import { HypothesisPage } from "./pages/HypothesisPage";
 import { LettersPage } from "./pages/LettersPage";
 import { SignalPage } from "./pages/SignalPage";
+import { SignalStudioPage } from "./pages/admin/SignalStudioPage";
 import { SignalAdminPage } from "./pages/admin/SignalAdminPage";
 import { RewardsPage } from "./pages/RewardsPage";
 import { BranchContributeAdminPage } from "./pages/admin/BranchContributeAdminPage";
@@ -170,6 +171,7 @@ export default function App() {
                 <Route path="featured" element={<FeaturedAdminPage />} />
                 <Route path="rewards" element={<RewardsAdminPage />} />
                 <Route path="signal" element={<SignalAdminPage />} />
+                <Route path="signal-studio" element={<SignalStudioPage />} />
                 <Route path="branches/:id/contribute" element={<BranchContributeAdminPage />} />
                 <Route path="branches/:id/identity" element={<BranchIdentityAdminPage />} />
                 <Route path="submissions" element={<SubmissionsAdminPage />} />

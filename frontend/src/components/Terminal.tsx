@@ -55,6 +55,7 @@ export function Terminal({ focus }: { focus: Entity | null }) {
     returnTo.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     setValue(prefill); setSel(-1); setHist(-1);
     if (!lines.length) { lines = [{ kind: "text", text: operator.greet() }]; bump((n) => n + 1); }
+    inputRef.current?.focus(); // at once: someone who types right after Ctrl+K must not lose their first keys
     requestAnimationFrame(() => inputRef.current?.focus());
     return () => { returnTo.current?.focus?.(); };
   }, [open, prefill]);
@@ -137,7 +138,7 @@ export function Terminal({ focus }: { focus: Entity | null }) {
         )}
         <div className="term-in">
           <span aria-hidden="true">›</span>
-          <input ref={inputRef} value={value} onChange={(e) => setValue(e.target.value)} onKeyDown={onKeyDown} placeholder="Type a name, or ? for commands" aria-label="Command" autoComplete="off" autoCapitalize="off" spellCheck={false} enterKeyHint="go" data-testid="terminal-input" />
+          <input ref={inputRef} autoFocus value={value} onChange={(e) => setValue(e.target.value)} onKeyDown={onKeyDown} placeholder="Type a name, or ? for commands" aria-label="Command" autoComplete="off" autoCapitalize="off" spellCheck={false} enterKeyHint="go" data-testid="terminal-input" />
         </div>
         <div className="term-foot" aria-hidden="true">Enter go · ↑↓ pick · Tab fill · Esc close · ? help</div>
       </div>
