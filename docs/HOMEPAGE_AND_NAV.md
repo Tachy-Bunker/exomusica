@@ -301,3 +301,11 @@ Tests: `frontend/_scratch/studio.test.ts` (font shape; text lands in the right p
 - Comments live **on the strip**: click it to seek and choose the moment (`@m:ss`), type, Post. Pins sit on the strip; click one to jump and read it; comments within 4s of the playhead show as a live caption. Authors and admins can delete. 240 chars, one line, 8 posts/min/user, 400 per track. `TrackComment { trackId, userId, atSeconds, body, createdAt }`.
 - Docked bar shows pins and the gradient but not the composer (the expanded view is where you write).
 - Deployment: `backend/Dockerfile` now installs `ffmpeg` (alpine package, ~60 MB image growth). Needs `--build`.
+
+## fix289 — Explore easing, terminal menu + ghost completion, Trace explainer, pocket → chat, dock-aware faceplate
+
+- **Explore:** the area under the card (pictures, studies) is always mounted and eases open/closed with a CSS grid-rows transition (0fr↔1fr, 0.32s, opacity 0.22s). It keeps the previous branch's content while closing, and holds its state while a branch's pictures load, so there is no closed-then-open flicker. No JS animation; off under reduced motion.
+- **Terminal:** with nothing typed it shows "Go to" chips (places) and "Type" chips (every command you may run; click fills it). Commands now complete like places (`len` → `lens`). On desktop (hover + fine pointer) a faint ghost completion shows the rest of the top match and a `Tab` key hint; Tab accepts it. Mobile keeps tap targets and shows neither.
+- **Trace lens:** hover/focus on the button explains it; the button shows "on"; on pages that can't hold marks it now says so (instead of showing nothing); where marks can be left the panel says what marks are and has "Turn lens off".
+- **Pocket → chat:** dropping a link on the composer was swallowed (the drop handler only knew files). Drops now insert a markdown link at the cursor. Plates carry `[title](absolute url)` when dragged. The pocket tray has a ↵ button per item that pastes into the chat composer on screen (`lib/chatInsert.ts`, event `exomusica:chat-insert`).
+- **Dock open (desktop):** the edge margins give way; "You were here" and "Nearby" sit in the middle of the faceplate and drop down on hover over everything (z 70), including the chat panel. The faceplate now stops at the dock's edge so its buttons are never covered.

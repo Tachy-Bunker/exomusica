@@ -3,7 +3,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../lib/auth";
 import { parseCommand, peekOf, type Entity } from "../lib/atlas";
-import { runCommand, suggest, type Out, type Suggestion } from "../lib/actions";
+import { menu, runCommand, suggest, type Out, type Suggestion } from "../lib/actions";
 import { operator } from "../lib/operator";
 import { setArrival } from "../lib/arrive";
 import { usePocketStore } from "../lib/pocketStore";
@@ -62,7 +62,11 @@ export function Terminal({ focus }: { focus: Entity | null }) {
   useEffect(() => { outRef.current?.scrollTo({ top: outRef.current.scrollHeight }); });
 
   const parsed = useMemo(() => parseCommand(value), [value]);
-  const suggestions: Suggestion[] = useMemo(() => (open ? suggest(value, parsed, index) : []), [open, value, parsed, index]);
+  const suggestions: Suggestion[] = useMemo(() => (open ? suggest(value, parsed, index, 6, user) : []), [open, value, parsed, index, user]);
+  const chips = useMemo(() => menu(user), [user]);
+  const fillOf = (s: Suggestion): string => (s.kind === "place" ? s.label.toLowerCase() : s.kind === "verb" ? `${s.verb} ` : s.entity.title);
+  const top = suggestions[sel >= 0 ? sel : 0];
+  const ghost = value && top ? (fillOf(top).toLowerCase().startsWith(value.toLowerCase()) ? fillOf(top).slice(value.length) : null) : null;
   useEffect(() => setSel(-1), [value]);
 
   if (!open) return null;
@@ -73,6 +77,7 @@ export function Terminal({ focus }: { focus: Entity | null }) {
     if (!input) return;
     if (sel >= 0 && suggestions[sel]) {
       const s = suggestions[sel];
+      if (s.kind === "verb") { setValue(fillOf(s)); return; }
       go(s.kind === "place" ? s.to : peekOf(s.entity).href);
       return;
     }
@@ -109,8 +114,7 @@ export function Terminal({ focus }: { focus: Entity | null }) {
     }
     if (e.key === "Tab" && suggestions.length) {
       e.preventDefault();
-      const s = suggestions[sel >= 0 ? sel : 0];
-      setValue(s.kind === "place" ? s.label.toLowerCase() : s.entity.title);
+      setValue(fillOf(suggestions[sel >= 0 ? sel : 0]));
     }
   }
 
@@ -126,19 +130,29 @@ export function Terminal({ focus }: { focus: Entity | null }) {
           ))}
           {open && index.length === 0 && <div className="term-line dim">Warming the dial…</div>}
         </div>
+        {!value.trim() && (
+          <div className="term-menu" data-testid="terminal-menu">
+            <div className="term-menu-row"><span className="term-menu-h">Go to</span>{chips.go.map((c) => <button key={c.to} type="button" className="term-chip" onClick={() => go(c.to)}>{c.label}</button>)}</div>
+            <div className="term-menu-row"><span className="term-menu-h">Type</span>{chips.verbs.map((v) => <button key={v.verb} type="button" className="term-chip term-chip-verb" title={v.summary} onClick={() => { setValue(`${v.verb} `); inputRef.current?.focus(); }}>{v.verb}</button>)}<span className="term-menu-note">or any name: a branch, a study, a frequency</span></div>
+          </div>
+        )}
         {suggestions.length > 0 && (
           <ul className="term-sugg" role="listbox" aria-label="Suggestions" data-testid="terminal-suggestions">
             {suggestions.map((s, i) => (
-              <li key={s.kind === "place" ? `p-${s.to}` : `e-${s.entity.type}-${s.entity.id}`} role="option" aria-selected={i === sel} className={i === sel ? "on" : ""}
-                onMouseDown={(e) => { e.preventDefault(); go(s.kind === "place" ? s.to : peekOf(s.entity).href); }}>
-                {s.kind === "place" ? <><span className="term-sugg-kind">place</span>{s.label}</> : <><span className="term-sugg-kind">{s.entity.type}</span>{s.entity.title}{s.entity.sub ? <i>{s.entity.sub}</i> : null}</>}
+              <li key={s.kind === "place" ? `p-${s.to}` : s.kind === "verb" ? `v-${s.verb}` : `e-${s.entity.type}-${s.entity.id}`} role="option" aria-selected={i === sel} className={i === sel ? "on" : ""}
+                onMouseDown={(e) => { e.preventDefault(); if (s.kind === "verb") { setValue(fillOf(s)); inputRef.current?.focus(); } else go(s.kind === "place" ? s.to : peekOf(s.entity).href); }}>
+                {s.kind === "place" ? <><span className="term-sugg-kind">place</span>{s.label}</> : s.kind === "verb" ? <><span className="term-sugg-kind">command</span>{s.verb}<i>{s.summary}</i></> : <><span className="term-sugg-kind">{s.entity.type}</span>{s.entity.title}{s.entity.sub ? <i>{s.entity.sub}</i> : null}</>}
               </li>
             ))}
           </ul>
         )}
         <div className="term-in">
           <span aria-hidden="true">›</span>
+          <span className="term-field">
+            {ghost && <span className="term-ghost" aria-hidden="true" data-testid="terminal-ghost"><span>{value}</span>{ghost}</span>}
           <input ref={inputRef} autoFocus value={value} onChange={(e) => setValue(e.target.value)} onKeyDown={onKeyDown} placeholder="Type a name, or ? for commands" aria-label="Command" autoComplete="off" autoCapitalize="off" spellCheck={false} enterKeyHint="go" data-testid="terminal-input" />
+          </span>
+          {suggestions.length > 0 && <kbd className="term-tab" aria-hidden="true" data-testid="terminal-tabhint">Tab</kbd>}
         </div>
         <div className="term-foot" aria-hidden="true">Enter go · ↑↓ pick · Tab fill · Esc close · ? help</div>
       </div>

@@ -117,6 +117,7 @@ export function HomeExplore({ branches, openFull = false, initialSlug = null }: 
   useEffect(() => () => { if (cam.current.raf) cancelAnimationFrame(cam.current.raf); }, []);
 
   const current = selected ? bySlug.get(selected) ?? null : null;
+  const belowRef = useRef<{ pics: BranchPicture[]; studies: { slug: string; title: string; complete: boolean }[]; slug: string; name: string; open: boolean }>({ pics: [], studies: [], slug: "", name: "", open: false });
 
   // The chosen branch's pictures (its cover, its albums' covers and gallery images), fetched once per branch.
   const picCache = useRef(new Map<string, BranchPicture[]>());
@@ -195,6 +196,13 @@ export function HomeExplore({ branches, openFull = false, initialSlug = null }: 
   const bg = current?.secondaryImage ?? null;
   // Pictures that aren't already doing a job (the main image is the logo, the secondary is the background).
   const unused = (pictures ?? []).filter((p) => p.url !== current?.image && p.url !== current?.secondaryImage).slice(0, 9);
+  // What is under the card. While a branch's pictures are still loading, the previous state stays (no flicker closed-then-open).
+  const studiesNow = current?.studies ?? [];
+  if (pictures !== null || !current) {
+    if (current && (unused.length > 0 || studiesNow.length > 0)) belowRef.current = { pics: unused, studies: studiesNow, slug: current.slug, name: current.name, open: true };
+    else belowRef.current = { ...belowRef.current, open: false };
+  }
+  const below = belowRef.current;
   return (
     <section id="home-explore" className="home-section" aria-labelledby="home-explore-h" onPointerDown={() => setTouched(true)} onFocus={() => setTouched(true)}>
       <h2 id="home-explore-h" className="sr-only">Explore the branches</h2>
@@ -230,19 +238,24 @@ export function HomeExplore({ branches, openFull = false, initialSlug = null }: 
             </article>
           )}
         </div>
-        {current && unused.length > 0 && (
-          <ul className="explore-pics" aria-label={`More pictures from ${current.name}`} data-testid="explore-pics">
-            {unused.map((p) => (
-              <li key={p.url} data-kind={p.kind}>
-                <Link to={p.albumSlug ? `/album/${p.albumSlug}` : `/soundbay?open=${current.slug}`} title={p.label} aria-label={p.albumSlug ? `${p.label} (album)` : p.label}>
-                  <img src={p.url} alt="" loading="lazy" decoding="async" />
-                  {p.kind === "album-cover" && <span className="pic-album-icon" data-testid="pic-album-icon"><AlbumIcon size={15} /></span>}
-                </Link>
-              </li>
-            ))}
-          </ul>
-        )}
-        {current && <BranchStudies studies={current.studies ?? []} />}
+        {/* The part under the card (pictures, studies) opens and closes smoothly, so changing branch doesn't jolt the whole page. It keeps the last content while closing. */}
+        <div className={`explore-below${below.open ? " open" : ""}`} aria-hidden={below.open ? undefined : true}>
+          <div className="explore-below-in">
+            {below.pics.length > 0 && (
+              <ul className="explore-pics" aria-label={`More pictures from ${below.name}`} data-testid="explore-pics">
+                {below.pics.map((p) => (
+                  <li key={p.url} data-kind={p.kind}>
+                    <Link to={p.albumSlug ? `/album/${p.albumSlug}` : `/soundbay?open=${below.slug}`} title={p.label} aria-label={p.albumSlug ? `${p.label} (album)` : p.label} tabIndex={below.open ? undefined : -1}>
+                      <img src={p.url} alt="" loading="lazy" decoding="async" />
+                      {p.kind === "album-cover" && <span className="pic-album-icon" data-testid="pic-album-icon"><AlbumIcon size={15} /></span>}
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            )}
+            <BranchStudies studies={below.studies} />
+          </div>
+        </div>
       </div>
 
       {full && (

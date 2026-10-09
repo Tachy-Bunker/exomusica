@@ -3,6 +3,7 @@ import { uploadChatAttachment, voiceNoteFilename } from "../lib/voiceNoteUpload"
 import { useEffect, useRef, useState, useCallback, useContext, createContext, type ChangeEvent, type ClipboardEvent, type DragEvent, type FormEvent } from "react";
 import { Link, useParams, useSearchParams, useNavigate } from "react-router-dom";
 import { api } from "../lib/api";
+import { CHAT_INSERT, LINK_MIME, spliceAt } from "../lib/chatInsert";
 import { exportChatHistory } from "../lib/exportChat";
 import { ExportIcon } from "../components/Icons";
 import { useAuth } from "../lib/auth";
@@ -729,8 +730,30 @@ export function ChannelPage({ channelSlug, fillHeight, parentControlsHeight }: {
   function handleComposerDrop(e: DragEvent) {
     e.preventDefault();
     setIsDraggingFile(false);
-    if (e.dataTransfer?.files && e.dataTransfer.files.length > 0) void uploadFiles(e.dataTransfer.files);
+    if (e.dataTransfer?.files && e.dataTransfer.files.length > 0) { void uploadFiles(e.dataTransfer.files); return; }
+    // a link dragged in (a pocket item, a plate, an address): it lands at the cursor as a markdown link
+    const dropped = e.dataTransfer?.getData(LINK_MIME) || e.dataTransfer?.getData("text/uri-list")?.split("\n").find((l) => l && !l.startsWith("#")) || e.dataTransfer?.getData("text/plain");
+    if (dropped?.trim()) putInDraft(dropped.trim());
   }
+
+  function putInDraft(text: string) {
+    const el = textareaRef.current;
+    const at = el?.selectionStart ?? draft.length, to = el?.selectionEnd ?? at;
+    const r = spliceAt(draft, at, to, text);
+    setDraft(r.value);
+    requestAnimationFrame(() => { el?.focus(); el?.setSelectionRange(r.cursor, r.cursor); });
+  }
+  const putRef = useRef(putInDraft);
+  putRef.current = putInDraft;
+  useEffect(() => {
+    function onInsert(ev: Event) {
+      const d = (ev as CustomEvent<{ text: string; handled: boolean }>).detail;
+      if (d.handled || !textareaRef.current || textareaRef.current.offsetParent === null) return;
+      d.handled = true; putRef.current(d.text);
+    }
+    window.addEventListener(CHAT_INSERT, onInsert);
+    return () => window.removeEventListener(CHAT_INSERT, onInsert);
+  }, []);
 
 
   function removePendingAttachment(id: number) {

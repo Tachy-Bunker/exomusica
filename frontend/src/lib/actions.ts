@@ -203,11 +203,22 @@ export function runCommand(input: string, parsed: { verb: string; rest: string }
   return goOrList(input.trim(), ctx) ?? [];
 }
 
-export type Suggestion = { kind: "place"; label: string; to: string } | { kind: "entity"; entity: Entity };
+export type Suggestion = { kind: "place"; label: string; to: string } | { kind: "entity"; entity: Entity } | { kind: "verb"; verb: string; summary: string };
+
+type Who = { isAdmin: boolean } | null;
+const allowed = (a: Action, user: Who): boolean => !a.needs || (a.needs === "admin" ? !!user?.isAdmin : !!user);
+/** The first thing to show when nothing is typed yet: where you can go, and what you can type. Clicking a chip does it. */
+export function menu(user: Who): { go: { label: string; to: string }[]; verbs: { verb: string; summary: string }[] } {
+  const want = ["Home", "Soundbay", "XenoLab", "Telemetry", "Log", "Hypotheses", "Signal", "Rewards", ...(user ? ["Letters", "Messages", "Account"] : [])];
+  return {
+    go: want.map((l) => PLACES.find((p) => p.label === l)).filter((p): p is (typeof PLACES)[number] => !!p).map((p) => ({ label: p.label, to: p.to })),
+    verbs: ACTIONS.filter((a) => allowed(a, user)).map((a) => ({ verb: a.verbs[0], summary: a.summary })),
+  };
+}
 const SEARCHY = new Set(["go", "goto", "open", "cd", "find", "search", "ls", "take", "grab", "pick"]);
 
 /** What to offer while someone is typing: places whose name starts like the input, then things that match it. */
-export function suggest(input: string, parsed: { verb: string; rest: string }, index: Entity[], limit = 6): Suggestion[] {
+export function suggest(input: string, parsed: { verb: string; rest: string }, index: Entity[], limit = 6, user: Who = null): Suggestion[] {
   const t = input.trim();
   if (!t || t.startsWith("@")) return [];
   const known = byVerb.has(parsed.verb) || parsed.verb === "?" || parsed.verb === "help";
@@ -215,6 +226,7 @@ export function suggest(input: string, parsed: { verb: string; rest: string }, i
   const q = known ? parsed.rest : t;
   const out: Suggestion[] = [];
   if (!known) for (const p of PLACES) if (p.names.some((n) => n.startsWith(q.toLowerCase())) && q.length >= 2) out.push({ kind: "place", label: p.label, to: p.to });
+  if (!known && !/\s/.test(t)) for (const a of ACTIONS) if (allowed(a, user) && a.verbs.some((v) => v.startsWith(t.toLowerCase()) && v !== t.toLowerCase())) out.push({ kind: "verb", verb: a.verbs.find((v) => v.startsWith(t.toLowerCase()))!, summary: a.summary });
   for (const e of searchEntities(index, q, limit)) out.push({ kind: "entity", entity: e });
   return out.slice(0, limit);
 }

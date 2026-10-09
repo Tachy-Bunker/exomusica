@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom";
 import { freqOf, showFreq, TYPE_LABEL, type EntityType, type Peek } from "../lib/atlas";
+import { dragPayload } from "../lib/chatInsert";
 import { setArrival, type Edge } from "../lib/arrive";
 import { AlbumIcon, ChallengeIcon, ChatIcon, NewsIcon, StudyIcon, WikiIcon } from "./ActivityIcons";
 
@@ -24,7 +25,7 @@ export function TypeGlyph({ type, size = 16 }: { type: EntityType; size?: number
 export function Plate({ peek, note, edge, onPick, children }: { peek: Peek; note?: string; edge?: Edge; onPick?: () => void; children?: React.ReactNode }) {
   return (
     <div className="plate" data-type={peek.type}>
-      <Link className="plate-link" to={peek.href} draggable onClick={() => { if (edge) setArrival(edge); onPick?.(); }} aria-label={`${peek.title} (${TYPE_LABEL[peek.type]})`} data-testid="plate">
+      <Link className="plate-link" to={peek.href} draggable onDragStart={(e) => dragPayload(e, peek.title, peek.href)} onClick={() => { if (edge) setArrival(edge); onPick?.(); }} aria-label={`${peek.title} (${TYPE_LABEL[peek.type]})`} data-testid="plate">
         <span className="plate-thumb" aria-hidden="true">
           {peek.image ? <img src={peek.image} alt="" loading="lazy" decoding="async" draggable={false} /> : null}
           <span className="plate-glyph"><TypeGlyph type={peek.type} size={15} /></span>

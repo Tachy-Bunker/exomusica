@@ -1,13 +1,15 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation } from "react-router-dom";
-import { focusOf, hrefOf, keyOf, peekOf, type Entity } from "../lib/atlas";
+import { focusOf, hrefOf, keyOf, peekOf, type Entity, type Peek } from "../lib/atlas";
 import { sectionOf } from "../lib/navSections";
 import { noteFocus } from "../lib/trace";
 import { useTrailStore } from "../lib/trailStore";
 import { usePocketStore } from "../lib/pocketStore";
 import { useAround, type ChatRef } from "../lib/useAtlas";
 import { useChatDockStore } from "../lib/chatDockStore";
+import { useIsDesktop } from "../lib/useIsDesktop";
 import { setArrival } from "../lib/arrive";
+import { chatLinkText, hasComposer, insertIntoChat } from "../lib/chatInsert";
 import { operator } from "../lib/operator";
 import { Faceplate } from "./Faceplate";
 import { Plate } from "./Plate";
@@ -35,6 +37,25 @@ function Panel({ label, onClose, children, testid }: { label: string; onClose: (
   return <div className="fp-panel" ref={ref} role="dialog" aria-label={label} data-testid={testid}>{children}</div>;
 }
 
+/** With the chat dock open the screen edges are taken, so "you were here" and "nearby" move into the middle of the faceplate and drop down on hover, over everything. */
+function Relations({ there, neighbors }: { there: { type: Entity["type"]; id: string; title: string }[]; neighbors: Peek[] }) {
+  const groups = [
+    { id: "there", label: "You were here", n: there.length, body: there.map((t) => <Plate key={`${t.type}:${t.id}`} peek={peekOf({ type: t.type, id: t.id, title: t.title })} edge="left"><Take e={t} /></Plate>) },
+    { id: "near", label: "Nearby", n: neighbors.length, body: neighbors.map((n) => <Plate key={n.key} peek={n} edge="right"><Take e={n} /></Plate>) },
+  ].filter((g) => g.n > 0);
+  if (!groups.length) return null;
+  return (
+    <div className="fp-rels" data-testid="fp-rels">
+      {groups.map((g) => (
+        <div key={g.id} className="fp-rel" data-testid={`fp-rel-${g.id}`}>
+          <button type="button" className="fp-btn fp-rel-btn" aria-haspopup="true">{g.label}<em>{g.n}</em></button>
+          <div className="fp-rel-drop" role="group" aria-label={g.label}>{g.body}</div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 /** The persistent frame around every page: the faceplate, the margins (what is just outside this page), the pocket, and the terminal. */
 export function AtlasShell() {
   const loc = useLocation();
@@ -47,6 +68,8 @@ export function AtlasShell() {
   const openChat = useChatDockStore((s) => s.openChat);
   const [sheet, setSheet] = useState(false);
   const section = sectionOf(loc.pathname);
+  const isDesktop = useIsDesktop();
+  const docked = useChatDockStore((s) => !!s.openChannelSlug && !s.collapsed) && isDesktop;
 
   useEffect(() => { noteFocus(focusKey); }, [focusKey]);
   useEffect(() => {
@@ -63,15 +86,15 @@ export function AtlasShell() {
 
   return (
     <>
-      <Faceplate focus={focus} section={section ? SECTION_NAME[section] : null} around={around} aroundCount={aroundCount} onAround={() => { setSheet((s) => !s); pocket.setOpen(false); }} />
+      <Faceplate focus={focus} section={section ? SECTION_NAME[section] : null} around={around} aroundCount={aroundCount} onAround={() => { setSheet((s) => !s); pocket.setOpen(false); }} center={docked ? <Relations there={there.slice(0, 6)} neighbors={neighbors.slice(0, 8)} /> : undefined} />
 
       {/* Wide screens: what is just outside this page sits at its edges. Left: where you came from. Right: what is nearby. Bottom: the conversation. */}
-      <aside className="margins margins-left" aria-label="Where you came from" data-testid="margins-left">
+      {!docked && <aside className="margins margins-left" aria-label="Where you came from" data-testid="margins-left">
         {there.slice(0, 5).map((t) => <Plate key={`${t.type}:${t.id}`} peek={peekOf({ type: t.type, id: t.id, title: t.title })} note="you were here" edge="left"><Take e={t} /></Plate>)}
-      </aside>
-      <aside className="margins margins-right" aria-label="Nearby" data-testid="margins-right">
+      </aside>}
+      {!docked && <aside className="margins margins-right" aria-label="Nearby" data-testid="margins-right">
         {neighbors.slice(0, 7).map((n) => <Plate key={n.key} peek={n} edge="right"><Take e={n} /></Plate>)}
-      </aside>
+      </aside>}
       {chat && (
         <button type="button" className="margin-chat" onClick={() => startChat(chat)} data-testid="margin-chat" aria-label={`Open the conversation: ${chat.name}`}>
           <span aria-hidden="true">💬</span> {chat.name}
@@ -92,6 +115,7 @@ export function AtlasShell() {
           <h3>Pocket</h3>
           {pocket.items.length === 0 ? <p className="dim">{operator.pocketEmpty}</p> : pocket.items.map((p) => (
             <Plate key={p.key} peek={peekOf({ type: p.type, id: p.id, title: p.title })} edge="top" onPick={() => { setArrival("top"); pocket.setOpen(false); }}>
+              {hasComposer() && <button type="button" className="plate-take plate-send" onClick={() => insertIntoChat(chatLinkText(p.title, hrefOf(p.type, p.id)))} aria-label={`Paste ${p.title} into the chat`} title="Paste into the chat" data-testid="pocket-send">↵</button>}
               <button type="button" className="plate-take" onClick={() => pocket.remove(p.key)} aria-label={`Take ${p.title} out of your pocket`} title="Drop" data-testid="pocket-drop">×</button>
             </Plate>
           ))}
@@ -99,7 +123,7 @@ export function AtlasShell() {
             <button type="button" className="btn" onClick={() => pocket.add(focusEntity)} data-testid="pocket-take-here">Pick up this page</button>
           )}
           {pocket.items.length > 0 && <button type="button" className="btn" onClick={pocket.clear}>Empty pocket</button>}
-          <p className="dim fp-hint">Drag any item into a chat to share its link.</p>
+          <p className="dim fp-hint">Drag an item into a chat, or press ↵ beside it, to share its link.</p>
         </Panel>
       )}
       <Landmarks focusKey={focusKey} />

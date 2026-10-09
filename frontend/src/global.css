@@ -5546,3 +5546,50 @@ th {
 .spec-caption { width: 100%; max-width: 480px; min-height: 1.3em; margin-top: 0.4rem; font-size: 0.75rem; color: var(--text-dim); text-align: left; }
 .spec-caption b { color: var(--text); font-weight: 600; }
 .spec-caption button { background: none; border: 0; color: var(--text-dim); cursor: pointer; padding: 0 0.3rem; }
+
+/* Terminal: what you can do before typing, and the ghost completion (desktop) */
+.term-menu { padding: 0.4rem 0.8rem 0.5rem; border-top: 1px solid var(--border); display: flex; flex-direction: column; gap: 0.35rem; max-height: 11rem; overflow: auto; }
+.term-menu-row { display: flex; flex-wrap: wrap; align-items: center; gap: 0.3rem; }
+.term-menu-h { flex: none; width: 3.4rem; font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--accent-audio); }
+.term-chip { padding: 0.1rem 0.55rem; border: 1px solid var(--border); border-radius: 999px; background: transparent; color: var(--text); font: inherit; font-size: 0.78rem; cursor: pointer; }
+.term-chip:hover, .term-chip:focus-visible { border-color: var(--accent-forum); color: var(--accent-forum); }
+.term-chip-verb { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 0.74rem; }
+.term-menu-note { color: var(--text-dim); font-size: 0.72rem; margin-left: 0.3rem; }
+.term-field { position: relative; flex: 1; min-width: 0; display: block; }
+.term-field input { width: 100%; position: relative; z-index: 1; }
+.term-ghost { display: none; }
+.term-tab { display: none; }
+@media (hover: hover) and (pointer: fine) {
+  .term-ghost { display: block; position: absolute; inset: 0; z-index: 0; font: inherit; font-size: 1rem; white-space: pre; overflow: hidden; pointer-events: none; color: color-mix(in srgb, var(--text) 32%, transparent); }
+  .term-ghost > span { visibility: hidden; }
+  .term-tab { display: inline-block; flex: none; padding: 0 0.4rem; border: 1px solid var(--border); border-radius: 4px; font-size: 0.68rem; color: var(--text-dim); opacity: 0.8; }
+}
+
+/* Trace lens explainer */
+.fp-tipwrap { position: relative; display: inline-flex; }
+.fp-state { font-style: normal; font-size: 0.66rem; padding: 0 0.3rem; border-radius: 999px; background: var(--accent-audio-dim, var(--bg-inset)); color: var(--text); }
+.fp-on { color: var(--accent-audio); border-color: var(--accent-audio-dim, var(--border)); }
+.fp-tip { display: none; position: absolute; top: calc(100% + 6px); right: 0; width: 17rem; z-index: 61; padding: 0.55rem 0.7rem; background: var(--bg-elevated); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: 0 10px 28px rgba(0,0,0,0.5); font-size: 0.78rem; line-height: 1.4; color: var(--text-dim); text-align: left; pointer-events: none; }
+.fp-tip b { display: block; color: var(--text); margin-bottom: 0.15rem; }
+@media (hover: hover) and (pointer: fine) { .fp-tipwrap:hover .fp-tip, .fp-tipwrap:focus-within .fp-tip { display: block; } }
+.landmarks-what { font-size: 0.74rem; }
+.landmarks-what .linklike { margin-left: 0.4rem; }
+
+/* Faceplate centre: "you were here" / "nearby" while the chat dock holds the screen edge */
+@media (min-width: 900px) {
+  .faceplate { padding-right: calc(var(--dock-offset, 0px) + 1.5rem); }
+  .faceplate.has-center { z-index: 46; }
+}
+.fp-rels { display: inline-flex; gap: 0.3rem; }
+.fp-rel { position: relative; }
+.fp-rel-drop { display: none; position: absolute; top: 100%; left: 50%; transform: translateX(-50%); width: 280px; max-height: min(70vh, 480px); overflow: auto; padding: 0.4rem 0.5rem 0.5rem; margin-top: 2px; background: var(--bg-elevated); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: 0 14px 36px rgba(0,0,0,0.55); z-index: 70; flex-direction: column; gap: 0.35rem; }
+.fp-rel::after { content: ""; position: absolute; left: 0; right: 0; top: 100%; height: 4px; } /* no dead gap between the button and its drop */
+.fp-rel:hover .fp-rel-drop, .fp-rel:focus-within .fp-rel-drop { display: flex; }
+.fp-rel-drop .plate-link { width: 100%; }
+
+/* Explore: the area under the card eases open/closed (grid rows 0fr→1fr: no JS, no layout thrash) */
+.explore-below { display: grid; grid-template-rows: 0fr; opacity: 0; transition: grid-template-rows 0.32s ease, opacity 0.22s ease; }
+.explore-below.open { grid-template-rows: 1fr; opacity: 1; }
+.explore-below-in { min-height: 0; overflow: hidden; }
+.explore-below:not(.open) .explore-below-in { visibility: hidden; transition: visibility 0s 0.32s; }
+@media (prefers-reduced-motion: reduce) { .explore-below { transition: none; } }
