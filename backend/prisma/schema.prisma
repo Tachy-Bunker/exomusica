@@ -94,6 +94,7 @@ model User {
   rewardClaims RewardClaim[]
   hypotheses   Hypothesis[]
   pollVotes    PollVote[]
+  puzzleSolves PuzzleSolve[]
   lettersSent  Letter[]  @relation("LetterAuthor")
   lettersGot   Letter[]  @relation("LetterTo")
   letterBlocks LetterBlock[] @relation("Blocker")
@@ -955,6 +956,7 @@ model SampleBankItem {
   coupons      ResourceCoupon[]
   unlocks      ResourceUnlock[]
   rewards      Reward[]
+  puzzleNodes  PuzzleNode[]
 }
 
 // A code that opens paid resources: for one resource, or (itemId null) for every paid one. The admin makes them and hands them to the contributing artists.
@@ -981,7 +983,7 @@ model ResourceUnlock {
   item      SampleBankItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
   couponId  Int?
   coupon    ResourceCoupon? @relation(fields: [couponId], references: [id], onDelete: SetNull)
-  via       String   @default("coupon") // how it was opened: coupon, points or gift
+  via       String   @default("coupon") // how it was opened: coupon, points, gift or puzzle
   createdAt DateTime @default(now())
 
   @@unique([userId, itemId])
@@ -1302,4 +1304,40 @@ model PollVote {
   updatedAt DateTime @updatedAt
 
   @@id([messageId, userId])
+}
+
+// The numbers station's puzzle graph. A node is a transmission, optionally with an answer. Hidden nodes are never sent to players.
+model PuzzleNode {
+  id          Int      @id @default(autoincrement())
+  title       String
+  body        String   @db.Text
+  mediaUrl    String?  // audio / image, an https link or an /uploads path (lossless WAV/FLAC are fine)
+  hint        String?  @db.Text
+  answerSalt  String?
+  answerHash  String?  // sha256(salt:normalised answer). null = no answer: the player just receives it
+  requires    Int[]    // node ids that must be met first
+  quorum      Int      @default(0) // > 0: a collective lock. Whatever requires it waits until this many members have solved it
+  opensOnDay  Int?     // station day index (see lib/signal.ts); null = no date
+  rewardText  String?  @db.Text
+  rewardUrl   String?
+  rewardPoints Int     @default(0)
+  rewardItemId Int?
+  rewardItem  SampleBankItem? @relation(fields: [rewardItemId], references: [id], onDelete: SetNull)
+  published   Boolean  @default(false)
+  x           Float?   // editor position, optional
+  y           Float?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  solves      PuzzleSolve[]
+}
+
+model PuzzleSolve {
+  nodeId Int
+  node   PuzzleNode @relation(fields: [nodeId], references: [id], onDelete: Cascade)
+  userId Int
+  user   User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  at     DateTime   @default(now())
+
+  @@id([nodeId, userId])
+  @@index([nodeId])
 }

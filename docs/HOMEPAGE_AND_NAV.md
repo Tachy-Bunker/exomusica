@@ -256,3 +256,23 @@ Tests: `backend/_scratch/letters.test.ts`, `frontend/_scratch/e2e_fix284.py` (21
 **Not yet**: structured cards in the mini-chat dock and PMs (they show the fallback text), squelch there, contextual chat per item, `/scope` and `/analyze`.
 
 Tests: `backend/_scratch/chatKinds.test.ts`, `frontend/_scratch/chat.test.ts`, `frontend/_scratch/e2e_fix285.py` (21 checks).
+
+## fix286: the numbers station (ARG engine core)
+
+Pages: `/signal` (players, login required; terminal `go signal`), `/admin/signal` (puzzle-graph editor, terminal `admin signal`).
+
+**Fantasy calendar** (`backend/src/lib/signal.ts`, mirrored in `frontend/src/lib/stationCalendar.ts`): 13 months of 28 days (Static, Drift, Carrier, Sideband, Squelch, Heterodyne, Overtone, Formant, Aliasing, Phase, Grain, Decay, Silence) + a Null Day = 365-day Cycle, counted from 1 Jan 2026 UTC. Dates only, never time of day. A transmission may be set to go on the air on a station date.
+
+**Nodes** (`PuzzleNode`): title, text, optional media (https or /uploads; audio and images render natively, so lossless WAV/FLAC work), hint, optional answer, requirements (other nodes), optional collective lock (`quorum`), optional date, reward (text, link, 0-100 points, and/or a resource unlocked with `ResourceUnlock.via = "puzzle"`), published flag. No answer = the player just logs reception.
+
+**Answers**: normalised (accents and punctuation dropped, case-insensitive), then `sha256(salt:answer)` with a per-node random salt, compared in constant time. The hash and salt never leave the server; the admin can only replace, remove or test an answer. 10 tries/min per member per node. Answers are never written to the audit log.
+
+**What's on the air** (`isOnAir`): published, its date has come, and every requirement is met. A requirement **with a quorum** is met for *everyone* once that many different members have solved it (a collective lock); any other requirement is met by your own solve. Anything not on the air for you is not sent at all (no titles, no counts) and answering it returns "Nothing on that frequency".
+
+**Rewards** are granted once, on the first solve, and shown only to those who solved it.
+
+**Admin**: SVG graph layered left to right by requirement depth (drafts dashed, locks show progress), click a node to edit, requirements as checkboxes (loops are refused), station-date picker, answer test, delete (dependents stop requiring it). The admin layout now stacks on phones.
+
+**Not yet** (the content tools that make puzzles): a "Signal studio" to generate Hellschreiber-style spectrogram text and XY-scope audio, SSTV, the UV lens, the foxhunt S-meter, spectrogram player bar; node reset/ban tools; a player-facing map; notifications when something new goes on the air.
+
+Tests: `backend/_scratch/signal.test.ts`, `frontend/_scratch/signal.test.ts`, `frontend/_scratch/e2e_fix286.py` (22 checks).

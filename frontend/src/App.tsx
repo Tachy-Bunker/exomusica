@@ -51,6 +51,8 @@ import { RewardsAdminPage } from "./pages/admin/RewardsAdminPage";
 import { HypothesesPage, HypothesisDrawPage } from "./pages/HypothesesPage";
 import { HypothesisPage } from "./pages/HypothesisPage";
 import { LettersPage } from "./pages/LettersPage";
+import { SignalPage } from "./pages/SignalPage";
+import { SignalAdminPage } from "./pages/admin/SignalAdminPage";
 import { RewardsPage } from "./pages/RewardsPage";
 import { BranchContributeAdminPage } from "./pages/admin/BranchContributeAdminPage";
 import { SubmissionsAdminPage } from "./pages/admin/SubmissionsAdminPage";
@@ -147,6 +149,7 @@ export default function App() {
             <Route path="pms/:username" element={<PMsPage />} />
             <Route path="account" element={<AccountSettingsPage />} />
             <Route path="rewards" element={<RewardsPage />} />
+            <Route path="signal" element={<SignalPage />} />
             <Route path="letters" element={<LettersPage />} />
             <Route path="hypotheses" element={<HypothesesPage />} />
             <Route path="hypotheses/draw" element={<HypothesisDrawPage />} />
@@ -166,6 +169,7 @@ export default function App() {
                 <Route path="resources" element={<ResourcesAdminPage />} />
                 <Route path="featured" element={<FeaturedAdminPage />} />
                 <Route path="rewards" element={<RewardsAdminPage />} />
+                <Route path="signal" element={<SignalAdminPage />} />
                 <Route path="branches/:id/contribute" element={<BranchContributeAdminPage />} />
                 <Route path="branches/:id/identity" element={<BranchIdentityAdminPage />} />
                 <Route path="submissions" element={<SubmissionsAdminPage />} />

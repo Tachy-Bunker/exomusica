@@ -1,0 +1,23 @@
+import assert from "node:assert/strict";
+import { stationDate, indexOfDate, dayIndex, EPOCH_MS, normalizeAnswer, hashAnswer, checkAnswer, newSalt, isOnAir, wouldLoop, MONTHS } from "../src/lib/signal.ts";
+assert.equal(dayIndex(EPOCH_MS), 0); assert.equal(dayIndex(EPOCH_MS + 86_400_000 * 3 + 5), 3);
+assert.equal(stationDate(0).label, "1 Static, Cycle 1"); assert.equal(stationDate(27).label, "28 Static, Cycle 1"); assert.equal(stationDate(28).label, "1 Drift, Cycle 1");
+assert.equal(stationDate(363).label, `28 ${MONTHS[12]}, Cycle 1`); assert.equal(stationDate(364).label, "Null Day, Cycle 1"); assert.equal(stationDate(365).label, "1 Static, Cycle 2");
+for (const i of [0, 1, 27, 28, 200, 363, 364, 365, 730]) { const s = stationDate(i); assert.equal(indexOfDate(s.cycle, s.month, s.day), i, `roundtrip ${i}`); }
+assert.equal(indexOfDate(1, 13, 1), null); assert.equal(indexOfDate(1, 0, 29), null); assert.equal(indexOfDate(0, 0, 1), null);
+assert.equal(normalizeAnswer("  Épée-Noire! 42 "), "epeenoire42");
+const salt = newSalt(), h = hashAnswer(salt, "The Quick Fox");
+assert.ok(checkAnswer(salt, h, "the quick  FOX!")); assert.ok(!checkAnswer(salt, h, "the quick fix")); assert.ok(!checkAnswer(salt, h, "")); assert.ok(!checkAnswer(newSalt(), h, "the quick fox"));
+assert.notEqual(hashAnswer(newSalt(), "x"), hashAnswer(newSalt(), "x"));
+const N = (id: number, o: Partial<{ published: boolean; opensOnDay: number | null; requires: number[]; quorum: number }> = {}) => ({ id, published: true, opensOnDay: null, requires: [], quorum: 0, ...o });
+const nodes = [N(1), N(2, { requires: [1] }), N(3, { requires: [2], quorum: 3 }), N(4, { requires: [3] }), N(5, { published: false }), N(6, { opensOnDay: 10 }), N(7, { requires: [99] })];
+const by = new Map(nodes.map((n) => [n.id, n]));
+const air = (today: number, mine: number[], counts: [number, number][] = []) => nodes.filter((n) => isOnAir(n, by, today, new Set(mine), new Map(counts))).map((n) => n.id);
+assert.deepEqual(air(0, []), [1]); assert.deepEqual(air(0, [1]), [1, 2]); assert.deepEqual(air(0, [1, 2]), [1, 2, 3]);
+assert.deepEqual(air(0, [1, 2, 3]), [1, 2, 3], "node 4 waits for the quorum even if I solved 3");
+assert.deepEqual(air(0, [1, 2], [[3, 3]]), [1, 2, 3, 4], "the quorum opens it for people who haven't solved 3");
+assert.deepEqual(air(10, []), [1, 6], "its day has come"); 
+assert.ok(!air(0, [], [[99, 1]]).includes(7), "missing requirement never opens");
+assert.ok(wouldLoop(1, [2], [{ id: 1, requires: [] }, { id: 2, requires: [1] }])); assert.ok(wouldLoop(1, [1], [{ id: 1, requires: [] }]));
+assert.ok(!wouldLoop(3, [1, 2], [{ id: 1, requires: [] }, { id: 2, requires: [1] }, { id: 3, requires: [] }]));
+console.log("signal ok");
