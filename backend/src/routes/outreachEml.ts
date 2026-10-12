@@ -137,12 +137,12 @@ export async function outreachEmlRoutes(app: FastifyInstance, W: Pre): Promise<v
     const items: { name: string; build: () => Promise<Buffer> }[] = [];
     for (const m of ms) items.push({ name: emlFileName(m.date, m.subject, `m${m.id}`), build: () => {
       const to = m.toEmails.split(",").map((x) => x.trim()).filter(isEmail);
-      return buildRaw({ from: { fromName: m.fromName || null, fromEmail: isEmail(m.fromEmail) ? m.fromEmail : "unknown@invalid.example", replyTo: null }, to: { email: to[0] ?? "unknown@invalid.example" }, cc: to.slice(1), bcc: [], subject: m.subject || "(no subject)", text: m.bodyText, html: "", attachments: [], messageId: m.messageId ?? undefined, inReplyTo: m.inReplyTo ?? undefined, date: m.date });
+      return buildRaw({ from: { fromName: m.fromName || null, fromEmail: isEmail(m.fromEmail) ? m.fromEmail : "unknown@invalid.example", replyTo: null }, to: { email: to[0] ?? "unknown@invalid.example" }, cc: to.slice(1), bcc: [], subject: m.subject || "(no subject)", text: m.bodyText, html: "", attachments: [], messageId: m.messageId || `<imported-m${m.id}@outreach.invalid>`, inReplyTo: m.inReplyTo ?? undefined, date: m.date });
     } });
     for (const s of ss) items.push({ name: emlFileName(s.sentAt, s.subject, `s${s.id}`), build: () => {
       const a = accts.find((x) => x.id === s.accountId) ?? def; const r = renderMail(s.bodyMd, { sizeOf: (u) => { const f = uploadFile(u, UPLOADS_DIR); try { return f ? statSync(f).size : null; } catch { return null; } } });
       const files = r.attachments.flatMap((x) => { const p = uploadFile(x.url, UPLOADS_DIR); try { return p && statSync(p).isFile() ? [{ filename: x.filename, path: p, cid: x.cid }] : []; } catch { return []; } });
-      return buildRaw({ from: { fromName: a?.fromName ?? null, fromEmail: a?.fromEmail || a?.smtpUser || "me@invalid.example", replyTo: a?.replyTo ?? null }, to: { email: s.toEmail, name: s.toName }, cc: (s.cc ?? "").split(",").map((x) => x.trim()).filter(isEmail), bcc: [], subject: s.subject, text: r.text, html: r.html, attachments: files, messageId: s.messageId ?? undefined, date: s.sentAt });
+      return buildRaw({ from: { fromName: a?.fromName ?? null, fromEmail: a?.fromEmail || a?.smtpUser || "me@invalid.example", replyTo: a?.replyTo ?? null }, to: { email: s.toEmail, name: s.toName }, cc: (s.cc ?? "").split(",").map((x) => x.trim()).filter(isEmail), bcc: [], subject: s.subject, text: r.text, html: r.html, attachments: files, messageId: s.messageId || `<sent-s${s.id}@outreach.invalid>`, date: s.sentAt });
     } });
     if (!items.length) return fail(reply, 404, "No mail to export for that choice.");
     if (items.length === 1) { const buf = await items[0].build(); return reply.header("content-type", "message/rfc822").header("content-disposition", `attachment; filename="${items[0].name}"`).send(buf); }
