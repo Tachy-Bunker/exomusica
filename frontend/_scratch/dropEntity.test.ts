@@ -10,3 +10,12 @@ ok(entityFromDrop("[Ice](https://x.test/study/ice-1)", O)!.title === "Ice", "mar
 ok(entityFromDrop("https://x.test/wiki/start", O)!.title === "start", "bare url falls back to the id");
 ok(entityFromDrop("hello", O) === null, "text is nothing");
 console.log(n, "passed");
+{
+  const { entitiesInText } = await import("../src/lib/dropEntity");
+  const o = "https://x.test";
+  const r = entitiesInText("hear [My Branch](/soundbay?open=drone) and https://x.test/study/abc, also https://evil.test/study/zzz and [me](/pms)", o);
+  const okk = (c: boolean, m: string) => { if (!c) { console.log("FAIL", m); process.exitCode = 1; } else console.log("ok  ", m); };
+  okk(r.length === 2 && r[0].id === "drone" && r[0].title === "My Branch", "message links: titled link first");
+  okk(r[1].type === "study" && !r.some((x) => x.id === "zzz" || x.id === "pms"), "message links: bare site link kept, other sites and private pages are not");
+  okk(entitiesInText("nothing here", o).length === 0, "message links: none");
+}

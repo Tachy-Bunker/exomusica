@@ -15,17 +15,20 @@ export function unpackPoints(b: Uint8Array): Uint8Array | null {
 }
 
 export type Strip = Uint8Array | "none"; // levels 0..15, row-major; "none" = this server can't measure it: the player keeps its plain bar
-const mem = new Map<number, Promise<Strip>>();
+const mem = new Map<string, Promise<Strip>>();
+/** Official and community tracks have separate numbering: this is the address base for each. */
+export const trackBase = (source: string | undefined): string => (source === "community" ? "/api/community-tracks" : source === "voice" ? "/api/voice-notes" : "/api/tracks");
 
 /** One request per track per page load (the server measures it once, ever, and the browser keeps it for a year). */
-export function loadStrip(trackId: number): Promise<Strip> {
-  let p = mem.get(trackId);
+export function loadStrip(trackId: number, source?: string): Promise<Strip> {
+  const key = `${source === "community" ? "c" : source === "voice" ? "v" : "o"}${trackId}`;
+  let p = mem.get(key);
   if (!p) {
-    p = fetch(`/api/tracks/${trackId}/spectrogram`)
+    p = fetch(`${trackBase(source)}/${trackId}/spectrogram`)
       .then(async (r) => { if (!r.ok) return "none" as const; return unpackPoints(new Uint8Array(await r.arrayBuffer())) ?? ("none" as const); })
       .catch(() => "none" as const);
-    mem.set(trackId, p);
-    if (mem.size > 6) mem.delete(mem.keys().next().value as number); // a few tracks are enough
+    mem.set(key, p);
+    if (mem.size > 6) mem.delete(mem.keys().next().value as string); // a few tracks are enough
   }
   return p;
 }

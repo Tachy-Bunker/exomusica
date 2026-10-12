@@ -46,6 +46,7 @@ model User {
   avatarUrl             String?
   contributorPointsEntries ContributorPointsEntry[]
   trackComments         TrackComment[]
+  communityTrackComments CommunityTrackComment[]
   dialJson              Json?        // the chat dock's dial: pinned rooms, scenes, sleeping slots (follows the member across devices)
   pointsAwarded             ContributorPointsEntry[] @relation("PointsAwardedBy")
   bio                   String?
@@ -433,6 +434,19 @@ model TrackComment {
   atSeconds Float
   body      String
   createdAt DateTime @default(now())
+
+  @@index([trackId, atSeconds])
+}
+
+model CommunityTrackComment {
+  id        Int            @id @default(autoincrement())
+  trackId   Int
+  track     CommunityTrack @relation(fields: [trackId], references: [id], onDelete: Cascade)
+  userId    Int
+  user      User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  atSeconds Float
+  body      String
+  createdAt DateTime       @default(now())
 
   @@index([trackId, atSeconds])
 }
@@ -1130,6 +1144,7 @@ model CommunityTrack {
 
   playlistItems PlaylistItem[]
   likes         CommunityTrackLike[]
+  comments      CommunityTrackComment[]
   remixOfId     Int?
   remixOf       CommunityTrack?  @relation("Remixes", fields: [remixOfId], references: [id], onDelete: SetNull)
   remixes       CommunityTrack[] @relation("Remixes")
@@ -1359,4 +1374,90 @@ model PuzzleSolve {
 
   @@id([nodeId, userId])
   @@index([nodeId])
+}
+
+// ---- Outreach: a private contact sheet and email composer for the site owner (festivals, open calls, labels...) ----
+model OutreachSettings {
+  id              Int      @id @default(1)
+  smtpHost        String?
+  smtpPort        Int?
+  smtpSecure      Boolean  @default(true)
+  smtpUser        String?
+  smtpPasswordEnc String? // sealed with OUTREACH_SECRET (or JWT_SECRET); never sent to the browser
+  fromName        String?
+  fromEmail       String?
+  replyTo         String?
+  defaultCc       String? // comma separated
+  defaultBcc      String?
+  imapHost        String?
+  imapPort        Int?
+  imapSecure      Boolean  @default(true)
+  sentFolder      String   @default("Sent")
+  fileInSent      Boolean  @default(false) // put a copy in the mailbox's Sent folder over IMAP (providers like Gmail do this by themselves)
+  signatureMd     String   @default("")
+  followUpDays    Int      @default(14)
+  updatedAt       DateTime @updatedAt
+}
+
+model OutreachColumn {
+  id       Int     @id @default(autoincrement())
+  key      String  @unique // the merge-field name: {{key}}
+  name     String
+  type     String  @default("text") // text, longtext, number, date, checkbox, select, multiselect, url, email, rating
+  options  Json?   // for select / multiselect: ["Open", "Closed"]
+  position Int     @default(0)
+  hidden   Boolean @default(false)
+  width    Int?
+}
+
+model OutreachContact {
+  id         Int       @id @default(autoincrement())
+  name       String    @default("")
+  email      String    @default("")
+  data       Json      @default("{}") // column key -> value
+  lastSentAt DateTime? // editable: for mail that was not sent from here
+  sentCount  Int       @default(0)  // editable too
+  followUpAt DateTime?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+  sends      OutreachSend[]
+
+  @@index([followUpAt])
+}
+
+model OutreachSend {
+  id          Int              @id @default(autoincrement())
+  contactId   Int?
+  contact     OutreachContact? @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  toEmail     String
+  toName      String           @default("")
+  subject     String
+  bodyMd      String
+  cc          String?
+  bcc         String?
+  messageId   String?
+  filedInSent Boolean          @default(false)
+  error       String?
+  batch       String?
+  sentAt      DateTime         @default(now())
+
+  @@index([contactId, sentAt])
+  @@index([sentAt])
+}
+
+model OutreachBlockType {
+  id       Int             @id @default(autoincrement())
+  name     String
+  position Int             @default(0)
+  blocks   OutreachBlock[]
+}
+
+model OutreachBlock {
+  id        Int               @id @default(autoincrement())
+  typeId    Int
+  type      OutreachBlockType @relation(fields: [typeId], references: [id], onDelete: Cascade)
+  title     String
+  body      String            @default("")
+  position  Int               @default(0)
+  updatedAt DateTime          @updatedAt
 }

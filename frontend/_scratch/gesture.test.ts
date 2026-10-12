@@ -1,0 +1,16 @@
+import { swipeIntent, stillHolding, sheetSizes, snapDetent, stepDetent, radialSlots, fitCentre, slotAt } from "../src/lib/gesture";
+let n = 0; const ok = (c: boolean, m: string) => { if (!c) { console.log("FAIL", m); process.exitCode = 1; } else { n++; console.log("ok  ", m); } };
+ok(swipeIntent(90, 10) === "right" && swipeIntent(-90, 20) === "left", "swipe: sideways");
+ok(swipeIntent(60, 5) === null && swipeIntent(80, 60) === null, "swipe: too short or diagonal is scrolling");
+ok(swipeIntent(10, 90) === "pull" && swipeIntent(10, -90) === null, "swipe: pull is downward only");
+ok(stillHolding(3, 4) && !stillHolding(9, 9), "hold: a small wobble still holds");
+const s = sheetSizes(800); ok(s.peek === 168 && s.half === 400 && s.full === 744, "sheet sizes");
+ok(snapDetent(180, 0, s) === "peek" && snapDetent(390, 0, s) === "half" && snapDetent(700, 0, s) === "full", "snap: nearest rests");
+ok(snapDetent(300, 1.5, s) === "half" && snapDetent(300, -1.5, s) === "peek", "snap: a flick carries it onward");
+ok(stepDetent("peek", 1) === "half" && stepDetent("full", 1) === "full" && stepDetent("peek", -1) === "peek", "step: clamped");
+const r = radialSlots(5, 80); ok(r.length === 5 && r.every((p) => p.y < 0) , "radial: all slots open upward");
+ok(r[0].x < r[2].x && r[2].x < r[4].x && Math.abs(r[2].x) <= 2, "radial: spread left to right, middle straight up");
+ok(radialSlots(0, 80).length === 0 && radialSlots(1, 80)[0].x === 0, "radial: none, one");
+const f = fitCentre(5, 20, 100, 390, 700); ok(f.x === 100 && f.y === 108, "fit: pulled in from the corner");
+ok(slotAt(r[3].x, r[3].y, 5, 80) === 3 && slotAt(0, 0, 5, 80) === -1, "slotAt: finger over a button");
+console.log(n + " passed");

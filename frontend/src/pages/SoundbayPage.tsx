@@ -6,6 +6,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { AlbumIcon, ChatIcon, MapIcon } from "../components/ActivityIcons";
 import { Username } from "../components/Username";
+import { CreateBox } from "../components/CreateBox";
 import { BranchEmblem } from "../components/BranchEmblem";
 import { PauseIcon, PlayIcon } from "../components/Icons";
 import { api } from "../lib/api";
@@ -24,6 +25,8 @@ import { useIsDesktop } from "../lib/useIsDesktop";
 import { MAP_VIEW_ENABLED } from "../lib/features";
 import { useUrlParams } from "../lib/useUrlParams";
 
+/** A steady colour for a name: the same card always has the same tint. */
+const hueOf = (slug: string): number => { let h = 0; for (let i = 0; i < slug.length; i++) h = (h * 31 + slug.charCodeAt(i)) % 360; return h; };
 interface PlaylistRow { slug: string; title: string; owner: string; description: string | null }
 interface CommunityAlbumRow { slug: string; title: string; composer: string; coverArtUrl: string | null; owner: { username: string } }
 interface AlbumLite { slug: string; title: string; composer?: string | null; coverArtUrl: string | null; trackCount?: number }
@@ -317,16 +320,24 @@ export function SoundbayPage() {
         <>
           {branchSection("sb-branches", "Branches", grown)}
           {branchSection("sb-seeds", "Growing seeds", seeds)}
-          {lists.length > 0 && (
+          {(lists.length > 0 || !searching) && (
             <section id="sb-playlists" className="sb-section" aria-labelledby="sb-playlists-h">
-              <div className="home-h2-row"><h2 id="sb-playlists-h" className="home-h2">Playlists <span className="home-dim sb-count">{lists.length}</span></h2><span className="home-dim">made by members</span></div>
-              <ul className="sb-simple" data-testid="playlist-list">{lists.map((p) => <li key={p.slug}><Link to={`/playlist/${p.slug}`}><b>{p.title}</b></Link><span className="home-dim"> by <Username name={p.owner} />{p.description ? ` · ${p.description}` : ""}</span></li>)}</ul>
+              <div className="home-h2-row"><h2 id="sb-playlists-h" className="home-h2">Playlists <span className="home-dim sb-count">{lists.length}</span></h2><span className="home-dim sb-sub">made by members</span><CreateBox kind="playlist" label="Name your playlist" /></div>
+              {lists.length > 0 && <ul className="sb-cards" data-testid="playlist-list">{lists.map((p) => (
+                <li key={p.slug} className="sb-card" style={{ ["--hue" as string]: hueOf(p.slug) }}>
+                  <span className="sb-card-art sb-card-art--list" aria-hidden="true"><i /><i /><i /></span>
+                  <span className="sb-card-text"><Link to={`/playlist/${p.slug}`} className="sb-card-title">{p.title}</Link><span className="home-dim sb-card-sub">by <Username name={p.owner} />{p.description ? ` · ${p.description}` : ""}</span></span>
+                </li>))}</ul>}
             </section>
           )}
-          {albs.length > 0 && (
+          {(albs.length > 0 || !searching) && (
             <section id="sb-albums" className="sb-section" aria-labelledby="sb-albums-h">
-              <div className="home-h2-row"><h2 id="sb-albums-h" className="home-h2">Community albums <span className="home-dim sb-count">{albs.length}</span></h2><span className="home-dim">from members</span></div>
-              <ul className="sb-simple" data-testid="album-list">{albs.map((a) => <li key={a.slug}><Link to={`/community-album/${a.slug}`}><b>{a.title}</b></Link><span className="home-dim"> {a.composer || <Username name={a.owner.username} />}</span></li>)}</ul>
+              <div className="home-h2-row"><h2 id="sb-albums-h" className="home-h2">Community albums <span className="home-dim sb-count">{albs.length}</span></h2><span className="home-dim sb-sub">from members</span><CreateBox kind="album" label="Name your album" /></div>
+              {albs.length > 0 && <ul className="sb-cards" data-testid="album-list">{albs.map((a) => (
+                <li key={a.slug} className="sb-card" style={{ ["--hue" as string]: hueOf(a.slug) }}>
+                  <span className="sb-card-art">{a.coverArtUrl ? <img src={a.coverArtUrl} alt="" loading="lazy" decoding="async" draggable={false} /> : <i className="sb-card-disc" />}</span>
+                  <span className="sb-card-text"><Link to={`/community-album/${a.slug}`} className="sb-card-title">{a.title}</Link><span className="home-dim sb-card-sub">{a.composer || <Username name={a.owner.username} />}</span></span>
+                </li>))}</ul>}
             </section>
           )}
           {searching && totalShown > 0 && <p className="home-dim sb-found">{totalShown} result{totalShown === 1 ? "" : "s"}</p>}

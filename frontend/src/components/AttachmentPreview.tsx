@@ -1,3 +1,4 @@
+import { VoiceStrip } from "./VoiceStrip";
 import { isVoiceNoteName } from "../lib/voiceNoteUpload";
 
 interface AttachmentInfo {
@@ -22,7 +23,7 @@ function guessKind(filename: string): "image" | "audio" | "video" | "text" | "ot
   return "other";
 }
 
-export function AttachmentPreview({ attachment }: { attachment: AttachmentInfo }) {
+export function AttachmentPreview({ attachment, messageId }: { attachment: AttachmentInfo; messageId?: number }) {
   const kind = guessKind(attachment.filename);
   const filenameLabel = (
     <div style={{ fontSize: "0.7rem", color: "var(--text-dim)", marginTop: "0.3rem" }}>{attachment.filename}</div>
@@ -43,7 +44,7 @@ export function AttachmentPreview({ attachment }: { attachment: AttachmentInfo }
     return (
       <div data-testid={voice ? "voice-note-message" : undefined}>
         {voice ? <div style={{ fontSize: "0.75rem", color: "var(--text-dim)", marginTop: "0.3rem" }}>🎙 Voice note</div> : filenameLabel}
-        <audio controls src={attachment.url} style={{ display: "block", width: "100%", maxWidth: 320 }} />
+        {voice && messageId ? <VoiceStrip id={attachment.id} url={attachment.url} messageId={messageId} /> : <audio controls src={attachment.url} style={{ display: "block", width: "100%", maxWidth: 320 }} />}
       </div>
     );
   }

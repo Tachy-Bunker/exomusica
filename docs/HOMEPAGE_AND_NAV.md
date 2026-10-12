@@ -369,3 +369,17 @@ Phase 1 (this delivery), idea 4:
 - **Pocket drop:** branch rows in Soundbay and any link to a site thing are draggable; a pocket pad appears while dragging, the faceplate Pocket button is a target too. Private pages are not things, so nothing is carried. Touch screens cannot HTML5-drag.
 - **Spectrogram:** 250x20 4-bit points (2500 bytes, `uploads/spectro/<id>-<hash>.pts`) painted on a canvas through a ramp of the cover's average colour. Old `.spec` files are unused and can be deleted.
 - **Imports:** uploads read embedded tags (title, artist, album, track no., year, genre). Admin `track-upload` returns them; community upload has an optional title (typed > tag > file name) and composer falls back to the artist tag. Submit and My Music accept several files at once, ordered by file name.
+
+## fix297 — chat on phones, track comments, Soundbay cards, Outreach
+
+**Chat on phones** (touch only; mouse/pen keep the ⋮ menu): bottom-sheet chat with three stops (peek / half / full); long-press radial menu on a message; pull-down at the top of a room for the catch-up reel; voice-note strips with timed pins (a reply starting `@m:ss ` to the voice note); swipe a message to put the things it links to in the pocket; tether chip; haptic receipts (`navigator.vibrate`, respects reduced motion and `exomusica_haptics`).
+
+**Comments on community tracks**: `CommunityTrackComment`; routes `/api/community-tracks/:id/comments`, voice notes are strip-only (`/api/voice-notes`). Strip cache ids are offset (1e9 community, 2e9 voice) so sources never collide.
+
+**Soundbay**: Playlists and Community albums are cards (hue from the title), with a **+ Create** next to each heading (`CreateBox`). **AZERTY**: Q no longer opens the room switcher while a map is walked with ZQSD (`data-wasd`). **Scan Visor**: hints removed.
+
+**Admin → Outreach** (`/admin/outreach`, backend `routes/outreach.ts`, `lib/outreach*.ts`, `lib/mailMarkdown.ts`):
+- *Mail settings*: SMTP (password sealed with AES-256-GCM, key from `OUTREACH_SECRET`, else `JWT_SECRET`), From / Reply-To, default Cc/Bcc, signature, default follow-up days, optional IMAP "file a copy in Sent" (leave off for Gmail & other hosts that already file SMTP mail in Sent).
+- *Contact list*: typed columns (text, long text, number, date, checkbox, choice, several choices, link, email, rating), sort, search, "follow-up due", "never written to", CSV import (Google Sheets export), CSV/JSON export, per-row ✉. Last sent / times sent are editable (for mail not sent from the site); sending from the site updates them.
+- *Composer*: the studies/articles dialect cut down to what mail carries, plus underline `++`, highlight `==`, `^sup^`, `~sub~`, colour/size `{c:#c0392b s:18|text}`, buttons `[[Label]](url)`, alignment `:::center`, tables. Merge fields `{{first_name|there}}` (any column key). Pictures are inline, audio/files are attachments (20 MB total, 50 recipients per send). Blocks palette grouped by kinds you define (Short bio, Long bio…). Server-rendered preview = what is sent. Follow-up date set per send (+3 d … +1 mo, default from settings). Test send to yourself. Missing merge fields are listed (409) before anything leaves. Draft autosaves in the browser. Mails go out one per ~1.2 s.
+- Nav dot on *Outreach* when a follow-up date has come.

@@ -1,6 +1,6 @@
 import { VoiceNoteRecorder, type FinishedVoiceNote } from "../components/VoiceNoteRecorder";
 import { uploadChatAttachment, voiceNoteFilename } from "../lib/voiceNoteUpload";
-import { useEffect, useRef, useState, useCallback, useContext, createContext, type ChangeEvent, type ClipboardEvent, type DragEvent, type FormEvent } from "react";
+import { useEffect, useMemo, useRef, useState, useCallback, useContext, createContext, type ChangeEvent, type ClipboardEvent, type DragEvent, type FormEvent } from "react";
 import { Link, useParams, useSearchParams, useNavigate } from "react-router-dom";
 import { api } from "../lib/api";
 import { useToastStore } from "../lib/toastStore";
@@ -8,6 +8,15 @@ import { CHAT_INSERT, LINK_MIME, spliceAt, chatLinkText, dragPayload } from "../
 import { entityHits, entityMarkdown, entityTrigger, type EntityTrigger } from "../lib/chatEntities";
 import { useIndex } from "../lib/useAtlas";
 import { usePocketStore } from "../lib/pocketStore";
+import { entitiesInText } from "../lib/dropEntity";
+import { useMessageGestures } from "../lib/useMessageGestures";
+import { RadialMenu, RADIAL_R, type RadialItem } from "../components/RadialMenu";
+import { fitCentre, slotAt } from "../lib/gesture";
+import { buzz } from "../lib/haptics";
+import { branchHref } from "../lib/branchLinks";
+import { TypeGlyph } from "../components/Plate";
+import { freqOf, showFreq } from "../lib/atlas";
+import { fmtClock, PIN_EVENT, pinsByTarget, usePinStore } from "../lib/voicePins";
 import { ChatStrip } from "../components/ChatStrip";
 import { CatchUp } from "../components/CatchUp";
 import { catchUp, getSeen, setSeen, type Reel } from "../lib/chatStrip";
@@ -212,13 +221,56 @@ function MessageBody({
     if (ids.length > 0) resolveMentions(ids);
   }, [message.contentRaw, resolveMentions]);
 
+  // Phone gestures (touch only): hold for a fan of actions, swipe right to put what the message links to in the pocket.
+  const coarse = typeof matchMedia === "function" && matchMedia("(pointer: coarse)").matches;
+  const emojis = useEmojiStore((s) => s.emojis);
+  const [fan, setFan] = useState<{ x: number; y: number; sel: number; react: boolean } | null>(null);
+  const links = useMemo(() => entitiesInText(message.contentRaw, window.location.origin), [message.contentRaw]);
+  const pocketIt = useCallback(() => {
+    if (links.length === 0) { useToastStore.getState().showToast("Nothing to pocket in this message"); return; }
+    links.forEach((e) => usePocketStore.getState().add(e));
+    useToastStore.getState().showToast(links.length === 1 ? `${links[0].title} is in your pocket` : `${links.length} things are in your pocket`);
+  }, [links]);
+  const fanItems = useMemo<RadialItem[]>(() => {
+    if (fan?.react) return emojis.slice(0, 6).map((e) => ({ id: `e${e.id}`, label: e.name, glyph: <img src={e.imageUrl} alt="" width={24} height={24} /> }));
+    const l: RadialItem[] = [];
+    if (user) { l.push({ id: "reply", label: "Reply", glyph: "↩" }); if (emojis.length) l.push({ id: "react", label: "React", glyph: "☺" }); }
+    l.push({ id: "link", label: "Copy link", glyph: "🔗" }, { id: "text", label: "Copy text", glyph: "⧉" });
+    if (links.length) l.push({ id: "pocket", label: "Pocket", glyph: "◧" });
+    if (canModerate) l.push({ id: "delete", label: "Delete", glyph: "🗑", danger: true });
+    return l;
+  }, [fan?.react, emojis, user, links.length, canModerate]);
+  const centre = fan ? fitCentre(fan.x, fan.y, RADIAL_R + 34, window.innerWidth, window.innerHeight) : null;
+  function choose(it: RadialItem) {
+    if (it.id === "react") { setFan((f) => (f ? { ...f, react: true, sel: -1 } : f)); return; }
+    setFan(null);
+    if (it.id === "reply") onQuote(message);
+    else if (it.id === "link") onCopyLink(message);
+    else if (it.id === "text") void navigator.clipboard?.writeText(message.contentRaw).then(() => useToastStore.getState().showToast("Copied"));
+    else if (it.id === "pocket") pocketIt();
+    else if (it.id === "delete") onDelete(message.id);
+    else if (it.id.startsWith("e")) void api(`/api/messages/${message.id}/reactions`, { method: "POST", body: JSON.stringify({ emojiId: Number(it.id.slice(1)) }) });
+    buzz("tick");
+  }
+  const fanItemsRef = useRef(fanItems); fanItemsRef.current = fanItems;
+  const fanRef = useRef(fan); fanRef.current = fan;
+  const gestures = useMessageGestures({
+    enabled: coarse && !message.isDeleted,
+    onHold: (x, y) => setFan({ x, y, sel: -1, react: false }),
+    onHoldMove: (dx, dy) => setFan((f) => { if (!f) return f; const c = fitCentre(f.x, f.y, RADIAL_R + 34, window.innerWidth, window.innerHeight); const sel = slotAt(f.x + dx - c.x, f.y + dy - c.y, fanItemsRef.current.length, RADIAL_R); if (sel !== f.sel && sel >= 0) buzz("tick"); return sel === f.sel ? f : { ...f, sel }; }),
+    onHoldEnd: () => { const f = fanRef.current; const it = f && f.sel >= 0 ? fanItemsRef.current[f.sel] : null; if (it) choose(it); },
+    onSwipeRight: pocketIt,
+  });
+
   if (message.isDeleted) {
     return <em style={{ color: "var(--text-dim)" }}>message deleted</em>;
   }
   const structured = !!message.kind && message.kind !== "text";
 
   return (
-    <div style={{ position: "relative" }}>
+    <div style={{ position: "relative" }} className="msg-gest" ref={gestures.ref} onPointerDown={gestures.onPointerDown} onPointerMove={gestures.onPointerMove} onPointerUp={gestures.onPointerUp} onPointerCancel={gestures.onPointerCancel} onContextMenu={gestures.onContextMenu}>
+      <span className="msg-swipe-hint" aria-hidden="true">◧ pocket</span>
+      {fan && centre && <RadialMenu x={fan.x} y={fan.y} items={fanItems} sel={fan.sel} onPick={choose} onClose={() => setFan(null)} />}
       <MessageMenu message={message} onDelete={onDelete} onQuote={onQuote} onCopyLink={onCopyLink} canModerate={canModerate} />
       {message.replyPreview && (
         <a href={`#m-${message.replyPreview.id}`} style={{ display: "block", fontSize: "0.75rem", color: "var(--text-dim)", marginBottom: "0.2rem" }}>
@@ -235,7 +287,7 @@ function MessageBody({
         </div>
       ))}
       {message.attachments.map((a) => (
-        <AttachmentPreview key={a.id} attachment={a} />
+        <AttachmentPreview key={a.id} attachment={a} messageId={message.id} />
       ))}
       <ReactionPills message={message} />
     </div>
@@ -358,6 +410,7 @@ export function ChannelPage({ channelSlug, fillHeight, parentControlsHeight }: {
   const [hasMoreOlder, setHasMoreOlder] = useState(true);
   const [showLiveChatButton, setShowLiveChatButton] = useState(false);
   const messagesRef = useRef<MessageDTO[]>([]);
+  const [channelBranch, setChannelBranch] = useState<{ slug: string; name: string } | null>(null);
   const [archiveDays, setArchiveDays] = useState<{ day: string; messageCount: number }[]>([]);
   const [draft, setDraft] = useState("");
   const [cmdError, setCmdError] = useState<string | null>(null);
@@ -537,7 +590,8 @@ export function ChannelPage({ channelSlug, fillHeight, parentControlsHeight }: {
 
   useEffect(() => {
     if (!slug) return;
-    api<{ name: string; font: FontInfo | null }>(`/api/channels/${slug}`).then((c) => {
+    api<{ name: string; font: FontInfo | null; branch?: { slug: string; name: string } | null }>(`/api/channels/${slug}`).then((c) => {
+      setChannelBranch(c.branch ?? null);
       setChannelName(c.name);
       setChannelFont(c.font);
     });
@@ -571,6 +625,41 @@ export function ChannelPage({ channelSlug, fillHeight, parentControlsHeight }: {
       }
     });
   }, [slug, mode, selectedDay, activeSearch]);
+
+  // Replies that start with "@0:07" are pins on the voice note they answer: the strip shows them where they belong.
+  useEffect(() => { usePinStore.getState().set(pinsByTarget(messages)); }, [messages]);
+  useEffect(() => {
+    function onPin(e: Event) {
+      const d = (e as CustomEvent<{ messageId: number; at: number }>).detail;
+      const m = messagesRef.current.find((x) => x.id === d.messageId); if (!m) return;
+      setReplyTarget({ id: m.id, authorUsername: m.authorUsername, excerpt: m.contentRaw.slice(0, 80) || "🎙 voice note" });
+      setDraft((prev) => `@${fmtClock(d.at)} ${prev.replace(/^@\d+:\d\d\s*/, "")}`);
+      textareaRef.current?.focus();
+    }
+    window.addEventListener(PIN_EVENT, onPin); return () => window.removeEventListener(PIN_EVENT, onPin);
+  }, []);
+
+  // Pull down past the top of the list (touch): the catch-up reel for everything since you last spoke here.
+  useEffect(() => {
+    const list = messageListRef.current;
+    if (isDesktop || !list || mode !== "live") return;
+    let y0: number | null = null, dy = 0;
+    const set = (v: number) => list.parentElement?.style.setProperty("--pull", String(Math.round(v)));
+    const start = (e: TouchEvent) => { y0 = list.scrollTop <= 0 ? e.touches[0].clientY : null; dy = 0; };
+    const move = (e: TouchEvent) => { if (y0 === null) return; dy = Math.max(0, e.touches[0].clientY - y0); set(Math.min(dy, 110) * 0.6); };
+    const end = () => {
+      if (y0 !== null && dy >= 80) {
+        const all = messagesRef.current, mine = [...all].reverse().find((m) => m.authorId === user?.id);
+        const r = catchUp(all, mine?.id ?? 0, user?.id ?? null, 1);
+        buzz("snap");
+        if (r) setReel(r); else useToastStore.getState().showToast("Nothing new since you last spoke here");
+      }
+      y0 = null; dy = 0; set(0);
+    };
+    list.addEventListener("touchstart", start, { passive: true }); list.addEventListener("touchmove", move, { passive: true });
+    list.addEventListener("touchend", end); list.addEventListener("touchcancel", end);
+    return () => { list.removeEventListener("touchstart", start); list.removeEventListener("touchmove", move); list.removeEventListener("touchend", end); list.removeEventListener("touchcancel", end); };
+  }, [isDesktop, mode, user?.id, slug]);
 
   // Discord-style infinite scroll: scrolling near the top of the live feed
   // loads the next 100 older messages via cursor pagination, prepending
@@ -711,6 +800,8 @@ export function ChannelPage({ channelSlug, fillHeight, parentControlsHeight }: {
     setReplyTarget(null);
     setPendingAttachments([]);
     setFollowing(true); // posting auto-follows server-side; keep the button in sync without a refetch
+    const hereNow = (usePresenceStore.getState().viewersByChannel.get(slug) ?? []).filter((n) => n !== user?.username).length;
+    buzz(hereNow > 0 ? "double" : "tick"); // one tap sent; two when someone is in the room with you
   }
 
   // A voice note is sent as its own message (with whatever is typed as its caption, and any files already attached). If the upload
@@ -951,6 +1042,11 @@ export function ChannelPage({ channelSlug, fillHeight, parentControlsHeight }: {
         {(!isMobileWindow || isChatFullscreen) && (
           <>
             <TopicSwitcher label={!isDesktop && channelName ? channelName : undefined} />
+            {channelBranch && branchHref(channelBranch.slug) !== location.pathname + location.search && (
+              <Link className="tether" to={branchHref(channelBranch.slug)} draggable onDragStart={(e) => dragPayload(e, channelBranch.name, branchHref(channelBranch.slug))} title={`This room belongs to ${channelBranch.name}`} data-testid="tether">
+                <TypeGlyph type="branch" size={14} /><b>{channelBranch.name}</b><i>{showFreq(freqOf("branch", channelBranch.slug))}</i>
+              </Link>
+            )}
             {isDesktop && (
               <button className="btn" onClick={popOutChat} title="Open in a floating window">
                 ↗ Pop out
@@ -1020,7 +1116,8 @@ export function ChannelPage({ channelSlug, fillHeight, parentControlsHeight }: {
         onPick={(m) => { document.getElementById(`m-${m.id}`)?.scrollIntoView({ block: "center" }); setReel(null); }}
         onFirst={() => { document.getElementById(`m-${reel.firstId}`)?.scrollIntoView({ block: "start" }); }}
         onLive={() => { scrollToLive(); setReel(null); }} />}
-      <div className={stripOn ? "chat-list-wrap" : undefined} style={stripOn ? { position: "relative", display: "flex", flexDirection: "column", flex: 1, minHeight: 0 } : undefined}>
+      <div className={`${stripOn ? "chat-list-wrap " : ""}pull-wrap`} style={stripOn ? { position: "relative", display: "flex", flexDirection: "column", flex: 1, minHeight: 0 } : undefined}>
+      {!isDesktop && <div className="pull-hint" aria-hidden="true">↓ pull for the catch-up</div>}
       {stripOn && <ChatStrip listRef={messageListRef} messages={shownMessages} meId={user?.id ?? null} unreadFromId={reel?.firstId ?? null} />}
       <div
         ref={messageListRef}

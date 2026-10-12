@@ -1,3 +1,4 @@
+import { ChatSheet } from "../components/ChatSheet";
 import { useEffect, useState } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import { api } from "../lib/api";
@@ -97,8 +98,8 @@ export function BranchPage() {
   const albumTextScale = isDesktop ? coverTextScale : coverTextScale * 2.2;
 
   return (
-    <div className={isDesktop ? "page-column" : undefined} style={{ fontFamily, ...(isDesktop ? { maxWidth: 1000 } : { display: "flex", flexDirection: "column", height: "calc(100dvh - var(--nav-height, 3.6rem) - 3rem - var(--player-height, 0px))", marginTop: "-0.6rem" }) }}>
-      <div style={isDesktop ? {} : { flexShrink: 0, overflowY: "auto" }}>
+    <div className={isDesktop ? "page-column" : undefined} style={{ fontFamily, ...(isDesktop ? { maxWidth: 1000 } : { display: "flex", flexDirection: "column", marginTop: "-0.6rem", paddingBottom: branch.channel ? 200 : 0 }) }}>
+      <div style={isDesktop ? {} : { flexShrink: 0 }}>
         <p style={{ marginBottom: "0.5rem" }}>
           <Link to="/soundbay">{isDesktop ? "← Soundbay (R)" : "← Soundbay"}</Link>
         </p>
@@ -107,12 +108,12 @@ export function BranchPage() {
       </div>
 
       {!isDesktop && branch.channel && (
-        <div style={{ flexShrink: 0, height: "42dvh", marginTop: "0.6rem", marginBottom: "0.6rem" }}>
+        <ChatSheet title={`Chat · ${branch.name}`}>
           <ChannelPage channelSlug={branch.channel.slug} parentControlsHeight />
-        </div>
+        </ChatSheet>
       )}
 
-      <div style={isDesktop ? {} : { flexShrink: 0, overflowY: "auto" }}>
+      <div style={isDesktop ? {} : { flexShrink: 0 }}>
         <h2 style={{ fontSize: "1.1rem", color: "var(--accent-audio)" }}>Music</h2>
         {albums.length === 0 ? (
           <p style={{ color: "var(--text-dim)" }}>

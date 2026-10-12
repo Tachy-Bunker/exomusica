@@ -1,3 +1,4 @@
+import { useWasdKeys } from "../lib/useWasd";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { api } from "../lib/api";
@@ -146,6 +147,7 @@ export function ForumMapPage({ embedded = false, onViewAsList }: { embedded?: bo
   nodesRef.current = nodes;
   const lockableIdsRef = useRef<Set<number>>(new Set());
 
+  useWasdKeys();
   useEffect(() => {
     api<MapNode[]>("/api/forum-map").then(setNodes);
     api<{ forumMapInitialX: number; forumMapInitialY: number; forumMapInitialZoom: number; forumMapNavSpeed: number; forumMapFireflySize: number; forumMapFireflySpeed: number }>("/api/site-settings").then((s) => {

@@ -22,3 +22,16 @@ export function entityFromDrop(text: string, origin: string): Dragged | null {
 
 /** The text a dragged link carries so every drop target (pocket, chat, dial) understands it. */
 export const dragText = (title: string, href: string): string => chatLinkText(title, href);
+
+/** Every carriable thing a message links to (`[Title](url)` or a bare address), in order, once each: what a swipe puts in the pocket. */
+export function entitiesInText(text: string, origin: string, max = 3): Dragged[] {
+  const out: Dragged[] = [], seen = new Set<string>();
+  const add = (href: string, title: string) => {
+    const e = entityOfHref(href, origin); if (!e) return;
+    const k = `${e.type}:${e.id}`; if (seen.has(k) || out.length >= max) return;
+    seen.add(k); out.push({ ...e, title: title.trim() || e.id });
+  };
+  const rest = text.replace(/\[([^\]]*)\]\((\S+?)\)/g, (_m, t: string, h: string) => { add(h, t); return " "; });
+  for (const m of rest.matchAll(/https?:\/\/[^\s)>\]]+|(?<![\w/])\/(?:[\w-]+\/?[\w\-.?=&%#]*)/g)) add(m[0], "");
+  return out;
+}

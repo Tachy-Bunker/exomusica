@@ -9,7 +9,7 @@ import { useFixedPortalRoot } from "../lib/useFixedPortalRoot";
 import { api } from "../lib/api";
 import { useAuth } from "../lib/auth";
 import { SpecLayer } from "./SpecLayer";
-import { coverColor, loadStrip, nearbyComments, type Strip, type TrackComment } from "../lib/specStrip";
+import { coverColor, loadStrip, trackBase, nearbyComments, type Strip, type TrackComment } from "../lib/specStrip";
 import { PreviousIcon, NextIcon, LoopIcon, LoopOneIcon, ExpandIcon, CollapseIcon, ShuffleIcon, QueueIcon } from "./Icons";
 
 function formatTime(seconds: number): string {
@@ -199,6 +199,7 @@ export function PlayerBar() {
 
   // Spectrogram strip + comments for the current track.
   const trackId = currentTrack?.id ?? null;
+  const source = currentTrack?.source;
   const [strip, setStrip] = useState<Strip | null>(null);
   const [comments, setComments] = useState<TrackComment[]>([]);
   const [pickAt, setPickAt] = useState<number | null>(null);
@@ -211,23 +212,23 @@ export function PlayerBar() {
     setStrip(null); setComments([]); setPickAt(null); setActiveId(null); setCErr("");
     if (trackId == null) return;
     let live = true;
-    loadStrip(trackId).then((s) => { if (live) setStrip(s); });
+    loadStrip(trackId, source).then((s) => { if (live) setStrip(s); });
     setTint(null); void coverColor(currentTrack?.coverArtUrl).then((c) => { if (live) setTint(c); });
-    api<TrackComment[]>(`/api/tracks/${trackId}/comments`).then((c) => { if (live) setComments(Array.isArray(c) ? c : []); }).catch(() => {});
+    api<TrackComment[]>(`${trackBase(source)}/${trackId}/comments`).then((c) => { if (live) setComments(Array.isArray(c) ? c : []); }).catch(() => {});
     return () => { live = false; };
-  }, [trackId]);
+  }, [trackId, source]);
   const spec = strip && strip !== "none" ? strip : null;
   async function postComment(e: React.FormEvent) {
     e.preventDefault();
     if (trackId == null || !draft.trim()) return;
     try {
-      const c = await api<TrackComment>(`/api/tracks/${trackId}/comments`, { method: "POST", body: JSON.stringify({ atSeconds: pickAt ?? currentTime, body: draft }) });
+      const c = await api<TrackComment>(`${trackBase(source)}/${trackId}/comments`, { method: "POST", body: JSON.stringify({ atSeconds: pickAt ?? currentTime, body: draft }) });
       setComments((l) => [...l, c].sort((a, b) => a.atSeconds - b.atSeconds)); setDraft(""); setCErr(""); setActiveId(c.id);
     } catch (err) { setCErr(err instanceof Error ? err.message : "Couldn't post."); }
   }
   async function removeComment(id: number) {
     if (trackId == null) return;
-    await api(`/api/tracks/${trackId}/comments/${id}`, { method: "DELETE" }).catch(() => {});
+    await api(`${trackBase(source)}/${trackId}/comments/${id}`, { method: "DELETE" }).catch(() => {});
     setComments((l) => l.filter((c) => c.id !== id)); setActiveId(null);
   }
   function pinClick(c: TrackComment) { setActiveId(c.id); setPickAt(c.atSeconds); seek(c.atSeconds); }

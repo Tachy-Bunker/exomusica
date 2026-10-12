@@ -65,6 +65,7 @@ import { AuditLogAdminPage } from "./pages/admin/AuditLogAdminPage";
 import { AboutAdminPage } from "./pages/admin/AboutAdminPage";
 import { FontsAdminPage } from "./pages/admin/FontsAdminPage";
 import { FxSettingsAdminPage } from "./pages/admin/FxSettingsAdminPage";
+import { OutreachAdminPage } from "./pages/admin/OutreachAdminPage";
 import { NewsletterAdminPage } from "./pages/admin/NewsletterAdminPage";
 import { DiscordImportPage } from "./pages/admin/DiscordImportPage";
 import { StorageAdminPage } from "./pages/admin/StorageAdminPage";
@@ -184,6 +185,7 @@ export default function App() {
                 <Route path="fonts" element={<FontsAdminPage />} />
                 <Route path="fx-settings" element={<FxSettingsAdminPage />} />
                 <Route path="newsletter" element={<NewsletterAdminPage />} />
+                <Route path="outreach" element={<OutreachAdminPage />} />
                 <Route path="discord-import" element={<DiscordImportPage />} />
                 <Route path="storage" element={<StorageAdminPage />} />
                 <Route path="discord-bridge" element={<DiscordBridgePage />} />

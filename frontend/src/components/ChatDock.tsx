@@ -1,3 +1,4 @@
+import { wasdActive } from "../lib/useWasd";
 import { branchHref } from "../lib/branchLinks";
 import { useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
@@ -28,7 +29,7 @@ export function ChatDock() {
     function onKey(e: KeyboardEvent) {
       const st = useChatDockStore.getState();
       // Q opens the room list from anywhere (not while typing, and not over another dialog)
-      if (!e.altKey && !e.ctrlKey && !e.metaKey && !e.shiftKey && e.key.toLowerCase() === "q" && !isTypingTarget(e.target) && (st.switcherOpen || !document.querySelector('[aria-modal="true"]'))) {
+      if (!e.altKey && !e.ctrlKey && !e.metaKey && !e.shiftKey && e.key.toLowerCase() === "q" && !wasdActive() && !isTypingTarget(e.target) && (st.switcherOpen || !document.querySelector('[aria-modal="true"]'))) {
         e.preventDefault(); st.setSwitcher(!st.switcherOpen); return;
       }
       if (!e.altKey || e.ctrlKey || e.metaKey) return;

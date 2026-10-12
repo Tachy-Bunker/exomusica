@@ -70,7 +70,7 @@ export function Faceplate({ focus, section, around, onAround, aroundCount, cente
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="9" /><circle cx="12" cy="12" r="4.5" opacity=".6" /><g className={lens.on ? "lens-pulse" : undefined}><path d="M12 12L12 3" /></g><circle cx="16.5" cy="8" r="1.1" fill="currentColor" stroke="none" /></svg>
           <span className="fp-btn-label">Scan</span>{lens.on && <i className="fp-state">on</i>}
         </button>
-        <span id="fp-lens-tip" role="tooltip" className="fp-tip" data-testid="fp-lens-tip"><b>Scan Visor</b> Travellers leave traces on places: notes written right on the page, or small drawings. Switch the visor on to see the traces in the sector you are in, and write your own anywhere. Traces fade after a while. {lens.on ? "Scanning now." : "Off, so pages stay clean."}</span>
+        <span id="fp-lens-tip" role="tooltip" className="fp-tip" data-testid="fp-lens-tip"><b>Scan Visor</b> {lens.on ? "on" : "off"}</span>
       </span>
       {user && <Link to="/pms" className="fp-btn" aria-label={`Post${unread + unreadPms ? ` (${unread + unreadPms} unread)` : ""}`} data-testid="fp-post">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" aria-hidden="true" focusable="false"><rect x="3" y="5" width="18" height="14" rx="2" /><path d="M3 7l9 6 9-6" /></svg>

@@ -1,3 +1,4 @@
+import { useWasdKeys } from "../lib/useWasd";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useNavigate, Link, useSearchParams } from "react-router-dom";
 import { api } from "../lib/api";
@@ -159,6 +160,7 @@ export function PlaylistSpaceMapPage() {
   const hideControls = searchParams.get("hideControls") === "1";
   const isDesktop = useIsDesktop();
   const isDesktopRef = useRef(isDesktop);
+  useWasdKeys();
   useEffect(() => {
     isDesktopRef.current = isDesktop;
   }, [isDesktop]);

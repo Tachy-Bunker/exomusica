@@ -77,12 +77,9 @@ export function Landmarks({ focusKey }: { focusKey: string | null }) {
             {user && <Link className="visor-btn" to={`/pms?at=${encodeURIComponent(focusKey)}`} data-testid="leave-mark" title="Draw something on a sheet instead">Draw one</Link>}
             <button type="button" className="visor-btn" onClick={() => setLens(false)} data-testid="visor-off">Off</button>
           </div>
-          {writing && <p className="visor-hint">{at ? "Write it, then Enter." : "Click anywhere on the page. Esc stops."}</p>}
-          {marks && marks.length === 0 && !writing && <p className="visor-hint">Empty space. Nobody has left a trace here yet.</p>}
         </>
       ) : (
         <>
-          <p className="visor-hint">Nothing to scan on this page. Fly to a branch, album, study or wiki page: the visor reads what other travellers left in that sector.</p>
           <div className="visor-tools"><button type="button" className="visor-btn" onClick={() => setLens(false)}>Off</button></div>
         </>
       )}

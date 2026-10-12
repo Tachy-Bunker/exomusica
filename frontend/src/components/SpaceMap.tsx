@@ -1,3 +1,4 @@
+import { useWasdKeys } from "../lib/useWasd";
 import { branchHref } from "../lib/branchLinks";
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
@@ -180,6 +181,7 @@ export function SpaceMap({
   const softwareRendererName = useMapQualityStore((s) => s.softwareRendererName);
   const [dismissedSwNotice, setDismissedSwNotice] = useState(false);
 
+  useWasdKeys();
   useEffect(() => {
     const branch = currentTrack ? branches.find((b) => b.slug === currentTrack.branchSlug) : null;
     wardenBridge.setPlayingBranch(branch?.id ?? null);
