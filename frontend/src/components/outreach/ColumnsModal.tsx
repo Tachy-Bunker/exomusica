@@ -10,21 +10,33 @@ export function ColumnsModal({ cols, focusId, onChange, onClose }: { cols: Col[]
 
   const add = () => run(async () => {
     if (!nn.trim()) return;
-    const c = await api<Col>("/api/admin/outreach/columns", { method: "POST", body: JSON.stringify({ name: nn, type: nt }) });
+    const c = await api<Col>("/api/outreach/columns", { method: "POST", body: JSON.stringify({ name: nn, type: nt }) });
     setNn(""); onChange([...cols, c], false); setOpen(c.id);
   });
+  const RESEARCH: { name: string; type: ColType; why: string }[] = [
+    { name: "Hook", type: "longtext", why: "one personal line per recipient: {{hook}}" },
+    { name: "Past lineup", type: "longtext", why: "who played before, to reference in the mail" },
+    { name: "Language", type: "select", why: "fr / en: picks the matching twin of a block" },
+    { name: "Rights checked", type: "checkbox", why: "asks before sending if the call's terms weren't read" },
+    { name: "Fee", type: "text", why: "feeds the fit score and the yearly budget" },
+    { name: "Link", type: "url", why: "the call's page" },
+  ];
+  const addResearch = (r: (typeof RESEARCH)[number]) => run(async () => {
+    const c = await api<Col>("/api/outreach/columns", { method: "POST", body: JSON.stringify({ name: r.name, type: r.type, ...(r.name === "Language" ? { options: ["fr", "en"] } : {}) }) });
+    onChange([...cols, c], false); setOpen(c.id);
+  });
   const patch = (c: Col, body: Partial<Col>, reload = false) => run(async () => {
-    const out = await api<Col>(`/api/admin/outreach/columns/${c.id}`, { method: "PATCH", body: JSON.stringify(body) });
+    const out = await api<Col>(`/api/outreach/columns/${c.id}`, { method: "PATCH", body: JSON.stringify(body) });
     onChange(cols.map((x) => (x.id === c.id ? out : x)), reload);
   });
   const remove = (c: Col) => run(async () => {
     if (!confirm(`Delete the column "${c.name}" and everything typed in it?`)) return;
-    await api(`/api/admin/outreach/columns/${c.id}`, { method: "DELETE" }); onChange(cols.filter((x) => x.id !== c.id), true);
+    await api(`/api/outreach/columns/${c.id}`, { method: "DELETE" }); onChange(cols.filter((x) => x.id !== c.id), true);
   });
   const move = (i: number, d: -1 | 1) => run(async () => {
     const j = i + d; if (j < 0 || j >= cols.length) return;
     const next = cols.slice(); [next[i], next[j]] = [next[j], next[i]];
-    onChange(next, false); await api("/api/admin/outreach/columns/order", { method: "PUT", body: JSON.stringify({ ids: next.map((c) => c.id) }) });
+    onChange(next, false); await api("/api/outreach/columns/order", { method: "PUT", body: JSON.stringify({ ids: next.map((c) => c.id) }) });
   });
 
   return (
@@ -32,6 +44,7 @@ export function ColumnsModal({ cols, focusId, onChange, onClose }: { cols: Col[]
       <div className="ox-modal" role="dialog" aria-label="Columns">
         <header><h2>Columns</h2><button className="btn" onClick={onClose} aria-label="Close">✕</button></header>
         <p className="ox-hint">Name, Email, Last sent, Times sent and Follow up are always there. Every column below is also a merge field: write <code>{"{{key}}"}</code> in a message.</p>
+        <p className="ox-presets">Useful to add: {RESEARCH.filter((r) => !cols.some((c) => c.name.toLowerCase() === r.name.toLowerCase())).map((r) => <button key={r.name} className="btn-link" title={r.why} onClick={() => addResearch(r)}>＋ {r.name}</button>)}</p>
         <ul className="ox-collist">
           {cols.map((c, i) => (
             <li key={c.id} className={open === c.id ? "open" : ""}>

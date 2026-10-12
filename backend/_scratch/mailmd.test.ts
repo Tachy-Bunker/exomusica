@@ -29,4 +29,12 @@ assert.ok(media.html.includes("Demo reel") && media.html.includes("3.2 MB") && m
 const t = r("# Hi\n**Ana**, see [site](https://a.org).\n- one\n- two\n[[Go]](https://g.org)\n![p](/uploads/a.png)");
 assert.ok(t.text.includes("Hi\n==") && t.text.includes("Ana, see site (https://a.org).") && t.text.includes("- one") && t.text.includes("Go: https://g.org") && t.text.includes("[picture: p]"), "plain text twin: " + JSON.stringify(t.text));
 assert.ok(r("").html.includes("<table") && r("").text === "", "empty message still frames");
+
+// formattings stack: nested styled spans, styled spans around/inside bold, italic, links
+x = body("{c:#c0392b|{s:18|nested}} end");
+assert.ok(x.includes("color:#c0392b;\">") && x.includes("font-size:18px") && !x.includes("{s:") && !x.includes("|nested"), "colour around size: " + x);
+x = body("{s:18|{c:#112233|{c:#445566|deep}}}");
+x = body("**{c:#c0392b s:20|bold red big}** and {c:#c0392b|*it* **b** [link](https://a.org)}");
+assert.ok(x.includes("<strong><span style=\"color:#c0392b;font-size:20px") && x.includes("<em>it</em>") && x.includes("<a href=\"https://a.org\""), "bold around a styled span, styled around bold/italic/link: " + x);
+assert.ok(r("{c:#c0392b|{s:18|text}}").text.includes("text") && !r("{c:#c0392b|{s:18|text}}").text.includes("{"), "plain text drops nested markers");
 console.log("mailmd ok");

@@ -13,10 +13,10 @@ export interface RawAttachment { filename: string; path: string; cid?: string }
 export const fromHeader = (a: Pick<MailAccount, "fromName" | "fromEmail">): string => (a.fromName ? { name: a.fromName.replace(/["\r\n]/g, ""), address: a.fromEmail } as unknown as string : a.fromEmail);
 
 /** One message as bytes. `keepBcc` is for the copy kept in Sent (it shows who was blind-copied); the copy that goes out never carries a Bcc header. */
-export async function buildRaw(o: { from: Pick<MailAccount, "fromName" | "fromEmail" | "replyTo">; to: { email: string; name?: string }; cc: string[]; bcc: string[]; subject: string; text: string; html: string; attachments: RawAttachment[]; messageId: string; date?: Date; keepBcc?: boolean }): Promise<Buffer> {
+export async function buildRaw(o: { from: Pick<MailAccount, "fromName" | "fromEmail" | "replyTo">; to: { email: string; name?: string }; cc: string[]; bcc: string[]; subject: string; text: string; html: string; attachments: RawAttachment[]; messageId: string; date?: Date; keepBcc?: boolean; inReplyTo?: string; references?: string }): Promise<Buffer> {
   const mail = new MailComposer({
     from: fromHeader(o.from), to: o.to.name ? { name: o.to.name.replace(/["\r\n]/g, ""), address: o.to.email } : o.to.email, cc: o.cc, bcc: o.bcc, replyTo: o.from.replyTo ?? undefined,
-    subject: o.subject.replace(/[\r\n]+/g, " "), text: o.text, html: o.html, messageId: o.messageId, date: o.date ?? new Date(),
+    subject: o.subject.replace(/[\r\n]+/g, " "), text: o.text, html: o.html, messageId: o.messageId, date: o.date ?? new Date(), inReplyTo: o.inReplyTo, references: o.references,
     attachments: o.attachments.map((a) => ({ filename: a.filename, path: a.path, cid: a.cid, contentDisposition: a.cid ? "inline" : "attachment" })),
   } as never);
   const node = mail.compile(); node.keepBcc = !!o.keepBcc;

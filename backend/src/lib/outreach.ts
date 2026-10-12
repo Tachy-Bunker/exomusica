@@ -83,12 +83,13 @@ export function fieldValues(c: ContactLike, columns: ColumnDef[]): Record<string
 }
 
 /** {{field}} or {{field|fallback}}. A field with nothing in it and no fallback comes out empty and is reported, so nothing is sent with a hole in it unnoticed. */
-export function fillFields(text: string, values: Record<string, string>): { text: string; missing: string[] } {
+export function fillFields(text: string, values: Record<string, string>, mark = false): { text: string; missing: string[] } {
   const missing: string[] = [];
   const out = text.replace(/\{\{\s*([a-z0-9_]+)\s*(?:\|([^{}]*))?\}\}/gi, (_m, k: string, fb?: string) => {
     const val = values[k.toLowerCase()];
-    if (val !== undefined && val.trim() !== "") return val;
-    if (fb !== undefined) return fb.trim();
+    const wrap = (x: string) => (mark ? `\u0001${x}\u0002` : x);
+    if (val !== undefined && val.trim() !== "") return wrap(val);
+    if (fb !== undefined) return wrap(fb.trim());
     if (!missing.includes(k.toLowerCase())) missing.push(k.toLowerCase());
     return "";
   });
@@ -101,32 +102,40 @@ export const isDue = (followUpAt: Date | string | null, now: Date): boolean => !
 export function toCsv(rows: string[][]): string {
   return rows.map((r) => r.map((c) => (/[",\r\n]/.test(c) ? `"${c.replace(/"/g, '""')}"` : c)).join(",")).join("\r\n");
 }
-export interface ImportContact { name: string; email: string; data: Record<string, unknown>; lastSentAt: string | null; sentCount: number; followUpAt: string | null }
+export interface ImportContact { place: string; lat: number | null; lng: number | null; status: string; deadline: string | null; timezone: string | null; groups: string[]; name: string; email: string; data: Record<string, unknown>; lastSentAt: string | null; sentCount: number; followUpAt: string | null }
 export interface ImportPlan { newColumns: { key: string; name: string; type: ColumnType }[]; contacts: ImportContact[]; skipped: number }
 const norm = (s: string) => s.trim().toLowerCase().replace(/[\s_-]+/g, " ");
 /** Maps a sheet's header onto the contact sheet: Name, Email, Last sent, Times sent, Follow up are built in; a header that matches a column goes there; any other becomes a new text column. */
-export function planImport(header: string[], rows: string[][], columns: ColumnDef[], maxRows = 2000): ImportPlan {
+export function planImport(header: string[], rows: string[][], columns: ColumnDef[], maxRows = 2000, hints: Record<string, string> = {}): ImportPlan {
+  const hintOf = (h: string): ColumnType => { const t = hints[norm(h)]; return (COLUMN_TYPES as readonly string[]).includes(t) ? (t as ColumnType) : "text"; };
   const taken = new Set(columns.map((c) => c.key));
   const newColumns: ImportPlan["newColumns"] = [];
-  const map: ({ kind: "name" | "email" | "last" | "count" | "follow" } | { kind: "col"; key: string; type: string; options?: unknown } | null)[] = header.map((h) => {
+  const map: ({ kind: "name" | "email" | "last" | "count" | "follow" | "groups" | "status" | "deadline" | "timezone" | "place" | "lat" | "lng" } | { kind: "col"; key: string; type: string; options?: unknown } | null)[] = header.map((h) => {
     const n = norm(h);
     if (!n) return null;
     if (n === "name" || n === "contact") return { kind: "name" };
+    if (n === "group" || n === "groups") return { kind: "groups" };
     if (n === "email" || n === "e mail" || n === "mail") return { kind: "email" };
     if (n === "last sent" || n === "last contacted") return { kind: "last" };
     if (n === "sent" || n === "times sent" || n === "sent count" || n === "emails sent") return { kind: "count" };
+    if (n === "status" || n === "stage") return { kind: "status" };
+    if (n === "deadline" || n === "closes" || n === "closing date") return { kind: "deadline" };
+    if (n === "timezone" || n === "time zone") return { kind: "timezone" };
+    if (n === "place" || n === "location") return { kind: "place" };
+    if (n === "latitude" || n === "lat") return { kind: "lat" };
+    if (n === "longitude" || n === "lng" || n === "lon" || n === "long") return { kind: "lng" };
     if (n === "follow up" || n === "followup" || n === "follow up date") return { kind: "follow" };
     const hit = columns.find((c) => norm(c.name) === n || c.key === n.replace(/ /g, "_"));
     if (hit) return { kind: "col", key: hit.key, type: hit.type, options: hit.options };
     const already = newColumns.find((c) => norm(c.name) === n);
-    if (already) return { kind: "col", key: already.key, type: "text" };
+    if (already) return { kind: "col", key: already.key, type: already.type };
     if (columns.length + newColumns.length >= MAX_COLUMNS) return null;
-    const key = slugKey(h, taken); taken.add(key); newColumns.push({ key, name: h.trim().slice(0, 60), type: "text" });
-    return { kind: "col", key, type: "text" };
+    const key = slugKey(h, taken); taken.add(key); const type = hintOf(h); newColumns.push({ key, name: h.trim().slice(0, 60), type });
+    return { kind: "col", key, type };
   });
   const contacts: ImportContact[] = []; let skipped = 0;
   for (const r of rows.slice(0, maxRows)) {
-    const c: ImportContact = { name: "", email: "", data: {}, lastSentAt: null, sentCount: 0, followUpAt: null };
+    const c: ImportContact = { place: "", lat: null, lng: null, status: "", deadline: null, timezone: null, groups: [], name: "", email: "", data: {}, lastSentAt: null, sentCount: 0, followUpAt: null };
     r.forEach((cell, i) => {
       const m = map[i]; if (!m) return;
       const v = (cell ?? "").trim();
@@ -135,6 +144,13 @@ export function planImport(header: string[], rows: string[][], columns: ColumnDe
       else if (m.kind === "last") c.lastSentAt = dateOnly(v);
       else if (m.kind === "count") c.sentCount = Math.max(0, Math.min(9999, parseInt(v, 10) || 0));
       else if (m.kind === "follow") c.followUpAt = dateOnly(v);
+      else if (m.kind === "status") c.status = cleanStatus(v.toLowerCase());
+      else if (m.kind === "deadline") c.deadline = dateOnly(v);
+      else if (m.kind === "timezone") c.timezone = validZone(v) ? v : null;
+      else if (m.kind === "place") c.place = v.slice(0, 160);
+      else if (m.kind === "lat") { const n = Number(v.replace(",", ".")); c.lat = Number.isFinite(n) && Math.abs(n) <= 90 ? n : null; }
+      else if (m.kind === "lng") { const n = Number(v.replace(",", ".")); c.lng = Number.isFinite(n) && Math.abs(n) <= 180 ? n : null; }
+      else if (m.kind === "groups") c.groups = [...new Set(v.split(/[;|,]/).map((x) => x.trim().slice(0, 60)).filter(Boolean))].slice(0, 20);
       else if (m.kind === "col" && v !== "") { const x = cleanCell(m.type, m.options, v); if (x !== null && !(Array.isArray(x) && x.length === 0)) c.data[m.key] = x; }
     });
     if (!c.name && !c.email && Object.keys(c.data).length === 0) { skipped++; continue; }
@@ -145,6 +161,7 @@ export function planImport(header: string[], rows: string[][], columns: ColumnDe
 
 // ---- files that live on this server
 import path from "node:path";
+import { cleanStatus, validZone } from "./outreachPlus.js";
 /** The file on disk behind an /uploads/... address, or null: never outside the uploads folder. */
 export function uploadFile(url: string, root: string): string | null {
   if (!url.startsWith("/uploads/")) return null;

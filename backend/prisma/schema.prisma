@@ -1401,32 +1401,66 @@ model OutreachSettings {
 
 model OutreachColumn {
   id       Int     @id @default(autoincrement())
-  key      String  @unique // the merge-field name: {{key}}
+  workspaceId Int?
+  key      String  // the merge-field name: {{key}} (unique inside a workspace)
   name     String
   type     String  @default("text") // text, longtext, number, date, checkbox, select, multiselect, url, email, rating
   options  Json?   // for select / multiselect: ["Open", "Closed"]
   position Int     @default(0)
   hidden   Boolean @default(false)
   width    Int?
+
+  @@unique([workspaceId, key])
+  @@index([workspaceId])
 }
 
 model OutreachContact {
   id         Int       @id @default(autoincrement())
+  workspaceId Int?
+  place      String    @default("") // where the call / venue is, as written
+  lat        Float?
+  lng        Float?
+  source     String?   // capture, form, feed, newsletter, eml, import
+  doNotContact Boolean @default(false)
+  snoozeReason String?
+  declineReason String?
+  reopensAt  DateTime?  // a recurring call: when it usually opens again
   name       String    @default("")
   email      String    @default("")
   data       Json      @default("{}") // column key -> value
   lastSentAt DateTime? // editable: for mail that was not sent from here
   sentCount  Int       @default(0)  // editable too
   followUpAt DateTime?
+  status     String    @default("") // pipeline: "" / lead, contacted, replied, accepted, declined, ghosted
+  deadline   DateTime? // an open call's closing date
+  repliedAt  DateTime?
+  timezone   String? // IANA name, for "send at 10:00 their time"
   createdAt  DateTime  @default(now())
   updatedAt  DateTime  @updatedAt
   sends      OutreachSend[]
+  scheduled  OutreachScheduled[]
+  groups     OutreachGroup[]
 
   @@index([followUpAt])
+  @@index([workspaceId])
+}
+
+model OutreachGroup {
+  id       Int               @id @default(autoincrement())
+  workspaceId Int?
+  name     String
+  position Int               @default(0)
+  contacts OutreachContact[]
+
+  @@unique([workspaceId, name])
 }
 
 model OutreachSend {
   id          Int              @id @default(autoincrement())
+  workspaceId Int?
+  accountId   Int?             // which mailbox it went out from
+  subjectVariant String?       // "A" / "B" when two subjects were compared
+  source      String?          // null = sent from here, "eml" = imported from a mail file
   contactId   Int?
   contact     OutreachContact? @relation(fields: [contactId], references: [id], onDelete: SetNull)
   toEmail     String
@@ -1439,14 +1473,18 @@ model OutreachSend {
   filedInSent Boolean          @default(false)
   error       String?
   batch       String?
+  templateName String?
+  blocksUsed  Json? // [{kind, blockId}] the variants this person got
   sentAt      DateTime         @default(now())
 
   @@index([contactId, sentAt])
   @@index([sentAt])
+  @@index([workspaceId])
 }
 
 model OutreachBlockType {
   id       Int             @id @default(autoincrement())
+  workspaceId Int?
   name     String
   position Int             @default(0)
   blocks   OutreachBlock[]
@@ -1460,4 +1498,174 @@ model OutreachBlock {
   body      String            @default("")
   position  Int               @default(0)
   updatedAt DateTime          @updatedAt
+}
+
+model OutreachTemplate {
+  id        Int      @id @default(autoincrement())
+  workspaceId Int?
+  name      String
+  subject   String   @default("")
+  bodyMd    String   @default("")
+  rules     Json     @default("[]") // [{kind, group|null, blockId}]
+  updatedAt DateTime @updatedAt
+}
+
+model OutreachScheduled {
+  id        Int              @id @default(autoincrement())
+  workspaceId Int?
+  contactId Int?
+  contact   OutreachContact? @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  toEmail   String
+  toName    String           @default("")
+  subject   String
+  sendAt    DateTime
+  status    String           @default("pending") // pending, sending, sent, failed, cancelled
+  payload   Json // the compose body for this one recipient
+  error     String?
+  createdAt DateTime         @default(now())
+
+  @@index([status, sendAt])
+}
+
+// ---- Outreach workspaces: one per artist, entered with a shared password (no site login needed) ----
+model OutreachWorkspace {
+  id           Int       @id @default(autoincrement())
+  slug         String    @unique
+  name         String
+  passwordHash String
+  tokenVersion Int       @default(0) // bumping it signs everybody out
+  trackLinks   Boolean   @default(false)
+  dnc          Json      @default("[]") // do-not-contact: emails or "@domain"
+  profile      Json      @default("{}") // fit profile: keywords, maxFee, yearlyBudget, regions
+  attachRules  Json      @default("[]") // [{group, fileId}] a file that goes with everyone in a group
+  digestOn     Boolean   @default(false)
+  digestAt     DateTime?
+  createdAt    DateTime  @default(now())
+}
+
+// A mailbox the workspace can send from ("Send as X"). The password is sealed like the old single account's.
+model OutreachAccount {
+  id              Int      @id @default(autoincrement())
+  workspaceId     Int?
+  label           String   @default("")
+  position        Int      @default(0)
+  isDefault       Boolean  @default(false)
+  smtpHost        String?
+  smtpPort        Int?
+  smtpSecure      Boolean  @default(true)
+  smtpUser        String?
+  smtpPasswordEnc String?
+  fromName        String?
+  fromEmail       String?
+  replyTo         String?
+  defaultCc       String?
+  defaultBcc      String?
+  imapHost        String?
+  imapPort        Int?
+  imapSecure      Boolean  @default(true)
+  sentFolder      String   @default("Sent")
+  fileInSent      Boolean  @default(false)
+  signatureMd     String   @default("")
+  followUpDays    Int      @default(14)
+  updatedAt       DateTime @updatedAt
+
+  @@index([workspaceId])
+}
+
+// Files that can be used again, in groups ("press photos", "stereo masters").
+model OutreachFileGroup {
+  id          Int    @id @default(autoincrement())
+  workspaceId Int?
+  name        String
+  position    Int    @default(0)
+
+  @@index([workspaceId])
+}
+
+model OutreachFile {
+  id          Int      @id @default(autoincrement())
+  workspaceId Int?
+  groupId     Int?
+  name        String
+  url         String
+  mimeType    String   @default("")
+  sizeBytes   Int      @default(0)
+  hash        String?
+  createdAt   DateTime @default(now())
+
+  @@index([workspaceId, groupId])
+}
+
+// Mail read from .eml files (and the viewer's source): application mail or stray.
+model OutreachMessage {
+  id          Int       @id @default(autoincrement())
+  workspaceId Int?
+  contactId   Int?
+  direction   String    @default("in") // in / out
+  fromEmail   String    @default("")
+  fromName    String    @default("")
+  toEmails    String    @default("")
+  subject     String    @default("")
+  date        DateTime
+  messageId   String?
+  inReplyTo   String?
+  bodyText    String    @default("")
+  kind        String    @default("application") // application / stray
+  reason      String    @default("")
+  hint        String?   // looks like: decline, acceptance, ...
+  attachments Json      @default("[]") // [{name, size}] names only
+  createdAt   DateTime  @default(now())
+
+  @@index([workspaceId, date])
+  @@index([workspaceId, messageId])
+  @@index([contactId])
+}
+
+// Calls found by a feed, a pasted newsletter, the bookmarklet or a form: wait here until kept or dismissed.
+model OutreachFeed {
+  id            Int       @id @default(autoincrement())
+  workspaceId   Int?
+  url           String
+  title         String    @default("")
+  active        Boolean   @default(true)
+  lastCheckedAt DateTime?
+  error         String?
+  createdAt     DateTime  @default(now())
+
+  @@index([workspaceId])
+}
+
+model OutreachLead {
+  id          Int      @id @default(autoincrement())
+  workspaceId Int?
+  feedId      Int?
+  title       String
+  url         String   @default("")
+  summary     String   @default("")
+  deadline    DateTime?
+  fee         String?
+  place       String   @default("")
+  emails      Json     @default("[]")
+  fields      Json     @default("[]") // form questions, when it came from a form
+  source      String   @default("feed") // feed, newsletter, bookmarklet, form
+  status      String   @default("new") // new, kept, dismissed
+  key         String   // dedupe: url or title
+  foundAt     DateTime @default(now())
+
+  @@unique([workspaceId, key])
+  @@index([workspaceId, status])
+}
+
+// Tracked links: a plain redirect that counts clicks.
+model OutreachLink {
+  id          Int       @id @default(autoincrement())
+  workspaceId Int?
+  code        String    @unique
+  url         String
+  contactId   Int?
+  clicks      Int       @default(0)
+  lastClickAt DateTime?
+  createdAt   DateTime  @default(now())
+
+  @@index([workspaceId, contactId])
 }

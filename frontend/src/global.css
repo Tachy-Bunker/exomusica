@@ -6000,3 +6000,98 @@ textarea.ox-cell-input:focus { height: 6rem; position: relative; z-index: 5; ove
 .ox-history li.bad { color: var(--accent-danger); }
 .ox-history time { color: var(--text-dim); margin-right: 0.4rem; }
 @media (max-width: 900px) { .ox-main { grid-template-columns: 1fr; } .ox-ccs { grid-template-columns: 1fr; } .ox-frame { height: 26rem; } }
+
+/* --- Outreach: pipeline, today, results, variants ------------------------------ */
+.ox-st { font-weight: 600; }
+.ox-st-lead { color: var(--text-dim); } .ox-st-contacted { color: var(--accent-audio); } .ox-st-replied { color: #6fd08c; } .ox-st-accepted { color: #3fd16a; }
+.ox-st-declined { color: var(--accent-danger); } .ox-st-ghosted { color: #b58a2f; } .ox-st-none { color: var(--text-dim); font-weight: 400; }
+select.ox-st { min-width: 7rem; }
+.ox-acts { white-space: nowrap; } .ox-acts .btn { padding: 0.2rem 0.55rem; margin: 0.2rem 0.1rem; }
+.ox-today, .ox-results { border: 1px solid var(--border); border-radius: var(--radius); padding: 0.6rem 0.9rem; background: var(--bg-elevated); }
+.ox-today summary, .ox-results summary { cursor: pointer; }
+.ox-today-grid, .ox-results-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(17rem, 1fr)); gap: 1rem; margin-top: 0.7rem; }
+.ox-today h4, .ox-results h4 { margin: 0 0 0.4rem; font-size: 0.9rem; display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap; }
+.ox-today h4 small { color: var(--text-dim); font-weight: 400; }
+.ox-today ul { list-style: none; margin: 0 0 0.4rem; padding: 0; display: flex; flex-direction: column; gap: 0.35rem; }
+.ox-today li { display: flex; justify-content: space-between; align-items: center; gap: 0.5rem; font-size: 0.86rem; }
+.ox-li-btns { display: inline-flex; gap: 0.3rem; flex-shrink: 0; } .ox-li-btns .btn { padding: 0.2rem 0.6rem; font-size: 0.8rem; }
+.ox-stats { width: 100%; border-collapse: collapse; font-size: 0.84rem; } .ox-stats th, .ox-stats td { text-align: left; padding: 0.25rem 0.4rem; border-bottom: 1px solid var(--border); }
+.ox-bar-cell { position: relative; display: inline-block; min-width: 5rem; padding: 0 0.3rem; } .ox-bar-cell i { position: absolute; left: 0; top: 0; bottom: 0; background: color-mix(in srgb, var(--accent-audio) 35%, transparent); z-index: 0; border-radius: 3px; }
+.ox-bar-cell { z-index: 1; isolation: isolate; }
+.ox-chips-lite { display: flex; gap: 0.4rem; flex-wrap: wrap; } .ox-chips-lite span { border: 1px solid var(--border); border-radius: 999px; padding: 0.05rem 0.6rem; font-size: 0.8rem; }
+.ox-days { display: flex; gap: 0.5rem; align-items: flex-end; height: 6rem; } .ox-days div { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; height: 100%; font-size: 0.72rem; color: var(--text-dim); }
+.ox-days i { width: 100%; background: var(--border); border-radius: 3px 3px 0 0; display: flex; align-items: flex-end; min-height: 2px; } .ox-days b { width: 100%; background: var(--accent-audio); border-radius: 3px 3px 0 0; display: block; }
+.ox-tplbar { display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: center; }
+.ox-variants { border: 1px dashed var(--border); border-radius: var(--radius); padding: 0.5rem 0.7rem; margin-top: 0.6rem; display: flex; flex-direction: column; gap: 0.4rem; font-size: 0.85rem; }
+.ox-variants h4 { margin: 0; font-size: 0.85rem; color: var(--text-dim); } .ox-variant { display: flex; gap: 0.6rem; flex-wrap: wrap; align-items: center; } .ox-variant label { display: inline-flex; gap: 0.35rem; align-items: center; color: var(--text-dim); }
+.ox-pitch { border: 1px solid var(--border); border-radius: var(--radius); padding: 0.5rem 0.8rem; } .ox-pitch summary { cursor: pointer; } .ox-pitch ul { list-style: none; margin: 0.4rem 0 0; padding: 0; font-size: 0.86rem; display: flex; flex-direction: column; gap: 0.25rem; }
+.ox-pn-warn { color: var(--accent-forum); } .ox-pn-ok { color: var(--text-dim); }
+.ox-opts { display: flex; flex-direction: column; gap: 0.35rem; } .ox-later { display: flex; gap: 0.6rem; flex-wrap: wrap; align-items: center; padding-left: 1.4rem; }
+.ox-scheduled ul { list-style: none; padding: 0; margin: 0.3rem 0 0; font-size: 0.84rem; display: flex; flex-direction: column; gap: 0.25rem; } .ox-scheduled li.bad { color: var(--accent-danger); } .ox-scheduled time { color: var(--text-dim); margin-right: 0.4rem; }
+.ox-wide { width: min(70rem, 100%); } .ox-review td { vertical-align: top; padding: 0.4rem 0.6rem; } .ox-review th { text-align: left; padding: 0.4rem 0.6rem; background: var(--bg-elevated); }
+.ox-flag { display: block; color: var(--accent-forum); font-size: 0.82rem; }
+.ox-today .ox-due { color: var(--accent-forum); }
+.ox-fine { color: #6fd08c; }
+.ox-results-grid section { min-width: 0; overflow-x: auto; } .ox-today-grid section { min-width: 0; }
+
+/* --- Outreach: workspace gate, library, merge, inbox, past mail ------------------ */
+.ox-gate { max-width: 30rem; margin: 6vh auto; padding: 0 1rem; display: flex; flex-direction: column; gap: 1rem; }
+.ox-gate h1, .ox-gate h2 { margin: 0; }
+.ox-gate-form { display: flex; flex-direction: column; gap: 0.6rem; border: 1px solid var(--border); border-radius: var(--radius); padding: 1rem; background: var(--bg-elevated); }
+.ox-gate-form label { display: flex; flex-direction: column; gap: 0.25rem; font-size: 0.85rem; color: var(--text-dim); }
+.ox-gate-form .ox-check { flex-direction: row; align-items: center; }
+.ox-gate-list { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 0.4rem; align-items: center; }
+.ox-tabs { display: flex; flex-wrap: wrap; gap: 0.3rem; }
+.ox-from { display: flex; gap: 0.6rem; align-items: center; flex-wrap: wrap; font-size: 0.85rem; color: var(--text-dim); }
+.ox-from select { max-width: 100%; }
+.ox-tag { display: inline-block; font-size: 0.72rem; padding: 0.05rem 0.5rem; border: 1px solid var(--border); border-radius: 999px; color: var(--text-dim); background: var(--bg-inset); }
+.ox-clip { display: inline-block; max-width: 22rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: bottom; }
+.ox-small { font-size: 0.75rem; color: var(--text-dim); display: flex; gap: 0.3rem; align-items: center; flex-wrap: wrap; }
+.ox-plain { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.25rem; font-size: 0.85rem; }
+.ox-hours { height: 4.5rem; }
+.ox-hours span { font-size: 0.6rem; }
+.ox-form-q { border: 1px solid var(--border); border-radius: var(--radius); padding: 0.4rem 0.7rem; }
+.ox-form-q ul { margin: 0.3rem 0; padding-left: 1.1rem; font-size: 0.85rem; }
+
+.ox-place { min-width: 11rem; }
+.ox-fit { text-align: center; }
+.ox-fitpill { display: inline-block; min-width: 2.2rem; padding: 0.05rem 0.4rem; border-radius: 999px; border: 1px solid var(--border); font-size: 0.78rem; font-variant-numeric: tabular-nums; }
+.ox-fitpill.hi { color: #3fd16a; border-color: #3fd16a; } .ox-fitpill.lo { color: var(--text-dim); }
+.ox-table tr.cur > td { box-shadow: inset 0 2px 0 var(--accent-audio), inset 0 -2px 0 var(--accent-audio); }
+.ox-table tr.dnc { opacity: 0.55; }
+.ox-near input[type="search"] { flex: 1 1 14rem; }
+.ox-sheet:focus { outline: none; }
+
+.ox-lib { display: grid; grid-template-columns: 11rem minmax(0, 1fr); gap: 0.8rem; min-height: 16rem; }
+.ox-lib-groups { display: flex; flex-direction: column; gap: 0.3rem; align-items: stretch; }
+.ox-lib-groups .btn { text-align: left; }
+.ox-lib-g { display: flex; flex-wrap: wrap; gap: 0.2rem; }
+.ox-lib-main { display: flex; flex-direction: column; gap: 0.6rem; min-width: 0; }
+.ox-lib-grid { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(8.5rem, 1fr)); gap: 0.5rem; }
+.ox-lib-grid li { border: 1px solid var(--border); border-radius: 8px; padding: 0.35rem; display: flex; flex-direction: column; gap: 0.25rem; font-size: 0.78rem; min-width: 0; background: var(--bg-inset); }
+.ox-lib-grid li.on { border-color: var(--accent-audio); }
+.ox-lib-pick { display: block; position: relative; cursor: pointer; }
+.ox-lib-pick input { position: absolute; top: 0.2rem; left: 0.2rem; z-index: 1; }
+.ox-lib-pick img { width: 100%; height: 5.2rem; object-fit: cover; border-radius: 6px; display: block; }
+.ox-lib-ico { display: flex; align-items: center; justify-content: center; height: 5.2rem; font-size: 2rem; }
+@media (max-width: 700px) { .ox-lib { grid-template-columns: 1fr; } .ox-lib-groups { flex-direction: row; flex-wrap: wrap; } }
+
+.ox-merge th, .ox-merge td { vertical-align: top; font-size: 0.82rem; }
+.ox-merge td.on { background: color-mix(in srgb, var(--accent-audio) 14%, transparent); }
+.ox-opt { display: flex; gap: 0.35rem; align-items: flex-start; cursor: pointer; }
+.ox-result { font-weight: 600; background: var(--bg-inset); }
+
+.ox-leads { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.5rem; max-height: 60vh; overflow: auto; }
+.ox-leads > li { border: 1px solid var(--border); border-radius: var(--radius); padding: 0.5rem 0.7rem; display: flex; flex-direction: column; gap: 0.3rem; }
+
+.ox-xwide { width: min(72rem, 100%); }
+.ox-mail { display: grid; grid-template-columns: minmax(14rem, 22rem) minmax(0, 1fr); gap: 0.8rem; min-height: 22rem; }
+.ox-mail-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.25rem; max-height: 65vh; overflow: auto; }
+.ox-mail-row { width: 100%; text-align: left; display: flex; flex-direction: column; gap: 0.1rem; background: var(--bg-inset); border: 1px solid var(--border); border-radius: 8px; padding: 0.35rem 0.55rem; color: var(--text); cursor: pointer; font-size: 0.82rem; }
+.ox-mail-row.on, .ox-mail-row:hover { border-color: var(--accent-audio); }
+.ox-mail-row small { color: var(--text-dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ox-mail-view { min-width: 0; display: flex; flex-direction: column; gap: 0.5rem; }
+.ox-mail-body { white-space: pre-wrap; word-break: break-word; font-family: var(--font-mono); font-size: 0.86rem; line-height: 1.5; background: var(--bg-inset); border: 1px solid var(--border); border-radius: 8px; padding: 0.7rem; max-height: 50vh; overflow: auto; margin: 0; user-select: text; }
+.ox-pickbar { position: sticky; bottom: 0; display: flex; gap: 0.4rem; flex-wrap: wrap; align-items: center; padding: 0.5rem; border: 1px solid var(--accent-audio); border-radius: 8px; background: var(--bg-elevated); }
+.ox-pvsubject { font-weight: 600; }
+@media (max-width: 800px) { .ox-mail { grid-template-columns: 1fr; } }

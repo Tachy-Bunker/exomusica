@@ -9,19 +9,22 @@ const PRESETS: { label: string; v: Partial<OutreachSettings> }[] = [
   { label: "Proton Bridge", v: { smtpHost: "127.0.0.1", smtpPort: 1025, smtpSecure: false, imapHost: "127.0.0.1", imapPort: 1143, imapSecure: false, sentFolder: "Sent", fileInSent: true } },
 ];
 
-export function SettingsModal({ settings, onSaved, onClose }: { settings: OutreachSettings; onSaved: (s: OutreachSettings) => void; onClose: () => void }) {
-  const [s, setS] = useState<OutreachSettings>(settings);
+export function SettingsModal({ accounts, onChange, onClose }: { accounts: OutreachSettings[]; onChange: (a: OutreachSettings[]) => void; onClose: () => void }) {
+  const [curId, setCurId] = useState<number>((accounts.find((a) => a.isDefault) ?? accounts[0]).id);
+  const base = accounts.find((a) => a.id === curId) ?? accounts[0];
+  const [s, setS] = useState<OutreachSettings>(base);
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState<"" | "save" | "test">("");
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const set = <K extends keyof OutreachSettings>(k: K, v: OutreachSettings[K]) => setS((p) => ({ ...p, [k]: v }));
+  const pick = (id: number) => { const a = accounts.find((x) => x.id === id); if (!a) return; setCurId(id); setS(a); setPassword(""); setMsg(null); };
 
   async function save(): Promise<boolean> {
     setBusy("save"); setMsg(null);
     try {
-      const { hasPassword: _h, ...body } = s;
-      const out = await api<OutreachSettings>("/api/admin/outreach/settings", { method: "PUT", body: JSON.stringify({ ...body, ...(password ? { password } : {}) }) });
-      setS(out); setPassword(""); onSaved(out); return true;
+      const { hasPassword: _h, id: _i, ...body } = s;
+      const out = await api<OutreachSettings>(`/api/outreach/accounts/${s.id}`, { method: "PUT", body: JSON.stringify({ ...body, ...(password ? { password } : {}) }) });
+      setS(out); setPassword(""); onChange(accounts.map((a) => (a.id === out.id ? out : out.isDefault ? { ...a, isDefault: false } : a))); return true;
     } catch (e) { setMsg({ ok: false, text: e instanceof Error ? e.message : "Couldn't save." }); return false; }
     finally { setBusy(""); }
   }
@@ -29,17 +32,34 @@ export function SettingsModal({ settings, onSaved, onClose }: { settings: Outrea
     if (!(await save())) return;
     setBusy("test");
     try {
-      const r = await api<{ smtp: string | null; imap: string | null }>("/api/admin/outreach/settings/test", { method: "POST" });
+      const r = await api<{ smtp: string | null; imap: string | null }>(`/api/outreach/accounts/${s.id}/test`, { method: "POST" });
       const parts = [`Sending: ${r.smtp ? r.smtp : "works"}`]; if (r.imap !== "off") parts.push(`Sent folder: ${r.imap ? r.imap : "works"}`);
       setMsg({ ok: !r.smtp && (r.imap === "off" || !r.imap), text: parts.join(" · ") });
     } catch (e) { setMsg({ ok: false, text: e instanceof Error ? e.message : "Test failed." }); }
     finally { setBusy(""); }
   }
+  async function add() {
+    try { const a = await api<OutreachSettings>("/api/outreach/accounts", { method: "POST", body: JSON.stringify({ label: "New mailbox" }) }); onChange([...accounts, a]); setCurId(a.id); setS(a); setPassword(""); setMsg(null); }
+    catch (e) { setMsg({ ok: false, text: e instanceof Error ? e.message : "Couldn't add." }); }
+  }
+  async function remove() {
+    if (!confirm(`Remove the mailbox “${s.label || s.fromEmail || "this one"}”? Mail already sent stays in the history.`)) return;
+    try { await api(`/api/outreach/accounts/${s.id}`, { method: "DELETE" }); const rest = accounts.filter((a) => a.id !== s.id).map((a, i) => (s.isDefault && i === 0 ? { ...a, isDefault: true } : a)); onChange(rest); setCurId(rest[0].id); setS(rest[0]); }
+    catch (e) { setMsg({ ok: false, text: e instanceof Error ? e.message : "Couldn't remove." }); }
+  }
 
   return (
     <div className="ox-modal-back" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
       <div className="ox-modal" role="dialog" aria-label="Mail settings">
-        <header><h2>Mail settings</h2><button className="btn" onClick={onClose} aria-label="Close">✕</button></header>
+        <header><h2>Mailboxes</h2><button className="btn" onClick={onClose} aria-label="Close">✕</button></header>
+        <div className="ox-tabs" role="tablist" aria-label="Mailboxes">
+          {accounts.map((a) => <button key={a.id} role="tab" aria-selected={a.id === curId} className={"btn" + (a.id === curId ? " btn-primary" : "")} onClick={() => pick(a.id)}>{a.label || a.fromEmail || `Mailbox ${a.id}`}{a.isDefault ? " ★" : ""}</button>)}
+          <button className="btn" onClick={add} title="Another address this artist can send from">＋ Add mailbox</button>
+        </div>
+        <div className="ox-grid">
+          <label>Name of this mailbox<input value={s.label} onChange={(e) => set("label", e.target.value)} placeholder="Booking, Label, Personal…" /></label>
+          <label className="ox-check"><input type="checkbox" checked={s.isDefault} onChange={(e) => set("isDefault", e.target.checked)} disabled={s.isDefault} /> The one chosen first in “Send as”</label>
+        </div>
         <div className="ox-presets">Fill in for: {PRESETS.map((p) => <button key={p.label} className="btn-link" onClick={() => setS((x) => ({ ...x, ...p.v }))}>{p.label}</button>)}</div>
         <fieldset><legend>Sending (SMTP)</legend>
           <div className="ox-grid">
@@ -74,6 +94,7 @@ export function SettingsModal({ settings, onSaved, onClose }: { settings: Outrea
         </fieldset>
         {msg && <p className={msg.ok ? "ox-ok" : "ox-err"} role="status">{msg.text}</p>}
         <footer>
+          {accounts.length > 1 && <button className="btn" onClick={remove} disabled={!!busy}>Remove this mailbox</button>}
           <button className="btn" onClick={test} disabled={!!busy}>{busy === "test" ? "Testing…" : "Save & test connection"}</button>
           <button className="btn btn-primary" onClick={async () => { if (await save()) onClose(); }} disabled={!!busy}>{busy === "save" ? "Saving…" : "Save"}</button>
         </footer>

@@ -3,7 +3,7 @@ import { api } from "../../lib/api";
 import type { Block, BlockType } from "./types";
 
 /** Reusable pieces of text (short bio, long bio, press quote…) grouped by the kinds you define. Click one to drop it into the message at the cursor. */
-export function BlocksPanel({ types, onTypes, onInsert, getSelection }: { types: BlockType[]; onTypes: (t: BlockType[]) => void; onInsert: (body: string) => void; getSelection: () => string }) {
+export function BlocksPanel({ types, onTypes, onInsert, onToken, getSelection }: { types: BlockType[]; onTypes: (t: BlockType[]) => void; onInsert: (body: string) => void; onToken: (kind: string) => void; getSelection: () => string }) {
   const [openType, setOpenType] = useState<number | null>(types[0]?.id ?? null);
   const [edit, setEdit] = useState<{ id: number | null; typeId: number; title: string; body: string } | null>(null);
   const [newType, setNewType] = useState("");
@@ -12,33 +12,33 @@ export function BlocksPanel({ types, onTypes, onInsert, getSelection }: { types:
 
   const addType = () => run(async () => {
     if (!newType.trim()) return;
-    const t = await api<{ id: number; name: string }>("/api/admin/outreach/block-types", { method: "POST", body: JSON.stringify({ name: newType }) });
+    const t = await api<{ id: number; name: string }>("/api/outreach/block-types", { method: "POST", body: JSON.stringify({ name: newType }) });
     onTypes([...types, { id: t.id, name: t.name, blocks: [] }]); setNewType(""); setOpenType(t.id);
   });
   const renameType = (t: BlockType) => run(async () => {
     const name = prompt("Rename this kind of block", t.name)?.trim(); if (!name || name === t.name) return;
-    await api(`/api/admin/outreach/block-types/${t.id}`, { method: "PATCH", body: JSON.stringify({ name }) });
+    await api(`/api/outreach/block-types/${t.id}`, { method: "PATCH", body: JSON.stringify({ name }) });
     onTypes(types.map((x) => (x.id === t.id ? { ...x, name } : x)));
   });
   const delType = (t: BlockType) => run(async () => {
     if (!confirm(`Delete "${t.name}" and its ${t.blocks.length} block${t.blocks.length === 1 ? "" : "s"}?`)) return;
-    await api(`/api/admin/outreach/block-types/${t.id}`, { method: "DELETE" }); onTypes(types.filter((x) => x.id !== t.id));
+    await api(`/api/outreach/block-types/${t.id}`, { method: "DELETE" }); onTypes(types.filter((x) => x.id !== t.id));
   });
   const saveBlock = () => run(async () => {
     if (!edit || !edit.title.trim()) return;
     const body = JSON.stringify({ typeId: edit.typeId, title: edit.title, body: edit.body });
     if (edit.id === null) {
-      const b = await api<Block>("/api/admin/outreach/blocks", { method: "POST", body });
+      const b = await api<Block>("/api/outreach/blocks", { method: "POST", body });
       onTypes(types.map((t) => (t.id === edit.typeId ? { ...t, blocks: [...t.blocks, b] } : t)));
     } else {
-      const b = await api<Block>(`/api/admin/outreach/blocks/${edit.id}`, { method: "PATCH", body });
+      const b = await api<Block>(`/api/outreach/blocks/${edit.id}`, { method: "PATCH", body });
       onTypes(types.map((t) => ({ ...t, blocks: t.blocks.filter((x) => x.id !== b.id) })).map((t) => (t.id === b.typeId ? { ...t, blocks: [...t.blocks, b].sort((x, y) => x.id - y.id) } : t)));
     }
     setEdit(null);
   });
   const delBlock = (b: Block) => run(async () => {
     if (!confirm(`Delete the block "${b.title}"?`)) return;
-    await api(`/api/admin/outreach/blocks/${b.id}`, { method: "DELETE" });
+    await api(`/api/outreach/blocks/${b.id}`, { method: "DELETE" });
     onTypes(types.map((t) => ({ ...t, blocks: t.blocks.filter((x) => x.id !== b.id) })));
   });
 
@@ -50,7 +50,7 @@ export function BlocksPanel({ types, onTypes, onInsert, getSelection }: { types:
         <div key={t.id} className={"ox-btype" + (openType === t.id ? " open" : "")}>
           <div className="ox-btype-head">
             <button className="btn-link" onClick={() => setOpenType(openType === t.id ? null : t.id)} aria-expanded={openType === t.id}>{openType === t.id ? "▾" : "▸"} {t.name} <span className="ox-dim">{t.blocks.length}</span></button>
-            <span><button className="btn-link" onClick={() => renameType(t)} aria-label={`Rename ${t.name}`}>rename</button> <button className="btn-link" onClick={() => delType(t)} aria-label={`Delete ${t.name}`}>✕</button></span>
+            <span><button className="btn-link" onClick={() => onToken(t.name)} title={`Put {{block:${t.name}}} in the message: the right version is chosen per person (set under the text)`}>{"{{ }}"}</button> <button className="btn-link" onClick={() => renameType(t)} aria-label={`Rename ${t.name}`}>rename</button> <button className="btn-link" onClick={() => delType(t)} aria-label={`Delete ${t.name}`}>✕</button></span>
           </div>
           {openType === t.id && (
             <ul>

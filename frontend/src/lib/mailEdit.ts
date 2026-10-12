@@ -5,6 +5,10 @@ export type MailKind = MdKind | "underline" | "highlight" | "sup" | "sub" | "h1"
 
 const WRAP: Record<string, [string, string, string]> = { underline: ["++", "++", "underlined"], highlight: ["==", "==", "highlighted"], sup: ["^", "^", "up"], sub: ["~", "~", "down"] };
 
+function setAttr(attrs: string, key: string, val: string): string {
+  const parts = attrs.trim().split(/\s+/).filter((p) => p[0] !== key);
+  return [...parts, `${key}:${val}`].sort().join(" "); // c before s, always the same order
+}
 function wrap(value: string, start: number, end: number, a: string, b: string, ph: string): Edit {
   const sel = value.slice(start, end);
   if (sel && value.slice(start - a.length, start) === a && value.slice(end, end + b.length) === b)
@@ -38,8 +42,21 @@ export function applyMail(value: string, start: number, end: number, kind: MailK
       return { value: value.slice(0, start) + ins + value.slice(end), start: start + ins.length - t.length + 2, end: start + ins.length - t.length + 7 };
     }
     case "color": case "size": {
-      const a = kind === "color" ? `{c:${/^#[0-9a-f]{3,6}$/i.test(arg) ? arg : "#c0392b"}|` : `{s:${Math.max(10, Math.min(48, Number(arg) || 18))}|`;
-      const body = sel || "text";
+      const key = kind === "color" ? "c" : "s";
+      const val = kind === "color" ? (/^#[0-9a-f]{3,6}$/i.test(arg) ? arg : "#c0392b") : String(Math.max(10, Math.min(48, Number(arg) || 18)));
+      // Colour and size share one span, {c:#… s:18|text}: applying the second to text already in a span (or a selected whole span) updates that span.
+      const before = value.slice(0, start), after = value.slice(end);
+      const inside = /\{((?:[cs]:[#\w.]+\s*)+)\|$/.exec(before);
+      if (sel && inside && after.startsWith("}")) {
+        const head = `{${setAttr(inside[1], key, val)}|`, at = start - inside[0].length;
+        return { value: value.slice(0, at) + head + sel + after, start: at + head.length, end: at + head.length + sel.length };
+      }
+      const whole = /^\{((?:[cs]:[#\w.]+\s*)+)\|([^{}]+)\}$/.exec(sel);
+      if (whole) {
+        const head = `{${setAttr(whole[1], key, val)}|`;
+        return { value: value.slice(0, start) + head + whole[2] + "}" + after, start: start + head.length, end: start + head.length + whole[2].length };
+      }
+      const a = `{${key}:${val}|`, body = sel || "text";
       return { value: value.slice(0, start) + a + body + "}" + value.slice(end), start: start + a.length, end: start + a.length + body.length };
     }
     case "field": {

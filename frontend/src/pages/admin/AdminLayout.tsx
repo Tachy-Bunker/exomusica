@@ -4,7 +4,6 @@ import { api } from "../../lib/api";
 
 export function AdminLayout() {
   const [pendingCount, setPendingCount] = useState(0);
-  const [outreachDue, setOutreachDue] = useState(0);
 
   useEffect(() => {
     function checkPending() {
@@ -14,8 +13,6 @@ export function AdminLayout() {
     }
     checkPending();
     const interval = setInterval(checkPending, 30000);
-    // follow-ups due in Outreach: asked once per visit to the admin, not polled
-    api<{ count: number }>("/api/admin/outreach/due").then((r) => setOutreachDue(r.count)).catch(() => {});
     return () => clearInterval(interval);
   }, []);
 
@@ -86,9 +83,8 @@ export function AdminLayout() {
         <NavLink to="/admin/fx-settings" className={({ isActive }) => (isActive ? "active" : "")}>
           Spacemap field
         </NavLink>
-        <NavLink to="/admin/outreach" className={({ isActive }) => (isActive ? "active" : "")} style={{ display: "inline-flex", alignItems: "center", gap: "0.35rem" }}>
-          Outreach
-          {outreachDue > 0 && <span className="admin-nav-pending-dot" title={`${outreachDue} follow-up${outreachDue === 1 ? "" : "s"} due`} />}
+        <NavLink to="/outreach" className={({ isActive }) => (isActive ? "active" : "")} style={{ display: "inline-flex", alignItems: "center", gap: "0.35rem" }} title="Outreach lives outside the admin panel now: shareable with a password">
+          Outreach ↗
         </NavLink>
         <NavLink to="/admin/newsletter" className={({ isActive }) => (isActive ? "active" : "")}>
           Newsletter

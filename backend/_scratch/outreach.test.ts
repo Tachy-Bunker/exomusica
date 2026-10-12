@@ -30,7 +30,23 @@ assert.equal(toCsv([["a", 'b"c', "d,e"], ["1", "2\n3", ""]]), 'a,"b""c","d,e"\r\
 const plan = planImport(["Name", "E-mail", "Festival", "Last sent", "Times sent", "Follow up", "City", "city"], [["Ana", "ana@x.org", "Sonar", "2026-05-01", "2", "2026-06-01", "Lisbon", "x"], ["", "", "", "", "", "", "", ""], ["Bob", "bad", "", "", "", "", "", ""]], [{ key: "festival", name: "Festival", type: "text" }]);
 assert.deepEqual(plan.newColumns.map((x) => x.key), ["city"]);
 assert.equal(plan.contacts.length, 2); assert.equal(plan.skipped, 1);
-assert.deepEqual(plan.contacts[0], { name: "Ana", email: "ana@x.org", data: { festival: "Sonar", city: "x" }, lastSentAt: "2026-05-01", sentCount: 2, followUpAt: "2026-06-01" });
+assert.deepEqual(plan.contacts[0], { name: "Ana", email: "ana@x.org", data: { festival: "Sonar", city: "x" }, lastSentAt: "2026-05-01", sentCount: 2, status: "", deadline: null, timezone: null, groups: [], followUpAt: "2026-06-01", place: "", lat: null, lng: null });
 assert.equal(plan.contacts[1].email, "");
 assert.ok(isDue("2026-10-01", new Date("2026-10-12")) && !isDue(null, new Date()) && !isDue("2026-11-01", new Date("2026-10-12")));
 console.log("outreach ok");
+{
+  const plan = planImport(["Name", "Email", "Groups"], [["A", "a@x.org", "Festivals; Open calls"], ["B", "b@x.org", ""], ["", "", "Orphan"]], []);
+  assert.deepEqual(plan.contacts.map((c) => c.groups), [["Festivals", "Open calls"], []], "groups column read, empty rows skipped");
+  assert.equal(plan.newColumns.length, 0, "Groups is not a custom column");
+  console.log("outreach groups ok");
+}
+{
+  const p = planImport(["Name", "Email", "Status", "Deadline", "Timezone", "Website", "Birthday"], [["A", "a@x.org", "Replied", "2027-03-01", "Europe/Paris", "https://a.org", "1990-05-02"]], [], 2000, { website: "url", birthday: "date" });
+  assert.deepEqual(p.newColumns.map((c) => [c.name, c.type]), [["Website", "url"], ["Birthday", "date"]], "hinted types create typed columns");
+  assert.deepEqual([p.contacts[0].status, p.contacts[0].deadline, p.contacts[0].timezone, p.contacts[0].data.birthday], ["replied", "2027-03-01", "Europe/Paris", "1990-05-02"]);
+  {
+  const pl = planImport(["Name", "Place", "Latitude", "Longitude"], [["Fest", "Lyon", "45.76", "4,83"], ["Bad", "X", "95", "x"]], [], 100, {});
+  assert.deepEqual([pl.contacts[0].place, pl.contacts[0].lat, pl.contacts[0].lng, pl.contacts[1].lat, pl.contacts[1].lng], ["Lyon", 45.76, 4.83, null, null]); assert.equal(pl.newColumns.length, 0);
+}
+console.log("outreach import hints ok");
+}

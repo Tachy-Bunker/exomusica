@@ -1,3 +1,5 @@
+import { outreachHeaders } from "./outreachSession";
+
 const TOKEN_KEY = "exomusica_token";
 
 export function getToken(): string | null {
@@ -24,6 +26,7 @@ export async function api<T>(path: string, options: RequestInit = {}): Promise<T
     headers: {
       ...(options.body && !isFormData ? { "Content-Type": "application/json" } : {}),
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...outreachHeaders(path),
       ...options.headers,
     },
   });
@@ -42,6 +45,7 @@ export async function api<T>(path: string, options: RequestInit = {}): Promise<T
       setToken(null);
       window.dispatchEvent(new Event("exomusica:session-expired"));
     }
+    if (res.status === 401 && body?.locked) window.dispatchEvent(new Event("outreach:locked"));
     throw new ApiError(res.status, body?.error ?? res.statusText, body);
   }
   return body as T;

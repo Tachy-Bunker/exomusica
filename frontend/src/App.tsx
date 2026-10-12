@@ -65,7 +65,6 @@ import { AuditLogAdminPage } from "./pages/admin/AuditLogAdminPage";
 import { AboutAdminPage } from "./pages/admin/AboutAdminPage";
 import { FontsAdminPage } from "./pages/admin/FontsAdminPage";
 import { FxSettingsAdminPage } from "./pages/admin/FxSettingsAdminPage";
-import { OutreachAdminPage } from "./pages/admin/OutreachAdminPage";
 import { NewsletterAdminPage } from "./pages/admin/NewsletterAdminPage";
 import { DiscordImportPage } from "./pages/admin/DiscordImportPage";
 import { StorageAdminPage } from "./pages/admin/StorageAdminPage";
@@ -85,6 +84,7 @@ function ConversationsRedirect() {
   return <Navigate to={`/telemetry${loc.search}`} replace />;
 }
 
+const OutreachPage = lazy(() => import("./pages/OutreachPage").then((m) => ({ default: m.OutreachPage })));
 const VoiceLabPage = lazy(() => import("./pages/VoiceLabPage").then((m) => ({ default: m.VoiceLabPage })));
 
 /** A resource or open call has its own address (for sharing and for link previews); it opens in XenoLab, scrolled to that card. */
@@ -106,6 +106,8 @@ export default function App() {
           <AuthProvider>
             <Routes>
               <Route path="chat-window" element={<MiniChatWindowPage />} />
+              <Route path="outreach" element={<Suspense fallback={null}><OutreachPage /></Suspense>} />
+              <Route path="outreach/:slug" element={<Suspense fallback={null}><OutreachPage /></Suspense>} />
               <Route path="embed/playlist/:slug" element={<EmbedPlaylistPage />} />
               <Route path="embed/main-spacemap" element={<EmbedMainSpacemapPage />} />
               <Route element={<Layout />}>
@@ -185,7 +187,7 @@ export default function App() {
                 <Route path="fonts" element={<FontsAdminPage />} />
                 <Route path="fx-settings" element={<FxSettingsAdminPage />} />
                 <Route path="newsletter" element={<NewsletterAdminPage />} />
-                <Route path="outreach" element={<OutreachAdminPage />} />
+                <Route path="outreach" element={<Navigate to="/outreach" replace />} />
                 <Route path="discord-import" element={<DiscordImportPage />} />
                 <Route path="storage" element={<StorageAdminPage />} />
                 <Route path="discord-bridge" element={<DiscordBridgePage />} />
