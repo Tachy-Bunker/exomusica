@@ -1,0 +1,11 @@
+import { firstUrl, normalizeUrl, sameSource } from "../src/lib/citations";
+let bad = 0; const eq = (a: unknown, b: unknown, m: string) => { const ok = JSON.stringify(a) === JSON.stringify(b); if (!ok) { bad++; console.log("FAIL", m, a, b); } else console.log("ok  ", m); };
+eq(firstUrl("Smith 2019, see https://doi.org/10.1/abc. Also"), "https://doi.org/10.1/abc", "url: trailing dot dropped");
+eq(firstUrl("[Paper](https://x.org/p?a=1) and more"), "https://x.org/p?a=1", "url: inside a markdown link");
+eq(firstUrl("no link here"), null, "url: none");
+eq(sameSource("https://www.X.org/p/?utm_source=a#top", "http://x.org/p"), true, "same: www, case, tracking, fragment, slash, scheme");
+eq(sameSource("https://x.org/p?a=1&b=2", "https://x.org/p?b=2&a=1"), true, "same: parameter order");
+eq(sameSource("https://x.org/p?a=1", "https://x.org/p?a=2"), false, "different: parameter value");
+eq(sameSource("https://x.org/a", "https://x.org/b"), false, "different: path");
+eq(normalizeUrl("javascript:alert(1)"), null, "scheme: only http(s)");
+process.exit(bad ? 1 : 0);

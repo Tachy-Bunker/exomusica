@@ -1,9 +1,13 @@
 import { useEffect, useRef, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { CHAIN_PRESETS } from "../lib/dsp/voiceChain";
+import { ChainBuilder } from "../components/ChainBuilder";
+import { customPreset, decodeChain, encodeChain, type Stage } from "../lib/dsp/chainLink";
 import { EXPORT_FORMATS, type ExportFormat } from "../lib/dsp/encode";
 import { useToastStore } from "../lib/toastStore";
 
 type Which = "original" | "processed";
+const CUSTOM = "custom";
 
 const FORMATS = Object.keys(EXPORT_FORMATS) as ExportFormat[];
 
@@ -22,7 +26,10 @@ export function VoiceLabPage({ embedded = false }: { embedded?: boolean } = {}) 
   const [processed, setProcessed] = useState<AudioBuffer | null>(null);
   const [progress, setProgress] = useState<number | null>(null);
   const [recording, setRecording] = useState(false);
-  const [chainId, setChainId] = useState(CHAIN_PRESETS[0].id);
+  const [params] = useSearchParams();
+  const linked = useRef(decodeChain(params.get("chain"))).current; // a chain arriving in the address opens the builder
+  const [stages, setStages] = useState<Stage[]>(() => linked ?? CHAIN_PRESETS[0].plugins.map((p) => ({ plugin: p.plugin, raw: p.raw })));
+  const [chainId, setChainId] = useState(linked ? CUSTOM : CHAIN_PRESETS[0].id);
   const [which, setWhich] = useState<Which>("processed");
   const [playing, setPlaying] = useState(false);
   const [position, setPosition] = useState(0);
@@ -187,7 +194,7 @@ export function VoiceLabPage({ embedded = false }: { embedded?: boolean } = {}) 
         setProgress(null);
       } else if (e.data.progress !== undefined) setProgress(e.data.progress);
     };
-    worker.postMessage({ id, presetId: chainId, sampleRate: b.sampleRate, left, right }, right ? [left.buffer, right.buffer] : [left.buffer]);
+    worker.postMessage({ id, ...(chainId === CUSTOM ? { preset: customPreset(stages) } : { presetId: chainId }), sampleRate: b.sampleRate, left, right }, right ? [left.buffer, right.buffer] : [left.buffer]);
   }
 
   function switchTo(next: Which) {
@@ -234,7 +241,11 @@ export function VoiceLabPage({ embedded = false }: { embedded?: boolean } = {}) 
     worker.postMessage({ id, format, sampleRate: processed.sampleRate, left: processed.getChannelData(0).slice(), right: processed.getChannelData(1).slice() });
   }
 
-  const chain = CHAIN_PRESETS.find((p) => p.id === chainId)!;
+  const chain = chainId === CUSTOM ? customPreset(stages) : CHAIN_PRESETS.find((p) => p.id === chainId)!;
+  const shareChain = () => {
+    const url = `${location.origin}/xenolab?tab=effects&chain=${encodeChain(stages)}`;
+    navigator.clipboard?.writeText(url).then(() => useToastStore.getState().showToast("Link to this chain copied"), () => useToastStore.getState().showToast(url));
+  };
   const total = (current ?? source?.buffer)?.duration ?? 0;
   const needsProcessing = !!source && !processed && progress === null;
 
@@ -297,6 +308,7 @@ export function VoiceLabPage({ embedded = false }: { embedded?: boolean } = {}) 
       </section>
 
       {error && <p style={{ color: "var(--accent-forum)" }}>{error}</p>}
+      {linked && !source && <p data-testid="chain-linked-note">A shared chain of {linked.length} effect{linked.length === 1 ? "" : "s"} is loaded: ({linked.map((s) => s.plugin).join(" → ")}). Load or record audio to try it.</p>}
 
       {source && (
         <>
@@ -312,12 +324,19 @@ export function VoiceLabPage({ embedded = false }: { embedded?: boolean } = {}) 
                     {p.name}
                   </option>
                 ))}
+                <option value={CUSTOM}>Custom chain…</option>
               </select>
             </label>
             <button className={`btn ${needsProcessing ? "btn-primary btn-attention" : ""}`} onClick={process} disabled={progress !== null} data-testid="voice-process">
               {progress !== null ? `Processing… ${Math.round(progress * 100)}%` : processed ? "Process again" : `Process with ${chain.name}`}
             </button>
           </section>
+          {chainId === CUSTOM && (
+            <section style={{ marginBottom: "1rem" }}>
+              <ChainBuilder stages={stages} onChange={(s) => { setStages(s); setProcessed(null); }} disabled={progress !== null} />
+              <button type="button" className="btn" onClick={shareChain} data-testid="chain-share">Copy link to this chain</button>
+            </section>
+          )}
 
           <section style={{ border: "1px solid var(--border)", borderRadius: "var(--radius)", padding: "0.8rem" }}>
             <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap", alignItems: "center" }}>

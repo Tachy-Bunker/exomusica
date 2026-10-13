@@ -112,7 +112,7 @@ def run(playwright):
     ctx = new_ctx(); page = ctx.new_page(); watch(page)
     page.goto(f"{BASE}/xenolab"); page.wait_for_selector("[data-testid=xenolab-page]")
     labels = [t.strip() for t in page.locator(".xl-tab").all_inner_texts()]
-    check(labels == ["Studies", "Contribute", "Resources", "Analyze", "Effects", "Open calls"], f"tabs in the requested order, no Overview/Log: {labels}")
+    check(labels == ["Studies", "Contribute", "Resources", "Analyze", "Effects", "Phenomena", "Open calls"], f"tabs in the requested order, no Overview/Log: {labels}")
     check(page.locator("[data-testid=studies-panel] .xl-card").count() == 2, "Studies is the default tab")
     page.goto(f"{BASE}/xenolab?tab=overview"); page.wait_for_selector("[data-testid=studies-panel]")
     check(page.locator("[data-testid=studies-panel]").count() == 1, "old ?tab=overview lands on Studies")

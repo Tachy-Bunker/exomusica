@@ -1,5 +1,6 @@
 import { createReadStream } from "node:fs";
-import { stat } from "node:fs/promises";
+import { readFile, stat } from "node:fs/promises";
+import { firstUrl, sameSource } from "../lib/citations.js";
 import path from "node:path";
 import { UPLOADS_DIR } from "../lib/storage.js";
 import { isTextFile, readTextPreview } from "../lib/textFiles.js";
@@ -66,7 +67,36 @@ export async function studiesRoutes(app: FastifyInstance): Promise<void> {
       },
     });
     if (!study) return reply.code(404).send({ error: "no such study" });
-    return { ...study, branches: study.branches.filter((b) => b.visibility !== "HIDDEN").map((b) => ({ slug: b.slug, name: b.name })), files: study.files.map((f) => ({ id: f.id, filename: f.filename, mimeType: f.mimeType, sizeBytes: Number(f.sizeBytes), url: f.storagePath })) };
+    // live data: a chart linked to a CSV file shows that file as it is now
+    const charts = await Promise.all(study.charts.map(async (c) => {
+      if (!c.sourceFileId) return { ...c, live: false };
+      const csv = await readChartFile(c.sourceFileId, study.id);
+      return csv ? { ...c, dataCsv: csv.text, live: true, sourceName: csv.name } : { ...c, live: false };
+    }));
+    return { ...study, charts, branches: study.branches.filter((b) => b.visibility !== "HIDDEN").map((b) => ({ slug: b.slug, name: b.name })), files: study.files.map((f) => ({ id: f.id, filename: f.filename, mimeType: f.mimeType, sizeBytes: Number(f.sizeBytes), url: f.storagePath })) };
+  });
+
+  // Each note's source (its first link) and the other studies that cite the same page.
+  app.get<{ Params: { slug: string } }>("/api/studies/:slug/citations", async (req, reply) => {
+    const study = await prisma.study.findUnique({ where: { slug: req.params.slug }, select: { id: true, annotations: { orderBy: { position: "asc" }, select: { text: true } } } });
+    if (!study) return reply.code(404).send({ error: "no such study" });
+    const urls: (string | null)[] = study.annotations.map((a: { text: string }) => firstUrl(a.text));
+    const wanted = [...new Set(urls.filter((u): u is string => !!u))];
+    const others = wanted.length
+      ? await prisma.studyAnnotation.findMany({
+          where: { studyId: { not: study.id }, OR: wanted.map((u) => ({ text: { contains: new URL(u).hostname.replace(/^www\./, "") } })) },
+          select: { text: true, study: { select: { slug: true, title: true } } },
+          take: 400,
+        })
+      : [];
+    reply.header("Cache-Control", "public, max-age=60");
+    return study.annotations.map((_, i) => {
+      const url = urls[i];
+      if (!url) return { url: null, citedBy: [] };
+      const seen = new Set<string>();
+      const citedBy = others.filter((o) => { const u = firstUrl(o.text); return !!u && sameSource(u, url) && !seen.has(o.study.slug) && (seen.add(o.study.slug), true); }).map((o) => ({ slug: o.study.slug, title: o.study.title }));
+      return { url, citedBy };
+    });
   });
 
   app.post<{ Body: { title: string; body?: string } }>("/api/studies", { preHandler: requireAuth }, async (req, reply) => {
@@ -406,24 +436,52 @@ export async function studiesRoutes(app: FastifyInstance): Promise<void> {
 
   // --- Charts/data tables: author-only, positioned within the study ---
 
-  app.post<{ Params: { slug: string }; Body: { title: string; kind: "LINE" | "BAR" | "SCATTER" | "TABLE"; xLabel?: string; yLabel?: string; xLog?: boolean; yLog?: boolean; dataCsv: string } }>(
+  const CSV_NAME = /\.(csv|tsv|txt)$/i;
+  const CHART_FILE_MAX = 1_000_000; // bytes: a chart is not a database
+  /** The current text of a study's data file (tabs become commas), or null if it isn't one or can't be read. */
+  async function readChartFile(attachmentId: number, studyId: number): Promise<{ text: string; name: string } | null> {
+    const att = await prisma.attachment.findUnique({ where: { id: attachmentId }, select: { filename: true, storagePath: true, studyId: true } });
+    if (!att || att.studyId !== studyId || !CSV_NAME.test(att.filename) || !att.storagePath.startsWith("/uploads/")) return null;
+    try {
+      const file = path.join(UPLOADS_DIR, "messages", path.basename(att.storagePath));
+      const info = await stat(file);
+      if (!info.isFile() || info.size > CHART_FILE_MAX) return null;
+      let text = (await readFile(file, "utf8")).replace(/^\uFEFF/, "").replace(/\r\n?/g, "\n");
+      if (att.filename.toLowerCase().endsWith(".tsv")) text = text.replace(/\t/g, ",");
+      return text.trim() ? { text, name: att.filename } : null;
+    } catch {
+      return null;
+    }
+  }
+  /** Validates a chosen source file: it must be a data file of this very study. Returns the id (or null to unlink). */
+  async function chartSourceId(value: unknown, studyId: number): Promise<{ ok: true; id: number | null; text?: string } | { ok: false }> {
+    if (value === null) return { ok: true, id: null };
+    const id = Number(value);
+    if (!Number.isInteger(id)) return { ok: false };
+    const csv = await readChartFile(id, studyId);
+    return csv ? { ok: true, id, text: csv.text } : { ok: false };
+  }
+
+  app.post<{ Params: { slug: string }; Body: { title: string; kind: "LINE" | "BAR" | "SCATTER" | "TABLE"; xLabel?: string; yLabel?: string; xLog?: boolean; yLog?: boolean; dataCsv: string; sourceFileId?: number | null } }>(
     "/api/studies/:slug/charts",
     { preHandler: requireAuth },
     async (req, reply) => {
       const study = await prisma.study.findUnique({ where: { slug: req.params.slug }, include: { charts: true } });
       if (!study) return reply.code(404).send({ error: "no such study" });
       if (study.ownerId !== req.user!.id && !req.user!.isAdmin) return reply.code(403).send({ error: "not your study" });
-      const { title, kind, xLabel, yLabel, xLog, yLog, dataCsv } = req.body ?? {};
+      const { title, kind, xLabel, yLabel, xLog, yLog, dataCsv, sourceFileId } = req.body ?? {};
       if (!title?.trim() || !dataCsv?.trim()) return reply.code(400).send({ error: "title and dataCsv are required" });
+      const src: Awaited<ReturnType<typeof chartSourceId>> = sourceFileId === undefined ? { ok: true, id: null } : await chartSourceId(sourceFileId, study.id);
+      if (!src.ok) return reply.code(400).send({ error: "that file can't feed a chart: it must be a CSV among this study's files" });
       const nextPosition = study.charts.length + 1;
       const chart = await prisma.studyChart.create({
-        data: { studyId: study.id, position: nextPosition, title: title.trim(), kind: kind ?? "LINE", xLabel: xLabel?.trim() || null, yLabel: yLabel?.trim() || null, xLog: xLog === true, yLog: yLog === true, dataCsv },
+        data: { studyId: study.id, position: nextPosition, title: title.trim(), kind: kind ?? "LINE", xLabel: xLabel?.trim() || null, yLabel: yLabel?.trim() || null, xLog: xLog === true, yLog: yLog === true, dataCsv: src.text ?? dataCsv, sourceFileId: src.id },
       });
       return reply.code(201).send(chart);
     },
   );
 
-  app.patch<{ Params: { id: string }; Body: Partial<{ title: string; kind: "LINE" | "BAR" | "SCATTER" | "TABLE"; xLabel: string | null; yLabel: string | null; xLog: boolean; yLog: boolean; dataCsv: string }> }>(
+  app.patch<{ Params: { id: string }; Body: Partial<{ title: string; kind: "LINE" | "BAR" | "SCATTER" | "TABLE"; xLabel: string | null; yLabel: string | null; xLog: boolean; yLog: boolean; dataCsv: string; sourceFileId: number | null }> }>(
     "/api/study-charts/:id",
     { preHandler: requireAuth },
     async (req, reply) => {
@@ -431,15 +489,21 @@ export async function studiesRoutes(app: FastifyInstance): Promise<void> {
       if (!chart) return reply.code(404).send({ error: "no such chart" });
       if (chart.study.ownerId !== req.user!.id && !req.user!.isAdmin) return reply.code(403).send({ error: "not your study" });
       // whitelist: the raw body could otherwise move a chart to another study (studyId) or change its position
-      const { title, kind, xLabel, yLabel, xLog, yLog, dataCsv } = req.body ?? {};
+      const { title, kind, xLabel, yLabel, xLog, yLog, dataCsv, sourceFileId } = req.body ?? {};
       const data: Record<string, unknown> = {};
+      if (sourceFileId !== undefined) {
+        const src = await chartSourceId(sourceFileId, chart.studyId);
+        if (!src.ok) return reply.code(400).send({ error: "that file can't feed a chart: it must be a CSV among this study's files" });
+        data.sourceFileId = src.id;
+        if (src.text) data.dataCsv = src.text;
+      }
       if (typeof title === "string" && title.trim()) data.title = title.trim();
       if (kind === "LINE" || kind === "BAR" || kind === "SCATTER" || kind === "TABLE") data.kind = kind;
       if (xLabel === null || typeof xLabel === "string") data.xLabel = xLabel?.trim() || null;
       if (yLabel === null || typeof yLabel === "string") data.yLabel = yLabel?.trim() || null;
       if (typeof xLog === "boolean") data.xLog = xLog;
       if (typeof yLog === "boolean") data.yLog = yLog;
-      if (typeof dataCsv === "string" && dataCsv.trim()) data.dataCsv = dataCsv;
+      if (typeof dataCsv === "string" && dataCsv.trim() && !(typeof data.sourceFileId === "number")) data.dataCsv = dataCsv;
       return prisma.studyChart.update({ where: { id: chart.id }, data });
     },
   );

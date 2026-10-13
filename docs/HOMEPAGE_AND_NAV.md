@@ -432,3 +432,13 @@ Phase 1 (this delivery), idea 4:
 - **Provenance strip** (expanded player): study › sketch › branch › album, each chip opens its place. `GET /api/tracks/:id/provenance`; set per track in Admin → Albums → track edit ("Came out of study", "Grew from sketch"; `Track.fromStudyId/fromSketchId`). Shown when at least one of study/sketch is set.
 - **Offline album pack**: "Save offline" on an album page. `lib/offlinePack.ts` stores tracks, cover, gallery, notes (`/api/albums/:slug`) in Cache Storage; `public/sw.js` serves them (Range-aware) and keeps the app shell, so a pinned album opens offline. The worker is registered only after someone pins and removed when the last pin is removed. `/offline` lists/removes packs and shows storage use.
 - Fix: `GET /api/albums/:slug` now returns `contentMarkdown` and the og fields (they were missing, so the admin edit form could blank them on save).
+
+## fix302b: XenoLab (charts, citations, chains, phenomena)
+
+- **Study charts** use the Telemetry Scope look (`.study-scope`, `.inst-*`). Colours are spread around the study picture's average colour (`lib/chartPalette.ts`, luminance floor 0.2 on the dark panel; none if there is no picture). The study background now fades on the sides as well as the bottom (two masks, intersected).
+- **Live charts**: a chart can point at a CSV among the study's files (`StudyChart.sourceFileId`); the data is re-read on every `GET /api/studies/:slug`. The note "live · reads file.csv" shows on the chart.
+- **Citations**: `[n]` shows a hover card (source, page peek via `/api/link-preview`, other studies citing the same source). `GET /api/studies/:slug/citations`, logic in `backend/src/lib/citations.ts`.
+- **Chain builder**: Effects → "Custom chain…". Sliders are named and read out by the plugin itself; the engine loads only when the builder opens. "Copy link to this chain" gives `/xenolab?tab=effects&chain=<code>` (`lib/dsp/chainLink.ts`: base64url JSON, validated; max 8 stages / 16 params). The worker accepts an inline `preset`.
+- **Phenomena**: XenoLab tab `?tab=phenomena&item=<slug>`. Model `Phenomenon` (title, summary, markdown notes, chain code, example track, published). Public `GET /api/phenomena`; admin `GET/POST/PATCH/DELETE /api/admin/phenomena`. Admins edit inline on the tab. "Reproduce this" opens the Effects tab with the card's chain.
+- Prisma: `fix302b_xenolab` (StudyChart.sourceFileId, Phenomenon).
+- Tests: `_scratch/chartpalette|chainlink.test.ts`, `backend/_scratch/citations|phenomena.test.ts`, `e2e_fix302b.py`.

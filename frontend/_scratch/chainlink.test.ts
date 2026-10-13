@@ -1,0 +1,17 @@
+import assert from "node:assert/strict";
+import { encodeChain, decodeChain, customPreset } from "../src/lib/dsp/chainLink";
+const s = [{ plugin: "Galactic3", raw: [0.1, 0.5, 1, 0] }, { plugin: "Pressure5", raw: [0.29139712, 0.2] }];
+const e = encodeChain(s);
+assert.ok(/^[A-Za-z0-9_-]+$/.test(e));
+const d = decodeChain(e)!;
+assert.equal(d[0].plugin, "Galactic3"); assert.equal(d[1].raw[0], 0.2914); assert.equal(d.length, 2);
+assert.equal(decodeChain("!!"), null); assert.equal(decodeChain(null), null); assert.equal(decodeChain(""), null);
+const bad = (x: unknown) => btoa(JSON.stringify(x)).replace(/=+$/, "");
+assert.equal(decodeChain(bad([["a b", [0]]])), null);
+assert.equal(decodeChain(bad([["Ok", [2]]])), null);
+assert.equal(decodeChain(bad([["Ok", ["x"]]])), null);
+assert.equal(decodeChain(bad([])), null);
+assert.equal(decodeChain(bad(Array(9).fill(["Ok", [0]]))), null);
+assert.equal(decodeChain("{"), null);
+assert.equal(customPreset(d).plugins.length, 2);
+console.log("chainlink ok");

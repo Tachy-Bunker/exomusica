@@ -1,3 +1,4 @@
+import { CiteRef } from "../components/CiteRef";
 import { IMAGE_LINE, parseImageAttrs, isUploadingUrl, type ImageAttrs } from "./images";
 import { ALIGN_OPEN, ALIGN_CLOSE } from "./textEdit";
 import { StudyImage } from "../components/StudyImage";
@@ -26,6 +27,8 @@ export interface MarkdownOptions {
   extended?: boolean;
   /** Note texts, so [n] renders as a superscript link to note n. */
   notes?: string[];
+  /** Per note: its source link and the other studies citing it, for the hover card on [n]. */
+  cites?: import("../components/CiteRef").Cite[];
   /** Renders the content of a figure/table placed with {fig:N} / {tab:N} on its own line. */
   figures?: (kind: "fig" | "tab", n: number) => ReactNode | null;
   /** How many figures/tables exist, so references to missing ones stay plain text. */
@@ -92,20 +95,7 @@ function renderInline(text: string, onLinkClick?: (path: string) => void, option
       if (noteText === undefined) nodes.push(match[0]); // [7] with no 7th note is just text
       else {
         const noteClip = parseClip(noteText);
-        nodes.push(
-          <sup key={key} className="footnote-ref">
-            <a
-              href={`#note-${n}`}
-              title={stripClip(noteText)}
-              onClick={(e) => {
-                e.preventDefault();
-                document.getElementById(`note-${n}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
-              }}
-            >
-              [{n}]
-            </a>
-          </sup>,
-        );
+        nodes.push(<CiteRef key={key} n={n} cite={options?.cites?.[n - 1]} text={stripClip(noteText)} />);
         // a note that cites a slice of audio gets a play button right beside its number
         if (noteClip) nodes.push(<ClipButton key={`${key}-clip`} clip={noteClip} compact />);
       }

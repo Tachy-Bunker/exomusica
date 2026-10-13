@@ -1,11 +1,13 @@
 /// <reference lib="webworker" />
 // Runs a chain of Airwindows plugins over a recording off the main thread, so the page stays responsive.
 import { AirwindowsEngine } from "../lib/dsp/airwindows";
-import { CHAIN_PRESETS, runChain } from "../lib/dsp/voiceChain";
+import { CHAIN_PRESETS, runChain, type ChainPreset } from "../lib/dsp/voiceChain";
 
 interface Request {
   id: number;
-  presetId: string;
+  presetId?: string;
+  /** A chain built in the interface, used instead of a named preset. */
+  preset?: ChainPreset;
   sampleRate: number;
   left: Float32Array;
   right: Float32Array | null;
@@ -16,9 +18,9 @@ let engine: Promise<AirwindowsEngine> | null = null;
 const load = () => (engine ??= fetch("/dsp/airwindows_voice.wasm").then((r) => r.arrayBuffer()).then((b) => AirwindowsEngine.load(b)));
 
 self.onmessage = async (e: MessageEvent<Request>) => {
-  const { id, presetId, sampleRate, left, right, seed } = e.data;
+  const { id, presetId, preset: inline, sampleRate, left, right, seed } = e.data;
   try {
-    const preset = CHAIN_PRESETS.find((p) => p.id === presetId);
+    const preset = inline ?? CHAIN_PRESETS.find((p) => p.id === presetId);
     if (!preset) throw new Error(`Unknown chain "${presetId}"`);
     const eng = await load();
     const out = runChain(eng, preset, sampleRate, left, right, { seed, block: 4096, onProgress: (p) => self.postMessage({ id, progress: p }) });

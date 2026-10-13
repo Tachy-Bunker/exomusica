@@ -1,11 +1,12 @@
 // XenoLab's sections. The address says which one is open (?tab=), so each can be linked and the back button works.
-export type LabTab = "studies" | "resources" | "analyze" | "effects" | "open" | "contribute";
+export type LabTab = "studies" | "resources" | "analyze" | "effects" | "phenomena" | "open" | "contribute";
 export const LAB_TABS: { id: LabTab; label: string }[] = [
   { id: "studies", label: "Studies" },
   { id: "contribute", label: "Contribute" },
   { id: "resources", label: "Resources" },
   { id: "analyze", label: "Analyze" },
   { id: "effects", label: "Effects" },
+  { id: "phenomena", label: "Phenomena" },
   { id: "open", label: "Open calls" },
 ];
 // Addresses from before the tabs were renamed keep working.

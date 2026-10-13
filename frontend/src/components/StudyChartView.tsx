@@ -1,4 +1,9 @@
+import { createContext, useContext, useMemo, type CSSProperties } from "react";
 import { formatTick, linearTicks, logTicks, parseChartSeries } from "../lib/chartScale";
+import { chartPalette } from "../lib/chartPalette";
+
+/** The study page puts its picture's colour here; every chart under it takes its colours from it (above a luminance floor). */
+export const ChartAccentContext = createContext<string | null>(null);
 
 interface Props {
   kind: "LINE" | "BAR" | "SCATTER" | "TABLE";
@@ -26,11 +31,14 @@ const PAD = { top: 20, right: 20, bottom: 44, left: 56 };
 const MAX_POINT_MARKERS = 200; // past this a line is just a line - thousands of <circle>s help nobody and cost a lot on weak devices
 
 export function StudyChartView({ kind, xLabel, yLabel, dataCsv, xLog = false, yLog = false }: Props) {
+  const base = useContext(ChartAccentContext);
+  const palette = useMemo(() => { const p = chartPalette(base, 6); return p.length ? p : SERIES_COLORS; }, [base]);
+  const scopeStyle = { ["--chart-accent" as string]: palette[0], ["--accent-audio" as string]: palette[0] } as CSSProperties;
   const { headers, rows } = parseCsv(dataCsv);
 
   if (kind === "TABLE") {
     return (
-      <div style={{ overflowX: "auto" }}>
+      <div className="study-scope" style={{ overflowX: "auto", ...scopeStyle }}>
         <table style={{ borderCollapse: "collapse", fontSize: "0.85rem" }}>
           <thead>
             <tr>
@@ -61,7 +69,7 @@ export function StudyChartView({ kind, xLabel, yLabel, dataCsv, xLog = false, yL
     return <p style={{ fontSize: "0.8rem", color: "var(--text-dim)" }}>Not enough data - need a header row plus at least one X column and one Y column.</p>;
   }
 
-  const series = parseChartSeries(headers, rows, SERIES_COLORS);
+  const series = parseChartSeries(headers, rows, palette);
   if (series.length === 0) {
     return <p style={{ fontSize: "0.8rem", color: "var(--text-dim)" }}>No data columns to plot.</p>;
   }
@@ -168,34 +176,47 @@ export function StudyChartView({ kind, xLabel, yLabel, dataCsv, xLog = false, yL
     return d;
   };
 
+  const areaPath = (values: (number | null)[]) => {
+    // the first series gets a soft fill down to the baseline, one run at a time (gaps stay gaps)
+    let d = "";
+    let run: number[] = [];
+    const flush = () => {
+      if (run.length > 1) d += `M${scaleX(xNum[run[0]]).toFixed(1)},${(PAD.top + plotH).toFixed(1)}` + run.map((i) => `L${scaleX(xNum[i]).toFixed(1)},${scaleY(values[i] as number).toFixed(1)}`).join("") + `L${scaleX(xNum[run[run.length - 1]]).toFixed(1)},${(PAD.top + plotH).toFixed(1)}Z`;
+      run = [];
+    };
+    values.forEach((v, i) => { if (v === null) flush(); else run.push(i); });
+    flush();
+    return d;
+  };
+
   return (
-    <div>
+    <div className="study-scope" style={scopeStyle} data-testid="study-chart">
       <svg viewBox={`0 0 ${WIDTH} ${HEIGHT}`} style={{ width: "100%", maxWidth: WIDTH, height: "auto" }} role="img" aria-label={`${yLabel ?? "Values"} against ${xLabel ?? "x"}`}>
         {/* gridlines + ticks */}
         {yMinor.map((v) => (
-          <line key={`ym${v}`} x1={PAD.left} x2={PAD.left + plotW} y1={scaleY(v)} y2={scaleY(v)} stroke="var(--border)" strokeOpacity={0.25} />
+          <line key={`ym${v}`} x1={PAD.left} x2={PAD.left + plotW} y1={scaleY(v)} y2={scaleY(v)} className="inst-grid inst-grid-v" />
         ))}
         {yTicks.map((v) => (
           <g key={`yt${v}`}>
-            <line x1={PAD.left} x2={PAD.left + plotW} y1={scaleY(v)} y2={scaleY(v)} stroke="var(--border)" strokeOpacity={0.55} />
-            <text x={PAD.left - 8} y={scaleY(v) + 4} fill="var(--text-dim)" fontSize={10} textAnchor="end">
+            <line x1={PAD.left} x2={PAD.left + plotW} y1={scaleY(v)} y2={scaleY(v)} className="inst-grid" />
+            <text x={PAD.left - 8} y={scaleY(v) + 4} className="inst-axis" fontSize={10} textAnchor="end">
               {formatTick(v)}
             </text>
           </g>
         ))}
         {xMinor.map((v) => (
-          <line key={`xm${v}`} y1={PAD.top} y2={PAD.top + plotH} x1={scaleX(v)} x2={scaleX(v)} stroke="var(--border)" strokeOpacity={0.25} />
+          <line key={`xm${v}`} y1={PAD.top} y2={PAD.top + plotH} x1={scaleX(v)} x2={scaleX(v)} className="inst-grid inst-grid-v" />
         ))}
         {xTicks.map((t, i) => (
           <g key={`xt${i}`}>
-            {!categorical && <line y1={PAD.top} y2={PAD.top + plotH} x1={scaleX(t.v)} x2={scaleX(t.v)} stroke="var(--border)" strokeOpacity={0.55} />}
-            <text x={scaleX(t.v)} y={PAD.top + plotH + 15} fill="var(--text-dim)" fontSize={10} textAnchor="middle">
+            {!categorical && <line y1={PAD.top} y2={PAD.top + plotH} x1={scaleX(t.v)} x2={scaleX(t.v)} className="inst-grid" />}
+            <text x={scaleX(t.v)} y={PAD.top + plotH + 15} className="inst-axis" fontSize={10} textAnchor="middle">
               {t.label}
             </text>
           </g>
         ))}
-        <line x1={PAD.left} y1={PAD.top} x2={PAD.left} y2={PAD.top + plotH} stroke="var(--text-dim)" />
-        <line x1={PAD.left} y1={PAD.top + plotH} x2={PAD.left + plotW} y2={PAD.top + plotH} stroke="var(--text-dim)" />
+        <line x1={PAD.left} y1={PAD.top} x2={PAD.left} y2={PAD.top + plotH} className="study-scope-axis" />
+        <line x1={PAD.left} y1={PAD.top + plotH} x2={PAD.left + plotW} y2={PAD.top + plotH} className="study-scope-axis" />
         {yLabel && (
           <text x={14} y={PAD.top + plotH / 2} fill="var(--text-dim)" fontSize={11} textAnchor="middle" transform={`rotate(-90, 14, ${PAD.top + plotH / 2})`}>
             {yLabel}
@@ -218,7 +239,8 @@ export function StudyChartView({ kind, xLabel, yLabel, dataCsv, xLog = false, yL
             }),
           )}
 
-        {kind === "LINE" && series.map((s, si) => <path key={si} d={linePath(s.values)} fill="none" stroke={s.color} strokeWidth={2} />)}
+        {kind === "LINE" && series[0] && <path d={areaPath(series[0].values)} fill={series[0].color} opacity={0.13} />}
+        {kind === "LINE" && series.map((s, si) => <path key={si} d={linePath(s.values)} fill="none" stroke={s.color} strokeWidth={2} strokeLinejoin="round" />)}
 
         {(kind === "LINE" || kind === "SCATTER") &&
           series.map((s, si) =>

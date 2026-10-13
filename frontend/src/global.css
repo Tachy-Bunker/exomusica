@@ -5206,7 +5206,10 @@ th {
 .xl-sep-top { margin: 1.1rem 0 0.8rem; }
 /* Study page background */
 .study-page { position: relative; isolation: isolate; }
-.study-bg { position: absolute; left: 50%; top: -1.5rem; width: min(100vw, 1100px); height: 300px; transform: translateX(-50%); object-fit: cover; opacity: var(--bgo, 0.17); z-index: -1; pointer-events: none; -webkit-mask-image: linear-gradient(180deg, #000 30%, transparent); mask-image: linear-gradient(180deg, #000 30%, transparent); }
+.study-bg { position: absolute; left: 50%; top: -1.5rem; width: min(100vw, 1100px); height: 300px; transform: translateX(-50%); object-fit: cover; opacity: var(--bgo, 0.17); z-index: -1; pointer-events: none;
+  /* fades out at the bottom and, on wide screens where the picture stops short of the window, at both sides too */
+  -webkit-mask-image: linear-gradient(180deg, #000 30%, transparent), linear-gradient(90deg, transparent, #000 16%, #000 84%, transparent); -webkit-mask-composite: source-in;
+  mask-image: linear-gradient(180deg, #000 30%, transparent), linear-gradient(90deg, transparent, #000 16%, #000 84%, transparent); mask-composite: intersect; }
 .study-bgpick { margin: 0.4rem 0 1rem; display: flex; flex-wrap: wrap; align-items: center; gap: 0.4rem; }
 .study-bgpick-thumb { width: 44px; height: 28px; object-fit: cover; border-radius: 4px; border: 1px solid var(--border); }
 .study-bgpick-panel { flex: 1 1 100%; display: flex; flex-direction: column; gap: 0.6rem; border: 1px solid var(--border); border-radius: var(--radius); padding: 0.7rem; }
@@ -6115,3 +6118,21 @@ select.ox-st { min-width: 7rem; }
 .prov-chip { padding: 0.05rem 0.45rem; border: 1px solid var(--border); border-radius: 999px; color: var(--text-dim); text-decoration: none; max-width: 14rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: inline-block; vertical-align: bottom; }
 .prov-chip:hover { color: var(--text); border-color: var(--accent-forum, #7cf); }
 .ab-chip { font-size: 0.65rem; padding: 0 0.35rem; }
+
+/* study charts: instrument look (same family as the Telemetry scope), coloured from the study picture */
+.study-scope { background: #070b16; border: 1px solid color-mix(in srgb, var(--chart-accent, var(--accent-audio)) 28%, var(--border)); border-radius: var(--radius); padding: 0.6rem 0.7rem 0.5rem; max-width: 100%; }
+.study-scope svg { display: block; }
+.study-scope-axis { stroke: color-mix(in srgb, var(--chart-accent, var(--accent-audio)) 55%, transparent); stroke-width: 0.8; }
+.study-scope .inst-grid { stroke: color-mix(in srgb, var(--chart-accent, var(--accent-audio)) 20%, transparent); }
+.study-scope table { color: var(--text); }
+.study-scope th { color: var(--chart-accent, var(--accent-audio)); font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; font-size: 0.7rem; }
+
+/* citation hover cards */
+.footnote-ref.cite { position: relative; }
+.cite-card { display: none; position: absolute; left: 50%; bottom: 1.4em; transform: translateX(-50%); z-index: 30; width: min(320px, 80vw); padding: 0.55rem 0.65rem; background: var(--bg-elevated, #12151f); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: 0 8px 28px rgba(0,0,0,0.5); font-size: 0.78rem; font-weight: 400; line-height: 1.35; text-align: left; flex-direction: column; gap: 0.4rem; color: var(--text); }
+.footnote-ref.cite:hover .cite-card, .footnote-ref.cite:focus-within .cite-card { display: flex; }
+.cite-src { display: flex; flex-direction: column; gap: 0.15rem; padding: 0.35rem 0.45rem; border: 1px solid var(--border); border-radius: 6px; text-decoration: none; color: inherit; }
+.cite-src img { width: 100%; max-height: 110px; object-fit: cover; border-radius: 4px; }
+.cite-desc { color: var(--text-dim); display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.cite-host { color: var(--text-dim); font-size: 0.68rem; font-family: var(--font-mono, monospace); }
+.cite-by, .cite-by-note { color: var(--text-dim); font-size: 0.72rem; }

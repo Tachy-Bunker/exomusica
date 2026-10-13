@@ -27,7 +27,9 @@ import { uploadedFileUrls } from "../lib/studyFiles";
 import { useDocumentTitle } from "../lib/useDocumentTitle";
 import { useToastStore } from "../lib/toastStore";
 import { LogLinks } from "../components/LogLinks";
-import { StudyChartView } from "../components/StudyChartView";
+import type { Cite } from "../components/CiteRef";
+import { StudyChartView, ChartAccentContext } from "../components/StudyChartView";
+import { coverColor } from "../lib/specStrip";
 
 interface Annotation {
   id: number;
@@ -45,6 +47,9 @@ interface Chart {
   xLog?: boolean;
   yLog?: boolean;
   dataCsv: string;
+  sourceFileId?: number | null;
+  live?: boolean; // the data is read from a CSV among the study's files each time the page opens
+  sourceName?: string;
 }
 
 const NO_CHARTS: Chart[] = []; // stable identity so the figure memo doesn't churn before the study loads
@@ -74,6 +79,8 @@ export function StudyPage() {
   const navigate = useNavigate();
   const [study, setStudy] = useState<StudyDetail | null>(null);
   const [bgPreview, setBgPreview] = useState<number | null | undefined>(undefined); // the picture strength while the owner drags the slider
+  const [cites, setCites] = useState<Cite[]>([]);
+  const [pictureColor, setPictureColor] = useState<string | null>(null); // the background picture's average colour: the charts take their colours from it
   const [editing, setEditing] = useState(false);
   const [draftTitle, setDraftTitle] = useState("");
   const [draftBody, setDraftBody] = useState("");
@@ -81,7 +88,7 @@ export function StudyPage() {
   const [editingAnnotationId, setEditingAnnotationId] = useState<number | null>(null);
   const [annotationDraft, setAnnotationDraft] = useState("");
   const [addingChart, setAddingChart] = useState(false);
-  const [chartForm, setChartForm] = useState({ title: "", kind: "LINE" as Chart["kind"], xLabel: "", yLabel: "", xLog: false, yLog: false, dataCsv: "" });
+  const [chartForm, setChartForm] = useState({ title: "", kind: "LINE" as Chart["kind"], xLabel: "", yLabel: "", xLog: false, yLog: false, dataCsv: "", sourceFileId: null as number | null });
   const [pendingDraft, setPendingDraft] = useState<StudyDraft | null>(null);
   const [showHistory, setShowHistory] = useState(false);
   const [showQr, setShowQr] = useState(false);
@@ -91,6 +98,21 @@ export function StudyPage() {
   const [editingChartId, setEditingChartId] = useState<number | null>(null);
 
   useDocumentTitle(study?.title ?? "Study");
+  const studySlug = study?.slug;
+  const noteCount = study?.annotations.length ?? 0;
+  useEffect(() => {
+    if (!studySlug || noteCount === 0) { setCites([]); return; }
+    let live = true;
+    api<Cite[]>(`/api/studies/${studySlug}/citations`).then((c) => { if (live) setCites(Array.isArray(c) ? c : []); }).catch(() => {});
+    return () => { live = false; };
+  }, [studySlug, noteCount]);
+  const bgUrl = study?.backgroundUrl ?? null;
+  useEffect(() => {
+    let live = true;
+    setPictureColor(null);
+    if (bgUrl) void coverColor(bgUrl).then((c) => { if (live) setPictureColor(c); });
+    return () => { live = false; };
+  }, [bgUrl]);
   const figs = useFigures(study?.charts ?? NO_CHARTS);
 
   function reload() {
@@ -283,13 +305,13 @@ export function StudyPage() {
   }
 
   function startAddChart() {
-    setChartForm({ title: "", kind: "LINE", xLabel: "", yLabel: "", xLog: false, yLog: false, dataCsv: "x,y\n1,2\n2,4\n3,3" });
+    setChartForm({ title: "", kind: "LINE", xLabel: "", yLabel: "", xLog: false, yLog: false, dataCsv: "x,y\n1,2\n2,4\n3,3", sourceFileId: null });
     setEditingChartId(null);
     setAddingChart(true);
   }
 
   function startEditChart(c: Chart) {
-    setChartForm({ title: c.title, kind: c.kind, xLabel: c.xLabel ?? "", yLabel: c.yLabel ?? "", xLog: !!c.xLog, yLog: !!c.yLog, dataCsv: c.dataCsv });
+    setChartForm({ title: c.title, kind: c.kind, xLabel: c.xLabel ?? "", yLabel: c.yLabel ?? "", xLog: !!c.xLog, yLog: !!c.yLog, dataCsv: c.dataCsv, sourceFileId: c.sourceFileId ?? null });
     setEditingChartId(c.id);
     setAddingChart(true);
   }
@@ -304,6 +326,7 @@ export function StudyPage() {
       xLog: chartForm.xLog,
       yLog: chartForm.yLog,
       dataCsv: chartForm.dataCsv,
+      sourceFileId: chartForm.sourceFileId,
     });
     if (editingChartId) {
       await api(`/api/study-charts/${editingChartId}`, { method: "PATCH", body });
@@ -314,6 +337,24 @@ export function StudyPage() {
     setAddingChart(false);
     useToastStore.getState().showToast("Saved ✓");
     reload();
+  }
+
+  // Live data: link the chart to a CSV among the study's files, or upload a new version of it. The page re-reads the file each time it opens.
+  async function linkChartFile(fileId: number | null) {
+    if (fileId === null) { setChartForm((f) => ({ ...f, sourceFileId: null })); return; }
+    const file = study?.files.find((f) => f.id === fileId);
+    if (!file) return;
+    const text = await fetch(file.url).then((r) => (r.ok ? r.text() : "")).catch(() => "");
+    setChartForm((f) => ({ ...f, sourceFileId: fileId, dataCsv: text.trim() ? text.replace(/\r\n?/g, "\n") : f.dataCsv }));
+  }
+  async function uploadChartFile(file: File | undefined) {
+    if (!file || !study) return;
+    try {
+      const up = await uploadStudyFileInfo(study.slug, file, file.name);
+      const text = (await file.text()).replace(/\r\n?/g, "\n");
+      setChartForm((f) => ({ ...f, sourceFileId: up.id, dataCsv: text }));
+      reload();
+    } catch { useToastStore.getState().showToast("Couldn't upload that file"); }
   }
 
   async function deleteChart(id: number) {
@@ -375,6 +416,7 @@ export function StudyPage() {
   );
 
   return (
+    <ChartAccentContext.Provider value={pictureColor}>
     <div className="page-column study-page" style={{ maxWidth: editing ? 1280 : 720 }}>
       {study.backgroundUrl && <img className="study-bg" style={{ ["--bgo" as string]: bgPreview !== undefined ? (bgPreview ?? undefined) : (study.backgroundOpacity ?? undefined) }} src={study.backgroundUrl} alt="" decoding="async" draggable={false} data-testid="study-bg" />}
       {!editing && slug && <LogLinks studySlug={slug} />}
@@ -536,7 +578,7 @@ export function StudyPage() {
           </details>
         )}
         <div className="study-body">
-          {renderMarkdown(study.body, (path) => navigate(path), { extended: true, notes: study.annotations.map((a) => a.text), figures: figs.render, figureCounts: figs.counts, audio: renderAudio, images: { editable: false }, file: renderFile })}
+          {renderMarkdown(study.body, (path) => navigate(path), { extended: true, notes: study.annotations.map((a) => a.text), cites, figures: figs.render, figureCounts: figs.counts, audio: renderAudio, images: { editable: false }, file: renderFile })}
         </div>
         </>
       )}
@@ -581,6 +623,7 @@ export function StudyPage() {
                   </span>
                 )}
               </div>
+              {c.live && <p className="home-dim" style={{ fontSize: "0.72rem", margin: "0 0 0.2rem" }} data-testid="chart-live-note">live · reads {c.sourceName}</p>}
               {!placedInText && <StudyChartView kind={c.kind} xLabel={c.xLabel} yLabel={c.yLabel} xLog={c.xLog} yLog={c.yLog} dataCsv={c.dataCsv} />}
             </div>
             );
@@ -631,8 +674,21 @@ export function StudyPage() {
               <p style={{ fontSize: "0.72rem", color: "var(--text-dim)", margin: "0 0 0.2rem" }}>
                 CSV - first row is headers. First column is X (or the row label for a table); every other column is its own data series. Add a column named <code>gain_err</code> (or <code>gain±</code>) next to <code>gain</code> for error bars.
               </p>
+              <div style={{ display: "flex", gap: "0.5rem", alignItems: "center", flexWrap: "wrap", margin: "0.2rem 0 0.4rem", fontSize: "0.8rem" }} data-testid="chart-live">
+                <label>Data from a file{" "}
+                  <select value={chartForm.sourceFileId ?? ""} onChange={(e) => void linkChartFile(e.target.value ? Number(e.target.value) : null)} data-testid="chart-source">
+                    <option value="">(typed below)</option>
+                    {study.files.filter((f) => /\.(csv|tsv|txt)$/i.test(f.filename)).map((f) => <option key={f.id} value={f.id}>{f.filename}</option>)}
+                  </select>
+                </label>
+                <label className="btn" style={{ fontSize: "0.78rem" }}>{chartForm.sourceFileId ? "Upload a new version" : "Upload a CSV"}
+                  <input type="file" accept=".csv,.tsv,.txt,text/csv,text/plain" hidden data-testid="chart-upload" onChange={(e) => { void uploadChartFile(e.target.files?.[0]); e.target.value = ""; }} />
+                </label>
+                {chartForm.sourceFileId && <span className="home-dim">Linked: the chart follows the file; replace the file and it follows.</span>}
+              </div>
               <textarea
                 value={chartForm.dataCsv}
+                readOnly={!!chartForm.sourceFileId}
                 onChange={(e) => setChartForm((f) => ({ ...f, dataCsv: e.target.value }))}
                 rows={6}
                 style={{ width: "100%", fontFamily: "var(--font-mono)", fontSize: "0.8rem" }}
@@ -672,6 +728,7 @@ export function StudyPage() {
                 ) : (
                   <span>
                     <b style={{ color: "var(--accent-forum)" }}>[{i + 1}]</b> {renderInlineMarkdown(a.text, (path) => navigate(path))}
+                    {cites[i]?.citedBy.length > 0 && <span className="cite-by-note" data-testid="cited-by"> · also cited in {cites[i].citedBy.map((c, k) => <span key={c.slug}>{k > 0 && ", "}<Link to={`/study/${c.slug}`}>{c.title}</Link></span>)}</span>}
                     {parseClip(a.text)?.img && (
                       <a href={parseClip(a.text)!.img!} target="_blank" rel="noreferrer">
                         <img className="clip-spectrogram" src={parseClip(a.text)!.img!} alt="Spectrogram of the cited passage" loading="lazy" />
@@ -721,5 +778,6 @@ export function StudyPage() {
         </div>
       )}
     </div>
+    </ChartAccentContext.Provider>
   );
 }

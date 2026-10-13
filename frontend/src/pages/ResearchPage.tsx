@@ -1,6 +1,7 @@
 import { Suspense, lazy, useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { PlotTool } from "../components/xenolab/PlotTool";
+import { PhenomenaPanel } from "../components/xenolab/PhenomenaPanel";
 import { StudiesPanel } from "../components/xenolab/StudiesPanel";
 import { SoundAnalyzer } from "../components/SoundAnalyzer";
 import { ChallengesPanel } from "./ChallengesPage";
@@ -40,6 +41,7 @@ export function ResearchPage() {
         </div>
       )}
       {tab === "effects" && <Suspense fallback={<p className="home-dim">Loading…</p>}><VoiceLab embedded /></Suspense>}
+      {tab === "phenomena" && <PhenomenaPanel focusSlug={params.get("item")} />}
       {tab === "open" && <ChallengesPanel focusId={Number(params.get("call")) || null} />}
       {tab === "contribute" && <Suspense fallback={<p className="home-dim">Loading…</p>}><Contribute embedded /></Suspense>}
     </div>
