@@ -7,9 +7,7 @@ export function AdminLayout() {
 
   useEffect(() => {
     function checkPending() {
-      api<{ status: string }[]>("/api/admin/join-requests").then((reqs) => {
-        setPendingCount(reqs.filter((r) => r.status === "PENDING").length);
-      });
+      api<{ total?: number }>("/api/admin/inbox").then((d) => setPendingCount(typeof d?.total === "number" ? d.total : 0)).catch(() => undefined);
     }
     checkPending();
     const interval = setInterval(checkPending, 30000);
@@ -19,9 +17,12 @@ export function AdminLayout() {
   return (
     <div className="admin-layout">
       <nav className="admin-nav">
-        <NavLink to="/admin/join-requests" className={({ isActive }) => (isActive ? "active" : "")} style={{ display: "inline-flex", alignItems: "center", gap: "0.35rem" }}>
+        <NavLink to="/admin/inbox" className={({ isActive }) => (isActive ? "active" : "")} style={{ display: "inline-flex", alignItems: "center", gap: "0.35rem" }}>
+          Inbox
+          {pendingCount > 0 && <span className="admin-nav-pending-dot" title={`${pendingCount} waiting`} />}
+        </NavLink>
+        <NavLink to="/admin/join-requests" className={({ isActive }) => (isActive ? "active" : "")}>
           Join requests
-          {pendingCount > 0 && <span className="admin-nav-pending-dot" title={`${pendingCount} pending`} />}
         </NavLink>
         <NavLink to="/admin/branches" className={({ isActive }) => (isActive ? "active" : "")}>
           Branches
@@ -76,6 +77,9 @@ export function AdminLayout() {
         </NavLink>
         <NavLink to="/admin/audit-log" className={({ isActive }) => (isActive ? "active" : "")}>
           Action log
+        </NavLink>
+        <NavLink to="/admin/trash" className={({ isActive }) => (isActive ? "active" : "")}>
+          Trash
         </NavLink>
         <NavLink to="/admin/about" className={({ isActive }) => (isActive ? "active" : "")}>
           About page

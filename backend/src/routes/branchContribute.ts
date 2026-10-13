@@ -142,7 +142,7 @@ export async function branchContributeRoutes(app: FastifyInstance): Promise<void
     const branch = await prisma.branch.findUnique({ where: { id: Number(req.params.id) }, select: { channel: { select: { id: true } } } });
     if (!branch?.channel) return reply.code(404).send({ error: "this branch has no discussion channel" });
     const attachments = await prisma.attachment.findMany({
-      where: { message: { channelId: branch.channel.id } },
+      where: { message: { channelId: branch.channel.id, isDeleted: false } },
       select: { id: true, filename: true, storagePath: true, mimeType: true, createdAt: true },
       orderBy: { createdAt: "desc" },
       take: 100,

@@ -928,6 +928,11 @@ export function ChannelPage({ channelSlug, fillHeight, parentControlsHeight }: {
   async function handleDelete(id: number) {
     await api(`/api/messages/${id}`, { method: "DELETE" });
     setMessages((prev) => prev.map((m) => (m.id === id ? { ...m, isDeleted: true, contentRaw: "", embeds: [] } : m)));
+    // Nothing is lost for 30 days: the toast offers the way back (the server also broadcasts the restored message to the room).
+    useToastStore.getState().showToast("Message deleted", {
+      label: "Undo",
+      run: () => { api<MessageDTO>(`/api/messages/${id}/restore`, { method: "POST" }).then((m) => setMessages((prev) => upsertMessage(prev, m))).catch(() => useToastStore.getState().showToast("Couldn't restore it")); },
+    });
   }
 
   function handleQuote(m: MessageDTO) {

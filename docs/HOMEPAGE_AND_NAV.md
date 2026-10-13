@@ -479,3 +479,13 @@ Phase 1 (this delivery), idea 4:
 **Idea 35: wanted slots.** Admin → Branches → contribution settings has a "Wanted" editor (≤12 slots, title ≤80, detail ≤200, release a claim, remove). The Contribute panel shows a Wanted tile: open slots have a Claim button (`/submit?branch=<slug>&want=<id>`), taken ones show the submission's title. Starting a submission with `wantedId` claims the slot atomically (`updateMany` on a still-open slot); a REJECTED submission frees it, and deleting the album nulls the claim.
 
 Schema: `CommunityTrackRevision`, `BranchWanted`. Migration `fix303c_versions_wanted`.
+
+## fix304a — trash with undo, admin inbox, audit-log search and export
+
+**Idea 44, soft delete.** Deleting a chat message now sets `Message.deletedAt` and keeps its text and files for 30 days (previously files were deleted at once). The author sees an "Undo" button in the toast for 8 s; admins can restore any message later from Admin → Trash (`POST /api/messages/:id/restore`, author or admin; admin restores of others are logged as `message.restore`). Restore re-broadcasts the message to the room. An hourly sweep (and "Purge" on the Trash page) deletes the files for good and blanks the text; the empty tombstone stays because replies point at it. Messages deleted before this update have no `deletedAt` and are not restorable. Deleted messages' files count against the uploader's quota until purged. Scope: chat messages only.
+
+**Idea 41, inbox.** Admin → Inbox lists join requests, pending submissions (with at least one track) and pending reward claims in one list, longest wait first, filterable by kind, each with an Open link. The nav dot on "Inbox" now reflects the total (it used to track join requests only). `GET /api/admin/inbox`.
+
+**Idea 45, audit log.** Filters: free text, admin, from/to (UTC days, inclusive), debounced. "Export CSV" downloads the same filter (up to 20 000 rows; cells starting with = + - @ are neutralised for spreadsheets). `GET /api/admin/audit-log.csv`.
+
+Schema: `Message.deletedAt` + index. Migration `fix304a_trash`.

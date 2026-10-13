@@ -1,5 +1,5 @@
 import { PUBLIC_CHANNEL_FILTER, isPublicChannel, plainExcerpt, attachmentOnlyLabel } from "../lib/publicChannels.js";
-import { deleteMessageAttachments } from "../lib/attachmentCleanup.js";
+import { canRestore } from "../lib/trash.js";
 import type { FastifyInstance } from "fastify";
 import { prisma } from "../lib/prisma.js";
 import { requireAuth, verifyToken } from "../lib/auth.js";
@@ -357,6 +357,20 @@ export async function messageRoutes(app: FastifyInstance): Promise<void> {
     },
   );
 
+  // Undo a delete: the author or an admin, while the message is still in the 30-day trash.
+  app.post<{ Params: { id: string } }>("/api/messages/:id/restore", { preHandler: requireAuth }, async (req, reply) => {
+    const id = Number(req.params.id);
+    const m = await prisma.message.findUnique({ where: { id }, include: { channel: true } });
+    if (!m || !canRestore(m)) return reply.code(404).send({ error: "that message can't be restored" });
+    const own = m.authorId === req.user!.id;
+    if (!own && !req.user!.isAdmin) return reply.code(403).send({ error: "not your message" });
+    const updated = await prisma.message.update({ where: { id }, data: { isDeleted: false, deletedAt: null }, include: messageInclude });
+    if (!own) await prisma.auditLog.create({ data: { actorId: req.user!.id, action: "message.restore", targetType: "Message", targetId: id } });
+    const dto = await toMessageDTO(updated);
+    broadcast(m.channel.slug, { type: "message.update", message: dto });
+    return dto;
+  });
+
   app.delete<{ Params: { id: string } }>(
     "/api/messages/:id",
     { preHandler: requireAuth },
@@ -368,14 +382,8 @@ export async function messageRoutes(app: FastifyInstance): Promise<void> {
       if (!isOwnMessage && !req.user!.isAdmin) {
         return reply.code(403).send({ error: "not your message" });
       }
-      await prisma.message.update({ where: { id }, data: { isDeleted: true } });
-      try {
-        // the message is hidden for good, so its files go too - otherwise they'd pile up on disk, count against the
-        // uploader's quota forever, and get dragged along into every archive.org backup
-        await deleteMessageAttachments(prisma, id);
-      } catch (err) {
-        req.log.warn({ err, messageId: id }, "failed to delete a deleted message's attachments");
-      }
+      // Soft delete: the text and the files stay for 30 days so it can be restored; the hourly sweep clears the files after that.
+      await prisma.message.update({ where: { id }, data: { isDeleted: true, deletedAt: new Date() } });
       if (!isOwnMessage) {
         await prisma.auditLog.create({
           data: { actorId: req.user!.id, action: "message.moderate_delete", targetType: "Message", targetId: id },

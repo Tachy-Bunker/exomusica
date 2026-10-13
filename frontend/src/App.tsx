@@ -64,6 +64,8 @@ import { BlogAdminPage } from "./pages/admin/BlogAdminPage";
 import { EmojiAdminPage } from "./pages/admin/EmojiAdminPage";
 import { EmailTemplatesAdminPage } from "./pages/admin/EmailTemplatesAdminPage";
 import { AuditLogAdminPage } from "./pages/admin/AuditLogAdminPage";
+import { TrashAdminPage } from "./pages/admin/TrashAdminPage";
+import { InboxAdminPage } from "./pages/admin/InboxAdminPage";
 import { AboutAdminPage } from "./pages/admin/AboutAdminPage";
 import { FontsAdminPage } from "./pages/admin/FontsAdminPage";
 import { FxSettingsAdminPage } from "./pages/admin/FxSettingsAdminPage";
@@ -189,6 +191,8 @@ export default function App() {
                 <Route path="emoji" element={<EmojiAdminPage />} />
                 <Route path="email-templates" element={<EmailTemplatesAdminPage />} />
                 <Route path="audit-log" element={<AuditLogAdminPage />} />
+                <Route path="trash" element={<TrashAdminPage />} />
+                <Route path="inbox" element={<InboxAdminPage />} />
                 <Route path="about" element={<AboutAdminPage />} />
                 <Route path="fonts" element={<FontsAdminPage />} />
                 <Route path="fx-settings" element={<FxSettingsAdminPage />} />

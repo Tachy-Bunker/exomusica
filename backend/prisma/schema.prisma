@@ -266,6 +266,7 @@ model Message {
   replies      Message[]    @relation("MessageReply")
   contentRaw   String       @db.Text
   isDeleted    Boolean      @default(false)
+  deletedAt    DateTime? // set while the message sits in the 30-day trash (restorable); cleared when its files are purged
   editedAt     DateTime?
   importedFrom String? // e.g. "discord:<author-id>:<timestamp>" for traceability
   discordMessageId String? @unique // set once forwarded to Discord - lets a Discord-side reply resolve back to this message
@@ -279,6 +280,7 @@ model Message {
 
   @@index([channelId, dayKey])
   @@index([channelId, createdAt])
+  @@index([deletedAt])
   @@unique([channelId, importedFrom])
 }
 

@@ -3,13 +3,14 @@ import { useToastStore } from "../lib/toastStore";
 
 export function Toast() {
   const message = useToastStore((s) => s.message);
+  const action = useToastStore((s) => s.action);
   const clear = useToastStore((s) => s.clear);
 
   useEffect(() => {
     if (!message) return;
-    const timer = setTimeout(clear, 2200);
+    const timer = setTimeout(clear, action ? 8000 : 2200);
     return () => clearTimeout(timer);
-  }, [message, clear]);
+  }, [message, action, clear]);
 
   if (!message) return null;
 
@@ -27,10 +28,11 @@ export function Toast() {
         borderRadius: "var(--radius)",
         padding: "0.5rem 1rem",
         fontSize: "0.85rem",
-        pointerEvents: "none",
+        pointerEvents: action ? "auto" : "none",
       }}
     >
       {message}
+      {action && <button className="btn" style={{ marginLeft: "0.7rem", padding: "0.1rem 0.5rem" }} data-testid="toast-action" onClick={() => { action.run(); clear(); }}>{action.label}</button>}
     </div>
   );
 }
