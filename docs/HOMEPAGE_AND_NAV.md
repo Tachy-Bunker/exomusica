@@ -510,3 +510,15 @@ No schema change.
 - Limits: official album tracks only (not community pieces); it keeps going on after you leave the page only for the song that is playing, the next song needs the page open.
 
 Schema: `RadioBlock`. Migration `fix304c_radio`.
+
+## fix304d — Jam rooms (idea 47)
+
+`/jam` ("Jam" in the desktop top bar). Members start a room (a 4-character code, easy to read aloud) or join one; up to 6 people edit one shared pattern and each browser makes its own sound. Nothing audio-related touches the server.
+
+- **Instrument:** 4 lanes x 16 steps: Kick, Hat (on/off), Bass and Lead (8 scale degrees each, shown as a small piano-roll). All voices are synthesized (no sample files). Scales are mostly just-intonation: minor pentatonic, Dorian, Phrygian dominant, 5-limit major, plus whole tone. Key (A1-D3), tempo 50-200, swing 0-0.6, per-lane mute/clear.
+- **Sync:** the server keeps the room state in memory and relays validated changes (tempo/key/scale/swing/mute/clear/step). Every change is rate-limited (40/s per person) and checked, nothing else is stored. Each browser measures its offset to the server clock with a few pings and schedules notes against that shared clock, so everyone's bar one lines up to within network latency. A tempo change restarts the shared count.
+- **Engine:** a 25 ms timer schedules notes 140 ms ahead on a Web Audio clock; voices are throw-away oscillator/filter nodes, a single compressor on the output; the playhead is one element moved with a transform (no re-render per step).
+- **Save loop (WAV):** renders two loops with the same voices in an OfflineAudioContext (44.1 kHz, 16-bit stereo) and downloads it; attach it in chat like any file.
+- **Rooms:** created via `POST /api/jam`, socket `/ws/jam/:code?token=`; full rooms close with 4409, unknown codes 4404. At most 40 rooms; a room empty for 10 min is dropped.
+
+No schema change.

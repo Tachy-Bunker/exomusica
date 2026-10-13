@@ -361,6 +361,7 @@ export function Layout() {
             ))}
           </nav>
           <div className="nav-tools">
+            {isDesktop && <Link to="/jam" className="nav-radio" title="Jam: a shared loop machine">Jam</Link>}
             {isDesktop && <Link to="/radio" className="nav-radio" title="Radio: one branch on air, the same moment for everyone">Radio</Link>}
             {isDesktop ? (
               user ? (

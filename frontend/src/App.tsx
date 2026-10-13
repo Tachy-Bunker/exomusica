@@ -63,6 +63,7 @@ import { ContributorPointsAdminPage } from "./pages/admin/ContributorPointsAdmin
 import { BlogAdminPage } from "./pages/admin/BlogAdminPage";
 import { EmojiAdminPage } from "./pages/admin/EmojiAdminPage";
 import { EmailTemplatesAdminPage } from "./pages/admin/EmailTemplatesAdminPage";
+import { JamPage } from "./pages/JamPage";
 import { RadioPage } from "./pages/RadioPage";
 import { RadioAdminPage } from "./pages/admin/RadioAdminPage";
 import { CapsulePage } from "./pages/CapsulePage";
@@ -125,6 +126,8 @@ export default function App() {
             <Route path="wiki" element={<LogPage />} />
             <Route path="capsule" element={<CapsulePage />} />
             <Route path="radio" element={<RadioPage />} />
+            <Route path="jam" element={<JamPage />} />
+            <Route path="jam/:code" element={<JamPage />} />
             <Route path="studies" element={<Navigate to="/xenolab?tab=studies" replace />} />
             <Route path="lab/voice" element={<Suspense fallback={null}><VoiceLabPage /></Suspense>} />
             <Route path="contribute" element={<Navigate to="/xenolab?tab=contribute" replace />} />

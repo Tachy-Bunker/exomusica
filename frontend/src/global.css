@@ -6218,3 +6218,21 @@ select.ox-st { min-width: 7rem; }
 .radio-card { display: flex; flex-direction: column; gap: 0.5rem; align-items: flex-start; border: 1px solid var(--border); border-radius: var(--radius); padding: 1rem 1.1rem; margin-top: 1rem; }
 .radio-title { font-size: 1.4rem; line-height: 1.2; }
 .nav-radio { font-size: 0.85rem; color: var(--text-dim); text-decoration: none; }
+
+/* Jam room: cells are fixed-size buttons; the playhead is one element moved with a transform */
+.jam-room { --jam-cell: 26px; }
+@media (max-width: 640px) { .jam-room { --jam-cell: 19px; } }
+.jam-top { display: flex; gap: 0.8rem; align-items: center; flex-wrap: wrap; margin-bottom: 0.6rem; }
+.jam-controls { display: flex; gap: 0.8rem; align-items: center; flex-wrap: wrap; margin-bottom: 0.8rem; font-size: 0.85rem; }
+.jam-controls label { display: inline-flex; gap: 0.35rem; align-items: center; }
+.jam-grid { position: relative; display: flex; flex-direction: column; gap: 0.6rem; }
+.jam-lane { padding-left: 0; }
+.jam-lane.muted { opacity: 0.4; }
+.jam-lane-tools { display: flex; gap: 0.4rem; align-items: center; font-size: 0.8rem; margin-bottom: 0.15rem; }
+.jam-lane-tools .btn { padding: 0 0.4rem; font-size: 0.7rem; }
+.jam-row { display: flex; gap: 2px; margin-bottom: 2px; align-items: center; }
+.jam-deg { width: 1.2rem; font-size: 0.6rem; color: var(--text-dim); text-align: right; margin-right: 2px; }
+.jam-cell { width: calc(var(--jam-cell) - 2px); height: calc(var(--jam-cell) - 6px); padding: 0; border: 1px solid var(--border); border-radius: 3px; background: transparent; cursor: pointer; }
+.jam-cell.beat { border-color: color-mix(in srgb, var(--text-dim) 60%, transparent); }
+.jam-cell.on { background: var(--accent-audio); border-color: var(--accent-audio); }
+.jam-head { position: absolute; top: 0; bottom: 0; left: 0; width: calc(var(--jam-cell) - 2px); margin-left: calc(1.2rem + 4px); background: color-mix(in srgb, var(--accent-audio) 18%, transparent); pointer-events: none; transform: translateX(0); }

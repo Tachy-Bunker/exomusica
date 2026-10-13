@@ -52,7 +52,7 @@ def run(playwright):
     check(len(asked) >= 2, f"Radio: asked the server again at the end ({len(asked)})")
     page.click("[data-testid=radio-leave]"); page.wait_for_timeout(300)
     check(page.evaluate("document.querySelector('.player-bar-wrapper audio').paused"), "Radio: Leave stops the sound")
-    check(page.locator(".nav-radio").count() == 1, "Radio: reachable from the top bar")
+    check(page.locator(".nav-radio[href=\"/radio\"]").count() == 1, "Radio: reachable from the top bar")
 
     admin = mk({"id": 1, "username": "tachy", "isAdmin": True})
     admin.goto(f"{BASE}/admin/radio"); admin.wait_for_selector("[data-testid=radio-block]")
