@@ -62,7 +62,7 @@ const mmss = (s: number): string => `${Math.floor(s / 60)}:${String(Math.round(s
 /** The lines of the readout for what the server (or the author) said. Missing fields are left out, never shown as "undefined". */
 export function readoutOf(t: Target, d: unknown): { title: string; lines: string[] } {
   const o = (d && typeof d === "object" ? d : {}) as Record<string, any>; // eslint-disable-line @typescript-eslint/no-explicit-any
-  if (t.kind === "point") return { title: t.label, lines: t.note ? [t.note] : [] };
+  if (t.kind === "point" || (t.fetch === null && t.note)) return { title: t.label, lines: t.note ? [t.note] : [] };
   const lines: string[] = [];
   if (t.key.startsWith("album:") || t.key.startsWith("calbum:")) {
     const tracks: { durationSeconds?: number | null }[] = Array.isArray(o.tracks) ? o.tracks : [];

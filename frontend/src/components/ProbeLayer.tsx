@@ -127,6 +127,7 @@ export function ProbeLayer({ colors = DEFAULT_COLORS }: { colors?: ProbeColors }
       <div className="probe-dim" aria-hidden="true" />
       <div className="probe-hud probe-ui" role="status" data-testid="probe-hud">
         <b>PROBE</b> hold or rest on a bracket · <kbd>[</kbd><kbd>]</kbd> step · <kbd>Enter</kbd> scan · <kbd>Esc</kbd> out
+        <a className="btn" href="/field-log" data-testid="probe-log">Field Log</a>
         <button type="button" className="btn" onClick={() => setOn(false)} data-testid="probe-off">Off</button>
       </div>
       {bar && <div className="probe-bar" style={{ left: bar.x, top: bar.y, width: bar.w, animationDuration: `${bar.ms}ms` }} aria-hidden="true" data-testid="probe-bar" />}

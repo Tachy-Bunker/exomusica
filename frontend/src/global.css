@@ -6260,3 +6260,15 @@ body.probe [data-probed] { outline-style: dotted !important; }
 html.classic .probe-dim, html.classic .probe-hud, html.classic .probe-bar, html.classic .probe-card { display: none; }
 .probe-preview { display: flex; gap: 1.2rem; flex-wrap: wrap; padding: 1rem; border: 1px solid var(--border); border-radius: var(--radius); background: color-mix(in srgb, var(--bg-elevated) 70%, #000); }
 .probe-preview span { padding: 0.1rem 0.4rem; font-size: 0.85rem; }
+
+/* Field Log */
+.log-meter{height:6px;background:var(--border);border-radius:3px;overflow:hidden;margin:0.2rem 0 0.6rem}
+.log-meter i{display:block;height:100%;background:#ff9d3c}
+.log-list{list-style:none;padding:0;margin:0;display:grid;gap:0.25rem 1rem;grid-template-columns:repeat(auto-fill,minmax(min(100%,16rem),1fr))}
+.log-list li{content-visibility:auto;contain-intrinsic-size:auto 1.6rem}
+.log-locked{opacity:0.35;letter-spacing:0.2em}
+.log-pips{display:inline-flex;gap:3px;margin-left:0.5rem;vertical-align:middle}
+.log-pips i{width:7px;height:7px;border-radius:50%;border:1px solid #ff9d3c}
+.log-pips i.on{background:#ff9d3c}
+.missing-scans{font-size:0.85rem;margin-top:1rem}
+html.classic .missing-scans{display:none}

@@ -8,6 +8,7 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import { api } from "../lib/api";
 import { useAuth } from "../lib/auth";
 import { renderInlineMarkdown, renderMarkdown } from "../lib/markdown";
+import { MissingScansHint } from "../components/MissingScansHint";
 import { findPlacedFigures, noteDeletionMap, noteSwapMap, remapFigureRefs, remapMarkers } from "../lib/footnotes";
 import { figureRefRemap, numberCharts } from "../lib/figures";
 import { extractHeadings } from "../lib/outline";
@@ -585,6 +586,7 @@ export function StudyPage() {
         <div className="study-body">
           {renderMarkdown(study.body, (path) => navigate(path), { extended: true, glossary, notes: study.annotations.map((a) => a.text), cites, figures: figs.render, figureCounts: figs.counts, audio: renderAudio, images: { editable: false }, file: renderFile })}
         </div>
+        <MissingScansHint ready={study.slug} />
         </>
       )}
 

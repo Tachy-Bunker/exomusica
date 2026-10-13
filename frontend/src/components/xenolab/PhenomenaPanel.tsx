@@ -27,17 +27,17 @@ export function PhenomenaPanel({ focusSlug }: { focusSlug: string | null }) {
       <ul style={{ listStyle: "none", padding: 0, display: "grid", gap: "0.9rem", gridTemplateColumns: "repeat(auto-fill,minmax(min(100%,22rem),1fr))" }}>
         {list.map((p) => (
           <li key={p.id} data-phenomenon={p.slug} data-testid="phenomenon-card" className={`phen-card${focusSlug === p.slug ? " on" : ""}`} style={{ border: "1px solid var(--border)", borderRadius: "var(--radius)", padding: "0.8rem" }}>
-            <h3 style={{ margin: 0 }}>{p.title}{!p.published && <span className="home-dim"> (hidden)</span>}</h3>
+            <h3 style={{ margin: 0 }} data-probe="lore" data-probe-key={`phenom:${p.slug}`} data-probe-label={p.title} data-probe-note={p.summary || "A named sonic phenomenon."}>{p.title}{!p.published && <span className="home-dim"> (hidden)</span>}</h3>
             {p.summary && <p style={{ margin: "0.3rem 0" }}>{p.summary}</p>}
-            {p.body && <details><summary className="home-dim">More</summary><div>{renderMarkdown(p.body)}</div></details>}
+            {p.body && <details data-probe="lore" data-probe-key={`phenom:${p.slug}#body`} data-probe-label={`${p.title}: notes`} data-probe-note="The notes are in the field now."><summary className="home-dim">More</summary><div>{renderMarkdown(p.body)}</div></details>}
             {p.example && (
-              <p style={{ margin: "0.5rem 0 0" }}>
+              <p style={{ margin: "0.5rem 0 0" }} data-probe="lore" data-probe-key={`phenom:${p.slug}#ex`} data-probe-label={`${p.title}: example`} data-probe-note={`Heard in ${p.example.title}.`}>
                 <span className="home-dim">Hear it: {p.example.title} ({p.example.albumTitle})</span>
                 <audio controls preload="none" src={p.example.fileUrl} style={{ width: "100%" }} data-testid="phenomenon-audio" />
               </p>
             )}
             <p style={{ margin: "0.5rem 0 0", display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
-              {p.chain && <Link className="btn btn-primary" to={`/xenolab?tab=effects&chain=${p.chain}`} data-testid="phenomenon-reproduce">Reproduce this</Link>}
+              {p.chain && <Link data-probe="lore" data-probe-key={`phenom:${p.slug}#chain`} data-probe-label={`${p.title}: preset`} data-probe-note="A chain that makes it." className="btn btn-primary" to={`/xenolab?tab=effects&chain=${p.chain}`} data-testid="phenomenon-reproduce">Reproduce this</Link>}
               {isAdmin && <button type="button" className="btn" onClick={() => setEditing(p)} data-testid="phenomenon-edit">Edit</button>}
             </p>
           </li>

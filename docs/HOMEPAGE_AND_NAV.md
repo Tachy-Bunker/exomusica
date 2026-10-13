@@ -545,3 +545,13 @@ Implementation: one injected `<style data-probe>` (exists only while on), event 
 
 API: `GET /api/scans`, `POST /api/scans {kind,key}` (idempotent, cap 5000).
 Deferred: scan-able images (56), touch/phone Probe UX.
+
+## fix307 — Field Log (59, 60, 61, 62, 64, 65)
+
+`/field-log` (links: Probe HUD, Account settings). Sections: **Lore** (wiki pages, studies, branches), **Phenomena**, **Recordings** (albums). Unscanned entries are `???` silhouettes whose names are not in the DOM; each section shows `found/total · %` only (no global percentage).
+Catalogue: `GET /api/field-log` (public data, one shared 5-minute cache, ≤400 per section, `lib/fieldLog.ts`). Unlocked = the entry's scan key is in your scans (localStorage, synced to the account on login).
+**Phenomena reveal in steps** (idea 62): the XenoLab card has separate brackets for name (`phenom:slug`), notes (`#body`), example (`#ex`), preset (`#chain`); a card only has the steps it actually has, so it can't get stuck below 100%. The log shows lit pips; unscanned step names stay `???`.
+**Share card**: canvas PNG drawn once on click (bars + up to 6 unlocked titles, nothing about the person).
+**Missing-scans hint**: under study text, "N scan points on this page are still unfound" (counted once after render; never says where; hidden in classic mode).
+Generic: any element with `data-probe="lore" data-probe-key data-probe-label data-probe-note` and no fetch is probe-able and reads out its note.
+No schema change. Deferred: Ancients (founders/old chat) and recovered-log headers (63), album unlock-by-listening (no listening history exists, so albums unlock on scanning), scan-as-read (53).

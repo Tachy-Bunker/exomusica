@@ -5,6 +5,7 @@ const read = (): Set<string> => { try { return new Set(JSON.parse(localStorage.g
 const write = (s: Set<string>) => { try { localStorage.setItem(KEY, JSON.stringify([...s].slice(-3000))); } catch { /* storage blocked */ } };
 
 export const scanId = (kind: string, key: string): string => `${kind}|${key}`;
+export const scannedIds = (): Set<string> => read();
 export const hasScanned = (kind: string, key: string): boolean => read().has(scanId(kind, key));
 export function recordScan(kind: string, key: string, loggedIn: boolean): boolean {
   const s = read(), id = scanId(kind, key), fresh = !s.has(id);

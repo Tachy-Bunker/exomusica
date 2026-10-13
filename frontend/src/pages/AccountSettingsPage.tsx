@@ -300,6 +300,8 @@ export function AccountSettingsPage() {
         <input type="checkbox" checked={classic} onChange={(e) => setClassic(e.target.checked)} data-testid="classic-toggle" /> Classic mode: no Probe mode, wipes, overlays or extra sounds (starts on by itself if your device asks for less motion or is low on memory)
       </label>
 
+      <p style={{ fontSize: "0.9rem", marginBottom: "0.8rem" }}><Link to="/field-log" data-testid="settings-field-log">Your Field Log</Link> <span className="home-dim">— what you have probed so far</span></p>
+
       <h2 style={{ fontSize: "1rem" }}>Bio & links</h2>
       <div className="field">
         <label>Bio</label>
