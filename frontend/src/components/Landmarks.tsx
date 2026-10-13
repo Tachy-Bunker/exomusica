@@ -3,7 +3,8 @@ import { createPortal } from "react-dom";
 import { Link } from "react-router-dom";
 import { api } from "../lib/api";
 import { useAuth } from "../lib/auth";
-import { useLensStore } from "../lib/lensStore";
+import { useProbeStore } from "../lib/probeStore";
+import { useClassicMode } from "../lib/classicMode";
 import type { Doc } from "../lib/letterDoc";
 import { LetterView } from "./LetterView";
 import { freqOf, showFreq, type EntityType } from "../lib/atlas";
@@ -17,11 +18,11 @@ function sector(key: string): string {
   try { return showFreq(freqOf(t as EntityType, r.join(":"))) + " MHz"; } catch { return "unknown"; }
 }
 
-/** The Scan Visor. With it on the page gets a faint grid in other colors, and the notes and drawings that travellers left in this sector hang where they were left.
+/** The traces half of Probe mode (it was the separate Scan Visor). With Probe on the page gets a faint grid in other colors, and the notes and drawings that travellers left in this sector hang where they were left.
  *  With "Write" on, a click anywhere puts a note there. No panel in the way: the only box is a small readout at the top. Off, nothing of this exists on the page. */
 export function Landmarks({ focusKey }: { focusKey: string | null }) {
-  const on = useLensStore((s) => s.on);
-  const setLens = useLensStore((s) => s.set);
+  const probeOn = useProbeStore((s) => s.on), classicOn = useClassicMode((s) => s.classic);
+  const on = probeOn && !classicOn; // the visor is part of Probe mode now: same switch, same exit
   const { user } = useAuth();
   const [marks, setMarks] = useState<Mark[] | null>(null);
   const [open, setOpen] = useState<number | null>(null);
@@ -67,20 +68,19 @@ export function Landmarks({ focusKey }: { focusKey: string | null }) {
   if (!on) return null;
   const shown = open !== null ? marks?.find((m) => m.id === open) ?? null : null;
   const hudEl = (
-    <div className="visor-hud" ref={hud} data-testid={focusKey ? "landmarks" : "landmarks-nowhere"} role="region" aria-label="Scan Visor">
-      <p className="visor-bar"><b>SCAN VISOR</b><span>{focusKey ? (marks === null ? "scanning" : "locked") : "no sector"}</span></p>
+    <div className="visor-hud" ref={hud} data-testid={focusKey ? "landmarks" : "landmarks-nowhere"} role="region" aria-label="Probe mode: traces here">
+      <p className="visor-bar"><b>PROBE · TRACES</b><span>{focusKey ? (marks === null ? "scanning" : "locked") : "no sector"}</span></p>
       {focusKey ? (
         <>
           <p className="visor-sector">sector <b>{sector(focusKey)}</b> · <b data-testid="lm-count">{marks === null ? "…" : marks.length}</b> {marks?.length === 1 ? "trace" : "traces"}</p>
           <div className="visor-tools">
             {user ? <button type="button" className="visor-btn" aria-pressed={writing} onClick={() => { setWriting((w) => !w); setAt(null); }} data-testid="visor-write">✎ Write on the page</button> : <Link className="visor-btn" to="/login">Log in to write</Link>}
             {user && <Link className="visor-btn" to={`/pms?at=${encodeURIComponent(focusKey)}`} data-testid="leave-mark" title="Draw something on a sheet instead">Draw one</Link>}
-            <button type="button" className="visor-btn" onClick={() => setLens(false)} data-testid="visor-off">Off</button>
           </div>
         </>
       ) : (
         <>
-          <div className="visor-tools"><button type="button" className="visor-btn" onClick={() => setLens(false)}>Off</button></div>
+          <p className="home-dim visor-sector">nothing can be left on this page</p>
         </>
       )}
     </div>

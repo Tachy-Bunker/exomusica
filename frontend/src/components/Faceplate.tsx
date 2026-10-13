@@ -2,7 +2,8 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../lib/api";
 import { useAuth } from "../lib/auth";
-import { useLensStore } from "../lib/lensStore";
+import { useProbeStore } from "../lib/probeStore";
+import { useClassicMode } from "../lib/classicMode";
 import { useProfileStore } from "../lib/profileStore";
 import { allowDrop, dropToPocket, useDragStore } from "./PocketPad";
 import { freqOf, showFreq, TYPE_LABEL, type Peek } from "../lib/atlas";
@@ -25,7 +26,8 @@ export function Faceplate({ focus, section, around, onAround, aroundCount, cente
   aroundCount: number;
 }) {
   const { user } = useAuth();
-  const lens = useLensStore();
+  const lens = useProbeStore();
+  const classicMode = useClassicMode((s) => s.classic);
   const [unread, setUnread] = useState(0);
   const unreadPms = useProfileStore((s) => s.unreadPms);
   useEffect(() => {
@@ -65,13 +67,13 @@ export function Faceplate({ focus, section, around, onAround, aroundCount, cente
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="3" /><path d="M12 2v4M12 18v4M2 12h4M18 12h4" /></svg>
         <span className="fp-btn-label">Around</span>{aroundCount > 0 && <em>{aroundCount}</em>}
       </button>
-      <span className="fp-tipwrap">
-        <button type="button" className={`fp-btn${lens.on ? " fp-on" : ""}`} onClick={lens.toggle} aria-pressed={lens.on} aria-label="Scan Visor: show what travellers left here" aria-describedby="fp-lens-tip" data-testid="fp-lens">
+      {!classicMode && <span className="fp-tipwrap">
+        <button type="button" className={`fp-btn${lens.on ? " fp-on" : ""}`} onClick={lens.toggle} aria-pressed={lens.on} aria-label="Probe mode: examine things and see what travellers left here" aria-describedby="fp-lens-tip" data-testid="fp-lens">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="9" /><circle cx="12" cy="12" r="4.5" opacity=".6" /><g className={lens.on ? "lens-pulse" : undefined}><path d="M12 12L12 3" /></g><circle cx="16.5" cy="8" r="1.1" fill="currentColor" stroke="none" /></svg>
-          <span className="fp-btn-label">Scan</span>{lens.on && <i className="fp-state">on</i>}
+          <span className="fp-btn-label">Probe</span>{lens.on && <i className="fp-state">on</i>}
         </button>
-        <span id="fp-lens-tip" role="tooltip" className="fp-tip" data-testid="fp-lens-tip"><b>Scan Visor</b> {lens.on ? "on" : "off"}</span>
-      </span>
+        <span id="fp-lens-tip" role="tooltip" className="fp-tip" data-testid="fp-lens-tip"><b>Probe mode</b> {lens.on ? "on" : "off"} (I)</span>
+      </span>}
       {user && <Link to="/pms" className="fp-btn" aria-label={`Post${unread + unreadPms ? ` (${unread + unreadPms} unread)` : ""}`} data-testid="fp-post">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" aria-hidden="true" focusable="false"><rect x="3" y="5" width="18" height="14" rx="2" /><path d="M3 7l9 6 9-6" /></svg>
         <span className="fp-btn-label">Post</span>{unread + unreadPms > 0 && <em>{unread + unreadPms}</em>}

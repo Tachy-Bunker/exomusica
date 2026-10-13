@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api } from "../lib/api";
+import { createPortal } from "react-dom";
 import { useAuth } from "../lib/auth";
 import { useClassicMode } from "../lib/classicMode";
 import { useProbeStore } from "../lib/probeStore";
@@ -52,7 +53,8 @@ export function ProbeLayer({ colors = DEFAULT_COLORS }: { colors?: ProbeColors }
     if (!t) return;
     (el as HTMLElement).dataset.probed = "1";
     const r = el.getBoundingClientRect();
-    const x = Math.min(Math.max(8, r.left), window.innerWidth - 300), y = r.bottom + 8 > window.innerHeight - 160 ? Math.max(8, r.top - 150) : r.bottom + 8;
+    // page coordinates: the card is part of the page, so it scrolls with it
+    const x = Math.min(Math.max(8, r.left), window.innerWidth - 300) + window.scrollX, y = (r.bottom + 8 > window.innerHeight - 160 ? Math.max(8, r.top - 150) : r.bottom + 8) + window.scrollY;
     const fresh = t.kind === "mod" ? false : recordScan(t.kind, t.key, !!user);
     if (fresh) fireJingle("firstScan");
     let data: unknown = null;
@@ -67,7 +69,7 @@ export function ProbeLayer({ colors = DEFAULT_COLORS }: { colors?: ProbeColors }
   const arm = useCallback((el: Element, ms: number) => {
     cancel();
     const r = el.getBoundingClientRect();
-    setBar({ x: r.left, y: r.bottom - 3, w: r.width, ms });
+    setBar({ x: r.left + window.scrollX, y: r.bottom - 3 + window.scrollY, w: r.width, ms });
     timer.current = window.setTimeout(() => { timer.current = null; setBar(null); swallow.current = Date.now(); void scan(el); }, ms);
   }, [cancel, scan]);
 
@@ -89,7 +91,7 @@ export function ProbeLayer({ colors = DEFAULT_COLORS }: { colors?: ProbeColors }
     const key = (e: KeyboardEvent) => {
       const t = e.target as HTMLElement | null;
       if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.isContentEditable)) return;
-      if (e.key === "Escape") { if (card) setCard(null); else setOn(false); return; }
+      if (e.key === "Escape") { if (document.body.classList.contains("visor-writing")) return; /* the note box handles its own Esc first */ if (card) setCard(null); else setOn(false); return; }
       if (e.key === "]" || e.key === "[") {
         const list = [...document.querySelectorAll(ALL_SELECTOR)].filter((n) => !n.closest(".probe-ui") && find(n) === n && (n as HTMLElement).offsetParent !== null);
         const i = stepIndex(list.length, cur.current ? list.indexOf(cur.current) : -1, e.key === "]" ? 1 : -1);
@@ -132,14 +134,13 @@ export function ProbeLayer({ colors = DEFAULT_COLORS }: { colors?: ProbeColors }
         <a className="btn" href="/field-log" data-testid="probe-log">Field Log</a>
         <button type="button" className="btn" onClick={() => setOn(false)} data-testid="probe-off">Off</button>
       </div>
-      {bar && <div className="probe-bar" style={{ left: bar.x, top: bar.y, width: bar.w, animationDuration: `${bar.ms}ms` }} aria-hidden="true" data-testid="probe-bar" />}
-      {card && (
+      {bar && createPortal(<div className="probe-bar" style={{ left: bar.x, top: bar.y, width: bar.w, animationDuration: `${bar.ms}ms` }} aria-hidden="true" data-testid="probe-bar" />, document.body)}
+      {card && createPortal(
         <div className="probe-card probe-ui" style={{ left: card.x, top: card.y, borderColor: accent }} role="dialog" aria-label="Probe readout" data-testid="probe-card">
           <div className="probe-card-kind" style={{ color: accent }}>{KIND_LABEL[card.t.kind]}{card.fresh && <span data-testid="probe-new"> · new</span>}</div>
           <b>{card.title}</b>
           {card.lines.map((l, i) => <p key={i}>{l}</p>)}
-        </div>
-      )}
+        </div>, document.body)}
     </>
   );
 }

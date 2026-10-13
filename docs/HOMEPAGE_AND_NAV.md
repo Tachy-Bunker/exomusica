@@ -581,3 +581,13 @@ Moments: `firstScan` (a new Probe scan), `firstListen` (a track reaches its natu
 - Plumbing: any code calls `fireJingle(event)` (`lib/jingleBus.ts`, a window event, no import cycles); `lib/jingles.ts` decides (`shouldPlay`) and plays through the existing one-shot SFX path (decoded buffers are cached).
 - "Once" is per browser, not per account, so a new device hears them again.
 - Schema change: `jingleUrls`. Migration name `fix310_jingles`.
+
+## fix311 — Scan merged into Probe, card scrolls with the page, slower door wipe
+
+- **One mode.** The old Scan Visor (travellers' notes/traces, "Write on the page", the corner grid) is now the traces half of Probe mode. One switch: faceplate **Probe** button (replaces the Scan button; the header's Probe button is gone), key `I`, or the terminal (`probe`, `scan`, `visor`, `lens` all work). Probe on shows brackets *and* the traces panel ("PROBE · TRACES"); Off (HUD button or `I`) turns both off. `lensStore` and its persisted `exomusica_lens` are removed: Probe starts off on every load, so traces no longer stay on across reloads.
+- **Classic mode now also hides the traces layer and the faceplate Probe button** (it is the same overlay).
+- **Esc order**: while writing a note, Esc stops writing first; the next Esc leaves Probe.
+- **Scrolling**: the scan progress bar and the readout card are portaled into the page and positioned in page coordinates, so they move with the content.
+- **Door wipe**: 260 ms → 750 ms, eased (in, brief hold, out).
+- Colour settings for the grid/panel/own-notes (Admin → Visor) are unchanged and now belong to Probe.
+- No schema change.

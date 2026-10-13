@@ -105,10 +105,10 @@ def run(playwright):
 
     # ---- the Scan Visor: no dialog, a grid over the page, write anywhere
     ctx = new_ctx(); page = ctx.new_page(); watch(page)
-    page.evaluate("0"); page.goto(f"{BASE}/study/mine-1"); page.evaluate("localStorage.setItem('exomusica_lens','1')"); page.reload()
+    page.evaluate("0"); page.goto(f"{BASE}/study/mine-1"); page.wait_for_selector("[data-testid=faceplate]"); page.click("[data-testid=fp-lens]")
     page.wait_for_selector("[data-testid=landmarks]"); page.wait_for_selector("[data-testid=landmark]")
     t = page.locator("[data-testid=landmarks]").inner_text()
-    check("SCAN VISOR" in t and page.locator("[data-testid=lm-count]").inner_text() == "3", "Visor: HUD with the sector's trace count")
+    check("PROBE" in t and page.locator("[data-testid=lm-count]").inner_text() == "3", "Visor: HUD with the sector's trace count")
     check(page.locator("[data-testid=visor-grid]").count() == 1 and page.locator("[data-testid=landmark]").count() == 3, "Visor: a grid over the page and one beacon per trace")
     xs = set(page.locator("[data-testid=landmark]").evaluate_all("els => els.map(e => e.parentElement.style.left + e.parentElement.style.top)"))
     check(len(xs) == 3, "Visor: beacons sit at different places")

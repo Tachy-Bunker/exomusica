@@ -44,11 +44,11 @@ def run(playwright):
 
     # the real visor in the site wears the saved colour
     page = mk(ME, {"visorColor": "#ff5a4d", "visorMineColor": "#ffd36b"})
-    page.goto(f"{BASE}/"); page.evaluate("localStorage.setItem('exomusica_lens','1')"); page.goto(f"{BASE}/study/mine-1")
+    page.goto(f"{BASE}/study/mine-1"); page.wait_for_selector("[data-testid=faceplate]"); page.click("[data-testid=fp-lens]")
     page.wait_for_selector(".visor-hud")
     check(col(page, ".visor-hud") == "rgb(255, 90, 77)", f"Site: the live visor uses the saved colour ({col(page, '.visor-hud')})")
     plain = mk(ME)
-    plain.goto(f"{BASE}/"); plain.evaluate("localStorage.setItem('exomusica_lens','1')"); plain.goto(f"{BASE}/study/mine-1"); plain.wait_for_selector(".visor-hud")
+    plain.goto(f"{BASE}/study/mine-1"); plain.wait_for_selector("[data-testid=faceplate]"); plain.click("[data-testid=fp-lens]"); plain.wait_for_selector(".visor-hud")
     check(col(plain, ".visor-hud") == "rgb(94, 242, 208)", "Site: with nothing chosen it stays cyan")
 
     check(not errors, f"No page errors {errors[:2]}")

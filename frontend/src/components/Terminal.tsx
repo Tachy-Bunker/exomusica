@@ -1,4 +1,4 @@
-import { useLensStore } from "../lib/lensStore";
+import { useProbeStore } from "../lib/probeStore";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../lib/auth";
@@ -92,7 +92,7 @@ export function Terminal({ focus }: { focus: Entity | null }) {
       pocket: { items: pocket.items, add: pocket.add, remove: pocket.remove, clear: pocket.clear },
       pathname: loc.pathname + loc.search,
       rand: Math.random,
-      lens: { on: useLensStore.getState().on, set: useLensStore.getState().set },
+      lens: { on: useProbeStore.getState().on, set: useProbeStore.getState().set },
     });
     if (out.some((o) => o.kind === "clear")) lines = [];
     else lines = [...lines, { kind: "text" as const, text: `› ${input}` }, ...out].slice(-60);

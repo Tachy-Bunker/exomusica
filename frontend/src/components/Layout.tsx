@@ -380,7 +380,6 @@ export function Layout() {
             ))}
           </nav>
           <div className="nav-tools">
-            {isDesktop && !classic && <button type="button" className="nav-radio nav-probe" aria-pressed={probeOn} onClick={() => useProbeStore.getState().toggle()} title="Probe mode (I): bracket what can be examined, hold to scan" data-testid="probe-toggle">Probe</button>}
             {isDesktop && <Link to="/jam" className="nav-radio" title="Jam: a shared loop machine">Jam</Link>}
             {isDesktop && <Link to="/radio" className="nav-radio" title="Radio: one branch on air, the same moment for everyone">Radio</Link>}
             {isDesktop ? (

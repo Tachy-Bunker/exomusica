@@ -45,8 +45,9 @@ def run(playwright):
     page.locator("[data-testid=landmark]").nth(1).dispatch_event("click")
     check("unsigned" in page.locator("[data-testid=landmark-open]").inner_text(), "Lens: an unsigned mark shows no author")
     check(page.locator("[data-testid=landmark] svg textPath").count() >= 1 or page.locator("svg textPath").count() >= 1, "Letter: curved text renders on a path")
-    page.reload(); page.wait_for_selector("[data-testid=landmarks]")
-    check(True, "Lens: remembered after reload")
+    page.reload(); page.wait_for_selector("[data-testid=faceplate]"); page.wait_for_timeout(400)
+    check(page.locator("[data-testid=landmarks]").count() == 0, "Probe: starts off again after a reload")
+    page.click("[data-testid=fp-lens]"); page.wait_for_selector("[data-testid=landmarks]")
     page.click("[data-testid=leave-mark]"); page.wait_for_url("**/pms?at=study%3Amine-1")
     # compose: ink, text, stamp
     page.wait_for_selector("[data-testid=comp-sheet]")
