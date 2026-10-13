@@ -244,6 +244,8 @@ export function Layout() {
       textColorSecondary: string | null;
       chatTitleColor: string | null;
       accentPrimaryColor: string | null;
+      visorColor?: string | null;
+      visorMineColor?: string | null;
       contentTextScaleDesktop: number;
       contentTextScaleMobile: number;
       caInitial: number;
@@ -286,6 +288,7 @@ export function Layout() {
         root.setProperty("--accent-forum", s.accentPrimaryColor);
         root.setProperty("--accent-forum-dim", darkenHex(s.accentPrimaryColor, 0.45));
       }
+      for (const [prop, v] of [["--visor", s.visorColor], ["--visor-mine", s.visorMineColor]] as const) { if (v && /^#[0-9a-fA-F]{6}$/.test(v)) root.setProperty(prop, v); else root.removeProperty(prop); }
       root.setProperty("--content-scale-desktop", String(s.contentTextScaleDesktop));
       root.setProperty("--content-scale-mobile", String(s.contentTextScaleMobile));
       useContentScaleStore.getState().setScale(s.contentTextScaleDesktop, s.contentTextScaleMobile);

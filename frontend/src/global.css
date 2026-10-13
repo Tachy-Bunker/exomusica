@@ -5784,31 +5784,31 @@ button.dial-slot.empty { padding: 0.1rem 0.4rem; color: var(--text-dim); cursor:
 .sb-row[draggable=true] { cursor: grab; }
 
 /* fix296: the Scan Visor: a grid over the page, traces hanging where they were left, one small readout */
-.visor-grid { position: fixed; inset: 0; z-index: 30; pointer-events: none; --v: #5ef2d0;
+.visor-grid { position: fixed; inset: 0; z-index: 30; pointer-events: none; --v: var(--visor, #5ef2d0);
   background-image: linear-gradient(color-mix(in srgb, var(--v) 9%, transparent) 1px, transparent 1px), linear-gradient(90deg, color-mix(in srgb, var(--v) 9%, transparent) 1px, transparent 1px), linear-gradient(color-mix(in srgb, var(--v) 18%, transparent) 1px, transparent 1px), linear-gradient(90deg, color-mix(in srgb, var(--v) 18%, transparent) 1px, transparent 1px);
   background-size: 32px 32px, 32px 32px, 160px 160px, 160px 160px; box-shadow: inset 0 0 120px 20px color-mix(in srgb, var(--v) 14%, transparent); }
 .visor-grid i { position: absolute; width: 26px; height: 26px; border: 0 solid var(--v); opacity: .8; }
 .visor-grid i:nth-child(1) { top: 5.6rem; left: 8px; border-width: 2px 0 0 2px; } .visor-grid i:nth-child(2) { top: 5.6rem; right: 8px; border-width: 2px 2px 0 0; }
 .visor-grid i:nth-child(3) { bottom: 8px; left: 8px; border-width: 0 0 2px 2px; } .visor-grid i:nth-child(4) { bottom: 8px; right: 8px; border-width: 0 2px 2px 0; }
-.visor-hud { position: fixed; z-index: 47; top: 7.1rem; right: 0.7rem; width: min(260px, calc(100vw - 1.4rem)); padding: 0.45rem 0.6rem; background: color-mix(in srgb, var(--bg, #0b0f14) 82%, #0a2a26); border: 1px solid #5ef2d0; border-radius: 2px; font-family: var(--mono, ui-monospace, monospace); font-size: 0.72rem; color: var(--text, #ddd); box-shadow: 0 0 14px color-mix(in srgb, #5ef2d0 25%, transparent); }
-.visor-bar { display: flex; justify-content: space-between; margin: 0 0 0.2rem; letter-spacing: 0.16em; color: #5ef2d0; font-size: 0.66rem; } .visor-bar span { color: var(--text-dim); letter-spacing: 0.08em; text-transform: uppercase; }
+.visor-hud { position: fixed; z-index: 47; top: 7.1rem; right: 0.7rem; width: min(260px, calc(100vw - 1.4rem)); padding: 0.45rem 0.6rem; background: color-mix(in srgb, var(--bg, #0b0f14) 82%, color-mix(in srgb, var(--visor, #5ef2d0) 14%, black)); border: 1px solid var(--visor, #5ef2d0); border-radius: 2px; font-family: var(--mono, ui-monospace, monospace); font-size: 0.72rem; color: var(--text, #ddd); box-shadow: 0 0 14px color-mix(in srgb, var(--visor, #5ef2d0) 25%, transparent); }
+.visor-bar { display: flex; justify-content: space-between; margin: 0 0 0.2rem; letter-spacing: 0.16em; color: var(--visor, #5ef2d0); font-size: 0.66rem; } .visor-bar span { color: var(--text-dim); letter-spacing: 0.08em; text-transform: uppercase; }
 .visor-sector { margin: 0 0 0.35rem; color: var(--text-dim); } .visor-sector b { color: var(--text, #ddd); font-weight: 600; }
 .visor-tools { display: flex; flex-wrap: wrap; gap: 0.3rem; } .visor-hint { margin: 0.35rem 0 0; color: var(--text-dim); font-size: 0.7rem; }
-.visor-btn { padding: 0.15rem 0.5rem; background: transparent; border: 1px solid color-mix(in srgb, #5ef2d0 60%, transparent); border-radius: 2px; color: inherit; cursor: pointer; font: inherit; text-decoration: none; }
-.visor-btn:hover:not(:disabled), .visor-btn[aria-pressed=true], .visor-btn.go { background: color-mix(in srgb, #5ef2d0 22%, transparent); } .visor-btn:disabled { opacity: .4; cursor: default; }
+.visor-btn { padding: 0.15rem 0.5rem; background: transparent; border: 1px solid color-mix(in srgb, var(--visor, #5ef2d0) 60%, transparent); border-radius: 2px; color: inherit; cursor: pointer; font: inherit; text-decoration: none; }
+.visor-btn:hover:not(:disabled), .visor-btn[aria-pressed=true], .visor-btn.go { background: color-mix(in srgb, var(--visor, #5ef2d0) 22%, transparent); } .visor-btn:disabled { opacity: .4; cursor: default; }
 .visor-layer { position: absolute; z-index: 36; top: 0; left: 0; width: 100%; height: 0; pointer-events: none; }
 .visor-beacon { position: absolute; transform: translate(-9px, -9px); pointer-events: none; }
 .visor-dot { pointer-events: auto; position: relative; width: 18px; height: 18px; padding: 0; background: none; border: 0; cursor: pointer; }
-.visor-dot::before { content: ""; position: absolute; inset: 3px; border: 1.5px solid #5ef2d0; border-radius: 50%; box-shadow: 0 0 8px #5ef2d0; }
-.visor-dot::after { content: ""; position: absolute; inset: 7px; border-radius: 50%; background: #5ef2d0; }
-.visor-beacon.mine .visor-dot::before { border-color: #f5a524; box-shadow: 0 0 8px #f5a524; } .visor-beacon.mine .visor-dot::after { background: #f5a524; }
-.visor-label { position: absolute; left: 22px; top: -1px; max-width: 16rem; white-space: nowrap; padding: 0 0.35rem; background: color-mix(in srgb, var(--bg, #0b0f14) 70%, transparent); border-left: 2px solid #5ef2d0; font: 0.72rem var(--mono, ui-monospace, monospace); color: #bff7ea; pointer-events: none; }
-.visor-beacon.left .visor-label { left: auto; right: 22px; border-left: 0; border-right: 2px solid #5ef2d0; }
-.visor-card, .visor-pop { pointer-events: auto; position: absolute; left: 24px; top: -4px; width: 240px; padding: 0.5rem 0.6rem; background: color-mix(in srgb, var(--bg, #0b0f14) 90%, #0a2a26); border: 1px solid #5ef2d0; border-radius: 2px; font: 0.76rem var(--mono, ui-monospace, monospace); box-shadow: 0 6px 20px rgba(0,0,0,.5); }
+.visor-dot::before { content: ""; position: absolute; inset: 3px; border: 1.5px solid var(--visor, #5ef2d0); border-radius: 50%; box-shadow: 0 0 8px var(--visor, #5ef2d0); }
+.visor-dot::after { content: ""; position: absolute; inset: 7px; border-radius: 50%; background: var(--visor, #5ef2d0); }
+.visor-beacon.mine .visor-dot::before { border-color: var(--visor-mine, #f5a524); box-shadow: 0 0 8px var(--visor-mine, #f5a524); } .visor-beacon.mine .visor-dot::after { background: var(--visor-mine, #f5a524); }
+.visor-label { position: absolute; left: 22px; top: -1px; max-width: 16rem; white-space: nowrap; padding: 0 0.35rem; background: color-mix(in srgb, var(--bg, #0b0f14) 70%, transparent); border-left: 2px solid var(--visor, #5ef2d0); font: 0.72rem var(--mono, ui-monospace, monospace); color: color-mix(in srgb, var(--visor, #5ef2d0) 40%, white); pointer-events: none; }
+.visor-beacon.left .visor-label { left: auto; right: 22px; border-left: 0; border-right: 2px solid var(--visor, #5ef2d0); }
+.visor-card, .visor-pop { pointer-events: auto; position: absolute; left: 24px; top: -4px; width: 240px; padding: 0.5rem 0.6rem; background: color-mix(in srgb, var(--bg, #0b0f14) 90%, color-mix(in srgb, var(--visor, #5ef2d0) 14%, black)); border: 1px solid var(--visor, #5ef2d0); border-radius: 2px; font: 0.76rem var(--mono, ui-monospace, monospace); box-shadow: 0 6px 20px rgba(0,0,0,.5); }
 .visor-beacon.left .visor-card, .visor-pop.left { left: auto; right: 24px; }
 .visor-pop { transform: translate(8px, 8px); } .visor-pop.left { transform: translate(calc(-100% - 8px), 8px); }
 .visor-words { margin: 0 0 0.3rem; font-size: 0.9rem; overflow-wrap: anywhere; } .visor-meta { margin: 0.3rem 0 0; color: var(--text-dim); font-size: 0.68rem; }
-.visor-pop textarea { width: 100%; box-sizing: border-box; resize: none; background: #05100e; color: #bff7ea; border: 1px solid #5ef2d0; font: inherit; padding: 0.3rem; }
+.visor-pop textarea { width: 100%; box-sizing: border-box; resize: none; background: color-mix(in srgb, var(--visor, #5ef2d0) 8%, black); color: color-mix(in srgb, var(--visor, #5ef2d0) 40%, white); border: 1px solid var(--visor, #5ef2d0); font: inherit; padding: 0.3rem; }
 .visor-pop-row { display: flex; flex-wrap: wrap; align-items: center; gap: 0.3rem; margin-top: 0.35rem; }
 .visor-sw { width: 16px; height: 16px; padding: 0; border: 2px solid transparent; border-radius: 50%; cursor: pointer; } .visor-sw.on { border-color: #fff; }
 .visor-un { font-size: 0.66rem; color: var(--text-dim); margin-right: auto; }
@@ -6236,3 +6236,12 @@ select.ox-st { min-width: 7rem; }
 .jam-cell.beat { border-color: color-mix(in srgb, var(--text-dim) 60%, transparent); }
 .jam-cell.on { background: var(--accent-audio); border-color: var(--accent-audio); }
 .jam-head { position: absolute; top: 0; bottom: 0; left: 0; width: calc(var(--jam-cell) - 2px); margin-left: calc(1.2rem + 4px); background: color-mix(in srgb, var(--accent-audio) 18%, transparent); pointer-events: none; transform: translateX(0); }
+
+/* Admin preview of the Scan Visor: the real classes, placed in the flow instead of over the page */
+.visor-preview { position: relative; min-height: 190px; padding: 0.8rem; border: 1px solid var(--border); border-radius: var(--radius); background: var(--bg-elevated); overflow: hidden; }
+.visor-preview .visor-grid { position: absolute; z-index: 0; }
+.visor-preview .visor-grid i:nth-child(1), .visor-preview .visor-grid i:nth-child(2) { top: 8px; }
+.visor-preview .visor-hud { position: relative; top: auto; right: auto; z-index: 1; width: 240px; }
+.visor-preview .visor-beacon { position: absolute; left: 300px; top: 70px; }
+.visor-preview .visor-beacon.mine { top: 120px; }
+.visor-preview .visor-dot { cursor: default; }

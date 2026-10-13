@@ -23,6 +23,8 @@ export async function siteSettingsRoutes(app: FastifyInstance): Promise<void> {
         usernameColor: true,
         playHighlightColor: true,
         accentPrimaryColor: true,
+        visorColor: true,
+        visorMineColor: true,
         contentTextScaleDesktop: true,
         contentTextScaleMobile: true,
         caInitial: true,
@@ -224,6 +226,8 @@ export async function siteSettingsRoutes(app: FastifyInstance): Promise<void> {
       usernameColor: string | null;
       playHighlightColor: string | null;
       accentPrimaryColor: string | null;
+      visorColor: string | null;
+      visorMineColor: string | null;
       contentTextScaleDesktop: number;
       contentTextScaleMobile: number;
       caInitial: number;
@@ -281,7 +285,12 @@ export async function siteSettingsRoutes(app: FastifyInstance): Promise<void> {
     if (body.playHighlightColor !== undefined && body.playHighlightColor !== null && body.playHighlightColor !== "off" && !isHexColor(body.playHighlightColor)) {
       return reply.code(400).send({ error: "playHighlightColor must be a colour like #8fd8ff, or off" });
     }
+    for (const k of ["visorColor", "visorMineColor"] as const) {
+      if (body[k] !== undefined && body[k] !== null && !isHexColor(body[k])) return reply.code(400).send({ error: `${k} must be a colour like #5ef2d0` });
+    }
     for (const key of [
+      "visorColor",
+      "visorMineColor",
       "defaultFontId",
       "defaultWikiPageId",
       "textColorPrimary",

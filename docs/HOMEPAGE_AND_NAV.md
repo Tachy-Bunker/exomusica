@@ -522,3 +522,11 @@ Schema: `RadioBlock`. Migration `fix304c_radio`.
 - **Rooms:** created via `POST /api/jam`, socket `/ws/jam/:code?token=`; full rooms close with 4409, unknown codes 4404. At most 40 rooms; a room empty for 10 min is dropped.
 
 No schema change.
+
+## fix305 — Scan Visor colours (idea 51)
+
+Admin → Scan visor. Two colours: the visor's own (grid corners, panel, beacons, labels, other travellers' notes) and the colour of your own notes. Six named presets (Scan cyan = the old look, Combat red, Thermal amber, Echo violet, Phazon green, X-ray blue) or any colour. The preview is the real visor markup and CSS placed in the page flow, so it cannot drift from the real thing; a colour with too little contrast on the dark page (< 4.5:1) is flagged. Saving applies at once without a reload; "Reset" stores nothing, so the default stays the default.
+
+How: every hard-coded visor colour in `global.css` became `var(--visor, #5ef2d0)` / `var(--visor-mine, #f5a524)` (panel and text tints are `color-mix` from it); `Layout` sets the two custom properties from `/api/site-settings`. Zero cost per frame.
+
+Schema: `SiteSettings.visorColor`, `SiteSettings.visorMineColor`. Migration `fix305_visor_colors`.

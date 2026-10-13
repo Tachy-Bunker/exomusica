@@ -65,6 +65,7 @@ import { EmojiAdminPage } from "./pages/admin/EmojiAdminPage";
 import { EmailTemplatesAdminPage } from "./pages/admin/EmailTemplatesAdminPage";
 import { JamPage } from "./pages/JamPage";
 import { RadioPage } from "./pages/RadioPage";
+import { VisorAdminPage } from "./pages/admin/VisorAdminPage";
 import { RadioAdminPage } from "./pages/admin/RadioAdminPage";
 import { CapsulePage } from "./pages/CapsulePage";
 import { AuditLogAdminPage } from "./pages/admin/AuditLogAdminPage";
@@ -201,6 +202,7 @@ export default function App() {
                 <Route path="audit-log" element={<AuditLogAdminPage />} />
                 <Route path="trash" element={<TrashAdminPage />} />
                 <Route path="radio" element={<RadioAdminPage />} />
+                <Route path="visor" element={<VisorAdminPage />} />
                 <Route path="inbox" element={<InboxAdminPage />} />
                 <Route path="about" element={<AboutAdminPage />} />
                 <Route path="fonts" element={<FontsAdminPage />} />

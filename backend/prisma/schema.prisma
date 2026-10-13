@@ -736,6 +736,8 @@ model SiteSettings {
   defaultWikiPage   WikiPage? @relation(fields: [defaultWikiPageId], references: [id])
   playHighlightColor String? // glow + drifting firefly on the Play buttons visitors should reach for; null = icy blue (#8fd8ff, the default); "off" = no highlight
   usernameColor      String? // the colour every username is shown in outside chat (and the link to their page)
+  visorColor         String? // the Scan Visor's main colour, #rrggbb (null = the default cyan)
+  visorMineColor     String? // the colour of your own notes in the Scan Visor (null = the default amber)
   textColorPrimary   String? // overrides --text site-wide
   textColorSecondary String? // overrides --text-dim site-wide
   chatTitleColor     String? // chat dock branch title specifically

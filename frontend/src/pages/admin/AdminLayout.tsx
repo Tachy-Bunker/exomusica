@@ -78,6 +78,9 @@ export function AdminLayout() {
         <NavLink to="/admin/audit-log" className={({ isActive }) => (isActive ? "active" : "")}>
           Action log
         </NavLink>
+        <NavLink to="/admin/visor" className={({ isActive }) => (isActive ? "active" : "")}>
+          Scan visor
+        </NavLink>
         <NavLink to="/admin/radio" className={({ isActive }) => (isActive ? "active" : "")}>
           Radio
         </NavLink>
