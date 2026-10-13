@@ -39,6 +39,7 @@ enum GhostReason {
 }
 
 model User {
+  probeScans ProbeScan[]
   id                    Int          @id @default(autoincrement())
   username              String       @unique // kept forever, even for ghosts - attribution needs a name
   email                 String?      @unique // null once a ghost: no login, no PII to leak
@@ -736,6 +737,7 @@ model SiteSettings {
   defaultWikiPage   WikiPage? @relation(fields: [defaultWikiPageId], references: [id])
   playHighlightColor String? // glow + drifting firefly on the Play buttons visitors should reach for; null = icy blue (#8fd8ff, the default); "off" = no highlight
   usernameColor      String? // the colour every username is shown in outside chat (and the link to their page)
+  probeColors        Json? // Probe mode bracket colours { lore, track, person, mod }, each #rrggbb (null = defaults)
   visorColor         String? // the Scan Visor's main colour, #rrggbb (null = the default cyan)
   visorMineColor     String? // the colour of your own notes in the Scan Visor (null = the default amber)
   textColorPrimary   String? // overrides --text site-wide
@@ -1781,4 +1783,16 @@ model RadioBlock {
   startHour Int    // 0-23, UTC
   hours     Int    // 1-24
   @@index([startHour])
+}
+
+// What a member has scanned in Probe mode: one row per thing, so the Field Log can show what is found and what is still a silhouette.
+model ProbeScan {
+  id     Int      @id @default(autoincrement())
+  userId Int
+  user   User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  kind   String   // lore | track | person | point
+  key    String   // e.g. album:slug, study:slug, user:name, point:<hash of the page + words>
+  at     DateTime @default(now())
+  @@unique([userId, kind, key])
+  @@index([userId, kind])
 }

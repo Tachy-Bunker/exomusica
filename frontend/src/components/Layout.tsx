@@ -1,3 +1,7 @@
+import { useClassicMode } from "../lib/classicMode";
+import { useProbeStore } from "../lib/probeStore";
+import { DEFAULT_COLORS, type ProbeColors } from "../lib/probeCore";
+import { ProbeLayer } from "./ProbeLayer";
 import { useHeaderThemeStore } from "../lib/headerTheme";
 import { useEffect, useRef, useState } from "react";
 import { Link, Outlet, useNavigate, useLocation } from "react-router-dom";
@@ -245,6 +249,7 @@ export function Layout() {
       chatTitleColor: string | null;
       accentPrimaryColor: string | null;
       visorColor?: string | null;
+      probeColors?: Partial<ProbeColors> | null;
       visorMineColor?: string | null;
       contentTextScaleDesktop: number;
       contentTextScaleMobile: number;
@@ -289,6 +294,7 @@ export function Layout() {
         root.setProperty("--accent-forum-dim", darkenHex(s.accentPrimaryColor, 0.45));
       }
       for (const [prop, v] of [["--visor", s.visorColor], ["--visor-mine", s.visorMineColor]] as const) { if (v && /^#[0-9a-fA-F]{6}$/.test(v)) root.setProperty(prop, v); else root.removeProperty(prop); }
+      setProbeColors({ ...DEFAULT_COLORS, ...(s.probeColors ?? {}) });
       root.setProperty("--content-scale-desktop", String(s.contentTextScaleDesktop));
       root.setProperty("--content-scale-mobile", String(s.contentTextScaleMobile));
       useContentScaleStore.getState().setScale(s.contentTextScaleDesktop, s.contentTextScaleMobile);
@@ -314,6 +320,9 @@ export function Layout() {
   useCustomFont(siteFont); // still needed for its @font-face injection side effect
 
   const headerTheme = useHeaderThemeStore((s) => s.theme);
+  const [probeColors, setProbeColors] = useState<ProbeColors>(DEFAULT_COLORS);
+  const classic = useClassicMode((s) => s.classic);
+  const probeOn = useProbeStore((s) => s.on);
   const currentTrack = useAudioStore((s) => s.currentTrack);
   const setAmbienceHasMainTrack = useAmbienceStore((s) => s.setHasMainTrack);
   useEffect(() => {
@@ -364,6 +373,7 @@ export function Layout() {
             ))}
           </nav>
           <div className="nav-tools">
+            {isDesktop && !classic && <button type="button" className="nav-radio nav-probe" aria-pressed={probeOn} onClick={() => useProbeStore.getState().toggle()} title="Probe mode (I): bracket what can be examined, hold to scan" data-testid="probe-toggle">Probe</button>}
             {isDesktop && <Link to="/jam" className="nav-radio" title="Jam: a shared loop machine">Jam</Link>}
             {isDesktop && <Link to="/radio" className="nav-radio" title="Radio: one branch on air, the same moment for everyone">Radio</Link>}
             {isDesktop ? (
@@ -411,6 +421,7 @@ export function Layout() {
 
       <main className="main-content" ref={mainRef} style={{ marginRight: dockOffset }}>
         <Outlet />
+        <ProbeLayer colors={probeColors} />
       </main>
 
       <PlayerBar />

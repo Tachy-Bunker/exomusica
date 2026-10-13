@@ -1,3 +1,4 @@
+import { useClassicMode } from "../lib/classicMode";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { api, ApiError } from "../lib/api";
@@ -61,6 +62,8 @@ interface Sound {
 
 export function AccountSettingsPage() {
   const { logout } = useAuth();
+  const classic = useClassicMode((s) => s.classic);
+  const setClassic = useClassicMode((s) => s.set);
   const navigate = useNavigate();
   const [me, setMe] = useState<Me | null>(null);
   const [passwords, setPasswords] = useState({ current: "", next: "" });
@@ -291,6 +294,10 @@ export function AccountSettingsPage() {
           onChange={(e) => toggleVisualEffect("exclusiveMediaPlayback", e.target.checked)}
         />{" "}
         Only one audio/video plays at a time (starting one pauses any other, including the main player)
+      </label>
+
+      <label style={{ display: "block", fontSize: "0.9rem", marginBottom: "0.8rem" }}>
+        <input type="checkbox" checked={classic} onChange={(e) => setClassic(e.target.checked)} data-testid="classic-toggle" /> Classic mode: no Probe mode, wipes, overlays or extra sounds (starts on by itself if your device asks for less motion or is low on memory)
       </label>
 
       <h2 style={{ fontSize: "1rem" }}>Bio & links</h2>

@@ -52,7 +52,7 @@ const BASE_INLINE = /\*\*(?<bold>.+?)\*\*|\*(?<italic>.+?)\*|\[(?<linkText>.+?)\
 // code first, so asterisks and brackets inside `code` stay literal; [n] last,
 // so [1](https://...) is still a link.
 const EXTENDED_INLINE =
-  /`(?<code>[^`\n]+)`|\*\*(?<bold>.+?)\*\*|\*(?<italic>.+?)\*|\[(?<linkText>.+?)\]\((?<linkUrl>https?:\/\/[^\s)]+)\)|\[(?<note>\d+)\]|\{(?<figKind>fig|tab):(?<figNum>\d+)\}|\{clip:(?<clipStart>\d+(?:\.\d+)?)-(?<clipEnd>\d+(?:\.\d+)?) (?<clipUrl>\S+?)(?: img=(?<clipImg>\S+?))?\}/g;
+  /`(?<code>[^`\n]+)`|\*\*(?<bold>.+?)\*\*|\*(?<italic>.+?)\*|\[(?<linkText>.+?)\]\((?<linkUrl>https?:\/\/[^\s)]+)\)|\[(?<note>\d+)\]|\{(?<figKind>fig|tab):(?<figNum>\d+)\}|\{scan (?<scanWords>[^|{}\n]{1,80})\|(?<scanNote>[^{}\n]{1,300})\}|\{clip:(?<clipStart>\d+(?:\.\d+)?)-(?<clipEnd>\d+(?:\.\d+)?) (?<clipUrl>\S+?)(?: img=(?<clipImg>\S+?))?\}/g;
 
 function renderInline(text: string, onLinkClick?: (path: string) => void, options?: MarkdownOptions): ReactNode[] {
   const ext = !!options?.extended;
@@ -70,9 +70,12 @@ function renderInline(text: string, onLinkClick?: (path: string) => void, option
   for (const match of text.matchAll(ext ? EXTENDED_INLINE : BASE_INLINE)) {
     if (match.index === undefined) continue;
     if (match.index > lastIndex) nodes.push(gap(text.slice(lastIndex, match.index)));
-    const { code, bold, italic, linkText, linkUrl, note: noteNumber, figKind, figNum, clipStart, clipEnd, clipUrl, clipImg } = match.groups ?? {};
+    const { code, bold, italic, linkText, linkUrl, note: noteNumber, figKind, figNum, clipStart, clipEnd, clipUrl, clipImg, scanWords, scanNote } = match.groups ?? {};
     const key = `i-${i++}`;
-    if (clipUrl !== undefined) {
+    if (scanWords !== undefined) {
+      // A scan point reads as plain words; it only shows up in Probe mode, which is what keeps the page clean for everyone else.
+      nodes.push(<span key={key} className="probe-point" data-probe-note={scanNote.trim()}>{scanWords.trim()}</span>);
+    } else if (clipUrl !== undefined) {
       const start = Number(clipStart);
       const end = Number(clipEnd);
       if (end > start) nodes.push(<ClipButton key={key} clip={{ start, end, url: clipUrl, img: clipImg ?? null }} />);

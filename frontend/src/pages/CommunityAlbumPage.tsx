@@ -28,6 +28,7 @@ interface CommunityAlbumDetail {
   coverArtUrl: string | null;
   description: string | null;
   owner: { username: string };
+  submissionStatus?: "PENDING" | "APPROVED" | "REJECTED" | null;
   tracks: CommunityTrackPlayable[];
 }
 
@@ -110,6 +111,7 @@ export function CommunityAlbumPage() {
         />
         <div style={{ minWidth: 0, flex: 1 }}>
           <h1 style={{ marginBottom: "0.1rem", overflowWrap: "break-word" }}>{album.title}</h1>
+          {album.submissionStatus === "PENDING" && <p className="home-dim" data-probe="mod" data-probe-label="Awaiting review" data-probe-note="A submission waiting for the team. Review it in Admin, Submissions." style={{ fontSize: "0.8rem", display: "inline-block" }}>Awaiting review</p>}
           <p style={{ color: "var(--text-dim)", marginTop: 0 }}>{album.composer}</p>
           <p style={{ fontSize: "0.8rem", color: "var(--text-dim)" }}>Uploaded by <Username name={album.owner.username} dm /></p>
         </div>

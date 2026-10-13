@@ -6245,3 +6245,18 @@ select.ox-st { min-width: 7rem; }
 .visor-preview .visor-beacon { position: absolute; left: 300px; top: 70px; }
 .visor-preview .visor-beacon.mine { top: 120px; }
 .visor-preview .visor-dot { cursor: default; }
+
+/* Probe mode: the page dims a little and the brackets (injected only while the mode is on) stand out */
+.probe-dim { position: fixed; inset: 0; z-index: 28; background: rgba(0, 0, 0, 0.26); pointer-events: none; }
+.probe-hud { position: fixed; z-index: 60; top: calc(var(--nav-height, 56px) + 6px); left: 50%; transform: translateX(-50%); display: flex; gap: 0.5rem; align-items: center; padding: 0.25rem 0.7rem; background: color-mix(in srgb, var(--bg, #0b0f14) 88%, #000); border: 1px solid var(--accent-audio); border-radius: 2px; font: 0.72rem var(--mono, ui-monospace, monospace); white-space: nowrap; max-width: 96vw; overflow: hidden; }
+.probe-hud kbd { border: 1px solid var(--border); border-radius: 3px; padding: 0 0.25rem; margin: 0 1px; }
+.probe-hud .btn { padding: 0 0.5rem; font-size: 0.7rem; }
+.probe-bar { position: fixed; z-index: 61; height: 3px; background: var(--accent-audio); transform-origin: left; animation: probe-fill linear forwards; pointer-events: none; }
+@keyframes probe-fill { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+.probe-card { position: fixed; z-index: 62; width: 280px; max-width: calc(100vw - 16px); padding: 0.55rem 0.7rem; background: color-mix(in srgb, var(--bg, #0b0f14) 94%, #000); border: 1px solid; border-radius: 2px; font: 0.78rem var(--mono, ui-monospace, monospace); box-shadow: 0 8px 24px rgba(0, 0, 0, 0.55); }
+.probe-card p { margin: 0.25rem 0 0; color: var(--text-dim); overflow-wrap: anywhere; }
+.probe-card-kind { font-size: 0.64rem; letter-spacing: 0.14em; text-transform: uppercase; margin-bottom: 0.1rem; }
+body.probe [data-probed] { outline-style: dotted !important; }
+html.classic .probe-dim, html.classic .probe-hud, html.classic .probe-bar, html.classic .probe-card { display: none; }
+.probe-preview { display: flex; gap: 1.2rem; flex-wrap: wrap; padding: 1rem; border: 1px solid var(--border); border-radius: var(--radius); background: color-mix(in srgb, var(--bg-elevated) 70%, #000); }
+.probe-preview span { padding: 0.1rem 0.4rem; font-size: 0.85rem; }

@@ -6,6 +6,8 @@ import { saveSoundFile, saveSiteImage } from "../lib/storage.js";
 import { verifySmtpConnection } from "../lib/mailer.js";
 import { restartDiscordBotIfNeeded, getDiscordBridgeStatus } from "../lib/discordBot.js";
 
+import { probeColorsProblem } from "../lib/probe.js";
+
 export async function siteSettingsRoutes(app: FastifyInstance): Promise<void> {
   app.get("/api/site-settings", async () => {
     const settings = await prisma.siteSettings.findUnique({
@@ -24,6 +26,7 @@ export async function siteSettingsRoutes(app: FastifyInstance): Promise<void> {
         playHighlightColor: true,
         accentPrimaryColor: true,
         visorColor: true,
+        probeColors: true,
         visorMineColor: true,
         contentTextScaleDesktop: true,
         contentTextScaleMobile: true,
@@ -227,6 +230,7 @@ export async function siteSettingsRoutes(app: FastifyInstance): Promise<void> {
       playHighlightColor: string | null;
       accentPrimaryColor: string | null;
       visorColor: string | null;
+      probeColors: unknown;
       visorMineColor: string | null;
       contentTextScaleDesktop: number;
       contentTextScaleMobile: number;
@@ -285,12 +289,17 @@ export async function siteSettingsRoutes(app: FastifyInstance): Promise<void> {
     if (body.playHighlightColor !== undefined && body.playHighlightColor !== null && body.playHighlightColor !== "off" && !isHexColor(body.playHighlightColor)) {
       return reply.code(400).send({ error: "playHighlightColor must be a colour like #8fd8ff, or off" });
     }
+    if (body.probeColors !== undefined) {
+      const bad = probeColorsProblem(body.probeColors);
+      if (bad) return reply.code(400).send({ error: bad });
+    }
     for (const k of ["visorColor", "visorMineColor"] as const) {
       if (body[k] !== undefined && body[k] !== null && !isHexColor(body[k])) return reply.code(400).send({ error: `${k} must be a colour like #5ef2d0` });
     }
     for (const key of [
       "visorColor",
       "visorMineColor",
+      "probeColors",
       "defaultFontId",
       "defaultWikiPageId",
       "textColorPrimary",

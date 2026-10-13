@@ -530,3 +530,18 @@ Admin → Scan visor. Two colours: the visor's own (grid corners, panel, beacons
 How: every hard-coded visor colour in `global.css` became `var(--visor, #5ef2d0)` / `var(--visor-mine, #f5a524)` (panel and text tints are `color-mix` from it); `Layout` sets the two custom properties from `/api/site-settings`. Zero cost per frame.
 
 Schema: `SiteSettings.visorColor`, `SiteSettings.visorMineColor`. Migration `fix305_visor_colors`.
+
+## fix306 — Probe mode (ideas 51–58) + classic mode (99/100)
+
+**Probe mode** (desktop): nav button "Probe" or key `I`. Page dims; scannable things get coloured brackets (lore orange, tracks red, people blue; mod magenta, admins only). Mouse dwell 900 ms or press-and-hold 450 ms fills a bar, then a readout card opens (track, person, lore page, authored point). Completed scans are recorded (`ProbeScan`, localStorage + server when logged in) and the card shows "new" only the first time. Clicks after a completed scan are swallowed (600 ms) so scanning never navigates.
+Keyboard: `[` / `]` step through brackets, `Enter` scans, `Esc` closes card then mode.
+Implementation: one injected `<style data-probe>` (exists only while on), event delegation, no per-element JS. Colours editable in Admin → Visor ("Probe mode brackets", live preview, contrast warning), stored in `SiteSettings.probeColors`.
+
+**Authored scan points** (extended markdown): `{scan visible words | note}`. Plain text unless Probe mode is on. Key = `point:` + hash(path + words).
+
+**Admin-only marks**: `data-probe="mod"`; first use "Awaiting review" on pending community albums.
+
+**Classic mode** (`lib/classicMode.ts`): Account settings checkbox; hides Probe entirely. Defaults ON when never chosen and the device reports reduced-motion, deviceMemory ≤ 2 or saveData. All later overlay/animation features must respect `html.classic`.
+
+API: `GET /api/scans`, `POST /api/scans {kind,key}` (idempotent, cap 5000).
+Deferred: scan-able images (56), touch/phone Probe UX.
