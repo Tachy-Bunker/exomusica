@@ -172,6 +172,7 @@ model Branch {
   createdAt   DateTime @default(now())
 
   wanted BranchWanted[]
+  radioBlocks RadioBlock[]
   briefMarkdown       String?     @db.Text // admin-authored concept brief for contributors, shown on "Choose your next project"
   contributeBackgroundUrl     String?
   contributeBackgroundOpacity Float   @default(0.3)
@@ -1768,4 +1769,14 @@ model BranchWanted {
   claimedAlbum   CommunityAlbum? @relation(fields: [claimedAlbumId], references: [id], onDelete: SetNull)
   claimedAt DateTime?
   @@index([branchId, position])
+}
+
+// Radio plays one branch at a time. A block says "from this UTC hour, for this many hours, play this branch"; hours without a block rotate through the branches.
+model RadioBlock {
+  id        Int    @id @default(autoincrement())
+  branchId  Int
+  branch    Branch @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  startHour Int    // 0-23, UTC
+  hours     Int    // 1-24
+  @@index([startHour])
 }

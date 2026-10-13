@@ -6215,3 +6215,6 @@ select.ox-st { min-width: 7rem; }
 .capsule-year { border-left: 3px solid var(--accent-audio); padding: 0.2rem 0 0.2rem 0.8rem; margin: 0 0 1.1rem; }
 .capsule-year h2 { margin: 0 0 0.3rem; font-size: 1.05rem; }
 .capsule-year ul { margin: 0.2rem 0; padding-left: 1.1rem; font-size: 0.9rem; }
+.radio-card { display: flex; flex-direction: column; gap: 0.5rem; align-items: flex-start; border: 1px solid var(--border); border-radius: var(--radius); padding: 1rem 1.1rem; margin-top: 1rem; }
+.radio-title { font-size: 1.4rem; line-height: 1.2; }
+.nav-radio { font-size: 0.85rem; color: var(--text-dim); text-decoration: none; }

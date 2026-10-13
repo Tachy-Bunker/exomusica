@@ -499,3 +499,14 @@ Schema: `Message.deletedAt` + index. Migration `fix304a_trash`.
 **Idea 50, time capsule.** `/capsule?md=MM-DD` (default today) lists, per past year, albums and studies created that day and the rooms that were active with up to three readable messages, linking to that room's day. Imported Discord days count. Only rooms the public may read. Answer cached 1 h per day. Reached from the archive calendar ("This day in past years →") or by address.
 
 No schema change.
+
+## fix304c — Radio (idea 48)
+
+`/radio` ("Radio" in the desktop top bar): one branch on air at a time, the same song at the same moment for everyone. It is a clock, not a stream: `GET /api/radio/now` computes the branch from the UTC hour, orders that branch's tracks with a seeded shuffle (same for everyone, new each day), and returns the song, how far in it is, and what is next. Nothing runs on the server between requests; the tracks are cached for a minute. "Tune in" starts the song at the broadcast position (a click is needed because browsers block sound otherwise); when the song ends the page asks again and plays the next. Branches with no tracks of known length are skipped.
+
+- **Schedule:** Admin → Radio. Blocks "from hour H for N hours → branch" (UTC, wrap past midnight, up to 24). Hours without a block rotate through the branches that have music in 3-hour parts.
+- **Chat:** the room of the branch on air is put in the chat dock while the page is open.
+- **Header:** wears the on-air branch's colour (fix304b).
+- Limits: official album tracks only (not community pieces); it keeps going on after you leave the page only for the song that is playing, the next song needs the page open.
+
+Schema: `RadioBlock`. Migration `fix304c_radio`.

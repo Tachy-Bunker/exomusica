@@ -63,6 +63,8 @@ import { ContributorPointsAdminPage } from "./pages/admin/ContributorPointsAdmin
 import { BlogAdminPage } from "./pages/admin/BlogAdminPage";
 import { EmojiAdminPage } from "./pages/admin/EmojiAdminPage";
 import { EmailTemplatesAdminPage } from "./pages/admin/EmailTemplatesAdminPage";
+import { RadioPage } from "./pages/RadioPage";
+import { RadioAdminPage } from "./pages/admin/RadioAdminPage";
 import { CapsulePage } from "./pages/CapsulePage";
 import { AuditLogAdminPage } from "./pages/admin/AuditLogAdminPage";
 import { TrashAdminPage } from "./pages/admin/TrashAdminPage";
@@ -122,6 +124,7 @@ export default function App() {
             <Route path="about" element={<Navigate to="/wiki" replace />} />
             <Route path="wiki" element={<LogPage />} />
             <Route path="capsule" element={<CapsulePage />} />
+            <Route path="radio" element={<RadioPage />} />
             <Route path="studies" element={<Navigate to="/xenolab?tab=studies" replace />} />
             <Route path="lab/voice" element={<Suspense fallback={null}><VoiceLabPage /></Suspense>} />
             <Route path="contribute" element={<Navigate to="/xenolab?tab=contribute" replace />} />
@@ -194,6 +197,7 @@ export default function App() {
                 <Route path="email-templates" element={<EmailTemplatesAdminPage />} />
                 <Route path="audit-log" element={<AuditLogAdminPage />} />
                 <Route path="trash" element={<TrashAdminPage />} />
+                <Route path="radio" element={<RadioAdminPage />} />
                 <Route path="inbox" element={<InboxAdminPage />} />
                 <Route path="about" element={<AboutAdminPage />} />
                 <Route path="fonts" element={<FontsAdminPage />} />
