@@ -18,6 +18,12 @@ export function useGlobalPlayerShortcuts(): void {
         return;
       }
 
+      if (e.code === "Backslash" && !e.ctrlKey && !e.metaKey && !e.altKey && (store.ab.A || store.ab.B)) {
+        e.preventDefault();
+        store.abFlip(); // the A/B pair: one key between the two stretches
+        return;
+      }
+
       // Space and the arrows keep their normal job when focus is on a control that uses them (pressing Space on a button must press it).
       const spaceIsTheControls = e.key === " " && usesSpaceItself(e.target);
       const arrowsAreTheControls = e.key.startsWith("Arrow") && usesArrowsItself(e.target);

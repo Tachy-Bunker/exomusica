@@ -1,0 +1,15 @@
+import { readFileSync } from "node:fs";
+const src = readFileSync(new URL("../public/sw.js", import.meta.url), "utf8");
+const fn = src.slice(src.indexOf("async function rangeResponse"), src.indexOf("async function pinnedFirst"));
+const rangeResponse = new Function(fn + "; return rangeResponse;")();
+let bad = 0; const ck = (c, m) => { if (!c) bad++; console.log(c ? "ok  " : "FAIL", m); };
+const body = new Uint8Array(1000).map((_, i) => i % 256);
+const res = () => new Response(new Blob([body], { type: "audio/wav" }), { status: 200, headers: { "Content-Type": "audio/wav" } });
+const req = (r) => ({ headers: new Headers(r ? { range: r } : {}) });
+let r = await rangeResponse(req("bytes=0-99"), res());
+ck(r.status === 206 && r.headers.get("Content-Range") === "bytes 0-99/1000" && (await r.arrayBuffer()).byteLength === 100, "range: first 100 bytes");
+r = await rangeResponse(req("bytes=900-"), res()); ck(r.status === 206 && r.headers.get("Content-Range") === "bytes 900-999/1000", "range: open-ended");
+r = await rangeResponse(req("bytes=-50"), res()); ck(r.headers.get("Content-Range") === "bytes 950-999/1000", "range: suffix");
+r = await rangeResponse(req("bytes=5000-6000"), res()); ck(r.status === 416, "range: past the end is 416");
+r = await rangeResponse(req(null), res()); ck(r.status === 200, "no range: whole file");
+process.exit(bad ? 1 : 0);

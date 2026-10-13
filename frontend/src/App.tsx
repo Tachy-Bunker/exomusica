@@ -26,6 +26,7 @@ import { ForumMapPage } from "./pages/ForumMapPage";
 import { TopicPage } from "./pages/TopicPage";
 import { BranchPage } from "./pages/BranchPage";
 import { AlbumPage } from "./pages/AlbumPage";
+import { OfflinePage } from "./pages/OfflinePage";
 import { CommunityAlbumPage } from "./pages/CommunityAlbumPage";
 import { CommunityPage } from "./pages/CommunityPage";
 import { MyMusicPage } from "./pages/MyMusicPage";
@@ -135,6 +136,7 @@ export default function App() {
             <Route path="discussion/map" element={<ForumMapPage />} />
             <Route path="branch/:slug" element={<BranchPage />} />
             <Route path="album/:slug" element={<AlbumPage />} />
+            <Route path="offline" element={<OfflinePage />} />
             <Route path="community-album/:slug" element={<CommunityAlbumPage />} />
             <Route path="cult" element={<CommunityPage />} />
             <Route path="my-music" element={<MyMusicPage />} />

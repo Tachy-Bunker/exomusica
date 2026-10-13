@@ -202,6 +202,7 @@ model BranchSketch {
   attachmentId Int        @unique
   attachment   Attachment @relation("BranchSketchAttachment", fields: [attachmentId], references: [id])
   addedAt      DateTime   @default(now())
+  tracks       Track[]    @relation("TrackFromSketch")
 }
 
 model ForumChannel {
@@ -354,6 +355,8 @@ model Album {
   coverArtUrl String?
   description String?  @db.Text
   contentMarkdown String? @db.Text // optional illustrative content shown on the album's page - images, text, embeds
+  transition  String   @default("none") // how the album's tracks join in the player: "none" | "gapless" | "crossfade" (set by the album's author)
+  crossfadeMs Int      @default(3000)   // overlap for "crossfade"
   createdAt   DateTime @default(now())
 
   tracks        Track[]
@@ -404,6 +407,10 @@ model Track {
   replayGainDb    Float? @map("replay_gain_db_v2") // sitewide loudness normalization (target -11 LUFS, boost limited by peak) - null means not yet analyzed. The column name changed with the target so every track is measured afresh.
   genres          String[] @default([]) // user-assigned, as many as wanted - drives Venn Views placement
   lyrics          String?  @db.Text // also doubles as the constellation scan panel's logbook description
+  fromStudyId     Int?     // provenance: the study this piece came out of
+  fromStudy       Study?   @relation("TrackFromStudy", fields: [fromStudyId], references: [id], onDelete: SetNull)
+  fromSketchId    Int?     // provenance: the branch sketch it grew from
+  fromSketch      BranchSketch? @relation("TrackFromSketch", fields: [fromSketchId], references: [id], onDelete: SetNull)
 
   bookmarks    AudioBookmark[]
   comments     TrackComment[]
@@ -863,6 +870,7 @@ model Study {
   files       Attachment[]      @relation("StudyFiles")
   branches    Branch[]          @relation("StudyBranches") // none, one or several
   hypotheses  Hypothesis[]
+  tracksMade  Track[]           @relation("TrackFromStudy")
 }
 
 // A snapshot of a study's title and body taken on save, so earlier drafts

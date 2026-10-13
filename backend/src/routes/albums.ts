@@ -42,11 +42,39 @@ export async function albumRoutes(app: FastifyInstance): Promise<void> {
     return shuffled.map(trackToDTO);
   });
 
+  // How an album's tracks join in the player (set by its author). Tiny and cacheable: the player asks once per album.
+  app.get<{ Params: { slug: string } }>("/api/albums/:slug/transition", async (req, reply) => {
+    const a = await prisma.album.findUnique({ where: { slug: req.params.slug }, select: { transition: true, crossfadeMs: true } });
+    if (!a) return reply.code(404).send({ error: "no such album" });
+    reply.header("Cache-Control", "public, max-age=300");
+    return { mode: a.transition, ms: a.crossfadeMs };
+  });
+
+  // Where a track came from: study -> sketch -> branch -> album. Stages that were never recorded are null.
+  app.get<{ Params: { id: string } }>("/api/tracks/:id/provenance", async (req, reply) => {
+    const t = await prisma.track.findUnique({
+      where: { id: Number(req.params.id) },
+      select: {
+        album: { select: { slug: true, title: true, branch: { select: { slug: true, name: true } } } },
+        fromStudy: { select: { slug: true, title: true } },
+        fromSketch: { select: { id: true, attachment: { select: { filename: true } }, branch: { select: { slug: true, name: true } } } },
+      },
+    });
+    if (!t) return reply.code(404).send({ error: "no such track" });
+    reply.header("Cache-Control", "public, max-age=120");
+    return {
+      study: t.fromStudy,
+      sketch: t.fromSketch ? { id: t.fromSketch.id, label: t.fromSketch.attachment.filename, branchSlug: t.fromSketch.branch.slug } : null,
+      branch: t.album.branch,
+      album: { slug: t.album.slug, title: t.album.title },
+    };
+  });
+
   app.get<{ Params: { slug: string } }>("/api/albums/:slug", async (req, reply) => {
     const album = await prisma.album.findUnique({
       where: { slug: req.params.slug },
       include: {
-        branch: { select: { slug: true, name: true } },
+        branch: { select: { id: true, slug: true, name: true } },
         collaborators: { include: { collaborator: true } },
         links: { orderBy: { position: "asc" }, include: { linkIcon: true } },
         galleryImages: { orderBy: { position: "asc" } },
@@ -56,6 +84,7 @@ export async function albumRoutes(app: FastifyInstance): Promise<void> {
             album: { include: { branch: true } },
             bookmarks: true,
             collaborators: { include: { collaborator: true } },
+            fromStudy: { select: { slug: true } },
           },
         },
       },
@@ -68,12 +97,20 @@ export async function albumRoutes(app: FastifyInstance): Promise<void> {
       composer: album.composer,
       coverArtUrl: album.coverArtUrl,
       description: album.description,
+      contentMarkdown: album.contentMarkdown,
+      ogTitle: album.ogTitle,
+      ogDescription: album.ogDescription,
+      ogImageUrl: album.ogImageUrl,
+      transition: album.transition,
+      crossfadeMs: album.crossfadeMs,
       branch: album.branch,
       links: album.links,
       gallery: album.galleryImages,
       collaborators: album.collaborators.map((c) => c.collaborator),
       tracks: album.tracks.map((t) => ({
         ...trackToDTO(t),
+        fromStudySlug: t.fromStudy?.slug ?? null,
+        fromSketchId: t.fromSketchId,
         composers: t.collaborators.map((tc) => ({ id: tc.collaborator.id, name: tc.collaborator.name, slug: tc.collaborator.slug })),
       })),
     };
@@ -155,11 +192,14 @@ export async function albumRoutes(app: FastifyInstance): Promise<void> {
     },
   );
 
-  app.patch<{ Params: { id: string }; Body: Partial<{ title: string; composer: string; description: string; contentMarkdown: string; ogTitle: string | null; ogDescription: string | null; ogImageUrl: string | null }> }>(
+  app.patch<{ Params: { id: string }; Body: Partial<{ title: string; composer: string; description: string; contentMarkdown: string; ogTitle: string | null; ogDescription: string | null; ogImageUrl: string | null; transition: string; crossfadeMs: number }> }>(
     "/api/admin/albums/:id",
     { preHandler: requireAdmin },
-    async (req) => {
-      return prisma.album.update({ where: { id: Number(req.params.id) }, data: req.body ?? {} });
+    async (req, reply) => {
+      const data = { ...(req.body ?? {}) };
+      if (data.transition !== undefined && !["none", "gapless", "crossfade"].includes(data.transition)) return reply.code(400).send({ error: "transition must be none, gapless or crossfade" });
+      if (data.crossfadeMs !== undefined) data.crossfadeMs = Math.max(500, Math.min(12000, Math.round(Number(data.crossfadeMs)) || 3000));
+      return prisma.album.update({ where: { id: Number(req.params.id) }, data });
     },
   );
 
@@ -306,13 +346,17 @@ export async function albumRoutes(app: FastifyInstance): Promise<void> {
 
   app.patch<{
     Params: { id: string };
-    Body: Partial<{ title: string; fileUrl: string; format: string; durationSeconds: number; genres: string[]; lyrics: string | null }>;
+    Body: Partial<{ title: string; fileUrl: string; format: string; durationSeconds: number; genres: string[]; lyrics: string | null; fromStudySlug: string | null; fromSketchId: number | null }>;
   }>("/api/admin/tracks/:id", { preHandler: requireAdmin }, async (req) => {
-    const data = { ...req.body };
+    const { fromStudySlug, ...rest } = req.body ?? {};
+    const data: Record<string, unknown> = { ...rest };
+    if (fromStudySlug !== undefined) {
+      data.fromStudyId = fromStudySlug ? ((await prisma.study.findUnique({ where: { slug: fromStudySlug }, select: { id: true } }))?.id ?? null) : null;
+    }
     // If the fileUrl is changing and no explicit duration was given,
     // re-probe - the old duration would belong to the previous file.
-    if (data.fileUrl && data.durationSeconds === undefined) {
-      data.durationSeconds = (await probeAudioDuration(data.fileUrl)) ?? undefined;
+    if (rest.fileUrl && rest.durationSeconds === undefined) {
+      data.durationSeconds = (await probeAudioDuration(rest.fileUrl)) ?? undefined;
     }
     return prisma.track.update({
       where: { id: Number(req.params.id) },

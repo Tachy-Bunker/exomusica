@@ -2,13 +2,15 @@ import { playlistHref } from "../lib/playlistSource";
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Link } from "react-router-dom";
-import { bindAudioElement, useAudioStore } from "../lib/audioStore";
-import { initAnalyser } from "../lib/audioAnalyser";
+import { bindAudioElement, isActiveEl, useAudioStore } from "../lib/audioStore";
+import { initAnalyser, setActiveForAnalyser } from "../lib/audioAnalyser";
 import { startMediaSession } from "../lib/mediaSession";
 import { useIsDesktop } from "../lib/useIsDesktop";
 import { useFixedPortalRoot } from "../lib/useFixedPortalRoot";
 import { api } from "../lib/api";
 import { useAuth } from "../lib/auth";
+import { AbPanel, AbRegions } from "./AbPanel";
+import { ProvenanceStrip } from "./ProvenanceStrip";
 import { SpecLayer } from "./SpecLayer";
 import { coverColor, loadStrip, trackBase, nearbyComments, type Strip, type TrackComment } from "../lib/specStrip";
 import { PreviousIcon, NextIcon, LoopIcon, LoopOneIcon, ExpandIcon, CollapseIcon, ShuffleIcon, QueueIcon } from "./Icons";
@@ -246,43 +248,50 @@ export function PlayerBar() {
           changes - that's the entire mechanism behind "playback survives
           navigation". No special persistence logic needed beyond living
           here, in Layout, outside the router's <Outlet />. */}
-      <audio
-        ref={(el) => {
-          audioRef.current = el;
-          bindAudioElement(el);
-          if (el) {
-            try {
-              initAnalyser(el);
-            } catch (err) {
-              console.error("Analyser init failed (visuals only):", err);
+      {([0, 1] as const).map((slot) => (
+        <audio
+          key={slot}
+          ref={(el) => {
+            if (slot === 0) audioRef.current = el;
+            bindAudioElement(el, slot);
+            if (el) {
+              try {
+                initAnalyser(el);
+                if (slot === 0) setActiveForAnalyser(el);
+              } catch (err) {
+                console.error("Analyser init failed (visuals only):", err);
+              }
             }
-          }
-        }}
-        onTimeUpdate={(e) => setProgress(e.currentTarget.currentTime, e.currentTarget.duration || 0)}
-        onLoadedMetadata={(e) => setProgress(e.currentTarget.currentTime, e.currentTarget.duration || 0)}
-        onPause={() => useAudioStore.setState({ isPlaying: false })}
-        onPlay={() => useAudioStore.setState({ isPlaying: true })}
-        onError={(e) => {
-          const el = e.currentTarget;
-          console.error("Audio playback error:", {
-            code: el.error?.code,
-            message: el.error?.message,
-            networkState: el.networkState,
-            src: el.currentSrc,
-          });
-        }}
-        onEnded={() => {
-          if (endedFiredRef.current) return;
-          endedFiredRef.current = true;
-          ended();
-        }}
-      />
+          }}
+          onTimeUpdate={(e) => isActiveEl(e.currentTarget) && setProgress(e.currentTarget.currentTime, e.currentTarget.duration || 0)}
+          onLoadedMetadata={(e) => isActiveEl(e.currentTarget) && setProgress(e.currentTarget.currentTime, e.currentTarget.duration || 0)}
+          onPause={(e) => isActiveEl(e.currentTarget) && useAudioStore.setState({ isPlaying: false })}
+          onPlay={(e) => isActiveEl(e.currentTarget) && useAudioStore.setState({ isPlaying: true })}
+          onError={(e) => {
+            const el = e.currentTarget;
+            if (!isActiveEl(el) || !el.currentSrc) return;
+            console.error("Audio playback error:", {
+              code: el.error?.code,
+              message: el.error?.message,
+              networkState: el.networkState,
+              src: el.currentSrc,
+            });
+          }}
+          onEnded={(e) => {
+            if (!isActiveEl(e.currentTarget)) return;
+            if (endedFiredRef.current) return;
+            endedFiredRef.current = true;
+            ended();
+          }}
+        />
+      ))}
 
       {currentTrack && !expanded && (
         <div className="player-bar-docked">
           <div className={`player-seek-strip${spec ? " has-spec" : ""}`} onClick={handleSeekStripClick}>
             <div className="player-seek-track">
               {spec ? <SpecLayer strip={spec} color={tint} pct={progressPct} comments={comments} duration={effectiveDuration} activeId={activeId} onPin={pinClick} /> : <div className="player-seek-fill" style={{ width: `${progressPct}%` }} />}
+              <AbRegions duration={effectiveDuration} />
             </div>
           </div>
           <div
@@ -387,11 +396,14 @@ export function PlayerBar() {
               </p>
             )}
 
+            <ProvenanceStrip track={currentTrack} onNavigate={() => setExpanded(false)} />
+
             <div className="seek-row">
               <span className="mono">{formatTime(seekPreview ?? currentTime)}</span>
               <div className={`player-seek-strip player-seek-strip--expanded${spec ? " has-spec" : ""}`} onClick={(e) => { e.stopPropagation(); handleSeekStripClick(e); if (effectiveDuration) { const r = e.currentTarget.getBoundingClientRect(); setPickAt(Math.max(0, Math.min(1, (e.clientX - r.left) / r.width)) * effectiveDuration); setActiveId(null); } }}>
                 <div className="player-seek-track">
                   {spec ? <SpecLayer strip={spec} color={tint} pct={progressPct} comments={comments} duration={effectiveDuration} activeId={activeId} onPin={pinClick} /> : <div className="player-seek-fill" style={{ width: `${progressPct}%` }} />}
+              <AbRegions duration={effectiveDuration} />
                 </div>
               </div>
               <span className="mono">{formatTime(effectiveDuration)}</span>
@@ -427,6 +439,8 @@ export function PlayerBar() {
                 {repeatMode === "one" ? <LoopOneIcon size={18} /> : <LoopIcon size={18} />}
               </button>
             </div>
+
+            <AbPanel />
 
             {currentTrack.bookmarks.length > 0 && (
               <div className="bookmarks" style={{ marginTop: "0.8rem" }} onClick={(e) => e.stopPropagation()}>

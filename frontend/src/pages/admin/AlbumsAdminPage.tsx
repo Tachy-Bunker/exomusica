@@ -27,6 +27,9 @@ interface AlbumDetail {
   composer: string;
   description: string | null;
   contentMarkdown: string | null;
+  transition?: string;
+  crossfadeMs?: number;
+  branch?: { id: number; slug: string; name: string };
   coverArtUrl: string | null;
   ogTitle?: string | null;
   ogDescription?: string | null;
@@ -34,7 +37,7 @@ interface AlbumDetail {
   links: { id: number; label: string; url: string; iconUrl: string | null; linkIconId: number | null; linkIcon: { id: number; name: string; url: string } | null }[];
   gallery: { id: number; url: string }[];
   collaborators: { id: number; name: string }[];
-  tracks: { id: number; title: string; fileUrl: string; format: string; position: number; genres: string[]; lyrics: string | null; composers: { id: number }[] }[];
+  tracks: { id: number; title: string; fileUrl: string; format: string; position: number; genres: string[]; lyrics: string | null; fromStudySlug?: string | null; fromSketchId?: number | null; composers: { id: number }[] }[];
 }
 
 export function AlbumsAdminPage() {
@@ -60,9 +63,11 @@ export function AlbumsAdminPage() {
   const [detail, setDetail] = useState<AlbumDetail | null>(null);
   const [linkForm, setLinkForm] = useState({ label: "", url: "" });
   const [editingTrackId, setEditingTrackId] = useState<number | null>(null);
-  const [trackEditForm, setTrackEditForm] = useState({ title: "", fileUrl: "", format: "MP3", genres: "", lyrics: "" });
+  const [trackEditForm, setTrackEditForm] = useState({ title: "", fileUrl: "", format: "MP3", genres: "", lyrics: "", fromStudySlug: "", fromSketchId: "" });
+  const [studyChoices, setStudyChoices] = useState<{ slug: string; title: string }[]>([]);
+  const [sketchChoices, setSketchChoices] = useState<{ id: number; attachment: { filename: string } }[]>([]);
   const [editingAlbumInfo, setEditingAlbumInfo] = useState(false);
-  const [albumEditForm, setAlbumEditForm] = useState({ title: "", composer: "", description: "", contentMarkdown: "", ogTitle: "", ogDescription: "", ogImageUrl: "" });
+  const [albumEditForm, setAlbumEditForm] = useState({ title: "", composer: "", description: "", contentMarkdown: "", ogTitle: "", ogDescription: "", ogImageUrl: "", transition: "none", crossfadeSec: 3 });
   const contentTextareaRef = useRef<HTMLTextAreaElement>(null);
 
   async function handleContentMediaUpload(e: ChangeEvent<HTMLInputElement>) {
@@ -144,13 +149,15 @@ export function AlbumsAdminPage() {
       ogTitle: detail.ogTitle ?? "",
       ogDescription: detail.ogDescription ?? "",
       ogImageUrl: detail.ogImageUrl ?? "",
+      transition: detail.transition ?? "none",
+      crossfadeSec: Math.round((detail.crossfadeMs ?? 3000) / 100) / 10,
     });
     setEditingAlbumInfo(true);
   }
 
   async function saveAlbumInfo() {
     if (!detail) return;
-    await api(`/api/admin/albums/${detail.id}`, { method: "PATCH", body: JSON.stringify(albumEditForm) });
+    await api(`/api/admin/albums/${detail.id}`, { method: "PATCH", body: JSON.stringify({ ...albumEditForm, crossfadeSec: undefined, crossfadeMs: Math.round(albumEditForm.crossfadeSec * 1000) }) });
     setEditingAlbumInfo(false);
     loadDetail(detail.slug);
     loadAlbums();
@@ -183,9 +190,11 @@ export function AlbumsAdminPage() {
     if (managingSlug) loadDetail(managingSlug);
   }
 
-  function startEditTrack(t: { id: number; title: string; fileUrl: string; format: string; genres: string[]; lyrics: string | null }) {
+  function startEditTrack(t: { id: number; title: string; fileUrl: string; format: string; genres: string[]; lyrics: string | null; fromStudySlug?: string | null; fromSketchId?: number | null }) {
     setEditingTrackId(t.id);
-    setTrackEditForm({ title: t.title, fileUrl: t.fileUrl, format: t.format, genres: t.genres.join(", "), lyrics: t.lyrics ?? "" });
+    setTrackEditForm({ title: t.title, fileUrl: t.fileUrl, format: t.format, genres: t.genres.join(", "), lyrics: t.lyrics ?? "", fromStudySlug: t.fromStudySlug ?? "", fromSketchId: t.fromSketchId ? String(t.fromSketchId) : "" });
+    api<{ slug: string; title: string }[]>("/api/studies").then((r) => setStudyChoices(Array.isArray(r) ? r : [])).catch(() => {});
+    if (detail?.branch) api<{ id: number; attachment: { filename: string } }[]>(`/api/admin/branches/${detail.branch.id}/sketches`).then((r) => setSketchChoices(Array.isArray(r) ? r : [])).catch(() => {});
   }
 
   async function saveTrackEdit(id: number) {
@@ -195,6 +204,8 @@ export function AlbumsAdminPage() {
         ...trackEditForm,
         genres: trackEditForm.genres.split(",").map((g) => g.trim()).filter(Boolean),
         lyrics: trackEditForm.lyrics.trim() || null,
+        fromStudySlug: trackEditForm.fromStudySlug || null,
+        fromSketchId: trackEditForm.fromSketchId ? Number(trackEditForm.fromSketchId) : null,
       }),
     });
     setEditingTrackId(null);
@@ -402,6 +413,19 @@ export function AlbumsAdminPage() {
               <div className="field">
                 <input value={albumEditForm.composer} onChange={(e) => setAlbumEditForm((f) => ({ ...f, composer: e.target.value }))} placeholder="composer" />
               </div>
+              <div className="field" style={{ display: "flex", gap: "0.5rem", alignItems: "center", flexWrap: "wrap" }} data-testid="album-transition">
+                <label>Between tracks{" "}
+                  <select value={albumEditForm.transition} onChange={(e) => setAlbumEditForm((f) => ({ ...f, transition: e.target.value }))}>
+                    <option value="none">plain (a short pause)</option>
+                    <option value="gapless">gapless</option>
+                    <option value="crossfade">crossfade</option>
+                  </select>
+                </label>
+                {albumEditForm.transition === "crossfade" && (
+                  <label>overlap <input type="number" min={0.5} max={12} step={0.5} style={{ width: "4.5rem" }} value={albumEditForm.crossfadeSec} onChange={(e) => setAlbumEditForm((f) => ({ ...f, crossfadeSec: Number(e.target.value) || 3 }))} /> s</label>
+                )}
+                <span style={{ fontSize: "0.72rem", color: "var(--text-dim)" }}>Applies when one track of this album follows another.</span>
+              </div>
               <div className="field">
                 <textarea
                   rows={2}
@@ -569,6 +593,18 @@ export function AlbumsAdminPage() {
                       rows={2}
                       style={{ flex: "1 1 100%", fontSize: "0.8rem" }}
                     />
+                    <label style={{ flex: "1 1 45%", fontSize: "0.8rem" }}>Came out of study{" "}
+                      <select value={trackEditForm.fromStudySlug} onChange={(e) => setTrackEditForm((f) => ({ ...f, fromStudySlug: e.target.value }))} data-testid="track-from-study">
+                        <option value="">(none)</option>
+                        {studyChoices.map((st) => <option key={st.slug} value={st.slug}>{st.title}</option>)}
+                      </select>
+                    </label>
+                    <label style={{ flex: "1 1 45%", fontSize: "0.8rem" }}>Grew from sketch{" "}
+                      <select value={trackEditForm.fromSketchId} onChange={(e) => setTrackEditForm((f) => ({ ...f, fromSketchId: e.target.value }))} data-testid="track-from-sketch">
+                        <option value="">(none)</option>
+                        {sketchChoices.map((sk) => <option key={sk.id} value={sk.id}>{sk.attachment.filename}</option>)}
+                      </select>
+                    </label>
                     <button className="btn btn-primary" onClick={() => saveTrackEdit(t.id)}>
                       Save
                     </button>

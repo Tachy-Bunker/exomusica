@@ -13,6 +13,7 @@ import { isTypingTarget } from "../lib/isTypingTarget";
 import type { PlayableTrackDTO } from "../lib/types";
 import { AddToPlaylistControl } from "../components/AddToPlaylistControl";
 import { ShareAutoplay } from "../components/ShareAutoplay";
+import { OfflineButton } from "../components/OfflineButton";
 import { ShareModal } from "../components/ShareModal";
 import { parseAutoplay } from "../lib/shareState";
 
@@ -179,6 +180,7 @@ export function AlbumPage() {
           Add all to queue
         </button>
         <button className="btn" onClick={() => setShareOpen(true)} data-testid="share-open-btn" title="Share a link to this album, or to a song in it and a moment of that song">Share</button>
+        <OfflineButton slug={album.slug} />
       </div>
       <ShareAutoplay
         ready

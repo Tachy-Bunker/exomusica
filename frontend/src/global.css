@@ -6095,3 +6095,23 @@ select.ox-st { min-width: 7rem; }
 .ox-pickbar { position: sticky; bottom: 0; display: flex; gap: 0.4rem; flex-wrap: wrap; align-items: center; padding: 0.5rem; border: 1px solid var(--accent-audio); border-radius: 8px; background: var(--bg-elevated); }
 .ox-pvsubject { font-weight: 600; }
 @media (max-width: 800px) { .ox-mail { grid-template-columns: 1fr; } }
+
+/* A/B pair, regions on the seek strip, provenance strip */
+.ab-panel { width: 100%; max-width: 480px; margin-top: 0.8rem; border: 1px solid var(--border); border-radius: var(--radius); padding: 0.4rem 0.5rem; font-size: 0.78rem; text-align: left; background: var(--bg-elevated); }
+.ab-head { display: flex; justify-content: space-between; align-items: center; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.06em; font-size: 0.68rem; margin-bottom: 0.3rem; }
+.ab-keys { display: inline-flex; gap: 0.3rem; }
+.ab-keys .btn, .ab-row .btn { padding: 0.05rem 0.4rem; font-size: 0.72rem; }
+.ab-keys kbd { font-family: var(--font-mono, monospace); opacity: 0.7; }
+.ab-row { display: flex; align-items: center; gap: 0.35rem; padding: 0.15rem 0.2rem; border-radius: 4px; }
+.ab-row.on { background: color-mix(in srgb, var(--accent-forum, #7cf) 18%, transparent); }
+.ab-row b { width: 1.1rem; }
+.ab-what { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ab-region { position: absolute; top: 0; bottom: 0; pointer-events: none; background: color-mix(in srgb, var(--accent-forum, #7cf) 22%, transparent); border-left: 1px solid var(--accent-forum, #7cf); border-right: 1px solid var(--accent-forum, #7cf); z-index: 2; }
+.ab-region.ab-B { background: color-mix(in srgb, var(--accent-primary, #f7a) 22%, transparent); border-color: var(--accent-primary, #f7a); }
+.ab-region.on { background-color: color-mix(in srgb, var(--accent-forum, #7cf) 38%, transparent); }
+.ab-region span { position: absolute; top: -0.9rem; left: 1px; font-size: 0.6rem; color: var(--text-dim); }
+.prov-strip { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 0.1rem; margin: 0.2rem 0 0.4rem; font-size: 0.75rem; max-width: 480px; }
+.prov-arrow { margin: 0 0.25rem; color: var(--text-dim); }
+.prov-chip { padding: 0.05rem 0.45rem; border: 1px solid var(--border); border-radius: 999px; color: var(--text-dim); text-decoration: none; max-width: 14rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: inline-block; vertical-align: bottom; }
+.prov-chip:hover { color: var(--text); border-color: var(--accent-forum, #7cf); }
+.ab-chip { font-size: 0.65rem; padding: 0 0.35rem; }
