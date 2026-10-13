@@ -19,6 +19,7 @@ interface Sketch {
   id: number;
   attachment: { id: number; filename: string; storagePath: string; mimeType: string };
 }
+interface WantedRow { id: number; title: string; detail: string; claimedAlbum: { slug: string; title: string; submissionStatus: string | null } | null }
 interface ChannelAttachment {
   id: number;
   filename: string;
@@ -34,6 +35,9 @@ export function BranchContributeAdminPage() {
   const [bgUrlDraft, setBgUrlDraft] = useState("");
   const [bgOpacityDraft, setBgOpacityDraft] = useState(0.3);
   const [sketches, setSketches] = useState<Sketch[]>([]);
+  const [wanted, setWanted] = useState<WantedRow[]>([]);
+  const [wTitle, setWTitle] = useState("");
+  const [wDetail, setWDetail] = useState("");
   const [hitQuery, setHitQuery] = useState("");
   const [hits, setHits] = useState<Hit[] | null>(null);
   const [channelAttachments, setChannelAttachments] = useState<ChannelAttachment[] | null>(null);
@@ -51,7 +55,16 @@ export function BranchContributeAdminPage() {
       }
     });
     api<Sketch[]>(`/api/admin/branches/${id}/sketches`).then(setSketches);
+    api<WantedRow[]>(`/api/admin/branches/${id}/wanted`).then(setWanted).catch(() => {});
   }
+  async function addWanted(e: React.FormEvent) {
+    e.preventDefault();
+    if (!wTitle.trim()) return;
+    await api(`/api/admin/branches/${id}/wanted`, { method: "POST", body: JSON.stringify({ title: wTitle, detail: wDetail }) });
+    setWTitle(""); setWDetail(""); load();
+  }
+  async function releaseWanted(w: number) { await api(`/api/admin/wanted/${w}`, { method: "PATCH", body: JSON.stringify({ release: true }) }); load(); }
+  async function removeWanted(w: number) { await api(`/api/admin/wanted/${w}`, { method: "DELETE" }); load(); }
   useEffect(load, [id]);
 
   async function saveBrief() {
@@ -153,6 +166,24 @@ export function BranchContributeAdminPage() {
           ))}
         </div>
       )}
+
+      <h2 style={{ fontSize: "1rem", marginTop: "1.5rem" }}>Wanted ({wanted.length})</h2>
+      <p className="home-dim" style={{ fontSize: "0.85rem" }}>What this branch is asking for. Members claim an open slot when they submit; a rejected submission frees it again.</p>
+      <ul data-testid="wanted-admin" style={{ listStyle: "none", padding: 0, display: "flex", flexDirection: "column", gap: "0.3rem" }}>
+        {wanted.map((w) => (
+          <li key={w.id} style={{ display: "flex", gap: "0.5rem", alignItems: "center", flexWrap: "wrap" }}>
+            <span><b>{w.title}</b> <span className="home-dim">{w.detail}</span></span>
+            {w.claimedAlbum && <span className="home-dim">· claimed by <Link to={`/community-album/${w.claimedAlbum.slug}`}>{w.claimedAlbum.title}</Link></span>}
+            {w.claimedAlbum && <button className="btn" onClick={() => releaseWanted(w.id)}>Release</button>}
+            <button className="btn" onClick={() => removeWanted(w.id)} aria-label={`Remove ${w.title}`}>✕</button>
+          </li>
+        ))}
+      </ul>
+      <form onSubmit={addWanted} style={{ display: "flex", gap: "0.4rem", flexWrap: "wrap" }}>
+        <input value={wTitle} onChange={(e) => setWTitle(e.target.value)} placeholder="e.g. 30 s drone in D" maxLength={80} aria-label="Slot title" />
+        <input value={wDetail} onChange={(e) => setWDetail(e.target.value)} placeholder="detail (optional)" maxLength={200} aria-label="Slot detail" style={{ flex: 1, minWidth: 140 }} />
+        <button className="btn" type="submit">Add slot</button>
+      </form>
 
       <h2 style={{ fontSize: "1rem", marginTop: "1.5rem" }}>Sketches ({sketches.length})</h2>
       <p style={{ fontSize: "0.8rem", color: "var(--text-dim)" }}>Curated chat attachments contributors can download as a zip.</p>

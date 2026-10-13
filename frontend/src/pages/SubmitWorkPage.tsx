@@ -9,6 +9,7 @@ interface ContributeBranch {
   slug: string;
   name: string;
 }
+interface Slot { id: number; title: string; open: boolean }
 interface SubmissionAlbum {
   id: number;
   slug: string;
@@ -27,9 +28,11 @@ export function SubmitWorkPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const branchSlug = searchParams.get("branch");
+  const wantId = Number(searchParams.get("want")) || null; // a "wanted" slot being claimed
   const albumSlug = searchParams.get("album"); // a submission that was started earlier and is being continued
   const [resume, setResume] = useState<{ state: "idle" | "loading" | "error"; message?: string }>({ state: albumSlug ? "loading" : "idle" });
   const [branch, setBranch] = useState<ContributeBranch | null>(null);
+  const [slot, setSlot] = useState<Slot | null>(null);
 
   const [title, setTitle] = useState("");
   const [composer, setComposer] = useState("");
@@ -45,6 +48,11 @@ export function SubmitWorkPage() {
   useEffect(() => {
     if (branchSlug) api<ContributeBranch>(`/api/contribute/branches/${branchSlug}`).then(setBranch);
   }, [branchSlug]);
+
+  useEffect(() => {
+    if (!wantId || !branchSlug) return;
+    api<(ContributeBranch & { wanted?: Slot[] })[]>("/api/contribute/branches").then((all) => setSlot(all.find((b) => b.slug === branchSlug)?.wanted?.find((w) => w.id === wantId && w.open) ?? null)).catch(() => {});
+  }, [wantId, branchSlug]);
 
   // Continue a submission that was started earlier: only your own, and only while it is still waiting (a reviewed one can't be changed).
   useEffect(() => {
@@ -69,7 +77,7 @@ export function SubmitWorkPage() {
     if (!title.trim() || !composer.trim() || !branchSlug) return;
     const created = await api<SubmissionAlbum>("/api/community-albums", {
       method: "POST",
-      body: JSON.stringify({ title: title.trim(), composer: composer.trim(), targetBranchSlug: branchSlug }),
+      body: JSON.stringify({ title: title.trim(), composer: composer.trim(), targetBranchSlug: branchSlug, ...(slot ? { wantedId: slot.id } : {}) }),
     });
     setAlbum(created);
     const detail = await api<{ submissionChannel: { slug: string } | null }>(`/api/community-albums/${created.slug}`);
@@ -128,6 +136,7 @@ export function SubmitWorkPage() {
         <li aria-current={album && tracks.length === 0 ? "step" : undefined}>2 · Add your tracks</li>
         <li aria-current={album && tracks.length > 0 ? "step" : undefined}>3 · Send for review</li>
       </ol>
+      {slot && !album && <p data-testid="claiming" style={{ fontSize: "0.9rem" }}>Claiming the slot: <b>{slot.title}</b></p>}
       <p className="home-dim" style={{ fontSize: "0.85rem" }}>The team listens and decides. Your work only joins the branch if it is approved, and you'll hear back in a discussion that opens for it.</p>
 
       {resume.state === "loading" && <p className="home-dim" role="status">Loading your submission…</p>}

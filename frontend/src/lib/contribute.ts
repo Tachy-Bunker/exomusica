@@ -21,6 +21,7 @@ export interface ContributeBranch {
   seed?: boolean; // a Growing seed
   sample?: ContributeSample | null;
   sketchCount: number;
+  wanted?: WantedSlot[];
   mySubmissions: MySubmission[];
 }
 
@@ -83,3 +84,5 @@ export function sortBranches(list: ContributeBranch[], sort: BranchSort): Contri
   const score = (b: ContributeBranch) => b.sketchCount * 100 + (b.previewUrl ? 10 : 0) + (b.hasBrief ? 1 : 0);
   return [...list].sort(sort === "material" ? (a, b) => score(b) - score(a) || byName(a, b) : byName);
 }
+
+export interface WantedSlot { id: number; title: string; detail: string; open: boolean; by: string | null }

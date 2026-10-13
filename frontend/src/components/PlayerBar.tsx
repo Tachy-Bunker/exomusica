@@ -12,6 +12,8 @@ import { useAuth } from "../lib/auth";
 import { AbPanel, AbRegions } from "./AbPanel";
 import { ProvenanceStrip } from "./ProvenanceStrip";
 import { SpecLayer } from "./SpecLayer";
+import { TrackVersions } from "./TrackVersions";
+import { answeredIds, uploadNewVersion, useTrackVersions } from "../lib/trackVersions";
 import { coverColor, layerHue, layersOf, loadStrip, trackBase, nearbyComments, type Strip, type TrackComment } from "../lib/specStrip";
 import { PreviousIcon, NextIcon, LoopIcon, LoopOneIcon, ExpandIcon, CollapseIcon, ShuffleIcon, QueueIcon } from "./Icons";
 
@@ -213,6 +215,13 @@ export function PlayerBar() {
   const [hidden, setHidden] = useState<Set<string>>(() => new Set()); // authors whose layer is switched off
   const [asRegion, setAsRegion] = useState(false);
   const { user } = useAuth();
+  const versions = useTrackVersions(trackId, source);
+  const isOwner = !!user && !!versions.data && versions.data.owner === user.username;
+  const answered = answeredIds(versions.data);
+  async function answerWith(commentId: number, file: File | undefined) {
+    if (!file || trackId == null) return;
+    try { await uploadNewVersion(trackId, file, commentId); setCErr(""); versions.reload(); } catch { setCErr("Couldn't upload that version."); }
+  }
   useEffect(() => {
     setStrip(null); setComments([]); setPickAt(null); setActiveId(null); setCErr(""); setHidden(new Set()); setAsRegion(false);
     if (trackId == null) return;
@@ -419,6 +428,10 @@ export function PlayerBar() {
               {heard.map((c) => (
                 <div key={c.id}><b>{c.user}</b> <span className="mono">{formatTime(c.atSeconds)}{c.endSeconds != null ? `–${formatTime(c.endSeconds)}` : ""}</span> {c.body}
                   {user && (user.id === c.userId || user.isAdmin) && <button onClick={() => removeComment(c.id)} aria-label="Delete comment" title="Delete">x</button>}
+                  {answered.has(c.id) && <span className="versions-badge" title="The owner answered this with a new version" data-testid="answered-badge"> ✓ answered</span>}
+                  {isOwner && c.userId !== user!.id && !answered.has(c.id) && (
+                    <label className="versions-answer-btn" title="Upload a revised file as the answer to this comment" data-testid="answer-with-file">↻ answer with a new version<input type="file" accept="audio/*" hidden onChange={(e) => { void answerWith(c.id, e.target.files?.[0]); e.target.value = ""; }} /></label>
+                  )}
                 </div>
               ))}
             </div>
@@ -429,6 +442,7 @@ export function PlayerBar() {
               <button className="btn btn-primary" disabled={!user || !draft.trim()}>Post</button>
             </form>
             {cErr && <div className="spec-caption" role="alert">{cErr}</div>}
+            {trackId != null && versions.data && <TrackVersions trackId={trackId} data={versions.data} isOwner={isOwner} onChanged={versions.reload} />}
             {layers.length > 1 && (
               <div className="spec-layers" onClick={(e) => e.stopPropagation()} data-testid="note-layers" aria-label="Whose notes to show">
                 {layers.map((l) => (

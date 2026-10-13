@@ -4,6 +4,8 @@ import type { Prisma } from "@prisma/client";
 import { prisma } from "../lib/prisma.js";
 import { requireAuth, requireAdmin, verifyToken } from "../lib/auth.js";
 import { saveCommunityTrackAudio, saveCommunityAlbumCover, deleteAttachmentAndReclaim } from "../lib/storage.js";
+import { slotState } from "../lib/wanted.js";
+import { answeredComment, revisionsToPrune } from "../lib/trackRevisions.js";
 import { resolvePlayableUrl } from "../lib/embeds.js";
 import { probeAudioDuration } from "../lib/audioProbe.js";
 import { deletePlaylistPreview, regeneratePlaylistPreview } from "../lib/playlistPreview.js";
@@ -56,6 +58,19 @@ async function canEditPlaylist(playlistId: number, userId: number, ownerId: numb
   if (ownerId === userId) return true;
   const collab = await prisma.playlistCollaborator.findUnique({ where: { playlistId_userId: { playlistId, userId } } });
   return !!collab;
+}
+
+/** Before a track's file is replaced: keep the old one as a version (optionally saying which pinned comment the new one answers), and drop the oldest beyond the limit. */
+async function keepOldVersion(track: { id: number; attachmentId: number | null; externalUrl: string | null }, answers: unknown): Promise<void> {
+  if (!track.attachmentId && !track.externalUrl) return;
+  const comments = await prisma.communityTrackComment.findMany({ where: { trackId: track.id }, select: { id: true } });
+  await prisma.communityTrackRevision.create({ data: { trackId: track.id, attachmentId: track.attachmentId, externalUrl: track.externalUrl, answersCommentId: answeredComment(answers, comments.map((c) => c.id)) } });
+  const all = await prisma.communityTrackRevision.findMany({ where: { trackId: track.id }, orderBy: { createdAt: "desc" }, select: { id: true, attachmentId: true } });
+  const drop = new Set(revisionsToPrune(all.map((r) => r.id)));
+  for (const r of all.filter((x) => drop.has(x.id))) {
+    await prisma.communityTrackRevision.delete({ where: { id: r.id } });
+    if (r.attachmentId) await deleteAttachmentAndReclaim(r.attachmentId).catch(() => undefined);
+  }
 }
 
 export async function communityMusicRoutes(app: FastifyInstance): Promise<void> {
@@ -235,11 +250,11 @@ export async function communityMusicRoutes(app: FastifyInstance): Promise<void> 
     },
   );
 
-  app.post<{ Body: { title: string; composer: string; description?: string; targetBranchSlug?: string } }>(
+  app.post<{ Body: { title: string; composer: string; description?: string; targetBranchSlug?: string; wantedId?: number } }>(
     "/api/community-albums",
     { preHandler: requireAuth },
     async (req, reply) => {
-      const { title, composer, description, targetBranchSlug } = req.body ?? {};
+      const { title, composer, description, targetBranchSlug, wantedId } = req.body ?? {};
       if (!title || !composer) return reply.code(400).send({ error: "title and composer are required" });
       const slug = await uniqueCommunityAlbumSlug(title);
 
@@ -249,6 +264,11 @@ export async function communityMusicRoutes(app: FastifyInstance): Promise<void> 
         const branch = await prisma.branch.findUnique({ where: { slug: targetBranchSlug }, select: { id: true, name: true } });
         if (!branch) return reply.code(404).send({ error: "no such branch" });
         targetBranchId = branch.id;
+        if (wantedId) {
+          const slot = await prisma.branchWanted.findUnique({ where: { id: Number(wantedId) }, include: { claimedAlbum: { select: { submissionStatus: true } } } });
+          if (!slot || slot.branchId !== branch.id) return reply.code(400).send({ error: "that slot isn't on this branch" });
+          if (slotState(slot) === "claimed") return reply.code(409).send({ error: "someone already claimed that slot" });
+        }
         const channelSlug = await uniqueChannelSlug(`submission-${title}`);
         const channel = await prisma.forumChannel.create({
           data: { slug: channelSlug, name: `Submission: ${title}`, category: "Submissions", kind: "DISCUSSION", isUserQuestion: true, askedById: req.user!.id },
@@ -266,6 +286,10 @@ export async function communityMusicRoutes(app: FastifyInstance): Promise<void> 
           ...(targetBranchId ? { targetBranchId, submissionStatus: "PENDING" as const, submissionChannelId } : {}),
         },
       });
+      if (wantedId && targetBranchId) {
+        // updateMany with the slot still open keeps two simultaneous claims from both winning
+        await prisma.branchWanted.updateMany({ where: { id: Number(wantedId), branchId: targetBranchId, OR: [{ claimedAlbumId: null }, { claimedAlbum: { submissionStatus: "REJECTED" } }] }, data: { claimedAlbumId: album.id, claimedAt: new Date() } });
+      }
       return reply.code(201).send(album);
     },
   );
@@ -417,7 +441,7 @@ export async function communityMusicRoutes(app: FastifyInstance): Promise<void> 
     },
   );
 
-  app.post<{ Params: { id: string } }>("/api/community-tracks/:id/replace-file", { preHandler: requireAuth }, async (req, reply) => {
+  app.post<{ Params: { id: string }; Querystring: { answers?: string } }>("/api/community-tracks/:id/replace-file", { preHandler: requireAuth }, async (req, reply) => {
     const track = await prisma.communityTrack.findUnique({ where: { id: Number(req.params.id) }, include: { album: true } });
     if (!track) return reply.code(404).send({ error: "no such track" });
     if (track.album.ownerId !== req.user!.id) return reply.code(403).send({ error: "not your track" });
@@ -432,6 +456,7 @@ export async function communityMusicRoutes(app: FastifyInstance): Promise<void> 
       } catch (err) {
         return reply.code(400).send({ error: err instanceof Error ? err.message : "upload failed" });
       }
+      await keepOldVersion(track, req.query.answers);
       const updated = await prisma.communityTrack.update({
         where: { id: track.id },
         data: { attachmentId: attachment.id, externalUrl: null, format: formatFromMime(file.mimetype), durationSeconds: null },
@@ -446,6 +471,7 @@ export async function communityMusicRoutes(app: FastifyInstance): Promise<void> 
 
     const { url } = (req.body ?? {}) as { url?: string };
     if (!url) return reply.code(400).send({ error: "url is required" });
+    await keepOldVersion(track, req.query.answers);
     const updated = await prisma.communityTrack.update({
       where: { id: track.id },
       data: { externalUrl: url, attachmentId: null, durationSeconds: null },
@@ -458,11 +484,36 @@ export async function communityMusicRoutes(app: FastifyInstance): Promise<void> 
     return updated;
   });
 
+  // Public: the earlier versions of a track, newest first, with the pinned comment each one answers.
+  app.get<{ Params: { id: string } }>("/api/community-tracks/:id/revisions", async (req, reply) => {
+    const track = await prisma.communityTrack.findUnique({ where: { id: Number(req.params.id) || 0 }, select: { id: true, album: { select: { owner: { select: { username: true } } } } } });
+    if (!track) return reply.code(404).send({ error: "no such track" });
+    const rows = await prisma.communityTrackRevision.findMany({
+      where: { trackId: track.id }, orderBy: { createdAt: "desc" },
+      select: { id: true, createdAt: true, externalUrl: true, attachment: { select: { storagePath: true } }, answersComment: { select: { id: true, atSeconds: true, endSeconds: true, body: true, user: { select: { username: true } } } } },
+    });
+    return {
+      owner: track.album.owner.username,
+      revisions: rows.map((r) => ({ id: r.id, at: r.createdAt.getTime(), url: r.attachment?.storagePath ?? r.externalUrl, answers: r.answersComment ? { id: r.answersComment.id, atSeconds: r.answersComment.atSeconds, body: r.answersComment.body, user: r.answersComment.user.username } : null })),
+    };
+  });
+
+  app.delete<{ Params: { id: string; rid: string } }>("/api/community-tracks/:id/revisions/:rid", { preHandler: requireAuth }, async (req, reply) => {
+    const rev = await prisma.communityTrackRevision.findUnique({ where: { id: Number(req.params.rid) || 0 }, include: { track: { include: { album: true } } } });
+    if (!rev || rev.trackId !== (Number(req.params.id) || 0)) return reply.code(404).send({ error: "no such version" });
+    if (rev.track.album.ownerId !== req.user!.id) return reply.code(403).send({ error: "not your track" });
+    await prisma.communityTrackRevision.delete({ where: { id: rev.id } });
+    if (rev.attachmentId) await deleteAttachmentAndReclaim(rev.attachmentId).catch(() => undefined);
+    return { ok: true };
+  });
+
   app.delete<{ Params: { id: string } }>("/api/community-tracks/:id", { preHandler: requireAuth }, async (req, reply) => {
     const track = await prisma.communityTrack.findUnique({ where: { id: Number(req.params.id) }, include: { album: true } });
     if (!track) return reply.code(404).send({ error: "no such track" });
     if (track.album.ownerId !== req.user!.id) return reply.code(403).send({ error: "not your track" });
+    const oldFiles = await prisma.communityTrackRevision.findMany({ where: { trackId: track.id, attachmentId: { not: null } }, select: { attachmentId: true } });
     await prisma.communityTrack.delete({ where: { id: track.id } });
+    for (const f of oldFiles) if (f.attachmentId) await deleteAttachmentAndReclaim(f.attachmentId).catch(() => undefined); // earlier versions go with the track
     return { status: "ok" };
   });
 

@@ -5,6 +5,7 @@ import { createReadStream, existsSync } from "node:fs";
 import { prisma } from "../lib/prisma.js";
 import { requireAdmin, verifyToken } from "../lib/auth.js";
 import { submissionState } from "../lib/submissionState.js";
+import { cleanWanted, MAX_WANTED, slotState } from "../lib/wanted.js";
 import { sampleOf, sampleUrl } from "../lib/contributeSample.js";
 
 const UPLOADS_DIR = path.join(process.cwd(), "uploads");
@@ -30,6 +31,7 @@ export async function branchContributeRoutes(app: FastifyInstance): Promise<void
         sampleTrack: { select: { id: true, title: true, fileUrl: true, album: { select: { slug: true, title: true } } } },
         sampleCommunityTrack: { select: { id: true, title: true, externalUrl: true, attachment: { select: { storagePath: true } }, album: { select: { slug: true, title: true } } } },
         _count: { select: { sketches: true } },
+        wanted: { orderBy: { position: "asc" }, select: { id: true, title: true, detail: true, claimedAlbumId: true, claimedAlbum: { select: { slug: true, title: true, submissionStatus: true } } } },
       },
       orderBy: { name: "asc" },
     });
@@ -58,6 +60,7 @@ export async function branchContributeRoutes(app: FastifyInstance): Promise<void
       previewUrl: sampleUrl(b),
       sample: sampleOf(b),
       sketchCount: b._count.sketches,
+      wanted: b.wanted.map((w) => ({ id: w.id, title: w.title, detail: w.detail, open: slotState(w) === "open", by: slotState(w) === "claimed" ? (w.claimedAlbum?.title ?? null) : null })),
       mySubmissions: mine
         .filter((a) => a.targetBranch?.slug === b.slug)
         .map((a) => ({ slug: a.slug, title: a.title, trackCount: a._count.tracks, state: submissionState(a.submissionStatus!, a._count.tracks) })),
@@ -145,5 +148,33 @@ export async function branchContributeRoutes(app: FastifyInstance): Promise<void
       take: 100,
     });
     return attachments;
+  });
+
+  // --- Admin: what the branch is asking for ---
+  app.get<{ Params: { id: string } }>("/api/admin/branches/:id/wanted", { preHandler: requireAdmin }, async (req) => {
+    return prisma.branchWanted.findMany({ where: { branchId: Number(req.params.id) }, orderBy: { position: "asc" }, include: { claimedAlbum: { select: { slug: true, title: true, submissionStatus: true } } } });
+  });
+  app.post<{ Params: { id: string }; Body: { title?: string; detail?: string } }>("/api/admin/branches/:id/wanted", { preHandler: requireAdmin }, async (req, reply) => {
+    const branchId = Number(req.params.id);
+    const c = cleanWanted(req.body ?? {});
+    if (!c) return reply.code(400).send({ error: "a title is required" });
+    const count = await prisma.branchWanted.count({ where: { branchId } });
+    if (count >= MAX_WANTED) return reply.code(400).send({ error: `at most ${MAX_WANTED} slots per branch` });
+    return reply.code(201).send(await prisma.branchWanted.create({ data: { branchId, ...c, position: count } }));
+  });
+  app.patch<{ Params: { wid: string }; Body: { title?: string; detail?: string; release?: boolean } }>("/api/admin/wanted/:wid", { preHandler: requireAdmin }, async (req, reply) => {
+    const id = Number(req.params.wid);
+    const data: Record<string, unknown> = {};
+    if (req.body?.title !== undefined || req.body?.detail !== undefined) {
+      const c = cleanWanted(req.body);
+      if (!c) return reply.code(400).send({ error: "a title is required" });
+      Object.assign(data, c);
+    }
+    if (req.body?.release) Object.assign(data, { claimedAlbumId: null, claimedAt: null });
+    return prisma.branchWanted.update({ where: { id }, data });
+  });
+  app.delete<{ Params: { wid: string } }>("/api/admin/wanted/:wid", { preHandler: requireAdmin }, async (req) => {
+    await prisma.branchWanted.delete({ where: { id: Number(req.params.wid) } });
+    return { ok: true };
   });
 }

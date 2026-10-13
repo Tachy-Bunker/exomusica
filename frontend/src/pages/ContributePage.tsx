@@ -103,6 +103,20 @@ export function ContributePage({ embedded = false }: { embedded?: boolean } = {}
           </div>
         </div>
 
+        {(selected.wanted?.length ?? 0) > 0 && (
+          <div className="ct2-wanted" data-testid="tile-wanted">
+            <span className="ct2-tile-h">Wanted · {selected.wanted!.filter((w) => w.open).length} open</span>
+            <ul>
+              {selected.wanted!.map((w) => (
+                <li key={w.id} className={w.open ? "open" : "taken"} data-testid="wanted-slot">
+                  <span><b>{w.title}</b>{w.detail && <span className="home-dim"> {w.detail}</span>}</span>
+                  {w.open ? (user ? <Link className="btn" to={`/submit?branch=${selected.slug}&want=${w.id}`}>Claim</Link> : <span className="ct2-none">log in to claim</span>) : <span className="ct2-none">taken{w.by ? ` · ${w.by}` : ""}</span>}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+
         {briefOpen && selected.hasBrief && (
           <div className="ct-brief" data-testid="contribute-brief">
             {briefs[selected.slug] === undefined ? <p className="home-dim">Loading…</p> : briefs[selected.slug] ? renderMarkdown(briefs[selected.slug]!, navigate) : <p className="home-dim">Couldn't load it. Download it instead.</p>}

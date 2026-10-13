@@ -471,3 +471,11 @@ Phase 1 (this delivery), idea 4:
 - **Points ledger** at `/ledger` (linked from Rewards): earned shares per member and every earning with its reason, public; spending is never listed; ghosts and deleted members appear as "former member". `GET /api/ledger`, cached 60 s.
 - Prisma: `fix303b_welcome_roles` (WelcomeBuddy, TrackCollaborator.roles, EmailType WELCOME_BUDDY).
 - Tests: `backend/_scratch/welcome|creditroles|ledger.test.ts`, `e2e_fix303b.py`.
+
+## fix303c — answer feedback with a new version; branch "wanted" slots
+
+**Idea 31: versions.** On a community track the owner can upload a revised file. The old file is kept as a version (max 3, oldest pruned and its storage reclaimed; files count against the owner's quota). In the player, an owner sees "↻ answer with a new version" on other people's unanswered pinned comments; the upload is linked to that comment, which then shows "✓ answered". A collapsible "Versions" list under the strip lets anyone play earlier versions (`preload="none"`, nothing loads until opened); the owner can delete one. Deleting the track removes its versions. API: `POST /api/community-tracks/:id/replace-file?answers=<commentId>`, `GET /api/community-tracks/:id/revisions`, `DELETE …/revisions/:rid`.
+
+**Idea 35: wanted slots.** Admin → Branches → contribution settings has a "Wanted" editor (≤12 slots, title ≤80, detail ≤200, release a claim, remove). The Contribute panel shows a Wanted tile: open slots have a Claim button (`/submit?branch=<slug>&want=<id>`), taken ones show the submission's title. Starting a submission with `wantedId` claims the slot atomically (`updateMany` on a still-open slot); a REJECTED submission frees it, and deleting the album nulls the claim.
+
+Schema: `CommunityTrackRevision`, `BranchWanted`. Migration `fix303c_versions_wanted`.

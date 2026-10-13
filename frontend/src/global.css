@@ -6194,3 +6194,14 @@ select.ox-st { min-width: 7rem; }
 
 .ledger-table { border-collapse: collapse; min-width: min(100%, 24rem); } .ledger-table th, .ledger-table td { text-align: left; padding: 0.25rem 1rem 0.25rem 0; }
 .ledger-list { list-style: none; padding: 0; display: grid; gap: 0.5rem; }
+
+/* track versions */
+.versions { margin-top: 0.5rem; } .versions-body ul { list-style: none; padding: 0; margin: 0.4rem 0; display: grid; gap: 0.4rem; } .versions-body audio { display: block; width: 100%; max-width: 24rem; }
+.versions-answer { font-size: 0.8rem; } .versions-badge { color: var(--accent-audio, #7cf); font-size: 0.75rem; }
+.versions-answer-btn { cursor: pointer; font-size: 0.75rem; margin-left: 0.5rem; color: var(--accent-audio, #7cf); }
+
+.ct2-wanted { border: 1px solid var(--border); border-radius: var(--radius); padding: 0.55rem 0.65rem; margin-bottom: 0.9rem; }
+.ct2-wanted ul { list-style: none; margin: 0.3rem 0 0; padding: 0; display: flex; flex-direction: column; gap: 0.3rem; }
+.ct2-wanted li { display: flex; justify-content: space-between; align-items: center; gap: 0.6rem; font-size: 0.88rem; }
+.ct2-wanted li.taken { opacity: 0.5; }
+.ct2-wanted .btn { padding: 0.2rem 0.55rem; font-size: 0.8rem; white-space: nowrap; }
