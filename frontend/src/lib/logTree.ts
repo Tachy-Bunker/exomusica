@@ -76,7 +76,7 @@ export interface Row {
 }
 
 export interface PostLite { id: number; slug: string; title: string; publishedAt: string }
-export interface StudyLite { slug: string; title: string; owner?: string; updatedAt?: string }
+export interface StudyLite { slug: string; title: string; owner?: string; updatedAt?: string; status?: "IN_PROGRESS" | "COMPLETE" }
 export const NEWS_FOLDER_LIMIT = 8;
 export const STUDIES_FOLDER_LIMIT = 8;
 

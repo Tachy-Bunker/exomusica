@@ -1,14 +1,18 @@
 import { useEffect } from "react";
 import { useEmojiStore, type Emoji } from "../lib/emojiStore";
+import { paletteFirst, useReactionPalette } from "../lib/reactionPalette";
 
-export function EmojiPicker({ filter = "", onSelect }: { filter?: string; onSelect: (emoji: Emoji) => void }) {
+export function EmojiPicker({ filter = "", onSelect, branchFirst = false }: { filter?: string; onSelect: (emoji: Emoji) => void; branchFirst?: boolean }) {
   const { emojis, load } = useEmojiStore();
+  const ids = useReactionPalette((s) => s.ids);
 
   useEffect(() => {
     load();
   }, [load]);
 
-  const filtered = emojis.filter((e) => e.name.includes(filter.toLowerCase())).slice(0, 30);
+  const matching = emojis.filter((e) => e.name.includes(filter.toLowerCase()));
+  const { picked, rest } = branchFirst && !filter ? paletteFirst(matching, ids) : { picked: [] as Emoji[], rest: matching };
+  const filtered = [...picked, ...rest].slice(0, 30);
 
   return (
     <div className="emoji-picker">
@@ -18,7 +22,7 @@ export function EmojiPicker({ filter = "", onSelect }: { filter?: string; onSele
         </p>
       )}
       {filtered.map((e) => (
-        <button key={e.id} type="button" onClick={() => onSelect(e)} title={`:${e.name}:`}>
+        <button key={e.id} type="button" className={picked.includes(e) ? "branch-pick" : undefined} onClick={() => onSelect(e)} title={`:${e.name}:`}>
           <img src={e.imageUrl} alt={e.name} />
         </button>
       ))}

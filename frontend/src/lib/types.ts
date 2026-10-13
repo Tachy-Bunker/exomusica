@@ -66,6 +66,7 @@ export interface Branch {
   longDescription?: string | null;
   identitySecondaryImageUrl?: string | null;
   identityBgOpacity?: number | null;
+  reactionEmojiIds?: number[];
   channel: { id: number; slug: string; discordChannelId: string | null; discordWebhookUrl: string | null } | null;
 }
 

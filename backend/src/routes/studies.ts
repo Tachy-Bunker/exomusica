@@ -1,6 +1,7 @@
 import { createReadStream } from "node:fs";
 import { readFile, stat } from "node:fs/promises";
 import { firstUrl, sameSource } from "../lib/citations.js";
+import { quoteBlock } from "../lib/studyQuote.js";
 import path from "node:path";
 import { UPLOADS_DIR } from "../lib/storage.js";
 import { isTextFile, readTextPreview } from "../lib/textFiles.js";
@@ -113,6 +114,19 @@ export async function studiesRoutes(app: FastifyInstance): Promise<void> {
     });
     await prisma.forumMapNode.create({ data: { type: "STUDY", studyId: study.id } });
     return reply.code(201).send(study);
+  });
+
+  // Pins a chat message (or the part of it that was selected) to the end of a study as a signed quote.
+  app.post<{ Params: { slug: string }; Body: { text?: string; by?: string; where?: string; href?: string } }>("/api/studies/:slug/quote", { preHandler: requireAuth }, async (req, reply) => {
+    const study = await prisma.study.findUnique({ where: { slug: req.params.slug } });
+    if (!study) return reply.code(404).send({ error: "no such study" });
+    if (study.ownerId !== req.user!.id && !req.user!.isAdmin) return reply.code(403).send({ error: "not your study" });
+    const block = quoteBlock(req.body?.text ?? "", req.body?.by, req.body?.where, req.body?.href);
+    if (!block) return reply.code(400).send({ error: "Nothing to quote." });
+    if (study.body.length + block.length > 200_000) return reply.code(413).send({ error: "This study is full." });
+    const updated = await prisma.study.update({ where: { id: study.id }, data: { body: study.body.replace(/\s+$/, "") + block } });
+    try { await recordStudyRevision(prisma, study.id, { authorId: req.user!.id, title: updated.title, body: updated.body }); } catch (err) { req.log.warn({ err, studyId: study.id }, "failed to record study revision"); }
+    return { slug: updated.slug };
   });
 
   app.patch<{ Params: { slug: string }; Body: Partial<{ title: string; body: string; status: "IN_PROGRESS" | "COMPLETE"; channelSlug: string | null; newChat: boolean; branchSlugs: string[]; backgroundUrl: string | null; backgroundOpacity: number | null; ogTitle: string | null; ogDescription: string | null; ogImageUrl: string | null }> }>(

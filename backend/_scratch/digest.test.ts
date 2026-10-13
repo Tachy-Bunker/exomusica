@@ -1,0 +1,11 @@
+import assert from "node:assert/strict";
+import { digestSince, snippet } from "../src/lib/digest";
+const now = 1_790_000_000_000, day = 86_400_000;
+assert.equal(digestSince(undefined, now).getTime(), now - 7 * day);
+assert.equal(digestSince("abc", now).getTime(), now - 7 * day);
+assert.equal(digestSince(now - 2 * day, now).getTime(), now - 2 * day);
+assert.equal(digestSince(now - 400 * day, now).getTime(), now - 60 * day);
+assert.equal(digestSince(now + 5 * day, now).getTime(), now);
+assert.equal(snippet("  hi   <@123> there "), "hi @… there");
+assert.equal(snippet("x".repeat(200)).length, 90);
+console.log("digest ok");

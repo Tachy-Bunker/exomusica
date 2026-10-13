@@ -6158,3 +6158,28 @@ select.ox-st { min-width: 7rem; }
 .spec-layers { display: flex; flex-wrap: wrap; gap: 0.3rem; margin-top: 0.4rem; }
 .spec-layer-chip { font-size: 0.72rem; padding: 0.1rem 0.5rem; border-radius: 99px; border: 1px solid var(--layer, #7cf); background: color-mix(in srgb, var(--layer, #7cf) 20%, transparent); color: inherit; cursor: pointer; }
 .spec-layer-chip.off { opacity: 0.4; background: transparent; text-decoration: line-through; }
+
+/* @mention glance card */
+.glance { position: relative; }
+.glance-card { display: none; position: absolute; left: 0; bottom: 100%; z-index: 40; width: max-content; max-width: min(18rem, 78vw); padding: 0.5rem 0.7rem; background: var(--bg-elevated, #12151f); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: 0 6px 24px rgba(0,0,0,.45); font-size: 0.82rem; line-height: 1.35; font-weight: 400; flex-direction: column; gap: 0.2rem; white-space: normal; text-align: left; }
+.glance:hover > .glance-card, .glance:focus > .glance-card, .glance:focus-within > .glance-card { display: flex; }
+
+/* members constellation */
+.sky { width: 100%; max-height: 78vh; aspect-ratio: 1 / 0.9; background: radial-gradient(ellipse at center, rgba(40,50,90,.28), transparent 70%); }
+.sky-star { fill: #8b93b8; opacity: .75; }
+.sky-star.lit { fill: #fff; opacity: 1; filter: drop-shadow(0 0 1.4px var(--accent-audio, #7cf)); transform-box: fill-box; transform-origin: center; animation: sky-pulse 2.6s ease-in-out infinite; }
+.sky-line { stroke: var(--accent-audio, #7cf); stroke-width: .18; opacity: .5; }
+.sky-name { font-size: 2.2px; fill: #d8dcf0; text-anchor: middle; pointer-events: none; }
+.sky a:hover .sky-star, .sky a:focus .sky-star { fill: #fff; opacity: 1; }
+@keyframes sky-pulse { 50% { transform: scale(1.35); } }
+@media (prefers-reduced-motion: reduce) { .sky-star.lit { animation: none; } }
+
+/* since-you-left digest */
+.digest { max-width: 44rem; margin: 0.6rem 0; padding: 0.55rem 0.8rem; border: 1px solid var(--border); border-left: 3px solid var(--accent-audio, #7cf); border-radius: var(--radius); font-size: 0.88rem; }
+.digest-head { display: flex; justify-content: space-between; align-items: center; gap: 0.5rem; }
+.digest ul { margin: 0.3rem 0 0; padding-left: 1.1rem; display: grid; gap: 0.2rem; }
+.digest-sub { display: inline-block; max-width: 100%; }
+
+.emoji-picker .branch-pick { outline: 1px solid var(--accent-audio, #7cf); border-radius: 4px; }
+
+.quote-studies { margin-top: 0.2rem; padding: 0.2rem; border: 1px solid var(--border); border-radius: var(--radius); background: var(--bg-elevated, #12151f); max-height: 12rem; overflow: auto; }

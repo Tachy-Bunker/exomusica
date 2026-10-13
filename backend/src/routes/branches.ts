@@ -221,6 +221,7 @@ export async function branchRoutes(app: FastifyInstance): Promise<void> {
       identityImageUrl: string | null;
       identitySecondaryImageUrl: string | null;
       identityBgOpacity: number | null;
+      reactionEmojiIds: number[];
     }>;
   }>("/api/admin/branches/:id", { preHandler: requireAdmin }, async (req, reply) => {
     const problem = identityProblem(req.body ?? {});

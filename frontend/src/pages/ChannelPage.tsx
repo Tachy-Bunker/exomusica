@@ -33,6 +33,9 @@ import { hintFor, parseSlash } from "../lib/chatCommands";
 import { audible, LEVEL_NOTE, useSquelchStore } from "../lib/squelch";
 import { useMentionResolutionStore } from "../lib/mentionResolutionStore";
 import { EmojiPicker } from "../components/EmojiPicker";
+import { useReactionPalette } from "../lib/reactionPalette";
+import { QuoteToStudy } from "../components/QuoteToStudy";
+import { useRoomName } from "../lib/roomContext";
 import { MentionPicker } from "../components/MentionPicker";
 import { AttachmentPreview } from "../components/AttachmentPreview";
 import { SearchBox } from "../components/SearchBox";
@@ -157,9 +160,10 @@ function MessageMenu({
               <button className="btn" style={{ width: "100%", textAlign: "left" }} onClick={() => setReacting((v) => !v)}>
                 React
               </button>
-              {reacting && <EmojiPicker onSelect={addReaction} />}
+              {reacting && <EmojiPicker branchFirst onSelect={addReaction} />}
             </div>
           )}
+          <QuoteToStudy message={message} root={menuRef.current} onDone={() => setOpen(false)} />
           {user && (
             <button
               className="btn"
@@ -600,11 +604,14 @@ export function ChannelPage({ channelSlug, fillHeight, parentControlsHeight }: {
 
   useEffect(() => {
     if (!slug) return;
-    api<{ name: string; font: FontInfo | null; branch?: { slug: string; name: string } | null }>(`/api/channels/${slug}`).then((c) => {
+    api<{ name: string; font: FontInfo | null; branch?: { slug: string; name: string; reactionEmojiIds?: number[] } | null }>(`/api/channels/${slug}`).then((c) => {
       setChannelBranch(c.branch ?? null);
+      useReactionPalette.getState().set(c.branch?.reactionEmojiIds ?? []);
       setChannelName(c.name);
+      useRoomName.getState().set(c.name);
       setChannelFont(c.font);
     });
+    return () => { useReactionPalette.getState().set([]); useRoomName.getState().set(""); };
   }, [slug]);
 
   useEffect(() => {

@@ -176,6 +176,7 @@ model Branch {
   identityGlyph       String?     // admin-chosen emblem, one of a fixed set (see lib/branchIdentity.ts)
   identityImageUrl    String?     // the branch's MAIN image: shown in place of the emblem (an album cover or gallery picture, or an upload)
   identitySecondaryImageUrl String? // the branch's SECONDARY image: the soft background of its tile and of the homepage module when it is chosen
+  reactionEmojiIds    Int[]       @default([]) // the emoji this branch's chat offers first when reacting (its own reaction culture)
   identityBgOpacity   Float?      // how strongly the branch's images show as backgrounds (0.05 - 0.9). null = each place's own soft default
   previewAttachmentId Int?        @unique
   sampleTrackId       Int?        // a track already on the site, offered as the branch's sample (instead of a chat file)

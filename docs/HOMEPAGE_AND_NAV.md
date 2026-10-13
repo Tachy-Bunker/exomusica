@@ -452,3 +452,13 @@ Phase 1 (this delivery), idea 4:
 - **Auto-links**: in studies and Log articles the first mention of each term/alias (whole words, longest match first, headings skipped) gets a dotted underline and a hover/focus card with the definition and a link to `/wiki/<page>#term-<id>`. Not applied to chat. One regex per document, one request per page load.
 - Prisma: `fix302c_glossary_notes` (GlossaryTerm, endSeconds on both comment tables).
 - Tests: `_scratch/glossary|specnotes.test.ts`, `backend/_scratch/glossary|clampend.test.ts`, `e2e_fix302c.py`.
+
+## fix303a: community layer
+
+- **Presence constellation** (Members → "Constellation", `?view=sky`): plain SVG, no animation loop. Stars on a sunflower spiral (`lib/constellation.ts`), most active in the centre, size by messages this month; members in a chat now are lit, pulse (CSS only, off under reduced motion) and are joined by a line chain. Click = profile.
+- **Mention cards**: hovering/focusing a resolved `@name` in chat shows their bio line, latest study and latest community track (`GET /api/users/:username/glance`, public data only, loaded once per name on first hover).
+- **Since-you-left digest** (Home, logged in): after 6 h+ away, one card with replies to you, new messages in followed rooms, new albums, updates to your/followed studies (`GET /api/digest?since=`, capped at 60 days). "Last visit" is a per-device localStorage stamp, written on dismiss and on page hide; a first visit on a device shows nothing.
+- **Branch reaction palettes**: `Branch.reactionEmojiIds` (ordered, max 24), set in Admin → Branch → Identity ("Reaction palette"). In that branch's rooms the React menu lists them first, outlined.
+- **Quote in a study**: message menu → "Quote in a study…" lists your in-progress studies; the selected words (if any, inside that message) or the whole message are appended as a signed markdown quote with a link back to the message (`POST /api/studies/:slug/quote`, owner only, adds a revision). Mentions are written as @name.
+- Prisma: `fix303a_community` (Branch.reactionEmojiIds).
+- Tests: `_scratch/constellation|digestui|palette.test.ts`, `backend/_scratch/digest|palette|studyquote.test.ts`, `e2e_fix303a.py`.

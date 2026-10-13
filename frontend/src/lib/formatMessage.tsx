@@ -1,3 +1,4 @@
+import { MentionGlance } from "../components/MentionGlance";
 import { useState, type ReactNode } from "react";
 import { useEmojiStore } from "./emojiStore";
 import { entityOfPath } from "./chatEntities";
@@ -105,17 +106,7 @@ function renderInline(
       const resolved = mentionCache?.get(userId);
       nodes.push(
         resolved ? (
-          <span
-            key={key}
-            className="mention"
-            style={{ cursor: "pointer" }}
-            onClick={(e) => {
-              e.preventDefault();
-              onLinkClick?.(`/u/${resolved.username}`);
-            }}
-          >
-            @{resolved.username}
-          </span>
+          <MentionGlance key={key} username={resolved.username} onOpen={onLinkClick} />
         ) : (
           <span key={key} className="mention" title="Not yet resolved">
             @{userId}

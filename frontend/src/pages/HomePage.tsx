@@ -1,3 +1,4 @@
+import { DigestCard } from "../components/DigestCard";
 import { useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { ACTIVITY_ICON } from "../components/ActivityIcons";
@@ -82,6 +83,7 @@ export function HomePage() {
       {user ? (
         <header className="home-hero" data-testid="home-member-hero">
           <h1>Welcome back, {user.username}</h1>
+          <DigestCard />
           {hasUnreadPms && (
             <div className="home-chips">
               <Link className="home-chip home-chip-alert" to="/pms">New message</Link>

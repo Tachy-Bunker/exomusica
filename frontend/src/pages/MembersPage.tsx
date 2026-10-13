@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { useAuth } from "../lib/auth";
 import { loadMembers, useLoaded } from "../lib/hubs";
+import { chatLines, layoutStars } from "../lib/constellation";
 import { usePresenceStore } from "../lib/presenceStore";
 import { filterMembers, initialOf, monthYear, nameHue, sortMembers, type Member, type MemberFilter, type MemberSort } from "../lib/spaceHubs";
 import { useDocumentTitle } from "../lib/useDocumentTitle";
@@ -34,6 +35,7 @@ export function MembersPage() {
   const [params, setUrlParam] = useUrlParams();
   const viewers = usePresenceStore((s) => s.viewersByChannel);
   const [limit, setLimit] = useState(PAGE);
+  const sky = params.get("view") === "sky";
 
   const filterParam = params.get("show");
   const filter: MemberFilter = filterParam === "new" || filterParam === "active" || filterParam === "chat" ? filterParam : "all";
@@ -76,6 +78,10 @@ export function MembersPage() {
             </select>
           </label>
         </div>
+        <div className="space-chips" role="group" aria-label="How to show members">
+          <button type="button" className="space-chip" aria-pressed={!sky} onClick={() => setUrlParam("view", "cards", "cards")} data-testid="members-view-cards">Cards</button>
+          <button type="button" className="space-chip" aria-pressed={sky} onClick={() => setUrlParam("view", "sky", "cards")} data-testid="members-view-sky">Constellation</button>
+        </div>
         <div className="space-chips" role="group" aria-label="Which members">
           {chips.map((c) => (
             <button key={c.id} type="button" className="space-chip" aria-pressed={filter === c.id} onClick={() => setParam("show", c.id, "all")} data-testid={`members-filter-${c.id}`}>
@@ -89,6 +95,8 @@ export function MembersPage() {
         <div className="home-placeholder" aria-busy={!failed}>{failed ? "Couldn't load the members. Reload to try again." : "Reading the crew manifest…"}</div>
       ) : shown.length === 0 ? (
         <p className="home-dim" data-testid="members-empty">{all.length === 0 ? "No members yet." : "Nobody matches. Try fewer words, or clear the filter."}</p>
+      ) : sky ? (
+        <Sky members={shown} inChat={inChat} />
       ) : (
         <>
           <div className="space-grid" data-testid="members-list">
@@ -115,5 +123,24 @@ export function MembersPage() {
         </>
       )}
     </div>
+  );
+}
+
+/** Members as stars: bigger the more they speak, lit and joined by lines when they are in a chat now. Plain SVG, no animation loop; only the lit stars pulse, in CSS. */
+function Sky({ members, inChat }: { members: Member[]; inChat: Set<string> }) {
+  const stars = useMemo(() => layoutStars(members, inChat), [members, inChat]);
+  const lines = useMemo(() => chatLines(stars), [stars]);
+  return (
+    <svg className="sky" viewBox="0 0 100 100" preserveAspectRatio="xMidYMid meet" role="group" aria-label="Members as a constellation" data-testid="members-sky">
+      {lines.map(([a, b], i) => <line key={i} x1={a.x} y1={a.y} x2={b.x} y2={b.y} className="sky-line" />)}
+      {stars.map((s) => (
+        <Link key={s.username} to={`/u/${encodeURIComponent(s.username)}`} data-testid="sky-star" data-lit={s.lit ? "1" : "0"}>
+          <title>{s.username}{s.lit ? " (in a chat now)" : ""}</title>
+          <circle cx={s.x} cy={s.y} r={Math.max(3, s.r * 2.2)} fill="transparent" />
+          <circle cx={s.x} cy={s.y} r={s.r} className={`sky-star${s.lit ? " lit" : ""}`} />
+          {(s.lit || s.r > 2) && <text x={s.x} y={s.y - s.r - 1.2} className="sky-name">{s.username}</text>}
+        </Link>
+      ))}
+    </svg>
   );
 }

@@ -7,6 +7,7 @@ import type { BranchPicture } from "../../lib/home";
 import { colorFromImageUrl } from "../../lib/imageColor";
 import type { Branch } from "../../lib/types";
 import { OpacitySlider } from "../../components/OpacitySlider";
+import { useEmojiStore } from "../../lib/emojiStore";
 
 /** Choose how a branch looks around the site: an accent colour, an emblem or a main image (its colour then follows the image), and a secondary image for backgrounds. */
 export function BranchIdentityAdminPage() {
@@ -18,6 +19,9 @@ export function BranchIdentityAdminPage() {
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [secondaryUrl, setSecondaryUrl] = useState<string | null>(null);
   const [bgOpacity, setBgOpacity] = useState<number | null>(null);
+  const [palette, setPalette] = useState<number[]>([]);
+  const { emojis, load: loadEmojis } = useEmojiStore();
+  useEffect(() => { void loadEmojis(); }, [loadEmojis]);
   const [pictures, setPictures] = useState<BranchPicture[]>([]);
   const [uploading, setUploading] = useState(false);
   const [status, setStatus] = useState<{ kind: "ok" | "error"; text: string } | null>(null);
@@ -33,6 +37,7 @@ export function BranchIdentityAdminPage() {
       setImageUrl(b?.identityImageUrl ?? null);
       setSecondaryUrl(b?.identitySecondaryImageUrl ?? null);
       setBgOpacity(b?.identityBgOpacity ?? null);
+      setPalette(b?.reactionEmojiIds ?? []);
       // every picture this branch has: its cover, its albums' covers and their gallery images
       if (b) api<BranchPicture[]>(`/api/branches/${b.slug}/images`).then((p) => setPictures(p.slice(0, 40))).catch(() => {});
     });
@@ -75,7 +80,7 @@ export function BranchIdentityAdminPage() {
     if (!branch) return;
     if (hexText && !isHexColor(hexText)) { setStatus({ kind: "error", text: "A colour looks like #4fa8e0: a # and six letters or digits." }); return; }
     try {
-      await api(`/api/admin/branches/${branch.id}`, { method: "PATCH", body: JSON.stringify({ identityColor: color, identityGlyph: glyph, identityImageUrl: imageUrl, identitySecondaryImageUrl: secondaryUrl, identityBgOpacity: bgOpacity }) });
+      await api(`/api/admin/branches/${branch.id}`, { method: "PATCH", body: JSON.stringify({ identityColor: color, identityGlyph: glyph, identityImageUrl: imageUrl, identitySecondaryImageUrl: secondaryUrl, identityBgOpacity: bgOpacity, reactionEmojiIds: palette }) });
       setStatus({ kind: "ok", text: "Saved. It shows on Soundbay, the homepage map and the branch page." });
     } catch (e) {
       setStatus({ kind: "error", text: e instanceof ApiError ? e.message : "Couldn't save." });
@@ -143,6 +148,22 @@ export function BranchIdentityAdminPage() {
         </div>
         <OpacitySlider value={bgOpacity} onChange={(v) => { setBgOpacity(v); setStatus(null); }} label="Background strength (all places the branch pictures are used as backgrounds)" />
         {pictures.length === 0 && <p className="home-dim">This branch has no pictures yet: add album covers or gallery images to its albums and they appear here.</p>}
+      </fieldset>
+
+      <fieldset className="idn-group" data-testid="identity-palette">
+        <legend>Reaction palette <span className="home-dim">(up to 24 emoji this branch's chat offers first when reacting; the order you pick them in is the order shown)</span></legend>
+        <div className="idn-glyphs" role="group" aria-label="Reaction palette">
+          {emojis.map((e) => {
+            const at = palette.indexOf(e.id);
+            return (
+              <button key={e.id} type="button" aria-pressed={at >= 0} className={`idn-glyph${at >= 0 ? " on" : ""}`} data-testid="palette-emoji" title={`:${e.name}:`}
+                onClick={() => { setStatus(null); setPalette((p) => (p.includes(e.id) ? p.filter((x) => x !== e.id) : p.length >= 24 ? p : [...p, e.id])); }}>
+                <img src={e.imageUrl} alt={e.name} width={32} height={32} /><span>{at >= 0 ? at + 1 : ""}</span>
+              </button>
+            );
+          })}
+          {emojis.length === 0 && <p className="home-dim">No emoji uploaded yet.</p>}
+        </div>
       </fieldset>
 
       <h2 className="home-h2">Preview</h2>

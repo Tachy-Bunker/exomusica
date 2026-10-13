@@ -1,0 +1,11 @@
+import assert from "node:assert/strict";
+import { layoutStars, chatLines } from "../src/lib/constellation";
+const m = (u: string, n: number) => ({ username: u, avatarUrl: null, bio: "", joinedAt: 0, studies: 0, messages: n });
+const list = [m("a", 1), m("b", 50), m("c", 10), m("d", 0)];
+const s1 = layoutStars(list, new Set(["a", "c"])), s2 = layoutStars(list, new Set());
+assert.equal(s1[0].username, "b"); assert.deepEqual(s1.map((s) => [s.x, s.y]), s2.map((s) => [s.x, s.y]));
+assert.ok(s1.every((s) => s.x >= 0 && s.x <= 100 && s.y >= 0 && s.y <= 100));
+assert.ok(s1[0].r > s1[3].r);
+assert.equal(s1.filter((s) => s.lit).length, 2); assert.equal(chatLines(s1).length, 1);
+assert.equal(chatLines(s2).length, 0); assert.deepEqual(layoutStars([], new Set()), []);
+console.log("constellation ok");

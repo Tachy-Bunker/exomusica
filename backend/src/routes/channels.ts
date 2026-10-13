@@ -17,7 +17,7 @@ export async function channelRoutes(app: FastifyInstance): Promise<void> {
   app.get<{ Params: { slug: string } }>("/api/channels/:slug", async (req, reply) => {
     const channel = await prisma.forumChannel.findUnique({
       where: { slug: req.params.slug },
-      include: { branch: { select: { slug: true, name: true } }, font: true },
+      include: { branch: { select: { slug: true, name: true, reactionEmojiIds: true } }, font: true },
     });
     if (!channel) return reply.code(404).send({ error: "no such channel" });
     return channel;

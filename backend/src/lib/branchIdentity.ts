@@ -13,12 +13,13 @@ export const isImageUrl = (s: unknown): s is string => typeof s === "string" && 
 export const isBgOpacity = (n: unknown): n is number => typeof n === "number" && Number.isFinite(n) && n >= 0.05 && n <= 0.9;
 
 /** null = fine; otherwise what is wrong. `null` values are allowed (they clear the choice). */
-export function identityProblem(body: { identityColor?: unknown; identityGlyph?: unknown; identityImageUrl?: unknown; identitySecondaryImageUrl?: unknown; identityBgOpacity?: unknown }): string | null {
+export function identityProblem(body: { identityColor?: unknown; identityGlyph?: unknown; identityImageUrl?: unknown; identitySecondaryImageUrl?: unknown; identityBgOpacity?: unknown; reactionEmojiIds?: unknown }): string | null {
   if (body.identityColor !== undefined && body.identityColor !== null && !isHexColor(body.identityColor)) return "identityColor must be a colour like #4fa8e0";
   if (body.identityGlyph !== undefined && body.identityGlyph !== null && !isGlyph(body.identityGlyph)) return `identityGlyph must be one of: ${BRANCH_GLYPHS.join(", ")}`;
   if (body.identityImageUrl !== undefined && body.identityImageUrl !== null && !isImageUrl(body.identityImageUrl)) return "identityImageUrl must be an uploaded image or an https address";
   if (body.identitySecondaryImageUrl !== undefined && body.identitySecondaryImageUrl !== null && !isImageUrl(body.identitySecondaryImageUrl)) return "identitySecondaryImageUrl must be an uploaded image or an https address";
   if (body.identityBgOpacity !== undefined && body.identityBgOpacity !== null && !isBgOpacity(body.identityBgOpacity)) return "identityBgOpacity must be a number from 0.05 to 0.9";
+  if (body.reactionEmojiIds !== undefined && !(Array.isArray(body.reactionEmojiIds) && body.reactionEmojiIds.length <= 24 && body.reactionEmojiIds.every((n) => Number.isInteger(n) && (n as number) > 0))) return "reactionEmojiIds must be a list of up to 24 emoji ids";
   return null;
 }
 
