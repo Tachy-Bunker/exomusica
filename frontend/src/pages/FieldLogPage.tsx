@@ -49,7 +49,7 @@ export function FieldLogPage() {
   return (
     <div className="field-log" data-testid="field-log">
       <h1>Field Log</h1>
-      <p className="home-dim">Turn on Probe mode (<kbd>I</kbd>) and scan things to fill this in. {user ? "Your scans follow your account." : "Without an account, scans stay on this device."}</p>
+      <p className="home-dim">Turn on Probe mode (<kbd>I</kbd>) and scan things to fill this in. {user ? "Your scans follow your account." : "Without an account, scans stay on this device."} <Link to="/chart">Chart</Link></p>
       {sections.map((s, si) => {
         const st = stats[si];
         return (

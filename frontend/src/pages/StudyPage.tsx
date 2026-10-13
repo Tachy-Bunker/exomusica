@@ -8,6 +8,7 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import { api } from "../lib/api";
 import { useAuth } from "../lib/auth";
 import { renderInlineMarkdown, renderMarkdown } from "../lib/markdown";
+import { SaveStation } from "../components/SaveStation";
 import { MissingScansHint } from "../components/MissingScansHint";
 import { findPlacedFigures, noteDeletionMap, noteSwapMap, remapFigureRefs, remapMarkers } from "../lib/footnotes";
 import { figureRefRemap, numberCharts } from "../lib/figures";
@@ -94,6 +95,7 @@ export function StudyPage() {
   const [annotationDraft, setAnnotationDraft] = useState("");
   const [addingChart, setAddingChart] = useState(false);
   const [chartForm, setChartForm] = useState({ title: "", kind: "LINE" as Chart["kind"], xLabel: "", yLabel: "", xLog: false, yLog: false, dataCsv: "", sourceFileId: null as number | null });
+  const [draftKeptAt, setDraftKeptAt] = useState<number | null>(null);
   const [pendingDraft, setPendingDraft] = useState<StudyDraft | null>(null);
   const [showHistory, setShowHistory] = useState(false);
   const [showQr, setShowQr] = useState(false);
@@ -188,8 +190,8 @@ export function StudyPage() {
   useEffect(() => {
     if (!editing || !study) return;
     const t = setTimeout(() => {
-      if (differsFromSaved({ title: draftTitle.trim(), body: draftBody }, study)) saveDraft(study.slug, { title: draftTitle, body: draftBody, base: study.body, savedAt: Date.now() });
-      else clearDraft(study.slug);
+      if (differsFromSaved({ title: draftTitle.trim(), body: draftBody }, study)) { const now = Date.now(); saveDraft(study.slug, { title: draftTitle, body: draftBody, base: study.body, savedAt: now }); setDraftKeptAt(now); }
+      else { clearDraft(study.slug); setDraftKeptAt(null); }
     }, 400);
     return () => clearTimeout(t);
   }, [editing, draftTitle, draftBody, study]);
@@ -425,6 +427,7 @@ export function StudyPage() {
     <div className="page-column study-page" style={{ maxWidth: editing ? 1280 : 720 }}>
       {study.backgroundUrl && <img className="study-bg" style={{ ["--bgo" as string]: bgPreview !== undefined ? (bgPreview ?? undefined) : (study.backgroundOpacity ?? undefined) }} src={study.backgroundUrl} alt="" decoding="async" draggable={false} data-testid="study-bg" />}
       {!editing && slug && <LogLinks studySlug={slug} />}
+      {editing && <SaveStation at={draftKeptAt} dirty={isDirty} />}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "1rem" }}>
         {editing ? (
           <input value={draftTitle} onChange={(e) => setDraftTitle(e.target.value)} style={{ fontSize: "1.4rem", flex: 1, minWidth: 0 }} />

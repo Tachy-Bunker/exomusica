@@ -1,6 +1,8 @@
 import { useClassicMode } from "../lib/classicMode";
 import { useProbeStore } from "../lib/probeStore";
 import { DEFAULT_COLORS, type ProbeColors } from "../lib/probeCore";
+import { writeLastPlay } from "../lib/visits";
+import { DoorWipe } from "./DoorWipe";
 import { ProbeLayer } from "./ProbeLayer";
 import { useHeaderThemeStore } from "../lib/headerTheme";
 import { useEffect, useRef, useState } from "react";
@@ -72,6 +74,7 @@ export function Layout() {
 
   const isDesktop = useIsDesktop();
   const location = useLocation();
+  useEffect(() => useAudioStore.subscribe((st, prev) => { const t = st.currentTrack; if (t && t.branchSlug && t !== prev.currentTrack) writeLastPlay({ branchSlug: t.branchSlug, title: t.albumTitle || t.title, at: Date.now() }); }), []);
   const navigate = useNavigate();
   const activeSection = sectionOf(location.pathname);
 
@@ -421,6 +424,7 @@ export function Layout() {
 
       <main className="main-content" ref={mainRef} style={{ marginRight: dockOffset }}>
         <Outlet />
+        <DoorWipe />
         <ProbeLayer colors={probeColors} />
       </main>
 

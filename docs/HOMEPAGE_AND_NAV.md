@@ -555,3 +555,11 @@ Catalogue: `GET /api/field-log` (public data, one shared 5-minute cache, ≤400 
 **Missing-scans hint**: under study text, "N scan points on this page are still unfound" (counted once after render; never says where; hidden in classic mode).
 Generic: any element with `data-probe="lore" data-probe-key data-probe-label data-probe-note` and no fetch is probe-able and reads out its note.
 No schema change. Deferred: Ancients (founders/old chat) and recovered-log headers (63), album unlock-by-listening (no listening history exists, so albums unlock on scanning), scan-as-read (53).
+
+## fix308 — Chart, door wipe, save station (66, 68, 69, 71)
+
+- **Door wipe (66)**: `DoorWipe` in Layout, plays only when the first path segment changes (section to section). One fixed element + one 260 ms CSS animation, removed on `animationend`. Never shown in classic mode or under prefers-reduced-motion.
+- **Chart (68)**: `/chart` (linked from the Field Log). `lib/chart.ts` lays the branch tree out as a floor plan (depth = column, leaves = rows, parent level with its children) and works out each room's state. Visited = in `exomusica_visits` (recorded by BranchPage) or scanned as `branch:slug`. Heard of = entrance rooms, a visited room's parent and children. Unseen = dark, name not in the DOM, not a link. Hidden branches are never listed. One SVG, drawn once.
+- **Pins (69)**: a pin on the room where you last listened (`exomusica_lastplay`, written when the playing track changes), plus a "Continue" list: last heard and every unsaved study draft on this device. Reply-waiting pins are not done.
+- **Save station (71)**: under the study editor, "Save point · draft kept on this device at HH:MM". Honest wording: drafts are stored in this browser (localStorage), not on the server.
+- No schema change. Not done: doors as access levels (67) and hidden branches as secret rooms (72); both need a decision on what is gated and how hidden branches relate to pages.

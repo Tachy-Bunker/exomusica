@@ -44,3 +44,18 @@ export function clearDraft(slug: string): void {
 export function differsFromSaved(draft: { title: string; body: string }, saved: { title: string; body: string }): boolean {
   return draft.title !== saved.title || draft.body !== saved.body;
 }
+
+/** Every unsaved draft on this device, newest first (for the chart's "continue" list). */
+export function listDrafts(): { slug: string; title: string; savedAt: number }[] {
+  const out: { slug: string; title: string; savedAt: number }[] = [];
+  try {
+    const pre = "exomusica_study_draft:";
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (!k || !k.startsWith(pre)) continue;
+      const d = loadDraft(k.slice(pre.length));
+      if (d) out.push({ slug: k.slice(pre.length), title: d.title.trim() || "Untitled", savedAt: d.savedAt });
+    }
+  } catch { /* nothing to list */ }
+  return out.sort((a, b) => b.savedAt - a.savedAt);
+}

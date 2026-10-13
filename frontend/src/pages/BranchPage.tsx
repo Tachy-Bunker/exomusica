@@ -12,6 +12,7 @@ import { useDocumentTitle } from "../lib/useDocumentTitle";
 import { useCustomFont } from "../lib/useCustomFont";
 import { useChatDockStore } from "../lib/chatDockStore";
 import { useIsDesktop } from "../lib/useIsDesktop";
+import { recordVisit } from "../lib/visits";
 import { BranchIntroOverlay } from "../components/BranchIntroOverlay";
 import { isTypingTarget } from "../lib/isTypingTarget";
 
@@ -70,6 +71,7 @@ export function BranchPage() {
 
   useEffect(() => {
     if (!slug) return;
+    recordVisit(slug);
     api<Branch>(`/api/branches/${slug}`).then(setBranch);
     api<BranchAlbum[]>(`/api/branches/${slug}/albums`).then(setAlbums);
   }, [slug]);

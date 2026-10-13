@@ -6272,3 +6272,22 @@ html.classic .probe-dim, html.classic .probe-hud, html.classic .probe-bar, html.
 .log-pips i.on{background:#ff9d3c}
 .missing-scans{font-size:0.85rem;margin-top:1rem}
 html.classic .missing-scans{display:none}
+
+/* Chart, door wipe, save station */
+.chart-scroll{overflow:auto;border:1px solid var(--border);border-radius:var(--radius);padding:0.4rem}
+.chart-corridor{fill:none;stroke:var(--border);stroke-width:2}
+.chart-room rect{fill:transparent;stroke:#ff9d3c;stroke-width:1.5}
+.chart-room text{fill:var(--text,#ddd);font-size:13px}
+.chart-room.visited rect{fill:color-mix(in srgb,#ff9d3c 28%,transparent)}
+.chart-room.unseen rect{fill:#0006;stroke:var(--border);stroke-dasharray:3 3}
+.chart-room.unseen text{fill:var(--border);letter-spacing:0.2em}
+.chart-room.heard rect{stroke-opacity:0.7}
+.chart-pin{fill:#4da3ff}
+.chart-continue{margin:0.4rem 0}.chart-continue p{margin:0.15rem 0}
+.door-wipe{position:fixed;inset:0;z-index:9000;pointer-events:none;background:linear-gradient(90deg,#05070b 0 94%,#ff9d3c 94% 96%,transparent 96%);transform:translateX(-102%);animation:door-wipe 260ms ease-in-out forwards}
+@keyframes door-wipe{0%{transform:translateX(-102%)}45%{transform:translateX(0)}55%{transform:translateX(0)}100%{transform:translateX(102%)}}
+@media (prefers-reduced-motion:reduce){.door-wipe{display:none}}
+html.classic .door-wipe{display:none}
+.save-station{font-size:0.8rem;margin:0 0 0.4rem}
+.save-station i{display:inline-block;width:8px;height:8px;border-radius:50%;border:1px solid #ff9d3c;vertical-align:middle}
+.save-station i.on{background:#ff9d3c}
