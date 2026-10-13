@@ -1,4 +1,5 @@
 import { useClassicMode } from "../lib/classicMode";
+import { useJingles } from "../lib/jingles";
 import { asSkin, SKINS, useSkin } from "../lib/skin";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { useNavigate, Link } from "react-router-dom";
@@ -65,6 +66,7 @@ export function AccountSettingsPage() {
   const { logout } = useAuth();
   const classic = useClassicMode((s) => s.classic);
   const setClassic = useClassicMode((s) => s.set);
+  const jOn = useJingles((s) => s.on), setJOn = useJingles((s) => s.setOn), jHas = useJingles((s) => Object.keys(s.urls).length > 0), jForget = useJingles((s) => s.forget);
   const skin = useSkin((s) => s.skin), setSkin = useSkin((s) => s.setSkin), hud = useSkin((s) => s.hud), setHud = useSkin((s) => s.setHud);
   const navigate = useNavigate();
   const [me, setMe] = useState<Me | null>(null);
@@ -312,6 +314,13 @@ export function AccountSettingsPage() {
       <label style={{ display: "block", fontSize: "0.9rem", marginBottom: "0.8rem" }}>
         <input type="checkbox" checked={hud} onChange={(e) => setHud(e.target.checked)} data-testid="hud-toggle" /> Visor frame: angled panels, faint scanlines and a curved vignette (off in classic mode)
       </label>
+
+      {jHas && (
+        <label style={{ display: "block", fontSize: "0.9rem", marginBottom: "0.8rem" }}>
+          <input type="checkbox" checked={jOn} onChange={(e) => setJOn(e.target.checked)} data-testid="jingle-toggle" /> Pickup sounds: a short recording the first time you scan, hear a track to the end, reply, or finish a Field Log section (off unless you choose; never in classic mode){" "}
+          <button type="button" className="btn" onClick={jForget} data-testid="jingle-forget">Let me hear them again</button>
+        </label>
+      )}
 
       <p style={{ fontSize: "0.9rem", marginBottom: "0.8rem" }}><Link to="/field-log" data-testid="settings-field-log">Your Field Log</Link> <span className="home-dim">— what you have probed so far</span></p>
 

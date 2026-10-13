@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { api } from "../../lib/api";
 import { useDocumentTitle } from "../../lib/useDocumentTitle";
+import { JinglesAdmin } from "../../components/JinglesAdmin";
 import { useToastStore } from "../../lib/toastStore";
 import { bracketStyle, DEFAULT_COLORS, type ProbeColors } from "../../lib/probeCore";
 import { contrastOnDark, isHex, VISOR_DEFAULT, VISOR_MINE_DEFAULT, VISOR_PRESETS } from "../../lib/visorColors";
@@ -91,6 +92,7 @@ export function VisorAdminPage() {
         <button className="btn btn-primary" disabled={!probeDirty} onClick={saveProbe} data-testid="probe-save">Save bracket colours</button>
         <button className="btn" onClick={() => setProbe(DEFAULT_COLORS)}>Reset to default</button>
       </div>
+      <JinglesAdmin />
     </div>
   );
 }

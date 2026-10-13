@@ -7,6 +7,7 @@ import { verifySmtpConnection } from "../lib/mailer.js";
 import { restartDiscordBotIfNeeded, getDiscordBridgeStatus } from "../lib/discordBot.js";
 
 import { probeColorsProblem } from "../lib/probe.js";
+import { isJingleEvent, withJingle } from "../lib/jingles.js";
 
 export async function siteSettingsRoutes(app: FastifyInstance): Promise<void> {
   app.get("/api/site-settings", async () => {
@@ -27,6 +28,7 @@ export async function siteSettingsRoutes(app: FastifyInstance): Promise<void> {
         accentPrimaryColor: true,
         visorColor: true,
         probeColors: true,
+        jingleUrls: true,
         visorMineColor: true,
         contentTextScaleDesktop: true,
         contentTextScaleMobile: true,
@@ -379,6 +381,31 @@ export async function siteSettingsRoutes(app: FastifyInstance): Promise<void> {
       update: { ambienceUrl: null },
     });
     return { status: "ok" };
+  });
+
+  // Pickup sounds: one uploaded file per event. The files are the admin's own; nothing is synthesised.
+  app.post<{ Params: { event: string } }>("/api/admin/site-settings/jingle/:event", { preHandler: requireAdmin }, async (req, reply) => {
+    if (!isJingleEvent(req.params.event)) return reply.code(400).send({ error: "unknown event" });
+    const file = await req.file();
+    if (!file) return reply.code(400).send({ error: "no file uploaded" });
+    const buffer = await file.toBuffer();
+    try {
+      const { url } = await saveSoundFile(file.filename, file.mimetype, buffer);
+      const cur = await prisma.siteSettings.findUnique({ where: { id: 1 }, select: { jingleUrls: true } });
+      const next = withJingle(cur?.jingleUrls, req.params.event, url);
+      await prisma.siteSettings.upsert({ where: { id: 1 }, create: { id: 1, jingleUrls: next }, update: { jingleUrls: next } });
+      return { jingleUrls: next };
+    } catch (err) {
+      return reply.code(400).send({ error: err instanceof Error ? err.message : "upload failed" });
+    }
+  });
+
+  app.delete<{ Params: { event: string } }>("/api/admin/site-settings/jingle/:event", { preHandler: requireAdmin }, async (req, reply) => {
+    if (!isJingleEvent(req.params.event)) return reply.code(400).send({ error: "unknown event" });
+    const cur = await prisma.siteSettings.findUnique({ where: { id: 1 }, select: { jingleUrls: true } });
+    const next = withJingle(cur?.jingleUrls, req.params.event, null);
+    await prisma.siteSettings.upsert({ where: { id: 1 }, create: { id: 1, jingleUrls: next }, update: { jingleUrls: next } });
+    return { jingleUrls: next };
   });
 
   app.post("/api/admin/site-settings/scan-sfx", { preHandler: requireAdmin }, async (req, reply) => {

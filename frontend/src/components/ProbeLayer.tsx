@@ -4,6 +4,7 @@ import { useAuth } from "../lib/auth";
 import { useClassicMode } from "../lib/classicMode";
 import { useProbeStore } from "../lib/probeStore";
 import { recordScan, syncScans } from "../lib/scanLog";
+import { fireJingle } from "../lib/jingleBus";
 import { allSelector, DEFAULT_COLORS, KIND_LABEL, probeCss, readoutOf, stepIndex, targetOfMention, targetOfPath, targetOfPoint, type ProbeColors, type Target } from "../lib/probeCore";
 
 const DWELL_MS = 900; // resting the pointer on a bracket
@@ -53,6 +54,7 @@ export function ProbeLayer({ colors = DEFAULT_COLORS }: { colors?: ProbeColors }
     const r = el.getBoundingClientRect();
     const x = Math.min(Math.max(8, r.left), window.innerWidth - 300), y = r.bottom + 8 > window.innerHeight - 160 ? Math.max(8, r.top - 150) : r.bottom + 8;
     const fresh = t.kind === "mod" ? false : recordScan(t.kind, t.key, !!user);
+    if (fresh) fireJingle("firstScan");
     let data: unknown = null;
     if (t.fetch) {
       if (cache.has(t.fetch)) data = cache.get(t.fetch);

@@ -1,4 +1,5 @@
 import { useChatDockStore } from "../lib/chatDockStore";
+import { fireJingle } from "../lib/jingleBus";
 import { VoiceNoteRecorder, type FinishedVoiceNote } from "../components/VoiceNoteRecorder";
 import { uploadChatAttachment, voiceNoteFilename } from "../lib/voiceNoteUpload";
 import { useEffect, useMemo, useRef, useState, useCallback, useContext, createContext, type ChangeEvent, type ClipboardEvent, type DragEvent, type FormEvent } from "react";
@@ -822,6 +823,7 @@ export function ChannelPage({ channelSlug, fillHeight, parentControlsHeight }: {
       throw e;
     }
     setMessages((prev) => upsertMessage(prev, dto)); // in case the WS event is delayed/missed
+    if (replyTarget) fireJingle("firstReply");
     setDraft("");
     setEmojiQuery(null);
     setReplyTarget(null);

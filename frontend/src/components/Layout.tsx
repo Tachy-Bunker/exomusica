@@ -2,6 +2,7 @@ import { useClassicMode } from "../lib/classicMode";
 import { useProbeStore } from "../lib/probeStore";
 import { DEFAULT_COLORS, type ProbeColors } from "../lib/probeCore";
 import { writeLastPlay } from "../lib/visits";
+import { installJingles, useJingles } from "../lib/jingles";
 import { DoorWipe } from "./DoorWipe";
 import { ProbeLayer } from "./ProbeLayer";
 import { useHeaderThemeStore } from "../lib/headerTheme";
@@ -74,6 +75,7 @@ export function Layout() {
 
   const isDesktop = useIsDesktop();
   const location = useLocation();
+  useEffect(() => { installJingles(); }, []);
   useEffect(() => useAudioStore.subscribe((st, prev) => { const t = st.currentTrack; if (t && t.branchSlug && t !== prev.currentTrack) writeLastPlay({ branchSlug: t.branchSlug, title: t.albumTitle || t.title, at: Date.now() }); }), []);
   const navigate = useNavigate();
   const activeSection = sectionOf(location.pathname);
@@ -253,6 +255,7 @@ export function Layout() {
       accentPrimaryColor: string | null;
       visorColor?: string | null;
       probeColors?: Partial<ProbeColors> | null;
+      jingleUrls?: unknown;
       visorMineColor?: string | null;
       contentTextScaleDesktop: number;
       contentTextScaleMobile: number;
@@ -298,6 +301,7 @@ export function Layout() {
       }
       for (const [prop, v] of [["--visor", s.visorColor], ["--visor-mine", s.visorMineColor]] as const) { if (v && /^#[0-9a-fA-F]{6}$/.test(v)) root.setProperty(prop, v); else root.removeProperty(prop); }
       setProbeColors({ ...DEFAULT_COLORS, ...(s.probeColors ?? {}) });
+      useJingles.getState().setUrls(s.jingleUrls);
       root.setProperty("--content-scale-desktop", String(s.contentTextScaleDesktop));
       root.setProperty("--content-scale-mobile", String(s.contentTextScaleMobile));
       useContentScaleStore.getState().setScale(s.contentTextScaleDesktop, s.contentTextScaleMobile);

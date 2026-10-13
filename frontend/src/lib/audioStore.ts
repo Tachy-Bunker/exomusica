@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { fireJingle } from "./jingleBus";
 import type { PlayableTrackDTO } from "./types";
 import { useAmbienceStore } from "./ambienceStore";
 import { resumeAnalyserContextIfNeeded, setReplayGainDb, setActiveForAnalyser, rampFade, setFade } from "./audioAnalyser";
@@ -382,6 +383,7 @@ export const useAudioStore = create<AudioState>((set, get) => ({
       audioEl?.play().catch(() => {});
       return;
     }
+    fireJingle("firstListen");
     if (get().repeatMode === "one") {
       get().seek(0);
       audioEl?.play().catch((err) => console.error("Repeat-one restart failed:", err));

@@ -571,3 +571,13 @@ No schema change. Deferred: Ancients (founders/old chat) and recovered-log heade
 - **Fog loading (85)**: `<Loading />` replaces the 20 `<p className="home-dim">Loading…</p>` placeholders. One compositor-only sweep (`transform`), static in classic mode and under reduced-motion, `role="status"`. New loading states should use it.
 - **Forgotten threads (93)**: `GET /api/channels` now includes `lastMessageAt` (unix s; one grouped query cached 2 min). The forum index tints topics quiet for 60+ days that you also haven't opened in that time (`lib/phazon.ts`; visits kept in `exomusica_thread_visits`, recorded by opening the chat dock or the topic page). Opening one clears it. Static tint only (no animation); the split-colour text shadow is off in classic mode.
 - No schema change.
+
+## fix310 — Pickup sounds (83), your own recordings
+
+Nothing is synthesised: the sounds are files the admin uploads (Admin → Visor → "Pickup sounds", one row per moment, any mp3/wav/ogg, 200–400 ms suggested).
+Moments: `firstScan` (a new Probe scan), `firstListen` (a track reaches its natural end), `firstReply` (a reply is sent in a chat), `sectionDone` (a Field Log section hits 100%).
+- Stored in `SiteSettings.jingleUrls` (Json, `{event: url}`); `POST/DELETE /api/admin/site-settings/jingle/:event`; public `GET /api/site-settings` includes `jingleUrls`.
+- Listener side: Account settings switch "Pickup sounds" (off by default, shown only when at least one file exists), "Let me hear them again". Each moment plays once per browser (`exomusica_jingles_done`), never in classic mode, at the SFX volume from the mixer. A moment without a file is silent, never a stand-in.
+- Plumbing: any code calls `fireJingle(event)` (`lib/jingleBus.ts`, a window event, no import cycles); `lib/jingles.ts` decides (`shouldPlay`) and plays through the existing one-shot SFX path (decoded buffers are cached).
+- "Once" is per browser, not per account, so a new device hears them again.
+- Schema change: `jingleUrls`. Migration name `fix310_jingles`.

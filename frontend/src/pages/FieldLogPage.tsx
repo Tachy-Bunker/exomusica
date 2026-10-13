@@ -4,6 +4,7 @@ import { api } from "../lib/api";
 import { useAuth } from "../lib/auth";
 import { useDocumentTitle } from "../lib/useDocumentTitle";
 import { scannedIds, syncScans } from "../lib/scanLog";
+import { fireJingle } from "../lib/jingleBus";
 import { entryState, keysOf, sectionStat, shareSummary, type LogSection } from "../lib/fieldLog";
 import { Loading } from "../components/Loading";
 
@@ -18,6 +19,7 @@ export function FieldLogPage() {
   useEffect(() => { api<LogSection[]>("/api/field-log").then((d) => (Array.isArray(d) ? setSections(d) : setFailed(true))).catch(() => setFailed(true)); }, []);
   useEffect(() => { if (user) void syncScans().then(() => setScanned(keysOf(scannedIds()))); }, [user]);
   const stats = useMemo(() => (sections ?? []).map((s) => sectionStat(s, scanned)), [sections, scanned]);
+  useEffect(() => { if (stats.some((x) => x.total > 0 && x.found === x.total)) fireJingle("sectionDone"); }, [stats]);
 
   function share() { // drawn once, on demand: no per-frame work
     if (!sections || busy.current) return;
