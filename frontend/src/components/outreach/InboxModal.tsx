@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
 import { api } from "../../lib/api";
+import { pasteEdit } from "../../lib/pasteMail";
 import type { Contact, Feed, Lead } from "./types";
 
 type Tab = "new" | "paste" | "feeds" | "tools";
-const SRC: Record<string, string> = { feed: "feed", newsletter: "newsletter", bookmarklet: "link", form: "form" };
+const SRC: Record<string, string> = { feed: "feed", newsletter: "newsletter", bookmarklet: "link", form: "form", inbox: "your inbox", eml: "newsletter file" };
 
 /** Where calls wait before they join the sheet: found by a feed, pulled out of a pasted newsletter, or sent from the browser. Keep or dismiss. */
 export function InboxModal({ slug, onKept, onCount, onClose }: { slug: string; onKept: (c: Contact[]) => void; onCount: (n: number) => void; onClose: () => void }) {
@@ -33,6 +34,17 @@ export function InboxModal({ slug, onKept, onCount, onClose }: { slug: string; o
     catch (e) { setErr(e instanceof Error ? e.message : "Couldn't read it."); }
     setBusy(false);
   }
+  async function importEml(files: FileList | null) {
+    if (!files?.length) return; setBusy(true); setErr(""); setMsg("");
+    try {
+      const fd = new FormData(); for (const f of Array.from(files).slice(0, 200)) fd.append("file", f, f.name);
+      const r = await api<{ files: number; mailsWithCalls: number; found: number; added: number; already: number; failed: { name: string; error: string }[] }>("/api/outreach/newsletter/eml", { method: "POST", body: fd });
+      setMsg(r.found ? `${r.mailsWithCalls} of ${r.files} mail${r.files === 1 ? "" : "s"} had calls: ${r.found} found, ${r.added} new${r.already ? `, ${r.already} already known` : ""}.` : `No calls found in ${r.files} mail${r.files === 1 ? "" : "s"}.`);
+      if (r.failed.length) setErr(`${r.failed.length} file${r.failed.length === 1 ? "" : "s"} couldn't be read (${r.failed[0].name}).`);
+      await loadLeads();
+    } catch (e) { setErr(e instanceof Error ? e.message : "Couldn't import them."); }
+    setBusy(false);
+  }
   async function addFeed() {
     setBusy(true); setErr(""); setMsg("");
     try { await api("/api/outreach/feeds", { method: "POST", body: JSON.stringify({ url: feedUrl }) }); setFeedUrl(""); await Promise.all([loadFeeds(), loadLeads()]); setMsg("Feed added; its current calls are in New."); }
@@ -49,7 +61,7 @@ export function InboxModal({ slug, onKept, onCount, onClose }: { slug: string; o
       <div className="ox-modal ox-wide" role="dialog" aria-label="Inbox of new calls">
         <header><h2>New calls</h2><button className="btn" onClick={onClose} aria-label="Close">✕</button></header>
         <div className="ox-tabs" role="tablist">
-          {([["new", `New${leads ? ` (${leads.length})` : ""}`], ["paste", "Paste a newsletter"], ["feeds", `Feeds${feeds ? ` (${feeds.length})` : ""}`], ["tools", "Bookmarklet"]] as [Tab, string][]).map(([k, l]) => <button key={k} role="tab" aria-selected={tab === k} className={"btn" + (tab === k ? " btn-primary" : "")} onClick={() => setTab(k)}>{l}</button>)}
+          {([["new", `New${leads ? ` (${leads.length})` : ""}`], ["paste", "Newsletters"], ["feeds", `Feeds${feeds ? ` (${feeds.length})` : ""}`], ["tools", "Bookmarklet"]] as [Tab, string][]).map(([k, l]) => <button key={k} role="tab" aria-selected={tab === k} className={"btn" + (tab === k ? " btn-primary" : "")} onClick={() => setTab(k)}>{l}</button>)}
         </div>
         {msg && <p className="ox-ok" role="status">{msg}</p>}{err && <p className="ox-err" role="alert">{err}</p>}
         {tab === "new" && (!leads ? <p className="ox-dim">Loading…</p> : leads.length === 0 ? <p className="ox-dim">Nothing waiting. Add a feed, paste a newsletter, or use the bookmarklet and calls will collect here.</p> : (
@@ -66,9 +78,12 @@ export function InboxModal({ slug, onKept, onCount, onClose }: { slug: string; o
         ))}
         {tab === "paste" && (
           <>
-            <p className="ox-hint">Paste a whole newsletter or a mailing-list digest. Every paragraph that talks about applying and has a link or a deadline becomes a call in <b>New</b>; the rest is ignored.</p>
-            <textarea rows={10} value={text} onChange={(e) => setText(e.target.value)} placeholder="Paste the text of the newsletter here…" aria-label="Newsletter text" />
+            <p className="ox-hint">Paste a whole newsletter or a mailing-list digest (links in it are kept). Every paragraph that talks about applying and has a link or a deadline becomes a call in <b>New</b>; the rest is ignored.</p>
+            <textarea rows={8} value={text} onChange={(e) => setText(e.target.value)} onPaste={(e) => { const el = e.currentTarget; const r = pasteEdit(e, el.value, el.selectionStart, el.selectionEnd); if (!r) return; e.preventDefault(); setText(r.value); }} placeholder="Paste the text of the newsletter here…" aria-label="Newsletter text" />
             <footer><button className="btn btn-primary" onClick={paste} disabled={busy || text.trim().length < 40}>{busy ? "Reading…" : "Find the calls"}</button></footer>
+            <hr />
+            <p className="ox-hint">Or import newsletters saved as mail files: one or many <b>.eml</b> files, or a <b>.zip</b> of them (drag them out of your mail app). Only the calls are kept, not the mails.</p>
+            <label className="btn" style={{ alignSelf: "flex-start" }}>{busy ? "Reading…" : "Import .eml / .zip"}<input type="file" multiple accept=".eml,.zip,message/rfc822,application/zip" hidden disabled={busy} onChange={(e) => { void importEml(e.target.files); e.target.value = ""; }} aria-label="Newsletter mail files" /></label>
           </>
         )}
         {tab === "feeds" && (

@@ -68,7 +68,7 @@ export function formQuestionsText(info: FormInfo): string {
 
 // ------------------------------------------------------------ newsletters
 export interface FoundCall { title: string; url: string; summary: string; deadline: string | null; fee: string | null; emails: string[]; key: string }
-const CALLWORD = /\b(open call|call for|calls? for|submissions?|apply|application|deadline|residen|commission|appel|candidature|festival|submit|proposals?|prize|award|grant)\b/i;
+const CALLWORD = /\b(open call|call for|calls? for|submissions?|apply|applications?|deadline|residen\w*|commissions?|appels?|candidatures?|festival|submit|proposals?|prizes?|awards?|grants?)\b/i;
 
 /** One pasted newsletter -> every call in it: a paragraph that has a link or a deadline and talks about applying. */
 export function splitNewsletter(text: string, today: string): FoundCall[] {

@@ -8,6 +8,8 @@ import { classifyMail, cleanMessageId, emlFileName, expandMailFiles, type MailFa
 import { htmlToText } from "../lib/outreachPlus.js";
 import { isEmail, uploadFile } from "../lib/outreach.js";
 import type { ScopedDb } from "../lib/outreachScopeDb.js";
+import { callsFromMail } from "../lib/outreachInbox.js";
+import { ingestCalls } from "./outreachCollect.js";
 import { fail, type workspaceAuth } from "./outreachShared.js";
 import { statSync } from "node:fs";
 
@@ -83,6 +85,30 @@ export async function outreachEmlRoutes(app: FastifyInstance, W: Pre): Promise<v
       if (v.kind === "stray") { report.strays++; continue; }
       const cid = await applyToSheet(db, { id: row.id, direction: v.direction, counterparty: v.counterparty ?? "", name: v.counterpartyName, date: m.date, subject: m.subject, text: m.text, messageId: m.messageId, hint: v.hint }, report, touched, made);
       if (cid) { await db.outreachMessage.update({ where: { id: row.id }, data: { contactId: cid } }); if (v.counterparty) { known.add(v.counterparty); knownDomains.add(v.counterparty.slice(v.counterparty.lastIndexOf("@") + 1)); } }
+    }
+    return report;
+  });
+
+  // ---- newsletters saved as .eml (or a .zip of them): the calls in them go to the New list; the mails themselves are not kept
+  app.post("/api/outreach/newsletter/eml", W, async (req, reply) => {
+    const db = req.db; const files: { name: string; buf: Buffer }[] = []; let bytes = 0;
+    for await (const part of req.parts()) {
+      if (part.type !== "file") continue; const buf = await part.toBuffer(); bytes += buf.length;
+      if (bytes > 80 * 1024 * 1024) return fail(reply, 413, "That is over 80 MB of mail files; import them in smaller batches.");
+      files.push({ name: part.filename, buf });
+    }
+    if (!files.length) return fail(reply, 400, "Choose .eml files or a .zip of them.");
+    let mails: { name: string; buf: Buffer }[]; try { mails = expandMailFiles(files); } catch (e) { return fail(reply, 422, e instanceof Error ? e.message : "That zip can't be opened."); }
+    if (!mails.length) return fail(reply, 422, "No .eml mail files were found.");
+    const mine = await own(db); const day = new Date().toISOString().slice(0, 10);
+    const report = { files: mails.length, mailsWithCalls: 0, found: 0, added: 0, already: 0, failed: [] as { name: string; error: string }[] };
+    for (const f of mails) {
+      try {
+        const p = await simpleParser(f.buf, { skipImageLinks: true, skipTextToHtml: true });
+        const calls = callsFromMail({ from: (p.from?.value?.[0]?.address ?? "").toLowerCase(), subject: p.subject ?? "", text: p.text ?? "", html: typeof p.html === "string" ? p.html : "", listUnsubscribe: p.headers.has("list-unsubscribe"), own: mine }, day);
+        if (!calls.length) continue;
+        const r = await ingestCalls(db, calls, "eml"); report.mailsWithCalls++; report.found += r.found; report.added += r.added; report.already += r.already;
+      } catch (e) { report.failed.push({ name: f.name, error: e instanceof Error ? e.message.slice(0, 120) : "unreadable" }); }
     }
     return report;
   });

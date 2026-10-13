@@ -4,6 +4,8 @@ import { cleanCell, dateOnly, isEmail } from "../lib/outreach.js";
 import { feedLead, findPeople, formQuestionsText, isGoogleFormUrl, looksLikeCall, parseFeed, parseForm, splitNewsletter, teamLinks, type FoundCall, type FormInfo } from "../lib/outreachCollect.js";
 import { findDeadline, findEmails, htmlToText, readOpportunity } from "../lib/outreachPlus.js";
 import { findPlace, geocode } from "../lib/geo.js";
+import { scanInbox } from "../lib/outreachImap.js";
+import type { MailAccount } from "../lib/outreachMail.js";
 import { dncHit } from "../lib/outreachRules.js";
 import type { ScopedDb } from "../lib/outreachScopeDb.js";
 import { dbFor, ensureColumns, fail, fetchPage, shapeContact, today, WITH_GROUPS, type workspaceAuth } from "./outreachShared.js";
@@ -99,10 +101,7 @@ export async function outreachCollectRoutes(app: FastifyInstance, W: Pre): Promi
   app.post<{ Body: { text?: string } }>("/api/outreach/newsletter", { ...W, bodyLimit: 1024 * 1024 }, async (req, reply) => {
     const text = String(req.body?.text ?? ""); if (text.trim().length < 40) return fail(reply, 400, "Paste the newsletter's text.");
     const found = splitNewsletter(text, today()); if (!found.length) return { found: 0, added: 0, leads: [] };
-    const db = req.db; const have = new Set((await db.outreachLead.findMany({ where: { key: { in: found.map((f) => f.key) } }, select: { key: true } })).map((x) => x.key));
-    const fresh = found.filter((f) => !have.has(f.key)); const rows = fresh.map((f) => leadData({ ...f, deadline: f.deadline }, "newsletter")).filter((x): x is NonNullable<typeof x> => !!x);
-    if (rows.length) await db.outreachLead.createMany({ data: rows, skipDuplicates: true });
-    return { found: found.length, added: rows.length, already: found.length - rows.length };
+    return ingestCalls(req.db, found, "newsletter");
   });
 
   // ---- feeds
@@ -188,4 +187,39 @@ export async function checkFeeds(): Promise<void> {
   const stale = new Date(Date.now() - 6 * 3600_000);
   const due = await prisma.outreachFeed.findMany({ where: { active: true, workspaceId: { not: null }, OR: [{ lastCheckedAt: null }, { lastCheckedAt: { lt: stale } }] }, select: { workspaceId: true }, distinct: ["workspaceId"], take: 5 });
   for (const w of due) if (w.workspaceId !== null) await checkWorkspaceFeeds(w.workspaceId).catch(() => {});
+}
+
+// ---------------------------------------------------------------- calls found in mail (a pasted newsletter, .eml files, the inbox check)
+/** Calls into the New list; ones already seen (kept or dismissed too) are left alone. */
+export async function ingestCalls(db: ScopedDb, found: FoundCall[], source: string): Promise<{ found: number; added: number; already: number }> {
+  const calls = found.filter((c) => c.title && c.key); if (!calls.length) return { found: 0, added: 0, already: 0 };
+  const have = new Set((await db.outreachLead.findMany({ where: { key: { in: calls.map((c) => c.key.slice(0, 300)) } }, select: { key: true } })).map((x) => x.key));
+  const fresh = calls.filter((c) => !have.has(c.key.slice(0, 300)));
+  if (fresh.length) await db.outreachLead.createMany({ data: fresh.map((c) => ({ title: c.title.slice(0, 140), url: c.url.slice(0, 500), summary: c.summary.slice(0, 600), deadline: c.deadline ? new Date(`${c.deadline}T00:00:00Z`) : null, fee: c.fee ? c.fee.slice(0, 40) : null, emails: c.emails.filter(isEmail).slice(0, 8) as object, source, key: c.key.slice(0, 300) })), skipDuplicates: true });
+  return { found: calls.length, added: fresh.length, already: calls.length - fresh.length };
+}
+
+type AcctRow = Awaited<ReturnType<typeof prisma.outreachAccount.findFirstOrThrow>>;
+export type ToMail = (a: AcctRow) => MailAccount | string;
+/** One mailbox: look at what arrived since last time. Never throws; the outcome is stored on the mailbox. */
+export async function checkInbox(a: AcctRow, toMail: ToMail): Promise<{ scanned: number; found: number; added: number; error: string | null }> {
+  const m = toMail(a);
+  if (typeof m === "string") { await prisma.outreachAccount.update({ where: { id: a.id }, data: { inboxError: m, inboxCheckedAt: new Date() } }); return { scanned: 0, found: 0, added: 0, error: m }; }
+  try {
+    const own = new Set([a.fromEmail, a.smtpUser].flatMap((x) => (x ? [x.toLowerCase()] : [])));
+    const r = await scanInbox(m, { folder: a.inboxFolder, lastUid: a.inboxLastUid, uidValidity: a.inboxValidity, own, today: today() });
+    const out = a.workspaceId === null ? { found: 0, added: 0, already: 0 } : await ingestCalls(dbFor(a.workspaceId), r.calls, "inbox");
+    await prisma.outreachAccount.update({ where: { id: a.id }, data: { inboxLastUid: r.lastUid, inboxValidity: r.uidValidity || a.inboxValidity, inboxCheckedAt: new Date(), inboxError: null } });
+    return { scanned: r.scanned, found: out.found, added: out.added, error: null };
+  } catch (e) {
+    const msg = e instanceof Error ? e.message.slice(0, 200) : "couldn't read the inbox";
+    await prisma.outreachAccount.update({ where: { id: a.id }, data: { inboxError: msg, inboxCheckedAt: new Date() } });
+    return { scanned: 0, found: 0, added: 0, error: msg };
+  }
+}
+/** Every half hour per mailbox that has it on, from the one-minute loop. */
+export async function checkInboxes(toMail: ToMail): Promise<void> {
+  const stale = new Date(Date.now() - 30 * 60_000);
+  const due = await prisma.outreachAccount.findMany({ where: { inboxOn: true, workspaceId: { not: null }, imapHost: { not: null }, OR: [{ inboxCheckedAt: null }, { inboxCheckedAt: { lt: stale } }] }, take: 3, orderBy: { inboxCheckedAt: "asc" } });
+  for (const a of due) await checkInbox(a, toMail).catch(() => {});
 }

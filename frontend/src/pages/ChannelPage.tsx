@@ -1,3 +1,4 @@
+import { useChatDockStore } from "../lib/chatDockStore";
 import { VoiceNoteRecorder, type FinishedVoiceNote } from "../components/VoiceNoteRecorder";
 import { uploadChatAttachment, voiceNoteFilename } from "../lib/voiceNoteUpload";
 import { useEffect, useMemo, useRef, useState, useCallback, useContext, createContext, type ChangeEvent, type ClipboardEvent, type DragEvent, type FormEvent } from "react";
@@ -482,6 +483,15 @@ export function ChannelPage({ channelSlug, fillHeight, parentControlsHeight }: {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // A notification click: the dock was told to show this room at this message
+  const pendingJump = useChatDockStore((st) => st.pendingJump);
+  useEffect(() => {
+    if (!pendingJump || pendingJump.slug !== slug) return;
+    if (pendingJump.day) { setSelectedDay(pendingJump.day); setMode("day"); } else setMode("live");
+    setPendingScrollTo(pendingJump.messageId);
+    useChatDockStore.getState().clearJump();
+  }, [pendingJump, slug]);
+
   useEffect(() => {
     if (pendingScrollTo === null) return;
     const el = document.getElementById(`m-${pendingScrollTo}`);
@@ -703,11 +713,11 @@ export function ChannelPage({ channelSlug, fillHeight, parentControlsHeight }: {
   }, [loadOlderMessages]);
 
   useEffect(() => {
-    if (mode === "search") setShowLiveChatButton(true);
+    setShowLiveChatButton(mode !== "live");
   }, [mode]);
 
   function scrollToLive() {
-    if (mode === "search") {
+    if (mode !== "live") {
       setMode("live");
       setActiveSearch(null);
     }

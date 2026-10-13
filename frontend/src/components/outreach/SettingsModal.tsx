@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { api } from "../../lib/api";
+import { pasteEdit } from "../../lib/pasteMail";
 import type { OutreachSettings } from "./types";
 
 const PRESETS: { label: string; v: Partial<OutreachSettings> }[] = [
@@ -22,7 +23,7 @@ export function SettingsModal({ accounts, onChange, onClose }: { accounts: Outre
   async function save(): Promise<boolean> {
     setBusy("save"); setMsg(null);
     try {
-      const { hasPassword: _h, id: _i, ...body } = s;
+      const { hasPassword: _h, id: _i, inboxCheckedAt: _c, inboxError: _e, ...body } = s;
       const out = await api<OutreachSettings>(`/api/outreach/accounts/${s.id}`, { method: "PUT", body: JSON.stringify({ ...body, ...(password ? { password } : {}) }) });
       setS(out); setPassword(""); onChange(accounts.map((a) => (a.id === out.id ? out : out.isDefault ? { ...a, isDefault: false } : a))); return true;
     } catch (e) { setMsg({ ok: false, text: e instanceof Error ? e.message : "Couldn't save." }); return false; }
@@ -36,6 +37,16 @@ export function SettingsModal({ accounts, onChange, onClose }: { accounts: Outre
       const parts = [`Sending: ${r.smtp ? r.smtp : "works"}`]; if (r.imap !== "off") parts.push(`Sent folder: ${r.imap ? r.imap : "works"}`);
       setMsg({ ok: !r.smtp && (r.imap === "off" || !r.imap), text: parts.join(" · ") });
     } catch (e) { setMsg({ ok: false, text: e instanceof Error ? e.message : "Test failed." }); }
+    finally { setBusy(""); }
+  }
+  const [inboxMsg, setInboxMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  async function checkInbox() {
+    if (!(await save())) return; setBusy("test"); setInboxMsg(null);
+    try {
+      const r = await api<{ scanned: number; found: number; added: number; error: string | null }>(`/api/outreach/accounts/${s.id}/inbox-check`, { method: "POST" });
+      setInboxMsg(r.error ? { ok: false, text: r.error } : { ok: true, text: `Looked at ${r.scanned} mail${r.scanned === 1 ? "" : "s"}: ${r.found} call${r.found === 1 ? "" : "s"} found, ${r.added} new (in New).` });
+      onChange(accounts.map((a) => (a.id === s.id ? { ...a, ...s, inboxCheckedAt: new Date().toISOString(), inboxError: r.error } : a)));
+    } catch (e) { setInboxMsg({ ok: false, text: e instanceof Error ? e.message : "Couldn't check." }); }
     finally { setBusy(""); }
   }
   async function add() {
@@ -80,7 +91,7 @@ export function SettingsModal({ accounts, onChange, onClose }: { accounts: Outre
             <label>Default Bcc<input value={s.defaultBcc} onChange={(e) => set("defaultBcc", e.target.value)} placeholder="a copy for your records" /></label>
             <label>Follow-up after (days)<input type="number" min={1} max={365} value={s.followUpDays} onChange={(e) => set("followUpDays", Number(e.target.value))} /></label>
           </div>
-          <label className="ox-block">Signature (same writing format as the composer)<textarea rows={4} value={s.signatureMd} onChange={(e) => set("signatureMd", e.target.value)} placeholder={"—\n**Your name**\nComposer · sound artist\n[site](https://example.org)"} /></label>
+          <label className="ox-block">Signature (same writing format as the composer; formatted text can be pasted in)<textarea rows={4} onPaste={(e) => { const el = e.currentTarget; const r = pasteEdit(e, el.value, el.selectionStart, el.selectionEnd); if (!r) return; e.preventDefault(); set("signatureMd", r.value); requestAnimationFrame(() => el.setSelectionRange(r.start, r.end)); }} value={s.signatureMd} onChange={(e) => set("signatureMd", e.target.value)} placeholder={"—\n**Your name**\nComposer · sound artist\n[site](https://example.org)"} /></label>
         </fieldset>
         <fieldset><legend>Copy in your Sent folder (IMAP)</legend>
           <label className="ox-check"><input type="checkbox" checked={s.fileInSent} onChange={(e) => set("fileInSent", e.target.checked)} /> Put a copy of each message in my Sent folder</label>
@@ -91,6 +102,14 @@ export function SettingsModal({ accounts, onChange, onClose }: { accounts: Outre
             <label className="ox-check"><input type="checkbox" checked={s.imapSecure} onChange={(e) => set("imapSecure", e.target.checked)} /> SSL</label>
             <label>Sent folder name<input value={s.sentFolder} onChange={(e) => set("sentFolder", e.target.value)} /></label>
           </div>
+        </fieldset>
+        <fieldset><legend>Look for open calls in my inbox (IMAP)</legend>
+          <label className="ox-check"><input type="checkbox" checked={s.inboxOn} onChange={(e) => set("inboxOn", e.target.checked)} disabled={!s.imapHost} /> Check this mailbox every half hour for open calls and newsletters that list them</label>
+          <p className="ox-hint">{s.imapHost ? <>Read-only: mail is never moved, marked or deleted, and only each call's title, link, deadline and fee are kept, not the mail. The first check looks back 30 days. Calls land in <b>New</b>.</> : <>Fill in the IMAP server above first.</>}</p>
+          <div className="ox-grid"><label>Folder to watch<input value={s.inboxFolder} onChange={(e) => set("inboxFolder", e.target.value)} placeholder="INBOX" /></label></div>
+          <div className="ox-colrow"><button className="btn" onClick={checkInbox} disabled={!!busy || !s.imapHost}>Save &amp; check now</button>
+            <small className="ox-dim">{s.inboxCheckedAt ? `last checked ${s.inboxCheckedAt.slice(0, 16).replace("T", " ")}` : "not checked yet"}</small></div>
+          {(inboxMsg || s.inboxError) && <p className={inboxMsg?.ok ? "ox-ok" : "ox-err"} role="status">{inboxMsg?.text ?? s.inboxError}</p>}
         </fieldset>
         {msg && <p className={msg.ok ? "ox-ok" : "ox-err"} role="status">{msg.text}</p>}
         <footer>

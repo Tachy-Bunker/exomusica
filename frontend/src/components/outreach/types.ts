@@ -12,6 +12,7 @@ export interface OutreachSettings {
   smtpHost: string; smtpPort: number; smtpSecure: boolean; smtpUser: string; hasPassword: boolean;
   fromName: string; fromEmail: string; replyTo: string; defaultCc: string; defaultBcc: string;
   imapHost: string; imapPort: number; imapSecure: boolean; sentFolder: string; fileInSent: boolean; signatureMd: string; followUpDays: number;
+  inboxOn: boolean; inboxFolder: string; inboxCheckedAt: string | null; inboxError: string | null;
 }
 export interface Block { id: number; typeId: number; title: string; body: string }
 export interface BlockType { id: number; name: string; blocks: Block[] }

@@ -87,9 +87,13 @@ export function CollaboratorPage() {
 
   return (
     <div className="page-column" style={{ maxWidth: 720 }}>
-      <Link to={`/collaborator/${collaborator.slug}/spacemap`} className="btn" style={{ marginBottom: "0.8rem", display: "inline-block" }}>
-        View discography on Spacemap
-      </Link>
+      {collaborator.discography.length > 0 && (
+        <div style={{ display: "flex", gap: "0.4rem", flexWrap: "wrap", marginBottom: "0.8rem" }}>
+          <Link to={`/collaborator/${collaborator.slug}/spacemap#venn`} className="btn">Constellation</Link>
+          <Link to={`/collaborator/${collaborator.slug}/spacemap`} className="btn">Spacemap</Link>
+          <Link to={`/collaborator/${collaborator.slug}/list`} className="btn">List</Link>
+        </div>
+      )}
       <div style={{ display: "flex", gap: "1.2rem", flexWrap: "wrap" }}>
         <div
           style={{

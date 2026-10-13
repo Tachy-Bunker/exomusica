@@ -14,6 +14,10 @@ interface ChatDockState {
   presets: (Room | null)[];
   scenes: Scene[];
   switcherOpen: boolean;
+  /** A message the dock should scroll to once its room is showing (set by notification clicks; never persisted). */
+  pendingJump: { slug: string; messageId: number; day: string | null } | null;
+  jumpTo: (room: { slug: string; name: string; branchSlug?: string }, messageId: number, day: string | null) => void;
+  clearJump: () => void;
   setSwitcher: (open: boolean) => void;
   sleepSlot: (i: number) => void;
   saveSceneAs: (name: string) => void;
@@ -46,6 +50,10 @@ export const useChatDockStore = create<ChatDockState>()(
       presets: [null, null, null, null, null, null],
       scenes: [],
       switcherOpen: false,
+      pendingJump: null,
+      jumpTo: (room, messageId, day) =>
+        set((s) => ({ openChannelSlug: room.slug, openChannelName: room.name, openBranchSlug: room.branchSlug ?? null, collapsed: false, recents: touchRecent(s.recents, room), pendingJump: { slug: room.slug, messageId, day } })),
+      clearJump: () => set({ pendingJump: null }),
       setSwitcher: (open) => set({ switcherOpen: open }),
       sleepSlot: (i) => set((s) => ({ presets: toggleSleep(s.presets, i) })),
       saveSceneAs: (name) => set((s) => ({ scenes: saveScene(s.scenes, name, s.presets) })),

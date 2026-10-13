@@ -1,6 +1,6 @@
 import { useWasdKeys } from "../lib/useWasd";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useParams, useNavigate, Link, useSearchParams } from "react-router-dom";
+import { useNavigate, Link, useSearchParams } from "react-router-dom";
 import { api } from "../lib/api";
 import { useAuth } from "../lib/auth";
 import { useAudioStore, shuffleArray } from "../lib/audioStore";
@@ -14,6 +14,7 @@ import { spiralOrder, type TrackPoint } from "../lib/vennLayout";
 import { layoutConstellationRegions, layoutStars, buildConnectionLines, settleNodes, type ConstellationTrack } from "../lib/constellationLayout";
 import { ConstellationScanPanel } from "../components/ConstellationScanPanel";
 import { VennCustomColorEditor } from "../components/VennCustomColorEditor";
+import { usePlaylistSource } from "../lib/playlistSource";
 import { ShareAutoplay } from "../components/ShareAutoplay";
 import { ShareModal } from "../components/ShareModal";
 import { genreStateFromShare, parseAutoplay, parseMapShare } from "../lib/shareState";
@@ -153,7 +154,7 @@ const LOCK_RADIUS = 58;
 const LOCK_TIME = 0.9;
 
 export function PlaylistSpaceMapPage() {
-  const { slug } = useParams<{ slug: string }>();
+  const { slug, collab, dataUrl, mapPath, listPath } = usePlaylistSource();
   const navigate = useNavigate();
   const { user } = useAuth();
   const [searchParams] = useSearchParams();
@@ -252,7 +253,7 @@ export function PlaylistSpaceMapPage() {
 
   function reload() {
     if (!slug) return;
-    api<PlaylistDetail>(`/api/playlists/${slug}`).then((p) => {
+    api<PlaylistDetail>(dataUrl).then((p) => {
       setPlaylist(p);
       setControls({
         coverSize: p.fxSettings?.coverSize ?? DEFAULT_COVER_SIZE,
@@ -1085,7 +1086,7 @@ export function PlaylistSpaceMapPage() {
         <>
           {!hideControls && (
           <div style={{ position: "absolute", top: 12, left: 12, right: 90, zIndex: 5, display: "flex", flexWrap: "wrap", gap: "0.4rem", alignItems: "center" }}>
-            <button className="btn" title="View as list" onClick={() => navigate(`/playlist/${playlist.slug}/list`)}>
+            <button className="btn" title="View as list" onClick={() => navigate(listPath)}>
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                 <path
                   d="M8 8H20M11 12H20M14 16H20M4 8H4.01M7 12H7.01M10 16H10.01"
@@ -1721,8 +1722,8 @@ export function PlaylistSpaceMapPage() {
       {shareOpen && playlist && (
         <ShareModal
           title="Share or embed this view"
-          pathname={`/playlist/${playlist.slug}`}
-          embedPath={`/embed/playlist/${playlist.slug}`}
+          pathname={mapPath}
+          embedPath={collab ? undefined : `/embed/playlist/${playlist.slug}`}
           tracks={playlist.items.map((i) => ({ id: i.trackId, source: i.source, title: i.title, composer: i.composer }))}
           genreState={genreState}
           view={viewMode}

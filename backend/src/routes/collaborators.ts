@@ -82,6 +82,66 @@ export async function collaboratorRoutes(app: FastifyInstance): Promise<void> {
     };
   });
 
+  // The collaborator's discography as a read-only, PlaylistDetail-shaped virtual
+  // playlist, so the playlist views (constellation / spacemap / list) can render it.
+  // Never listed anywhere: it is only reachable from the collaborator's profile.
+  app.get<{ Params: { slug: string } }>("/api/collaborators/:slug/playlist", async (req, reply) => {
+    const c = await prisma.collaborator.findUnique({
+      where: { slug: req.params.slug },
+      select: {
+        slug: true,
+        name: true,
+        tracks: {
+          select: {
+            track: {
+              select: {
+                id: true, title: true, fileUrl: true, durationSeconds: true, replayGainDb: true, genres: true, lyrics: true, position: true,
+                album: { select: { slug: true, title: true, coverArtUrl: true, composer: true, branch: { select: { slug: true } } } },
+              },
+            },
+          },
+        },
+      },
+    });
+    if (!c) return reply.code(404).send({ error: "not found" });
+    const rows = c.tracks
+      .map((t) => t.track)
+      .sort((a, b) => a.album.title.localeCompare(b.album.title) || a.position - b.position);
+    const items = rows.map((t, i) => ({
+      id: i + 1,
+      source: "official" as const,
+      trackId: t.id,
+      title: t.title,
+      fileUrl: resolvePlayableUrl(t.fileUrl, "track", t.id),
+      durationSeconds: t.durationSeconds,
+      albumTitle: t.album.title,
+      albumSlug: t.album.slug,
+      coverArtUrl: t.album.coverArtUrl,
+      composer: t.album.composer,
+      branchSlug: t.album.branch?.slug ?? null,
+      replayGainDb: t.replayGainDb,
+      genres: t.genres,
+      lyrics: t.lyrics,
+      trackPosition: t.position,
+    }));
+    const albums = new Map<string, { slug: string; title: string; coverArtUrl: string | null; source: "official" }>();
+    for (const it of items) {
+      if (!albums.has(it.albumSlug)) albums.set(it.albumSlug, { slug: it.albumSlug, title: it.albumTitle, coverArtUrl: it.coverArtUrl, source: "official" });
+    }
+    return {
+      id: 0,
+      slug: `collab-${c.slug}`,
+      title: `${c.name} — discography`,
+      description: null,
+      owner: c.name,
+      ownerId: 0,
+      collaborators: [],
+      fxSettings: null,
+      albums: [...albums.values()],
+      items,
+    };
+  });
+
   app.post<{ Body: { name: string; role: string } }>("/api/admin/collaborators", { preHandler: requireAdmin }, async (req, reply) => {
     const { name, role } = req.body ?? {};
     if (!name || !role) return reply.code(400).send({ error: "name and role are required" });

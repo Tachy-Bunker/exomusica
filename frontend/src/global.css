@@ -5893,7 +5893,7 @@ body.visor-writing .visor-hud *, body.visor-writing .visor-pop *, body.visor-wri
 .tether:hover { border-color: var(--accent-audio, #5ef2d0); }
 
 /* --- Admin: Outreach ------------------------------------------------------ */
-.ox-page { display: flex; flex-direction: column; gap: 1.5rem; max-width: 1500px; }
+.ox-page { display: flex; flex-direction: column; gap: 1.5rem; max-width: 1500px; margin: 0 auto; width: 100%; padding: 1.2rem 1rem 3rem; box-sizing: border-box; }
 .ox-head { display: flex; align-items: center; gap: 0.8rem; flex-wrap: wrap; }
 .ox-head h1 { margin: 0; }
 .ox-spacer { flex: 1; }

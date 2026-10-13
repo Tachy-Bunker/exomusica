@@ -80,7 +80,7 @@ export function findDates(text: string): { iso: string; at: number }[] {
   for (const m of text.matchAll(/\b(\d{1,2})[/.](\d{1,2})[/.](20\d\d)\b/g)) add(iso(+m[3], +m[2], +m[1]), m.index ?? 0); // day first, as in most of the world
   return out.sort((a, b) => a.at - b.at);
 }
-const KEY = /(dead\s?line|closes?|closing|due(?:\s+date)?|submit(?:ted)?\s+by|submissions?\s+(?:until|close)|apply\s+(?:by|before)|before|no\s+later\s+than|applications?\s+(?:until|close)|until|last\s+day|date\s+limite|clôture|cloture|avant\s+le|jusqu['’]au)/gi;
+const KEY = /((?:submit|apply|send|enter|sign\s?up)[^.\n]{0,40}?\bby|dead\s?line|closes?|closing|due(?:\s+date)?|submit(?:ted)?\s+by|submissions?\s+(?:until|close)|apply\s+(?:by|before)|before|no\s+later\s+than|applications?\s+(?:until|close)|until|last\s+day|date\s+limite|clôture|cloture|avant\s+le|jusqu['’]au)/gi;
 export function findDeadline(text: string, today: string): string | null {
   const dates = findDates(text); if (!dates.length) return null;
   const near: string[] = [];

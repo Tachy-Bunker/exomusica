@@ -1567,6 +1567,13 @@ model OutreachAccount {
   fileInSent      Boolean  @default(false)
   signatureMd     String   @default("")
   followUpDays    Int      @default(14)
+  // looking for open calls in the INBOX (read-only)
+  inboxOn         Boolean   @default(false)
+  inboxFolder     String    @default("INBOX")
+  inboxLastUid    Int       @default(0)
+  inboxValidity   String?
+  inboxCheckedAt  DateTime?
+  inboxError      String?
   updatedAt       DateTime @updatedAt
 
   @@index([workspaceId])
@@ -1647,7 +1654,7 @@ model OutreachLead {
   place       String   @default("")
   emails      Json     @default("[]")
   fields      Json     @default("[]") // form questions, when it came from a form
-  source      String   @default("feed") // feed, newsletter, bookmarklet, form
+  source      String   @default("feed") // feed, newsletter, bookmarklet, form, inbox, eml
   status      String   @default("new") // new, kept, dismissed
   key         String   // dedupe: url or title
   foundAt     DateTime @default(now())

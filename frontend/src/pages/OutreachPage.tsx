@@ -162,7 +162,7 @@ function Workspace({ session, onLeave }: { session: OxSession; onLeave: () => vo
         <h1>{st.workspace.name}</h1>
         {dueCount > 0 && <span className="ox-duechip" title="Contacts whose follow-up date has come">{dueCount} follow-up{dueCount === 1 ? "" : "s"} due</span>}
         <span className="ox-spacer" />
-        <button className="btn" onClick={() => setModal("inbox")} title="Calls found by the bookmarklet, feeds and pasted newsletters">New{st.newLeads > 0 ? ` (${st.newLeads})` : ""}</button>
+        <button className="btn" onClick={() => setModal("inbox")} title="Calls found by the bookmarklet, feeds and newsletters (pasted or imported) and your inbox">New{st.newLeads > 0 ? ` (${st.newLeads})` : ""}</button>
         <button className="btn" onClick={() => setModal("past")}>Past mail</button>
         <button className="btn" onClick={() => setModal("files")}>Files</button>
         <button className="btn" onClick={() => setModal("mail")}>Mailboxes{needsMail && <span className="admin-nav-pending-dot" title="Not set up yet" />}</button>

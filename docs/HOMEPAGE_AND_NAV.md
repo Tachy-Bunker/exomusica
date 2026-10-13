@@ -414,3 +414,12 @@ Phase 1 (this delivery), idea 4:
 - **Timing/learning**: 7-day and 2-day deadline ladder, "opens again" dates, snooze with a reason, `.ics` export, Monday digest, best hours (≥ 30 sends), answer-time stats (sets the "gone quiet" threshold), decline reasons, accepted-mail archive → template, fee budget, fit score and look-alikes.
 - **Keyboard** (sheet focused, not typing): J/K move, X select, W write, R replied, S snooze, / search.
 - **Env**: `PUBLIC_URL` (tracked links, digest links), `OUTREACH_OPEN_CREATE`, `OUTREACH_SECRET` (optional).
+
+## fix301 — Outreach paste/inbox, collaborator discography, notifications in the dock
+
+- **Outreach page** is centred (`.ox-page`, max 1500px).
+- **Paste with formatting** (`lib/pasteMail.ts`): pasting rich text into the composer or the signature converts bold/italic/underline/strike/sup/sub/highlight, colour+size spans, links, headings, lists, quotes, tables, images, centre/right alignment into the mail markup. Plain text pastes untouched.
+- **Newsletters**: the "Newsletters" tab also imports `.eml` / `.zip` (`POST /api/outreach/newsletter/eml`). Only calls are kept.
+- **Inbox checker** (read-only IMAP, per mailbox, every 30 min, `inboxOn`): finds open calls in new mail (newsletters are split into their calls), stores only title/link/deadline/fee into New leads (source "inbox"). Mailer settings: "Look for open calls in my inbox". Manual run: `POST /api/outreach/accounts/:id/inbox-check`. Schema: `OutreachAccount.inboxOn/inboxFolder/inboxLastUid/inboxValidity/inboxCheckedAt/inboxError`.
+- **Collaborator discography** uses the Playlist views: `GET /api/collaborators/:slug/playlist` is a virtual read-only playlist (`collab-<slug>`). `PlaylistSpaceMapPage`/`PlaylistPage` read `lib/playlistSource.ts` (`usePlaylistSource`) to pick data URL + links. Routes `collaborator/:slug/spacemap` (`#venn` = constellation) and `collaborator/:slug/list`. Profile shows Constellation / Spacemap / List. Not listed anywhere else. Old `CollaboratorSpacemapPage` removed.
+- **Notifications** (desktop): clicking a topic notification/recent message opens the room in the chat dock at that message (`chatDockStore.jumpTo` → `pendingJump`, consumed by `ChannelPage`) without leaving the page. In day/search view the "⇣⇣ Live chat" button now always shows and switches back to live (composer returns). Mobile still navigates. PM notifications still open Post.

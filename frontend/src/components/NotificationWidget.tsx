@@ -3,6 +3,7 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { api } from "../lib/api";
 import { useAuth } from "../lib/auth";
 import { useIsDesktop } from "../lib/useIsDesktop";
+import { useChatDockStore } from "../lib/chatDockStore";
 import { useVolumeMixerStore } from "../lib/volumeMixerStore";
 
 function playNotificationSound(url: string) {
@@ -135,6 +136,19 @@ export function NotificationWidget({ offsetRight = 0, inline = false }: { offset
     }
   }
 
+  // On desktop a topic message opens in the chat dock (live toggle + composer available) without leaving the page;
+  // elsewhere, and for post (PM) notifications, it goes to the page as before.
+  function openMessage(slug: string, name: string | undefined, unix: number, id: number) {
+    if (isDesktop) {
+      const iso = new Date(unix * 1000).toISOString().slice(0, 10);
+      const today = new Date().toISOString().slice(0, 10);
+      const known = useChatDockStore.getState().recents.find((r) => r.slug === slug);
+      useChatDockStore.getState().jumpTo({ slug, name: name ?? known?.name ?? slug, branchSlug: known?.branchSlug }, id, iso === today ? null : iso);
+      return;
+    }
+    navigate(jumpUrl(slug, unix, id));
+  }
+
   function handleNotificationClick(n: Notification) {
     setOpen(false);
     if (n.eventKey === "pm" && n.channelSlug) {
@@ -142,13 +156,13 @@ export function NotificationWidget({ offsetRight = 0, inline = false }: { offset
       return;
     }
     if (n.channelSlug && n.messageId) {
-      navigate(jumpUrl(n.channelSlug, Math.floor(new Date(n.createdAt).getTime() / 1000), n.messageId));
+      openMessage(n.channelSlug, recent.find((r) => r.channelSlug === n.channelSlug)?.channelName, Math.floor(new Date(n.createdAt).getTime() / 1000), n.messageId);
     }
   }
 
   function handleRecentClick(m: RecentMessage) {
     setOpen(false);
-    navigate(jumpUrl(m.channelSlug, m.unixTimestamp, m.id));
+    openMessage(m.channelSlug, m.channelName, m.unixTimestamp, m.id);
   }
 
   return (

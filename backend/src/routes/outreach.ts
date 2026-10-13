@@ -17,7 +17,7 @@ import {
 } from "../lib/outreach.js";
 import { ensureColumns, fail, fetchPage, shapeContact, today, wait, workspaceAuth, WITH_GROUPS, ymd, dbFor } from "./outreachShared.js";
 import { outreachWorkspaceRoutes, sendDigests } from "./outreachWorkspace.js";
-import { checkFeeds, outreachCollectRoutes } from "./outreachCollect.js";
+import { checkFeeds, checkInbox, checkInboxes, outreachCollectRoutes } from "./outreachCollect.js";
 import { outreachEmlRoutes } from "./outreachEml.js";
 
 const SECRET = (): string => process.env.OUTREACH_SECRET ?? process.env.JWT_SECRET ?? "";
@@ -29,6 +29,7 @@ export const shapeAccount = (s: AcctRow) => ({
   smtpHost: s.smtpHost ?? "", smtpPort: s.smtpPort ?? 465, smtpSecure: s.smtpSecure, smtpUser: s.smtpUser ?? "", hasPassword: !!s.smtpPasswordEnc,
   fromName: s.fromName ?? "", fromEmail: s.fromEmail ?? "", replyTo: s.replyTo ?? "", defaultCc: s.defaultCc ?? "", defaultBcc: s.defaultBcc ?? "",
   imapHost: s.imapHost ?? "", imapPort: s.imapPort ?? 993, imapSecure: s.imapSecure, sentFolder: s.sentFolder, fileInSent: s.fileInSent, signatureMd: s.signatureMd, followUpDays: s.followUpDays,
+  inboxOn: s.inboxOn, inboxFolder: s.inboxFolder, inboxCheckedAt: s.inboxCheckedAt?.toISOString() ?? null, inboxError: s.inboxError,
 });
 /** The workspace's mailboxes; the first visit adopts the old single account (and a fresh workspace gets an empty one). */
 export async function accountsOf(db: ScopedDb): Promise<AcctRow[]> {
@@ -130,6 +131,8 @@ export async function outreachRoutes(app: FastifyInstance): Promise<void> {
     if ("imapSecure" in b) data.imapSecure = b.imapSecure !== false;
     if ("sentFolder" in b) data.sentFolder = str(b.sentFolder, 80) ?? "Sent";
     if ("fileInSent" in b) data.fileInSent = b.fileInSent === true;
+    if ("inboxOn" in b) { data.inboxOn = b.inboxOn === true; if (b.inboxOn === true) { data.inboxError = null; } }
+    if ("inboxFolder" in b) { data.inboxFolder = str(b.inboxFolder, 80) ?? "INBOX"; }
     if ("signatureMd" in b) data.signatureMd = typeof b.signatureMd === "string" ? b.signatureMd.slice(0, 5000) : "";
     if ("followUpDays" in b) { const n = Number(b.followUpDays); data.followUpDays = Number.isInteger(n) && n >= 1 && n <= 365 ? n : 14; }
     if (b.clearPassword === true) data.smtpPasswordEnc = null;
@@ -143,8 +146,9 @@ export async function outreachRoutes(app: FastifyInstance): Promise<void> {
     return reply.code(201).send(shapeAccount(a));
   });
   app.put<{ Params: { id: string }; Body: Record<string, unknown> }>("/api/outreach/accounts/:id", { ...W, bodyLimit: 64 * 1024 }, async (req, reply) => {
-    const db = req.db; const id = Number(req.params.id) || 0; if (!(await db.outreachAccount.findUnique({ where: { id } }))) return fail(reply, 404, "No such mailbox.");
+    const db = req.db; const id = Number(req.params.id) || 0; const cur = await db.outreachAccount.findUnique({ where: { id } }); if (!cur) return fail(reply, 404, "No such mailbox.");
     const r = ACCOUNT_FIELDS(req.body ?? {}); if (r.error) return fail(reply, 400, r.error);
+    if (typeof r.data.inboxFolder === "string" && r.data.inboxFolder !== cur.inboxFolder) { r.data.inboxLastUid = 0; r.data.inboxValidity = null; } // another folder, another numbering
     if (req.body?.isDefault === true) { await db.outreachAccount.updateMany({ data: { isDefault: false } }); r.data.isDefault = true; }
     return shapeAccount(await db.outreachAccount.update({ where: { id }, data: r.data as never }));
   });
@@ -155,6 +159,11 @@ export async function outreachRoutes(app: FastifyInstance): Promise<void> {
     await db.outreachAccount.delete({ where: { id } });
     if (all.find((a) => a.id === id)?.isDefault) await db.outreachAccount.update({ where: { id: all.find((a) => a.id !== id)!.id }, data: { isDefault: true } });
     return { ok: true };
+  });
+  app.post<{ Params: { id: string } }>("/api/outreach/accounts/:id/inbox-check", W, async (req, reply) => {
+    const db = req.db; const a = await db.outreachAccount.findUnique({ where: { id: Number(req.params.id) || 0 } }); if (!a) return fail(reply, 404, "No such mailbox.");
+    if (!a.imapHost) return fail(reply, 400, "Set the IMAP server of this mailbox first.");
+    return checkInbox(a, account);
   });
   app.post<{ Params: { id: string } }>("/api/outreach/accounts/:id/test", W, async (req, reply) => {
     const db = req.db; const a = await db.outreachAccount.findUnique({ where: { id: Number(req.params.id) || 0 } }); if (!a) return fail(reply, 404, "No such mailbox.");
@@ -573,6 +582,7 @@ export async function outreachRoutes(app: FastifyInstance): Promise<void> {
       }
       await sendDigests(runSend);
       await checkFeeds();
+      await checkInboxes(account);
     } catch { /* the database is busy: next minute */ } finally { busy = false; }
   }
   const timer = setInterval(() => { void drainQueue(); }, 60_000); timer.unref();

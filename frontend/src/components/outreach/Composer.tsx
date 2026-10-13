@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api, ApiError } from "../../lib/api";
 import { applyMail, mediaLine, type MailKind } from "../../lib/mailEdit";
+import { pasteEdit } from "../../lib/pasteMail";
 import { mergeFields, parseAddressList } from "../../lib/outreachSheet";
 import { DateInput } from "./Cells";
 import { pitchChecks } from "../../lib/pitchCheck";
@@ -95,6 +96,11 @@ export function Composer({ workspaceId, accounts, columns, contacts, groups, tem
     requestAnimationFrame(() => { el.focus(); el.setSelectionRange(r.start, r.end); });
   }, []);
   const getSel = useCallback(() => { const el = ta.current; return el ? el.value.slice(el.selectionStart, el.selectionEnd) : ""; }, []);
+  /** Formatted text pasted in (Word, Docs, a web page, a mail) arrives as the composer's own markup; Ctrl+Shift+V still pastes plain. */
+  function onPaste(e: React.ClipboardEvent<HTMLTextAreaElement>) {
+    const el = e.currentTarget; const r = pasteEdit(e, el.value, el.selectionStart, el.selectionEnd); if (!r) return;
+    e.preventDefault(); set("body", r.value); requestAnimationFrame(() => { el.focus(); el.setSelectionRange(r.start, r.end); });
+  }
   function onKey(e: React.KeyboardEvent) {
     if (!(e.ctrlKey || e.metaKey) || e.altKey) return;
     const m: Record<string, MailKind> = { b: "bold", i: "italic", u: "underline", k: "link" };
@@ -210,7 +216,7 @@ export function Composer({ workspaceId, accounts, columns, contacts, groups, tem
               <input ref={fileIn} type="file" multiple hidden onChange={(e) => upload(e.target.files)} />
             </span>
           </div>
-          <textarea ref={ta} className="ox-body" value={d.body} onChange={(e) => set("body", e.target.value)} onKeyDown={onKey} rows={16} placeholder={"Dear {{first_name|there}},\n\nI'm writing about …"} aria-label="Message" spellCheck />
+          <textarea ref={ta} className="ox-body" value={d.body} onChange={(e) => set("body", e.target.value)} onKeyDown={onKey} onPaste={onPaste} rows={16} placeholder={"Dear {{first_name|there}},\n\nI'm writing about …"} aria-label="Message" spellCheck />
           <label className="ox-check"><input type="checkbox" checked={d.signature} onChange={(e) => set("signature", e.target.checked)} /> Add my signature{!settings?.signatureMd.trim() && <span className="ox-dim"> (none written yet: Mail settings)</span>}</label>
           <VariantsPanel body={d.body} types={blockTypes} groups={groups} rules={d.rules} onRules={(r) => set("rules", r)} />
         </div>

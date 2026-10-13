@@ -32,7 +32,6 @@ import { MyMusicPage } from "./pages/MyMusicPage";
 import { PlaylistPage } from "./pages/PlaylistPage";
 import { PlaylistSpaceMapPage } from "./pages/PlaylistSpaceMapPage";
 import { CollaboratorPage } from "./pages/CollaboratorPage";
-import { CollaboratorSpacemapPage } from "./pages/CollaboratorSpacemapPage";
 import { ProfilePage } from "./pages/ProfilePage";
 import { PostPage } from "./pages/PostPage";
 import { AccountSettingsPage } from "./pages/AccountSettingsPage";
@@ -146,7 +145,8 @@ export default function App() {
             <Route path="playlist/:slug" element={<PlaylistSpaceMapPage />} />
             <Route path="playlist/:slug/list" element={<PlaylistPage />} />
             <Route path="collaborator/:slug" element={<CollaboratorPage />} />
-            <Route path="collaborator/:slug/spacemap" element={<CollaboratorSpacemapPage />} />
+            <Route path="collaborator/:slug/spacemap" element={<PlaylistSpaceMapPage />} />
+            <Route path="collaborator/:slug/list" element={<PlaylistPage />} />
             <Route path="topic/:slug" element={<TopicPage />} />
             <Route path="u/:username" element={<ProfilePage />} />
             <Route path="pms" element={<PostPage />} />

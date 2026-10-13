@@ -1,3 +1,4 @@
+import { playlistHref } from "../lib/playlistSource";
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Link } from "react-router-dom";
@@ -308,7 +309,7 @@ export function PlayerBar() {
               {isDesktop && currentPlaylist && (
                 <div className="origin">
                   from:{" "}
-                  <Link to={`/playlist/${currentPlaylist.slug}`} onClick={(e) => e.stopPropagation()}>
+                  <Link to={playlistHref(currentPlaylist.slug)} onClick={(e) => e.stopPropagation()}>
                     {currentPlaylist.title}
                   </Link>
                 </div>
@@ -317,7 +318,7 @@ export function PlayerBar() {
 
             <div className="player-transport">
               {!isDesktop && currentPlaylist && (
-                <Link to={`/playlist/${currentPlaylist.slug}`} className="btn player-queue-indicator" onClick={(e) => e.stopPropagation()} title={`Playing from: ${currentPlaylist.title}`}>
+                <Link to={playlistHref(currentPlaylist.slug)} className="btn player-queue-indicator" onClick={(e) => e.stopPropagation()} title={`Playing from: ${currentPlaylist.title}`}>
                   <QueueIcon size={15} />
                 </Link>
               )}
@@ -380,7 +381,7 @@ export function PlayerBar() {
             {currentPlaylist && (
               <p style={{ color: "var(--text-dim)", marginTop: "-0.4rem" }}>
                 from:{" "}
-                <Link to={`/playlist/${currentPlaylist.slug}`} onClick={() => setExpanded(false)}>
+                <Link to={playlistHref(currentPlaylist.slug)} onClick={() => setExpanded(false)}>
                   {currentPlaylist.title}
                 </Link>
               </p>
