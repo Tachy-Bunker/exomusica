@@ -111,7 +111,7 @@ export function CommunityAlbumPage() {
         <div style={{ minWidth: 0, flex: 1 }}>
           <h1 style={{ marginBottom: "0.1rem", overflowWrap: "break-word" }}>{album.title}</h1>
           <p style={{ color: "var(--text-dim)", marginTop: 0 }}>{album.composer}</p>
-          <p style={{ fontSize: "0.8rem", color: "var(--text-dim)" }}>Uploaded by <Username name={album.owner.username} /></p>
+          <p style={{ fontSize: "0.8rem", color: "var(--text-dim)" }}>Uploaded by <Username name={album.owner.username} dm /></p>
         </div>
       </div>
 

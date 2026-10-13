@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../lib/api";
+import { DmButton } from "./DmButton";
 
 interface Glance { bio: string | null; study: { slug: string; title: string; status: "IN_PROGRESS" | "COMPLETE" } | null; track: { title: string; albumSlug: string; albumTitle: string } | null }
 const cache = new Map<string, Glance | null>();
@@ -19,7 +20,7 @@ export function MentionGlance({ username, onOpen }: { username: string; onOpen?:
       onClick={(e) => { e.preventDefault(); onOpen?.(`/u/${username}`); }} data-testid="mention">
       @{username}
       <span className="glance-card" role="tooltip" data-testid="glance-card">
-        <b>{username}</b>
+        <b>{username}<DmButton username={username} /></b>
         {!g && <span className="home-dim">…</span>}
         {g?.bio && <span className="home-dim">{g.bio}</span>}
         {g?.study && <span>{g.study.status === "IN_PROGRESS" ? "Working on" : "Finished"}: <Link to={`/study/${g.study.slug}`}>{g.study.title}</Link></span>}

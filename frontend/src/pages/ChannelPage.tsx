@@ -34,6 +34,7 @@ import { audible, LEVEL_NOTE, useSquelchStore } from "../lib/squelch";
 import { useMentionResolutionStore } from "../lib/mentionResolutionStore";
 import { EmojiPicker } from "../components/EmojiPicker";
 import { useReactionPalette } from "../lib/reactionPalette";
+import { DmButton } from "../components/DmButton";
 import { QuoteToStudy } from "../components/QuoteToStudy";
 import { useRoomName } from "../lib/roomContext";
 import { MentionPicker } from "../components/MentionPicker";
@@ -316,7 +317,7 @@ function StandardMessage({
       <div className="bubble">
         <div className="meta">
           <strong>
-            <Link to={`/u/${message.authorUsername}`}>{message.authorUsername}</Link>
+            <Link to={`/u/${message.authorUsername}`}>{message.authorUsername}</Link><DmButton username={message.authorUsername} />
           </strong>
           <span className="mono">{new Date(message.unixTimestamp * 1000).toLocaleString()}</span>
           {message.editedAt && <span>(edited)</span>}
@@ -355,7 +356,7 @@ function MessageGroup({
       <div className="bubble" style={{ background: "transparent", padding: 0 }}>
         <div className="meta">
           <strong>
-            <Link to={`/u/${first.authorUsername}`}>{first.authorUsername}</Link>
+            <Link to={`/u/${first.authorUsername}`}>{first.authorUsername}</Link><DmButton username={first.authorUsername} />
           </strong>
           <span className="mono">{new Date(first.unixTimestamp * 1000).toLocaleString()}</span>
         </div>
@@ -534,6 +535,15 @@ export function ChannelPage({ channelSlug, fillHeight, parentControlsHeight }: {
   const wsRef = useRef<WebSocket | null>(null);
   const navigate = useNavigate();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  // a link can arrive with the words ready (?say=Welcome @neo !): they go in the box, never sent for you
+  useEffect(() => {
+    const say = searchParams.get("say");
+    if (!say) return;
+    setDraft((d) => d || say.slice(0, 500));
+    const next = new URLSearchParams(searchParams); next.delete("say");
+    navigate({ search: next.toString() ? `?${next}` : "", hash: location.hash }, { replace: true });
+    requestAnimationFrame(() => textareaRef.current?.focus());
+  }, [searchParams]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Mobile virtual keyboard handling: visualViewport shrinks when the
   // keyboard opens (a real, standard signal - no guessing based on focus

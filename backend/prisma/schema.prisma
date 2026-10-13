@@ -111,6 +111,8 @@ model User {
   emojisUploaded   CustomEmoji[]
   sentPMs          PrivateMessage[] @relation("PMSender")
   receivedPMs      PrivateMessage[] @relation("PMRecipient")
+  welcomedBy       WelcomeBuddy?    @relation("WelcomeNew") // the member asked to greet this one
+  welcoming        WelcomeBuddy[]   @relation("WelcomeBuddy") // newcomers this member was asked to greet
   followedChannels ChannelFollow[]
   newsletterSub    NewsletterSubscription?
   auditLogEntries  AuditLog[]
@@ -430,6 +432,7 @@ model TrackCollaborator {
   collaboratorId Int
   track          Track        @relation(fields: [trackId], references: [id], onDelete: Cascade)
   collaborator   Collaborator @relation(fields: [collaboratorId], references: [id])
+  roles          String[]     @default([]) // what they did on this track (see lib/creditRoles); empty = composer
 
   @@id([trackId, collaboratorId])
 }
@@ -615,6 +618,7 @@ enum EmailType {
   NEWS
   CALL_FOR_IDEAS
   CALL_FOR_ARTISTS
+  WELCOME_BUDDY
 }
 
 // Admin-editable HTML per email type. A missing row for a type just means
@@ -1714,4 +1718,17 @@ model GlossaryTerm {
   aliases    String[] @default([])
   definition String   @db.Text
   updatedAt  DateTime @updatedAt
+}
+
+// Each approved newcomer is paired with one existing member, who gets a single prompt to say hello.
+model WelcomeBuddy {
+  id        Int       @id @default(autoincrement())
+  newUserId Int       @unique
+  newUser   User      @relation("WelcomeNew", fields: [newUserId], references: [id], onDelete: Cascade)
+  buddyId   Int
+  buddy     User      @relation("WelcomeBuddy", fields: [buddyId], references: [id], onDelete: Cascade)
+  createdAt DateTime  @default(now())
+  doneAt    DateTime? // said hello, or skipped
+
+  @@index([buddyId, doneAt])
 }

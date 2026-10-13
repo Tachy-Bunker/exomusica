@@ -34,6 +34,7 @@ interface CollaboratorDetail {
   linkedUsername: string | null;
   gallery: { id: number; url: string }[];
   discography: DiscographyAlbum[];
+  credits?: { role: string; count: number }[];
 }
 
 export function CollaboratorPage() {
@@ -144,6 +145,9 @@ export function CollaboratorPage() {
       )}
 
       <h2 style={{ fontSize: "1.1rem", marginTop: "1.5rem" }}>Discography</h2>
+      {collaborator.credits && collaborator.credits.length > 0 && (
+        <p className="home-dim" data-testid="collab-credits">{collaborator.credits.map((c) => `${c.role} ×${c.count}`).join(" · ")}</p>
+      )}
       {collaborator.discography.length === 0 && <p style={{ color: "var(--text-dim)" }}>No credited tracks yet.</p>}
       {collaborator.discography.map((album) => (
         <div key={album.slug} style={{ display: "flex", gap: "0.8rem", marginBottom: "1.2rem" }}>

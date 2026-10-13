@@ -125,7 +125,7 @@ export function ChallengesPanel({ focusId = null }: { focusId?: number | null } 
                     <ul className="xl2-list">
                       {detail.submissions.map((s) => (
                         <li key={s.id} className="xl-sub">
-                          <span><Link to={`/community-album/${s.albumSlug}`}>{s.trackTitle}</Link> <span className="home-dim"><Username name={s.username} /></span></span>
+                          <span><Link to={`/community-album/${s.albumSlug}`}>{s.trackTitle}</Link> <span className="home-dim"><Username name={s.username} dm /></span></span>
                           {user?.username === s.username && <button className="btn btn-danger" onClick={() => withdraw(s.id)}>withdraw</button>}
                         </li>
                       ))}

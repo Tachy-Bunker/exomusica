@@ -1,3 +1,4 @@
+import { roleSummary } from "../lib/creditRoles.js";
 import type { FastifyInstance } from "fastify";
 import { prisma } from "../lib/prisma.js";
 import { requireAdmin } from "../lib/auth.js";
@@ -79,6 +80,7 @@ export async function collaboratorRoutes(app: FastifyInstance): Promise<void> {
       linkedUsername: collaborator.linkedUser?.username ?? null,
       gallery: collaborator.galleryImages.map((g) => ({ id: g.id, url: g.url })),
       discography: [...albumMap.values()],
+      credits: roleSummary(collaborator.tracks),
     };
   });
 

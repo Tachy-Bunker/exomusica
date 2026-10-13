@@ -125,7 +125,7 @@ export function CommunityPage() {
       ) : (
         [...byOwner.entries()].map(([owner, list]) => (
           <div key={owner} style={{ marginBottom: "1.5rem" }}>
-            <h2 style={{ fontSize: "1rem" }}><Username name={owner} /></h2>
+            <h2 style={{ fontSize: "1rem" }}><Username name={owner} dm /></h2>
             <div style={{ display: "flex", flexDirection: "column", gap: "0.4rem" }}>
               {list.map((p) => (
                 <Link

@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
+import { DmButton } from "../components/DmButton";
 import { useAuth } from "../lib/auth";
 import { loadMembers, useLoaded } from "../lib/hubs";
 import { chatLines, layoutStars } from "../lib/constellation";
@@ -104,7 +105,7 @@ export function MembersPage() {
               <article key={m.username} className="crew-card" data-username={m.username}>
                 <Avatar m={m} inChat={inChat.has(m.username)} />
                 <div className="crew-main">
-                  <h3 className="sig-title"><Link className="sig-link uname-color" to={`/u/${encodeURIComponent(m.username)}`}>{m.username}</Link></h3>
+                  <h3 className="sig-title"><Link className="sig-link uname-color" to={`/u/${encodeURIComponent(m.username)}`}>{m.username}</Link><DmButton username={m.username} /></h3>
                   <p className="home-dim crew-joined">Joined {monthYear(m.joinedAt)}</p>
                   {m.bio && <p className="crew-bio">{m.bio}</p>}
                   <p className="sig-meta home-dim">

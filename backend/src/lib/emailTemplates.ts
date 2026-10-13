@@ -9,7 +9,8 @@ export type EmailType =
   | "JOIN_APPROVED"
   | "NEWS"
   | "CALL_FOR_IDEAS"
-  | "CALL_FOR_ARTISTS";
+  | "CALL_FOR_ARTISTS"
+  | "WELCOME_BUDDY";
 
 interface TemplateContent {
   subject: string;
@@ -28,6 +29,7 @@ export const TEMPLATE_TOKENS: Record<EmailType, string[]> = {
   NEWS: ["username", "date", "postTitle", "postExcerpt"],
   CALL_FOR_IDEAS: ["username", "date", "subject", "body"],
   CALL_FOR_ARTISTS: ["username", "date", "subject", "body"],
+  WELCOME_BUDDY: ["username", "date", "newMember", "welcomeUrl"],
 };
 
 export const DEFAULT_TEMPLATES: Record<EmailType, TemplateContent> = {
@@ -64,6 +66,10 @@ export const DEFAULT_TEMPLATES: Record<EmailType, TemplateContent> = {
   CALL_FOR_ARTISTS: {
     subject: "{{subject}}",
     bodyHtml: "<p>Hi {{username}},</p>{{body}}",
+  },
+  WELCOME_BUDDY: {
+    subject: "Say hello to {{newMember}} on Exomusica",
+    bodyHtml: "<p>Hi {{username}},</p><p>{{newMember}} just joined. You are their welcome buddy: one friendly line from you goes a long way.</p><p><a href=\"{{welcomeUrl}}\">Open the chat with the greeting ready to send</a></p>",
   },
 };
 

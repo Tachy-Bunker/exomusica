@@ -5,6 +5,7 @@ import { sendTemplatedMail } from "../lib/emailTemplates.js";
 import { sendMail } from "../lib/mailer.js";
 import { sendDiscordDM, sendDiscordAnnouncement } from "../lib/discordBot.js";
 import { createNotification } from "../lib/notify.js";
+import { assignWelcomeBuddy } from "../lib/welcomeAssign.js";
 import { USERNAME_RE, findJoinConflict, joinLockKeys, normalizeEmail, normalizeUsername, validEmail, JOIN_CONFLICT_MESSAGE } from "../lib/joinRules.js";
 
 interface JoinBody {
@@ -192,6 +193,7 @@ export async function joinRoutes(app: FastifyInstance): Promise<void> {
       void createNotification(user.id, "join_approved", "You're in", "Your Exomusica account was approved.").catch((err) =>
         app.log.error(err, "createNotification failed"),
       );
+      void assignWelcomeBuddy({ id: user.id, username: user.username }).catch((err) => app.log.error(err, "assignWelcomeBuddy failed"));
       void sendDiscordAnnouncement("join_approved", `${user.username} was approved for Exomusical experiments!`);
       return { id: user.id, username: user.username };
     },

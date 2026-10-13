@@ -1,8 +1,25 @@
 import type { FastifyInstance } from "fastify";
 import { prisma } from "../lib/prisma.js";
 import { requireAdmin } from "../lib/auth.js";
+import { earnedShares } from "../lib/ledger.js";
 
 export async function contributorPointsRoutes(app: FastifyInstance): Promise<void> {
+  // Public: how points were earned (never how they were spent). Ready in case donations are ever split by contribution.
+  app.get("/api/ledger", async (_req, reply) => {
+    const rows = await prisma.contributorPointsEntry.findMany({
+      where: { points: { gt: 0 } },
+      orderBy: { createdAt: "desc" },
+      take: 2000,
+      select: { userId: true, points: true, reason: true, createdAt: true, user: { select: { username: true, isGhost: true, deletedAt: true } }, submission: { select: { slug: true, title: true } } },
+    });
+    const name = (r: (typeof rows)[number]) => (r.user.isGhost || r.user.deletedAt ? null : r.user.username);
+    reply.header("cache-control", "public, max-age=60");
+    return {
+      shares: earnedShares(rows.map((r) => ({ userId: r.userId, username: name(r), points: r.points }))),
+      entries: rows.slice(0, 200).map((r) => ({ username: name(r) ?? "former member", points: r.points, reason: r.reason, at: r.createdAt.getTime(), album: r.submission ? { slug: r.submission.slug, title: r.submission.title } : null })),
+    };
+  });
+
   // Admin-only leaderboard: total points per user, most first.
   app.get("/api/admin/contributor-points", { preHandler: requireAdmin }, async () => {
     const entries = await prisma.contributorPointsEntry.findMany({

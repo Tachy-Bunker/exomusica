@@ -36,6 +36,7 @@ export function RewardsPage() {
   return (
     <div className="rewards-page page-column" style={{ maxWidth: 820 }} data-testid="rewards-page">
       <h1>Rewards</h1>
+      <p className="home-dim"><Link to="/ledger" data-testid="ledger-link">See the public points ledger</Link></p>
       {user ? (
         <p className="rewards-balance" data-testid="points-balance"><b>{balance ?? "…"}</b> <span className="home-dim">contributor points</span></p>
       ) : <p className="home-dim"><Link to="/login">Log in</Link> to see your points.</p>}

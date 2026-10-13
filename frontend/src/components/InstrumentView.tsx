@@ -53,7 +53,7 @@ export function InstrumentView({ data, rows, onRefresh, refreshing, showAll, onS
             {data.recent.map((m) => (
               <li key={m.id}>
                 <span className="inst-feed-time inst-dim">{timeAgo(m.at, now)}</span>
-                <span className="inst-feed-text"><Link to={m.href} className="inst-feed-chan" onClick={(e) => onOpen(e, { slug: m.channelSlug, name: m.channelName, branchSlug: m.branchSlug })}>{m.channelName}</Link> <Username name={m.author} /> {m.text}</span>
+                <span className="inst-feed-text"><Link to={m.href} className="inst-feed-chan" onClick={(e) => onOpen(e, { slug: m.channelSlug, name: m.channelName, branchSlug: m.branchSlug })}>{m.channelName}</Link> <Username name={m.author} dm /> {m.text}</span>
               </li>
             ))}
           </ol>

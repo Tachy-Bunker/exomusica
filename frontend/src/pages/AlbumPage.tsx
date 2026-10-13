@@ -1,3 +1,4 @@
+import { creditLabel } from "../lib/creditRoles";
 import { PlayGlow } from "../components/PlayGlow";
 import { PauseIcon, PlayIcon } from "../components/Icons";
 import { branchHref } from "../lib/branchLinks";
@@ -18,7 +19,7 @@ import { ShareModal } from "../components/ShareModal";
 import { parseAutoplay } from "../lib/shareState";
 
 interface TrackWithComposers extends PlayableTrackDTO {
-  composers: { id: number; name: string; slug: string | null }[];
+  composers: { id: number; name: string; slug: string | null; roles?: string[] }[];
 }
 
 interface AlbumDetail {
@@ -238,7 +239,7 @@ export function AlbumPage() {
                   {t.composers.map((c, i) => (
                     <span key={c.id}>
                       {i > 0 && ", "}
-                      {c.slug ? <Link to={`/collaborator/${c.slug}`}>{c.name}</Link> : c.name}
+                      {c.slug ? <Link to={`/collaborator/${c.slug}`}>{c.name}</Link> : c.name}{creditLabel("", c.roles).trim() && <span data-testid="credit-roles-shown"> {creditLabel("", c.roles).trim()}</span>}
                     </span>
                   ))}
                 </span>

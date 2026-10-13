@@ -1,3 +1,4 @@
+import { cleanRoles } from "../lib/creditRoles.js";
 import { shapeTrackHits } from "../lib/trackSearch.js";
 import { probeAudioTags, titleFor } from "../lib/audioTags.js";
 import type { FastifyInstance } from "fastify";
@@ -111,7 +112,7 @@ export async function albumRoutes(app: FastifyInstance): Promise<void> {
         ...trackToDTO(t),
         fromStudySlug: t.fromStudy?.slug ?? null,
         fromSketchId: t.fromSketchId,
-        composers: t.collaborators.map((tc) => ({ id: tc.collaborator.id, name: tc.collaborator.name, slug: tc.collaborator.slug })),
+        composers: t.collaborators.map((tc) => ({ id: tc.collaborator.id, name: tc.collaborator.name, slug: tc.collaborator.slug, roles: tc.roles })),
       })),
     };
   });
@@ -391,16 +392,16 @@ export async function albumRoutes(app: FastifyInstance): Promise<void> {
 
   // Full replace, not incremental add/remove - the admin UI sends the
   // complete checked set each time, simpler than diffing on both ends.
-  app.put<{ Params: { id: string }; Body: { collaboratorIds: number[] } }>(
+  app.put<{ Params: { id: string }; Body: { collaboratorIds: number[]; roles?: Record<string, string[]> } }>(
     "/api/admin/tracks/:id/composers",
     { preHandler: requireAdmin },
     async (req, reply) => {
       const trackId = Number(req.params.id);
-      const { collaboratorIds } = req.body ?? {};
+      const { collaboratorIds, roles } = req.body ?? {};
       await prisma.$transaction([
         prisma.trackCollaborator.deleteMany({ where: { trackId } }),
         prisma.trackCollaborator.createMany({
-          data: (collaboratorIds ?? []).map((collaboratorId) => ({ trackId, collaboratorId })),
+          data: (collaboratorIds ?? []).map((collaboratorId) => ({ trackId, collaboratorId, roles: cleanRoles(roles?.[String(collaboratorId)]) })),
         }),
       ]);
       return reply.code(204).send();

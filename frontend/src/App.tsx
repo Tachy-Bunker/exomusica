@@ -46,6 +46,7 @@ import { WikiAdminPage } from "./pages/admin/WikiAdminPage";
 import { AllTracksAdminPage } from "./pages/admin/AllTracksAdminPage";
 import { StudiesAdminPage } from "./pages/admin/StudiesAdminPage";
 import { ResourcesAdminPage } from "./pages/admin/ResourcesAdminPage";
+import { LedgerPage } from "./pages/LedgerPage";
 import { GlossaryAdminPage } from "./pages/admin/GlossaryAdminPage";
 import { FeaturedAdminPage } from "./pages/admin/FeaturedAdminPage";
 import { RewardsAdminPage } from "./pages/admin/RewardsAdminPage";
@@ -156,6 +157,7 @@ export default function App() {
             <Route path="pms/:username" element={<PostPage />} />
             <Route path="account" element={<AccountSettingsPage />} />
             <Route path="rewards" element={<RewardsPage />} />
+            <Route path="ledger" element={<LedgerPage />} />
             <Route path="signal" element={<SignalPage />} />
             <Route path="letters" element={<PostRedirect />} />
             <Route path="hypotheses" element={<HypothesesPage />} />

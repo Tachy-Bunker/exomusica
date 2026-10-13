@@ -6183,3 +6183,14 @@ select.ox-st { min-width: 7rem; }
 .emoji-picker .branch-pick { outline: 1px solid var(--accent-audio, #7cf); border-radius: 4px; }
 
 .quote-studies { margin-top: 0.2rem; padding: 0.2rem; border: 1px solid var(--border); border-radius: var(--radius); background: var(--bg-elevated, #12151f); max-height: 12rem; overflow: auto; }
+
+/* one-line private message from anywhere */
+.dm { position: relative; display: inline-block; vertical-align: baseline; margin-left: 0.25rem; }
+.dm-btn { background: none; border: 0; padding: 0 0.15rem; color: var(--text-dim); cursor: pointer; line-height: 1; opacity: .75; }
+.dm-btn:hover, .dm-btn[aria-expanded="true"] { color: var(--accent-audio, #7cf); opacity: 1; }
+.dm-pop { position: absolute; z-index: 50; left: 0; top: 100%; margin-top: 0.2rem; display: flex; gap: 0.3rem; align-items: center; flex-wrap: wrap; width: min(20rem, 80vw); padding: 0.4rem; background: var(--bg-elevated, #12151f); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: 0 6px 24px rgba(0,0,0,.45); font-weight: 400; }
+.dm-pop input { flex: 1; min-width: 8rem; }
+.glance .dm-pop { top: auto; bottom: 100%; }
+
+.ledger-table { border-collapse: collapse; min-width: min(100%, 24rem); } .ledger-table th, .ledger-table td { text-align: left; padding: 0.25rem 1rem 0.25rem 0; }
+.ledger-list { list-style: none; padding: 0; display: grid; gap: 0.5rem; }

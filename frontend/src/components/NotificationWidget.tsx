@@ -155,6 +155,10 @@ export function NotificationWidget({ offsetRight = 0, inline = false }: { offset
       navigate(`/pms/${n.channelSlug}`);
       return;
     }
+    if (n.eventKey === "welcome_buddy" && n.channelSlug) {
+      navigate(`/topic/${n.channelSlug}?say=${encodeURIComponent(n.body)}`);
+      return;
+    }
     if (n.channelSlug && n.messageId) {
       openMessage(n.channelSlug, recent.find((r) => r.channelSlug === n.channelSlug)?.channelName, Math.floor(new Date(n.createdAt).getTime() / 1000), n.messageId);
     }

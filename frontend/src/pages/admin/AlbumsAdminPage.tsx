@@ -1,3 +1,4 @@
+import { CREDIT_ROLES } from "../../lib/creditRoles";
 import { TrackSource } from "../../components/admin/TrackSource";
 import { useEffect, useRef, useState, type FormEvent, type ChangeEvent } from "react";
 import { api, ApiError } from "../../lib/api";
@@ -37,7 +38,7 @@ interface AlbumDetail {
   links: { id: number; label: string; url: string; iconUrl: string | null; linkIconId: number | null; linkIcon: { id: number; name: string; url: string } | null }[];
   gallery: { id: number; url: string }[];
   collaborators: { id: number; name: string }[];
-  tracks: { id: number; title: string; fileUrl: string; format: string; position: number; genres: string[]; lyrics: string | null; fromStudySlug?: string | null; fromSketchId?: number | null; composers: { id: number }[] }[];
+  tracks: { id: number; title: string; fileUrl: string; format: string; position: number; genres: string[]; lyrics: string | null; fromStudySlug?: string | null; fromSketchId?: number | null; composers: { id: number; roles?: string[] }[] }[];
 }
 
 export function AlbumsAdminPage() {
@@ -295,15 +296,20 @@ export function AlbumsAdminPage() {
     loadDetail(detail.slug);
   }
 
-  async function handleToggleComposer(trackId: number, collaboratorId: number, currentIds: number[]) {
+  async function handleToggleComposer(trackId: number, collaboratorId: number, current: { id: number; roles?: string[] }[]) {
     if (!detail) return;
-    const next = currentIds.includes(collaboratorId)
-      ? currentIds.filter((id) => id !== collaboratorId)
-      : [...currentIds, collaboratorId];
-    await api(`/api/admin/tracks/${trackId}/composers`, {
-      method: "PUT",
-      body: JSON.stringify({ collaboratorIds: next }),
-    });
+    const ids = current.map((c) => c.id);
+    const next = ids.includes(collaboratorId) ? ids.filter((id) => id !== collaboratorId) : [...ids, collaboratorId];
+    await saveCredits(trackId, next, current);
+  }
+  async function toggleRole(trackId: number, collaboratorId: number, role: string, current: { id: number; roles?: string[] }[]) {
+    const roles = Object.fromEntries(current.map((c) => [String(c.id), c.id === collaboratorId ? ((c.roles ?? []).includes(role) ? (c.roles ?? []).filter((r) => r !== role) : [...(c.roles ?? []), role]) : (c.roles ?? [])]));
+    await saveCredits(trackId, current.map((c) => c.id), current, roles);
+  }
+  async function saveCredits(trackId: number, ids: number[], current: { id: number; roles?: string[] }[], roles?: Record<string, string[]>) {
+    if (!detail) return;
+    const keep = roles ?? Object.fromEntries(current.map((c) => [String(c.id), c.roles ?? []])); // changing who is credited keeps everyone's roles
+    await api(`/api/admin/tracks/${trackId}/composers`, { method: "PUT", body: JSON.stringify({ collaboratorIds: ids, roles: keep }) });
     loadDetail(detail.slug);
   }
 
@@ -683,7 +689,7 @@ export function AlbumsAdminPage() {
                             handleToggleComposer(
                               t.id,
                               c.id,
-                              t.composers.map((tc) => tc.id),
+                              t.composers,
                             )
                           }
                         />{" "}
@@ -691,6 +697,14 @@ export function AlbumsAdminPage() {
                       </label>
                     ))}
                   </div>
+                  {t.composers.map((tc) => (
+                    <div key={tc.id} style={{ display: "flex", gap: "0.3rem", flexWrap: "wrap", alignItems: "center", marginTop: "0.25rem", fontSize: "0.72rem" }} data-testid="credit-roles">
+                      <span className="home-dim">{detail.collaborators.find((c) => c.id === tc.id)?.name} did:</span>
+                      {CREDIT_ROLES.map((r) => (
+                        <button key={r} type="button" className={`btn${(tc.roles ?? []).includes(r) ? " btn-primary" : ""}`} style={{ fontSize: "0.7rem", padding: "0 0.4rem" }} aria-pressed={(tc.roles ?? []).includes(r)} onClick={() => toggleRole(t.id, tc.id, r, t.composers)}>{r}</button>
+                      ))}
+                    </div>
+                  ))}
                 </div>
               ))}
             </>
