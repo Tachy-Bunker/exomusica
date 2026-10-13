@@ -1,0 +1,14 @@
+import { parseMonthDay, sameDay, dayString, byYear } from "../src/lib/capsule.js";
+import assert from "node:assert/strict";
+const today = new Date("2026-10-13T10:00:00Z");
+assert.deepEqual(parseMonthDay(undefined, today), { m: 10, d: 13 });
+assert.deepEqual(parseMonthDay("02-29"), { m: 2, d: 29 });
+assert.deepEqual(parseMonthDay("2024-03-05"), { m: 3, d: 5 });
+assert.equal(parseMonthDay("02-30"), null); assert.equal(parseMonthDay("13-01"), null); assert.equal(parseMonthDay("x"), null);
+assert.equal(sameDay(new Date("2025-10-13T23:59:59Z"), { m: 10, d: 13 }), true); assert.equal(sameDay(new Date("2025-10-14T00:00:00Z"), { m: 10, d: 13 }), false);
+assert.equal(dayString(2024, { m: 3, d: 5 }), "2024-03-05");
+const chat = new Map([[2024, { n: 1 }], [2026, { n: 9 }]]);
+const r = byYear(2026, [{ at: new Date("2025-10-13Z"), t: "a" }], [{ at: new Date("2024-10-13Z"), t: "s" }], chat);
+assert.deepEqual(r.map((y) => [y.year, y.yearsAgo]), [[2025, 1], [2024, 2]]);
+assert.equal(r[1].chat?.n, 1); assert.equal(r[0].chat, null); assert.equal(r[0].albums.length, 1);
+console.log("ok");

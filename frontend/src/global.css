@@ -6205,3 +6205,13 @@ select.ox-st { min-width: 7rem; }
 .ct2-wanted li { display: flex; justify-content: space-between; align-items: center; gap: 0.6rem; font-size: 0.88rem; }
 .ct2-wanted li.taken { opacity: 0.5; }
 .ct2-wanted .btn { padding: 0.2rem 0.55rem; font-size: 0.8rem; white-space: nowrap; }
+
+/* The top bar wears the colour of the branch being viewed (one custom property, no extra layers) */
+.top-nav.themed { border-bottom-color: var(--hdr); background: linear-gradient(90deg, color-mix(in srgb, var(--hdr) 14%, var(--bg-elevated)), var(--bg-elevated) 55%); box-shadow: 0 1px 0 color-mix(in srgb, var(--hdr) 50%, transparent); }
+.top-nav.themed .brand[aria-current="page"], .top-nav.themed .nav-link[aria-current="page"] { color: var(--hdr); }
+.hdr-branch { position: absolute; left: 50%; bottom: 0.1rem; transform: translateX(-50%); font-size: 0.65rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--hdr); text-decoration: none; max-width: 40vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.feed-link { display: inline-flex; gap: 0.5rem; font-size: 0.75rem; }
+.feed-link a { color: var(--text-dim); text-decoration: underline dotted; }
+.capsule-year { border-left: 3px solid var(--accent-audio); padding: 0.2rem 0 0.2rem 0.8rem; margin: 0 0 1.1rem; }
+.capsule-year h2 { margin: 0 0 0.3rem; font-size: 1.05rem; }
+.capsule-year ul { margin: 0.2rem 0; padding-left: 1.1rem; font-size: 0.9rem; }

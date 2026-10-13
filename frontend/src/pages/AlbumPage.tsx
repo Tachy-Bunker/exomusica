@@ -1,3 +1,4 @@
+import { useHeaderTheme } from "../lib/headerTheme";
 import { creditLabel } from "../lib/creditRoles";
 import { PlayGlow } from "../components/PlayGlow";
 import { PauseIcon, PlayIcon } from "../components/Icons";
@@ -43,6 +44,7 @@ export function AlbumPage() {
   const isDesktop = useIsDesktop();
   const lightbox = useLightbox();
   const [album, setAlbum] = useState<AlbumDetail | null>(null);
+  useHeaderTheme(album?.branch?.slug);
   const play = useAudioStore((s) => s.play);
   const playAt = useAudioStore((s) => s.playAt);
   const addToQueue = useAudioStore((s) => s.addToQueue);

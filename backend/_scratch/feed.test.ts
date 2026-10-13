@@ -1,0 +1,14 @@
+import { toAtom, toJsonFeed, xmlEscape, plainSummary, newestFirst, absolute } from "../src/lib/feed.js";
+import assert from "node:assert/strict";
+assert.equal(xmlEscape(`a<b>&"'\u0001`), "a&lt;b&gt;&amp;&quot;&apos;");
+assert.equal(plainSummary("# Title\n\nSome **bold** [link](http://x) text ![img](a.png)"), "Title Some bold link text");
+assert.ok(plainSummary("x ".repeat(300)).endsWith("…"));
+const items = [{ id: "a", title: "A & B", url: "http://s/a", date: new Date("2026-01-01"), summary: "s", author: "t", image: "http://s/i.png" }, { id: "b", title: "B", url: "http://s/b", date: new Date("2026-02-01") }];
+assert.deepEqual(newestFirst(items).map((i) => i.id), ["b", "a"]);
+const f = { title: "T", url: "http://s/", selfUrl: "http://s/f", items: newestFirst(items) };
+const x = toAtom(f);
+assert.ok(x.includes("<title>A &amp; B</title>") && x.includes("<updated>2026-02-01T00:00:00.000Z</updated>") && x.includes('rel="enclosure"'));
+assert.ok(toAtom({ ...f, items: [] }).includes("<feed"));
+const j: any = toJsonFeed(f); assert.equal(j.items.length, 2); assert.equal(j.items[1].authors[0].name, "t");
+assert.equal(absolute("http://s/", "/uploads/x.png"), "http://s/uploads/x.png"); assert.equal(absolute("http://s", "https://o/x"), "https://o/x"); assert.equal(absolute("http://s", null), null);
+console.log("ok");

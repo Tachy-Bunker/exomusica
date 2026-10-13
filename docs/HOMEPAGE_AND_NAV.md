@@ -489,3 +489,13 @@ Schema: `CommunityTrackRevision`, `BranchWanted`. Migration `fix303c_versions_wa
 **Idea 45, audit log.** Filters: free text, admin, from/to (UTC days, inclusive), debounced. "Export CSV" downloads the same filter (up to 20 000 rows; cells starting with = + - @ are neutralised for spreadsheets). `GET /api/admin/audit-log.csv`.
 
 Schema: `Message.deletedAt` + index. Migration `fix304a_trash`.
+
+## fix304b — branch header theme, feeds, "this day in past years"
+
+**Idea 40, header theme.** Inside a branch (its page, its albums, the Contribute panel with a branch selected) the top bar takes that branch's identity colour (the one set in Admin → Branch identity; branches without one get their name-derived colour) and shows the branch name under the logo, linking back to it. One CSS custom property (`--hdr`) on the header, no extra layers. Leaving the page restores the site look. Hook: `useHeaderTheme(slug)`.
+
+**Idea 49, feeds.** `GET /api/feed/branch/:slug` (albums, approved community pieces, tagged studies) and `GET /api/feed/study/:slug` (the study and each saved draft), Atom by default, `?format=json` for JSON Feed 1.1. Newest 50, cached 5 min, hidden branches are 404. Branch and study pages show "Feed · JSON" links and a `<link rel="alternate">`. Set `PUBLIC_URL` so feed links are absolute on your domain (falls back to the request host).
+
+**Idea 50, time capsule.** `/capsule?md=MM-DD` (default today) lists, per past year, albums and studies created that day and the rooms that were active with up to three readable messages, linking to that room's day. Imported Discord days count. Only rooms the public may read. Answer cached 1 h per day. Reached from the archive calendar ("This day in past years →") or by address.
+
+No schema change.

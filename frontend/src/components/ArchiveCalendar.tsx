@@ -175,6 +175,9 @@ export function ArchiveCalendar({ archiveDays, selectedDay, onSelect, label = "B
               );
             })}
           </div>
+          <a href={`/capsule?md=${(selectedDay ?? todayKey).slice(5)}`} data-testid="capsule-link" style={{ display: "block", marginTop: "0.5rem", fontSize: "0.75rem", textAlign: "center" }}>
+            This day in past years →
+          </a>
         </div>
       )}
     </div>

@@ -1,3 +1,4 @@
+import { useHeaderThemeStore } from "../lib/headerTheme";
 import { useEffect, useRef, useState } from "react";
 import { Link, Outlet, useNavigate, useLocation } from "react-router-dom";
 import { isTypingTarget } from "../lib/isTypingTarget";
@@ -309,6 +310,7 @@ export function Layout() {
   }, []);
   useCustomFont(siteFont); // still needed for its @font-face injection side effect
 
+  const headerTheme = useHeaderThemeStore((s) => s.theme);
   const currentTrack = useAudioStore((s) => s.currentTrack);
   const setAmbienceHasMainTrack = useAmbienceStore((s) => s.setHasMainTrack);
   useEffect(() => {
@@ -335,7 +337,7 @@ export function Layout() {
       className="app-shell"
       style={{ "--dock-offset": `${dockOffset}px` } as React.CSSProperties}
     >
-      <header className="top-nav" ref={navRef}>
+      <header className={`top-nav${headerTheme ? " themed" : ""}`} ref={navRef} style={headerTheme ? ({ "--hdr": headerTheme.color } as React.CSSProperties) : undefined} data-testid="top-nav">
         <div className="nav-side nav-left">
           {isDesktop && <OnlineOrbs />}
           <nav className="nav-pair" aria-label="Primary">
@@ -346,6 +348,7 @@ export function Layout() {
             ))}
           </nav>
         </div>
+        {headerTheme && <Link to={`/branch/${headerTheme.slug}`} className="hdr-branch" data-testid="hdr-branch" title={`You're in ${headerTheme.name}`}>{headerTheme.name}</Link>}
         <Link to="/" className="brand" aria-current={location.pathname === "/" ? "page" : undefined}>
           {isDesktop ? <>⩽ {underlineLetter("EXOMUSICA", "c")} ⪖</> : "⩽EXOMUSICA⪖"}
         </Link>

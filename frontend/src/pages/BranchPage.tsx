@@ -1,3 +1,5 @@
+import { FeedLink } from "../components/FeedLink";
+import { useHeaderTheme } from "../lib/headerTheme";
 import { ChatSheet } from "../components/ChatSheet";
 import { useEffect, useState } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
@@ -73,6 +75,7 @@ export function BranchPage() {
   }, [slug]);
 
   useDocumentTitle(branch?.name ?? "");
+  useHeaderTheme(slug);
 
   const setPageChannel = useChatDockStore((s) => s.setPageChannel);
   useEffect(() => {
@@ -104,6 +107,7 @@ export function BranchPage() {
           <Link to="/soundbay">{isDesktop ? "← Soundbay (R)" : "← Soundbay"}</Link>
         </p>
         <h1>{branch.name}</h1>
+        <FeedLink href={`/api/feed/branch/${branch.slug}`} title={`${branch.name} — new work`} />
         {branch.description && <p style={{ color: "var(--text-dim)", maxWidth: 640 }}>{branch.description}</p>}
       </div>
 

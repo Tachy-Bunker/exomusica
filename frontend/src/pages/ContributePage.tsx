@@ -1,3 +1,4 @@
+import { useHeaderTheme } from "../lib/headerTheme";
 import { branchHref } from "../lib/branchLinks";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
@@ -50,6 +51,7 @@ export function ContributePage({ embedded = false }: { embedded?: boolean } = {}
   const shown = useMemo(() => sortBranches(filterBranches(branches ?? [], "all", query), "az"), [branches, query]);
   const selectedSlug = params.get("branch");
   const selected = branches?.find((b) => b.slug === selectedSlug) ?? null;
+  useHeaderTheme(selected?.slug);
 
   useEffect(() => { // the brief is fetched only when someone opens it
     if (!selected || !briefOpen || selected.slug in briefs || !selected.hasBrief) return;

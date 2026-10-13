@@ -1,3 +1,4 @@
+import { FeedLink } from "../components/FeedLink";
 import { StudyBranches } from "../components/StudyBranches";
 import { StudySeo } from "../components/StudySeo";
 import { StudyBackground } from "../components/StudyBackground";
@@ -429,6 +430,7 @@ export function StudyPage() {
         ) : (
           <h1 style={{ margin: 0 }}>{study.title}</h1>
         )}
+        {!editing && slug && <FeedLink href={`/api/feed/study/${slug}`} title={`${study.title} — study`} />}
         <div style={{ display: "flex", gap: "0.4rem", alignItems: "center", flexShrink: 0 }}>
           <span
             style={{

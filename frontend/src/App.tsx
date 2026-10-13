@@ -63,6 +63,7 @@ import { ContributorPointsAdminPage } from "./pages/admin/ContributorPointsAdmin
 import { BlogAdminPage } from "./pages/admin/BlogAdminPage";
 import { EmojiAdminPage } from "./pages/admin/EmojiAdminPage";
 import { EmailTemplatesAdminPage } from "./pages/admin/EmailTemplatesAdminPage";
+import { CapsulePage } from "./pages/CapsulePage";
 import { AuditLogAdminPage } from "./pages/admin/AuditLogAdminPage";
 import { TrashAdminPage } from "./pages/admin/TrashAdminPage";
 import { InboxAdminPage } from "./pages/admin/InboxAdminPage";
@@ -120,6 +121,7 @@ export default function App() {
             <Route path="join" element={<JoinPage />} />
             <Route path="about" element={<Navigate to="/wiki" replace />} />
             <Route path="wiki" element={<LogPage />} />
+            <Route path="capsule" element={<CapsulePage />} />
             <Route path="studies" element={<Navigate to="/xenolab?tab=studies" replace />} />
             <Route path="lab/voice" element={<Suspense fallback={null}><VoiceLabPage /></Suspense>} />
             <Route path="contribute" element={<Navigate to="/xenolab?tab=contribute" replace />} />
