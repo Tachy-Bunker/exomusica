@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { api } from "../lib/api";
 import { useDocumentTitle } from "../lib/useDocumentTitle";
+import { Loading } from "../components/Loading";
 
 interface Block {
   year: number; yearsAgo: number;
@@ -30,7 +31,7 @@ export function CapsulePage() {
         Another day:{" "}
         <input type="date" aria-label="Pick a day" value={data?.day ?? ""} onChange={(e) => e.target.value && setParams({ md: e.target.value.slice(5) })} />
       </label>
-      {failed ? <p role="alert">Couldn't load it. Try again in a moment.</p> : !data ? <p className="home-dim">Loading…</p> : data.years.length === 0 ? (
+      {failed ? <p role="alert">Couldn't load it. Try again in a moment.</p> : !data ? <Loading /> : data.years.length === 0 ? (
         <p className="home-dim" data-testid="capsule-empty" style={{ marginTop: "1rem" }}>Nothing happened on this day in earlier years yet.</p>
       ) : data.years.map((y) => (
         <section key={y.year} className="capsule-year" data-testid="capsule-year">

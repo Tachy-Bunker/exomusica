@@ -7,6 +7,7 @@ import { keysOf } from "../lib/fieldLog";
 import { chartTally, layoutChart, roomStates, type ChartBranch } from "../lib/chart";
 import { readLastPlay, visitedSlugs } from "../lib/visits";
 import { listDrafts } from "../lib/studyDraft";
+import { Loading } from "../components/Loading";
 
 const CW = 180, RH = 74, W = 132, H = 44, PAD = 24;
 
@@ -22,7 +23,7 @@ export function ChartPage() {
   const plan = useMemo(() => (list ? layoutChart(list) : null), [list]);
   const states = useMemo(() => (list ? roomStates(list, visited) : null), [list, visited]);
   if (failed) return <p className="home-dim">The chart could not be read.</p>;
-  if (!list || !plan || !states) return <p className="home-dim">Loading…</p>;
+  if (!list || !plan || !states) return <Loading />;
   const tally = chartTally(states);
   const pos = new Map(plan.rooms.map((r) => [r.id, { x: PAD + r.col * CW, y: PAD + r.row * RH }]));
   const svgW = PAD * 2 + plan.cols * CW - (CW - W), svgH = PAD * 2 + Math.max(plan.rows - 1, 0) * RH + H;

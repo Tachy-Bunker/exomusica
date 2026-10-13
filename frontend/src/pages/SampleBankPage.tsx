@@ -5,6 +5,7 @@ import { useAuth } from "../lib/auth";
 import { Username } from "../components/Username";
 import { SamplePlay } from "../components/SamplePlay";
 import { Link } from "react-router-dom";
+import { Loading } from "../components/Loading";
 
 interface SampleItem {
   id: number;
@@ -232,7 +233,7 @@ export function SamplesPanel({ onAnalyze, focusId = null }: { onAnalyze: () => v
         </div>
       )}
 
-      {items === null ? <p className="home-dim">Loading…</p> : items.length === 0 ? (
+      {items === null ? <Loading /> : items.length === 0 ? (
         <p className="home-dim">{tagFilter ? `Nothing tagged "${tagFilter}".` : "Nothing here yet. Add the first sound."}</p>
       ) : (
         <ul className="xl-cards">

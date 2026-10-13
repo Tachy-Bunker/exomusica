@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { recordThreadVisit } from "../lib/phazon";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import { api } from "../lib/api";
 import { useChatDockStore } from "../lib/chatDockStore";
@@ -18,6 +19,7 @@ interface ChannelInfo {
 
 export function TopicPage() {
   const { slug } = useParams<{ slug: string }>();
+  useEffect(() => { if (slug) recordThreadVisit(slug); }, [slug]);
   const navigate = useNavigate();
   const [channel, setChannel] = useState<ChannelInfo | null>(null);
   const isDesktop = useIsDesktop();

@@ -563,3 +563,11 @@ No schema change. Deferred: Ancients (founders/old chat) and recovered-log heade
 - **Pins (69)**: a pin on the room where you last listened (`exomusica_lastplay`, written when the playing track changes), plus a "Continue" list: last heard and every unsaved study draft on this device. Reply-waiting pins are not done.
 - **Save station (71)**: under the study editor, "Save point · draft kept on this device at HH:MM". Honest wording: drafts are stored in this browser (localStorage), not on the server.
 - No schema change. Not done: doors as access levels (67) and hidden branches as secret rooms (72); both need a decision on what is gated and how hidden branches relate to pages.
+
+## fix309 — Palettes, visor frame, fog loading, forgotten threads (92, 81, 85, 93)
+
+- **Palettes (92)**: Account settings → Colours: Default / Chozo (warm gold, olive, calm) / Phazon (cold teal, 2 px corners, faint red/teal split on h1/h2). `lib/skin.ts` holds the palettes as data and applies them as CSS variables on `<html>` (nothing duplicated in the stylesheet); `contrast()` is used by `_scratch/skin.test.ts` to enforce text ≥ 7:1, dim text and accents ≥ 4.5:1 on both. Stored in `exomusica_skin`. Palettes are not overlays, so classic mode leaves them alone. Branch header colours (`--hdr`) are separate and unaffected.
+- **Visor frame (81)**: checkbox in Account settings, class `html.hud`. CSS only: one fixed `body::after` (scanline + vignette, `pointer-events:none`), notched corners on buttons/cards. Off in classic mode.
+- **Fog loading (85)**: `<Loading />` replaces the 20 `<p className="home-dim">Loading…</p>` placeholders. One compositor-only sweep (`transform`), static in classic mode and under reduced-motion, `role="status"`. New loading states should use it.
+- **Forgotten threads (93)**: `GET /api/channels` now includes `lastMessageAt` (unix s; one grouped query cached 2 min). The forum index tints topics quiet for 60+ days that you also haven't opened in that time (`lib/phazon.ts`; visits kept in `exomusica_thread_visits`, recorded by opening the chat dock or the topic page). Opening one clears it. Static tint only (no animation); the split-colour text shadow is off in classic mode.
+- No schema change.

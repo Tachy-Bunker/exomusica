@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { OpacitySlider } from "../../components/OpacitySlider";
 import { api, ApiError } from "../../lib/api";
+import { Loading } from "../../components/Loading";
 
 type Kind = "study" | "news" | "wiki";
 interface Entry { id: number; kind: Kind; refSlug: string; text: string | null; imageUrl: string | null; imageOpacity: number | null; active: boolean; title: string | null; missing: boolean }
@@ -121,7 +122,7 @@ export function FeaturedAdminPage() {
         <button className="btn btn-primary" onClick={add} disabled={!slug}>Feature it</button>
       </div>
       {error && <p className="an-err" role="alert">{error}</p>}
-      {entries === null ? <p className="home-dim">Loading…</p> : entries.length === 0 ? <p className="home-dim">Nothing featured yet: the homepage shows no slideshow.</p> : (
+      {entries === null ? <Loading /> : entries.length === 0 ? <p className="home-dim">Nothing featured yet: the homepage shows no slideshow.</p> : (
         <ul className="feat-admin-list">
           {entries.map((e, i) => <EntryEditor key={e.id} e={e} first={i === 0} last={i === entries.length - 1} onMove={(d) => move(i, d)} onChanged={load} onRemove={() => remove(e)} />)}
         </ul>

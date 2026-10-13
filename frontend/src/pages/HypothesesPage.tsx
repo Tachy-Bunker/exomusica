@@ -5,6 +5,7 @@ import { useAuth } from "../lib/auth";
 import { useDocumentTitle } from "../lib/useDocumentTitle";
 import { participantToken } from "../lib/participant";
 import { STATUS_LABEL, STATUS_ORDER, type HypCard } from "../lib/hypotheses";
+import { Loading } from "../components/Loading";
 
 /** The basket: claims anyone can test. Draw one, answer in a tap, or put your own in. */
 export function HypothesesPage() {
@@ -34,7 +35,7 @@ export function HypothesesPage() {
       <div className="hyp-filters" role="group" aria-label="Status">
         {["", ...STATUS_ORDER].map((s) => <button key={s} className={`xl-chip${status === s ? " on" : ""}`} aria-pressed={status === s} onClick={() => setSp(s ? { status: s } : {})}>{s ? STATUS_LABEL[s] : "all"}</button>)}
       </div>
-      {rows === null ? <p className="home-dim">Loading…</p> : rows.length === 0 ? <p className="home-dim">Nothing here yet.</p> : (
+      {rows === null ? <Loading /> : rows.length === 0 ? <p className="home-dim">Nothing here yet.</p> : (
         <ul className="hyp-list">
           {rows.map((h) => (
             <li key={h.id} className="hyp-card" data-testid="hyp-card">

@@ -8,6 +8,7 @@ import { useContentScaleStore } from "../lib/contentScaleStore";
 import type { Branch } from "../lib/types";
 import { ExportIcon } from "../components/Icons";
 import { exportChatHistory } from "../lib/exportChat";
+import { isForgotten, threadVisits } from "../lib/phazon";
 import { useChatDockStore } from "../lib/chatDockStore";
 
 interface ChannelSummary {
@@ -16,6 +17,7 @@ interface ChannelSummary {
   description: string | null;
   category: string | null;
   contentMarkdown: string | null;
+  lastMessageAt?: number | null;
 }
 
 export function DiscussionIndexPage() {
@@ -26,6 +28,7 @@ export function DiscussionIndexPage() {
   const [branches, setBranches] = useState<Branch[]>([]);
   const [categoryOrder, setCategoryOrder] = useState<string[]>([]);
   const openChat = useChatDockStore((s) => s.openChat);
+  const visits = threadVisits(), nowS = Math.floor(Date.now() / 1000);
 
   useEffect(() => {
     api<ChannelSummary[]>("/api/channels?kind=DISCUSSION").then(setTopics);
@@ -76,7 +79,7 @@ export function DiscussionIndexPage() {
             )}
             <ul style={{ listStyle: "none", padding: 0 }}>
               {items.map((t) => (
-                <li key={t.slug} style={{ marginBottom: "0.5rem" }}>
+                <li key={t.slug} style={{ marginBottom: "0.5rem" }} className={isForgotten(t.lastMessageAt, visits[t.slug], nowS) ? "forgotten" : undefined} title={isForgotten(t.lastMessageAt, visits[t.slug], nowS) ? "Quiet for a long time. Visit it to wake it up." : undefined}>
                   <Link
                     to={`/topic/${t.slug}`}
                     onClick={(e) => {

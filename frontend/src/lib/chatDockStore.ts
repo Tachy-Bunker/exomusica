@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
+import { recordThreadVisit } from "./phazon";
 import { dialOrder, freeSlot, pin, removeScene, saveScene, touchRecent, toggleSleep, tune, unpin, type Room, type Scene } from "./rooms";
 
 interface ChatDockState {
@@ -63,8 +64,10 @@ export const useChatDockStore = create<ChatDockState>()(
       // Deliberately a plain replace, not append - the spec is one chatbox
       // at a time, so opening a different branch's chat just swaps the
       // content.
-      openChat: (slug, name, branchSlug) =>
-        set((s) => ({ openChannelSlug: slug, openChannelName: name, openBranchSlug: branchSlug ?? null, collapsed: false, recents: touchRecent(s.recents, { slug, name, branchSlug }) })),
+      openChat: (slug, name, branchSlug) => {
+        recordThreadVisit(slug);
+        set((s) => ({ openChannelSlug: slug, openChannelName: name, openBranchSlug: branchSlug ?? null, collapsed: false, recents: touchRecent(s.recents, { slug, name, branchSlug }) }));
+      },
       // The dial of rooms (lib/rooms.ts): 6 pinned slots, then the rooms you used lately.
       pinRoom: (i, room) => set((s) => {
         const r = room ?? (s.openChannelSlug ? { slug: s.openChannelSlug, name: s.openChannelName ?? s.openChannelSlug, branchSlug: s.openBranchSlug ?? undefined } : null);

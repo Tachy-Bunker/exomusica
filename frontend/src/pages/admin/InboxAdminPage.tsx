@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../../lib/api";
 import { useDocumentTitle } from "../../lib/useDocumentTitle";
+import { Loading } from "../../components/Loading";
 
 interface Item { kind: "join" | "submission" | "reward"; id: number; title: string; who: string; at: number; to: string }
 interface Inbox { total: number; counts: Record<string, number>; items: Item[] }
@@ -31,7 +32,7 @@ export function InboxAdminPage() {
           {(Object.keys(LABEL) as (keyof typeof LABEL)[]).map((k) => <button key={k} className={`btn${only === k ? " btn-primary" : ""}`} onClick={() => setOnly(k)} data-testid={`inbox-filter-${k}`}>{LABEL[k]} · {d.counts[k] ?? 0}</button>)}
         </div>
       )}
-      {!d ? <p className="home-dim">Loading…</p> : items.length === 0 ? <p className="home-dim" data-testid="inbox-empty">Nothing is waiting.</p> : (
+      {!d ? <Loading /> : items.length === 0 ? <p className="home-dim" data-testid="inbox-empty">Nothing is waiting.</p> : (
         <ul style={{ listStyle: "none", padding: 0, display: "flex", flexDirection: "column", gap: "0.35rem" }}>
           {items.map((i) => (
             <li key={`${i.kind}-${i.id}`} data-testid="inbox-item" style={{ display: "flex", gap: "0.7rem", alignItems: "baseline", border: "1px solid var(--border)", borderRadius: "var(--radius)", padding: "0.4rem 0.6rem" }}>

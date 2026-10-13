@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { api } from "../lib/api";
 import { useAuth } from "../lib/auth";
 import { useDocumentTitle } from "../lib/useDocumentTitle";
+import { Loading } from "../components/Loading";
 
 interface Reward { id: number; title: string; description: string | null; cost: number; stock: number | null; perUser: number; itemId: number | null; itemTitle: string | null; mine: number }
 interface Points { balance: number; entries: { id: number; points: number; reason: string; createdAt: string }[]; claims: { id: number; title: string; itemId: number | null; cost: number; status: string; note: string | null; createdAt: string }[] }
@@ -41,7 +42,7 @@ export function RewardsPage() {
         <p className="rewards-balance" data-testid="points-balance"><b>{balance ?? "…"}</b> <span className="home-dim">contributor points</span></p>
       ) : <p className="home-dim"><Link to="/login">Log in</Link> to see your points.</p>}
 
-      {rewards === null ? <p className="home-dim">Loading…</p> : rewards.length === 0 ? <p className="home-dim">Nothing to claim yet. The team adds rewards over time.</p> : (
+      {rewards === null ? <Loading /> : rewards.length === 0 ? <p className="home-dim">Nothing to claim yet. The team adds rewards over time.</p> : (
         <ul className="rewards-list">
           {rewards.map((r) => {
             const out = r.stock !== null && r.stock <= 0;

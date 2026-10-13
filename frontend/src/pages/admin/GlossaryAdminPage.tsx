@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api, ApiError } from "../../lib/api";
 import { resetGlossaryCache, type GlossaryData, type GlossaryEntry } from "../../lib/glossary";
+import { Loading } from "../../components/Loading";
 
 /** Glossary terms. The Glossary page itself is a wiki page holding a {glossary} line: it can sit under any article in the Log and take a font like any page. */
 export function GlossaryAdminPage() {
@@ -16,7 +17,7 @@ export function GlossaryAdminPage() {
     try { await api("/api/admin/wiki", { method: "POST", body: JSON.stringify({ slug: "glossary", title: "Glossary", contentMarkdown: "Terms used around XenoLab.\n\n{glossary}" }) }); load(); }
     catch (e) { setError(e instanceof ApiError ? e.message : "Couldn't create the page (a page called glossary may already exist: add a {glossary} line to it)"); }
   }
-  if (!data) return <p className="home-dim">Loading…</p>;
+  if (!data) return <Loading />;
   return (
     <div data-testid="glossary-admin">
       <h2>Glossary</h2>

@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../../lib/api";
 import { useDocumentTitle } from "../../lib/useDocumentTitle";
+import { Loading } from "../../components/Loading";
 
 interface TrashRow { id: number; text: string; kind: string; author: string; channel: { slug: string; name: string }; files: number; deletedAt: string; daysLeft: number }
 
@@ -21,7 +22,7 @@ export function TrashAdminPage() {
     <div data-testid="trash-page">
       <h1>Trash</h1>
       <p className="home-dim" style={{ fontSize: "0.85rem" }}>Deleted messages stay here for 30 days with their files, then are cleared automatically. Restoring puts the message back in its room.</p>
-      {rows === null ? <p className="home-dim">Loading…</p> : rows.length === 0 ? <p className="home-dim" data-testid="trash-empty">The trash is empty.</p> : (
+      {rows === null ? <Loading /> : rows.length === 0 ? <p className="home-dim" data-testid="trash-empty">The trash is empty.</p> : (
         <table>
           <thead><tr><th>Message</th><th>Room</th><th>Left</th><th /></tr></thead>
           <tbody>

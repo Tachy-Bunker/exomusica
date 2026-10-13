@@ -6,6 +6,7 @@ import { timeAgo } from "../../lib/relativeTime";
 import { STUDY_TEMPLATES, templateById } from "../../lib/studyTemplates";
 import { filterStudies, type StudyCard, type StudyFilter } from "../../lib/xenolab";
 import { Username } from "../Username";
+import { Loading } from "../Loading";
 
 export function StudyCardView({ s }: { s: StudyCard }) {
   return (
@@ -50,7 +51,7 @@ export function StudiesPanel({ studies }: { studies: StudyCard[] | null }) {
 
   return (
     <div data-testid="studies-panel">
-      {studies === null ? <p className="home-dim">Loading…</p> : list.length === 0 ? <p className="home-dim">{studies.length === 0 ? "No studies yet. Yours could be the first." : "No study matches."}</p> : (
+      {studies === null ? <Loading /> : list.length === 0 ? <p className="home-dim">{studies.length === 0 ? "No studies yet. Yours could be the first." : "No study matches."}</p> : (
         <>
           <ul className="xl-cards">{list.slice(0, shown).map((s) => <StudyCardView key={s.slug} s={s} />)}</ul>
           {list.length > shown && <button className="btn" onClick={() => setShown((n) => n + 12)}>Show more ({list.length - shown})</button>}

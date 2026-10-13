@@ -1,5 +1,6 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { api, ApiError } from "../../lib/api";
+import { Loading } from "../../components/Loading";
 
 interface Reward { id: number; title: string; description: string | null; cost: number; perUser: number; stock: number | null; active: boolean; itemId: number | null; itemTitle: string | null; claimCount: number }
 interface Claim { id: number; username: string; title: string; cost: number; status: string; note: string | null; createdAt: string }
@@ -91,7 +92,7 @@ export function RewardsAdminPage() {
       </form>
       {error && <p className="an-err" role="alert">{error}</p>}
 
-      {rewards === null ? <p className="home-dim">Loading…</p> : rewards.length === 0 ? <p className="home-dim">No rewards yet.</p> : <ul className="res-list">{rewards.map((r) => <RewardRow key={r.id} r={r} onChanged={load} />)}</ul>}
+      {rewards === null ? <Loading /> : rewards.length === 0 ? <p className="home-dim">No rewards yet.</p> : <ul className="res-list">{rewards.map((r) => <RewardRow key={r.id} r={r} onChanged={load} />)}</ul>}
 
       <h2 className="home-h2" style={{ marginTop: "1.6rem" }}>To fulfil ({pending.length})</h2>
       {pending.length === 0 ? <p className="home-dim">Nothing waiting.</p> : (

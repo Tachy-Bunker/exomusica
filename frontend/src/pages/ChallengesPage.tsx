@@ -4,6 +4,7 @@ import { api } from "../lib/api";
 import { useAuth } from "../lib/auth";
 import { Username } from "../components/Username";
 import { SeoFieldsEditor } from "../components/SeoFieldsEditor";
+import { Loading } from "../components/Loading";
 
 interface ChallengeSummary { id: number; title: string; prompt: string; active: boolean; submissionCount: number; ogTitle?: string | null; ogDescription?: string | null; ogImageUrl?: string | null }
 
@@ -102,7 +103,7 @@ export function ChallengesPanel({ focusId = null }: { focusId?: number | null } 
         </form>
       )}
 
-      {challenges === null ? <p className="home-dim">Loading…</p> : challenges.length === 0 ? <p className="home-dim">No challenges yet.</p> : (
+      {challenges === null ? <Loading /> : challenges.length === 0 ? <p className="home-dim">No challenges yet.</p> : (
         <ul className="xl-cards">
           {challenges.map((c) => (
             <li key={c.id} id={`call-${c.id}`} className={`xl-card${c.active ? "" : " xl-card-closed"}${focusId === c.id ? " xl-card-focus" : ""}`}>

@@ -1,4 +1,5 @@
 import { useClassicMode } from "../lib/classicMode";
+import { asSkin, SKINS, useSkin } from "../lib/skin";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { api, ApiError } from "../lib/api";
@@ -64,6 +65,7 @@ export function AccountSettingsPage() {
   const { logout } = useAuth();
   const classic = useClassicMode((s) => s.classic);
   const setClassic = useClassicMode((s) => s.set);
+  const skin = useSkin((s) => s.skin), setSkin = useSkin((s) => s.setSkin), hud = useSkin((s) => s.hud), setHud = useSkin((s) => s.setHud);
   const navigate = useNavigate();
   const [me, setMe] = useState<Me | null>(null);
   const [passwords, setPasswords] = useState({ current: "", next: "" });
@@ -298,6 +300,17 @@ export function AccountSettingsPage() {
 
       <label style={{ display: "block", fontSize: "0.9rem", marginBottom: "0.8rem" }}>
         <input type="checkbox" checked={classic} onChange={(e) => setClassic(e.target.checked)} data-testid="classic-toggle" /> Classic mode: no Probe mode, wipes, overlays or extra sounds (starts on by itself if your device asks for less motion or is low on memory)
+      </label>
+
+      <label style={{ display: "block", fontSize: "0.9rem", marginBottom: "0.5rem" }}>
+        Colours{" "}
+        <select value={skin} onChange={(e) => setSkin(asSkin(e.target.value))} data-testid="skin-select" aria-label="Colour scheme">
+          <option value="">Default</option>
+          {Object.entries(SKINS).map(([id, k]) => <option key={id} value={id}>{k.label} — {k.blurb}</option>)}
+        </select>
+      </label>
+      <label style={{ display: "block", fontSize: "0.9rem", marginBottom: "0.8rem" }}>
+        <input type="checkbox" checked={hud} onChange={(e) => setHud(e.target.checked)} data-testid="hud-toggle" /> Visor frame: angled panels, faint scanlines and a curved vignette (off in classic mode)
       </label>
 
       <p style={{ fontSize: "0.9rem", marginBottom: "0.8rem" }}><Link to="/field-log" data-testid="settings-field-log">Your Field Log</Link> <span className="home-dim">— what you have probed so far</span></p>

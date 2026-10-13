@@ -2,6 +2,7 @@ import { useEffect, useState, type FormEvent } from "react";
 import { Link } from "react-router-dom";
 import { api, ApiError } from "../../lib/api";
 import { SeoFieldsEditor } from "../../components/SeoFieldsEditor";
+import { Loading } from "../../components/Loading";
 
 interface Resource {
   id: number; title: string; description: string | null; owner: string; kind: string; cover: string | null;
@@ -113,7 +114,7 @@ export function ResourcesAdminPage() {
       )}
 
       <h2 className="home-h2" style={{ marginTop: "1.6rem" }}>Resources</h2>
-      {items === null ? <p className="home-dim">Loading…</p> : items.length === 0 ? <p className="home-dim">Nothing has been added in XenoLab yet.</p> : (
+      {items === null ? <Loading /> : items.length === 0 ? <p className="home-dim">Nothing has been added in XenoLab yet.</p> : (
         <ul className="res-list">
           {items.map((r) => (
             <li key={r.id}>

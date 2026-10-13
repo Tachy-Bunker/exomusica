@@ -13,6 +13,7 @@ import { renderMarkdown } from "../lib/markdown";
 import { useDocumentTitle } from "../lib/useDocumentTitle";
 import { useIsDesktop } from "../lib/useIsDesktop";
 import { useUrlParams } from "../lib/useUrlParams";
+import { Loading } from "../components/Loading";
 
 interface BranchDetail { briefMarkdown: string | null }
 
@@ -121,7 +122,7 @@ export function ContributePage({ embedded = false }: { embedded?: boolean } = {}
 
         {briefOpen && selected.hasBrief && (
           <div className="ct-brief" data-testid="contribute-brief">
-            {briefs[selected.slug] === undefined ? <p className="home-dim">Loading…</p> : briefs[selected.slug] ? renderMarkdown(briefs[selected.slug]!, navigate) : <p className="home-dim">Couldn't load it. Download it instead.</p>}
+            {briefs[selected.slug] === undefined ? <Loading /> : briefs[selected.slug] ? renderMarkdown(briefs[selected.slug]!, navigate) : <p className="home-dim">Couldn't load it. Download it instead.</p>}
           </div>
         )}
 

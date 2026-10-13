@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { api } from "../lib/api";
 import { Username } from "../components/Username";
 import { useDocumentTitle } from "../lib/useDocumentTitle";
+import { Loading } from "../components/Loading";
 
 interface Ledger { shares: { username: string; earned: number; sharePermille: number }[]; entries: { username: string; points: number; reason: string; at: number; album: { slug: string; title: string } | null }[] }
 
@@ -15,7 +16,7 @@ export function LedgerPage() {
     <div className="page-column" data-testid="ledger-page">
       <h1>Points ledger</h1>
       <p className="home-dim">Every contributor point, who earned it and why. Only earnings are listed. <Link to="/rewards">Rewards</Link></p>
-      {!d ? <p className="home-dim">Loading…</p> : d.entries.length === 0 ? <p className="home-dim">No points have been awarded yet.</p> : (
+      {!d ? <Loading /> : d.entries.length === 0 ? <p className="home-dim">No points have been awarded yet.</p> : (
         <>
           <h2 className="home-h2">Shares</h2>
           <table className="ledger-table" data-testid="ledger-shares">

@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { api, ApiError } from "../../lib/api";
 import { useAuth } from "../../lib/auth";
 import { renderMarkdown } from "../../lib/markdown";
+import { Loading } from "../Loading";
 
 export interface Phenomenon { id: number; slug: string; title: string; summary: string; body: string; chain: string | null; published: boolean; example: { id: number; title: string; fileUrl: string; albumTitle: string } | null }
 
@@ -18,7 +19,7 @@ export function PhenomenaPanel({ focusSlug }: { focusSlug: string | null }) {
   useEffect(() => { void load(); }, [isAdmin]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { if (list && focusSlug) document.querySelector(`[data-phenomenon="${CSS.escape(focusSlug)}"]`)?.scrollIntoView({ block: "center" }); }, [list, focusSlug]);
 
-  if (!list) return <p className="home-dim">Loading…</p>;
+  if (!list) return <Loading />;
   return (
     <div data-testid="phenomena-panel">
       {isAdmin && <p><button type="button" className="btn" onClick={() => setEditing("new")} data-testid="phenomenon-new">+ New card</button></p>}

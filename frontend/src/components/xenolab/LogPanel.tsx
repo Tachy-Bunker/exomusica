@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { loadWikiPages, useLoaded } from "../../lib/hubs";
 import { buildTree, type WikiNode } from "../../lib/logTree";
+import { Loading } from "../Loading";
 
 function Nodes({ nodes }: { nodes: WikiNode[] }) {
   return (
@@ -33,7 +34,7 @@ export function LogPanel() {
         <Link className="btn" to="/wiki">Open the Log</Link>
       </div>
       <input type="search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search the Log" aria-label="Search the Log" className="xl-search" />
-      {failed ? <p className="home-dim">Could not load the Log.</p> : !data ? <p className="home-dim">Loading…</p> : tree.length === 0 ? <p className="home-dim">{query ? "No entry matches." : "The Log is empty."}</p> : <Nodes nodes={tree} />}
+      {failed ? <p className="home-dim">Could not load the Log.</p> : !data ? <Loading /> : tree.length === 0 ? <p className="home-dim">{query ? "No entry matches." : "The Log is empty."}</p> : <Nodes nodes={tree} />}
     </div>
   );
 }

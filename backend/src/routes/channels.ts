@@ -5,13 +5,26 @@ import { BACKUP_FORMAT, messageKey, parseBackup, type BackupFile } from "../lib/
 import { toDayKey } from "../lib/dayKey.js";
 import { deleteAttachmentAndReclaim } from "../lib/storage.js";
 
+let lastCache: { at: number; map: Map<number, number> } | null = null;
+async function lastMessageTimes(): Promise<Map<number, number>> {
+  if (lastCache && Date.now() - lastCache.at < 120_000) return lastCache.map;
+  const rows = await prisma.message.groupBy({ by: ["channelId"], where: { isDeleted: false }, _max: { createdAt: true } });
+  const map = new Map<number, number>();
+  for (const r of rows) if (r._max.createdAt) map.set(r.channelId, Math.floor(+r._max.createdAt / 1000));
+  lastCache = { at: Date.now(), map };
+  return map;
+}
+
 export async function channelRoutes(app: FastifyInstance): Promise<void> {
   app.get<{ Querystring: { kind?: "BRANCH" | "DISCUSSION" } }>("/api/channels", async (req) => {
-    return prisma.forumChannel.findMany({
+    const channels = await prisma.forumChannel.findMany({
       where: req.query.kind ? { kind: req.query.kind } : undefined,
       include: { font: true },
       orderBy: [{ position: "asc" }, { createdAt: "asc" }],
     });
+    // When each topic last heard anything (unix seconds); the forum index tints the long-quiet ones. One grouped query, shared for two minutes.
+    const last = await lastMessageTimes();
+    return channels.map((c) => ({ ...c, lastMessageAt: last.get(c.id) ?? null }));
   });
 
   app.get<{ Params: { slug: string } }>("/api/channels/:slug", async (req, reply) => {

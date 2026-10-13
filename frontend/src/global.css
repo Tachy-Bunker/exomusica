@@ -6291,3 +6291,16 @@ html.classic .door-wipe{display:none}
 .save-station{font-size:0.8rem;margin:0 0 0.4rem}
 .save-station i{display:inline-block;width:8px;height:8px;border-radius:50%;border:1px solid #ff9d3c;vertical-align:middle}
 .save-station i.on{background:#ff9d3c}
+
+/* Palettes, visor frame, fog loading, forgotten threads */
+html[data-skin="phazon"] h1,html[data-skin="phazon"] h2{text-shadow:1px 0 #ff4d7a66,-1px 0 #19e0c866}
+html[data-skin="chozo"] .btn{border-radius:calc(var(--radius) * 1.6)}
+.fog-load{position:relative;overflow:hidden;width:fit-content;padding-right:2.5rem}
+.fog-load::after{content:"";position:absolute;inset:0;background:linear-gradient(90deg,transparent,color-mix(in srgb,var(--text) 22%,transparent),transparent);transform:translateX(-100%);animation:fog-wipe 1.6s ease-in-out infinite}
+@keyframes fog-wipe{to{transform:translateX(100%)}}
+@media (prefers-reduced-motion:reduce){.fog-load::after{animation:none;display:none}}
+html.classic .fog-load::after{animation:none;display:none}
+html.hud:not(.classic) body::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:8000;background:repeating-linear-gradient(0deg,transparent 0 2px,rgba(0,0,0,.07) 2px 3px),radial-gradient(ellipse at center,transparent 62%,rgba(0,0,0,.45) 100%)}
+html.hud:not(.classic) .btn,html.hud:not(.classic) .probe-card,html.hud:not(.classic) .phen-card{border-radius:0;clip-path:polygon(0 0,calc(100% - 8px) 0,100% 8px,100% 100%,8px 100%,0 calc(100% - 8px))}
+li.forgotten{opacity:0.62;box-shadow:inset 3px 0 0 color-mix(in srgb,var(--accent-audio) 45%,transparent);padding-left:0.5rem;text-shadow:1px 0 #ff4d7a44,-1px 0 #19e0c844}
+html.classic li.forgotten{text-shadow:none}

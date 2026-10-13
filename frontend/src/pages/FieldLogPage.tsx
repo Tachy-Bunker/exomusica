@@ -5,6 +5,7 @@ import { useAuth } from "../lib/auth";
 import { useDocumentTitle } from "../lib/useDocumentTitle";
 import { scannedIds, syncScans } from "../lib/scanLog";
 import { entryState, keysOf, sectionStat, shareSummary, type LogSection } from "../lib/fieldLog";
+import { Loading } from "../components/Loading";
 
 /** Everything you have probed, as a log: unprobed entries are silhouettes (their names are not even in the page). Per-section counts only, never one grand total. */
 export function FieldLogPage() {
@@ -45,7 +46,7 @@ export function FieldLogPage() {
   }
 
   if (failed) return <p className="home-dim">The log could not be read.</p>;
-  if (!sections) return <p className="home-dim">Loading…</p>;
+  if (!sections) return <Loading />;
   return (
     <div className="field-log" data-testid="field-log">
       <h1>Field Log</h1>

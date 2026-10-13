@@ -9,6 +9,7 @@ import { SamplesPanel } from "./SampleBankPage";
 import { api } from "../lib/api";
 import { useDocumentTitle } from "../lib/useDocumentTitle";
 import { LAB_TABS, parseTab, type LabTab, type StudyCard } from "../lib/xenolab";
+import { Loading } from "../components/Loading";
 
 const VoiceLab = lazy(() => import("./VoiceLabPage").then((m) => ({ default: m.VoiceLabPage })));
 const Contribute = lazy(() => import("./ContributePage").then((m) => ({ default: m.ContributePage })));
@@ -40,10 +41,10 @@ export function ResearchPage() {
           <PlotTool latestSlug={studies?.[0]?.slug ?? null} />
         </div>
       )}
-      {tab === "effects" && <Suspense fallback={<p className="home-dim">Loading…</p>}><VoiceLab embedded /></Suspense>}
+      {tab === "effects" && <Suspense fallback={<Loading />}><VoiceLab embedded /></Suspense>}
       {tab === "phenomena" && <PhenomenaPanel focusSlug={params.get("item")} />}
       {tab === "open" && <ChallengesPanel focusId={Number(params.get("call")) || null} />}
-      {tab === "contribute" && <Suspense fallback={<p className="home-dim">Loading…</p>}><Contribute embedded /></Suspense>}
+      {tab === "contribute" && <Suspense fallback={<Loading />}><Contribute embedded /></Suspense>}
     </div>
   );
 }

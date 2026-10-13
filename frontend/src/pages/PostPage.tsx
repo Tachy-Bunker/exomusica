@@ -13,6 +13,7 @@ import { AttachmentPreview } from "../components/AttachmentPreview";
 import { LetterComposer } from "../components/LetterComposer";
 import { LetterView } from "../components/LetterView";
 import { MdBox } from "../components/MdBox";
+import { Loading } from "../components/Loading";
 
 interface Full { id: number; doc: Doc; from: string; at: string; mine: boolean; canBlock: boolean }
 const EMPTY: Doc = { bg: "paper", items: [] };
@@ -116,7 +117,7 @@ export function PostPage() {
             <input value={find} onChange={(e) => setFind(e.target.value)} placeholder="Write to… (username)" aria-label="Start a conversation" data-testid="post-new" />
             <button className="btn" type="submit" disabled={!find.trim()}>Go</button>
           </form>
-          {box === null && rows.length === 0 ? <p className="home-dim">Loading…</p> : rows.length === 0 ? <p className="home-dim">Nothing yet. Type a username above, or visit someone's profile.</p> : (
+          {box === null && rows.length === 0 ? <Loading /> : rows.length === 0 ? <p className="home-dim">Nothing yet. Type a username above, or visit someone's profile.</p> : (
             <ul data-testid="post-rows">
               {rows.map((r) => (
                 <li key={r.partner}>
