@@ -1,3 +1,6 @@
+import { GlossRef } from "../components/GlossRef";
+import { GlossaryList } from "../components/GlossaryList";
+import { splitTerms } from "./glossary";
 import { CiteRef } from "../components/CiteRef";
 import { IMAGE_LINE, parseImageAttrs, isUploadingUrl, type ImageAttrs } from "./images";
 import { ALIGN_OPEN, ALIGN_CLOSE } from "./textEdit";
@@ -37,6 +40,8 @@ export interface MarkdownOptions {
   audio?: (url: string) => ReactNode;
   /** Study images: their size and alignment are drawn, and (when editable) they can be dragged to resize. */
   images?: { editable?: boolean; onChange?: (index: number, attrs: ImageAttrs) => void };
+  /** Terms of the glossary: the first mention of each in plain text becomes a hover card linking to the glossary page. */
+  glossary?: import("./glossary").GlossaryIndex | null;
   /** Draws an @file(url)[label] line as a file card. Without it the line is a plain download button. */
   file?: (url: string, label: string | undefined) => ReactNode;
 }
@@ -51,7 +56,14 @@ const EXTENDED_INLINE =
 
 function renderInline(text: string, onLinkClick?: (path: string) => void, options?: MarkdownOptions): ReactNode[] {
   const ext = !!options?.extended;
-  const gap = (t: string) => (ext ? t.replace(/\t/g, "\u2003\u2003") : t); // a tab in the middle of a line is a visible gap (two em spaces)
+  const spaced = (t: string) => (ext ? t.replace(/\t/g, "\u2003\u2003") : t); // a tab in the middle of a line is a visible gap (two em spaces)
+  const g = options?.glossary;
+  const gap = (t: string): ReactNode => {
+    if (!g) return spaced(t);
+    const parts = splitTerms(t, g);
+    if (parts.length === 1 && typeof parts[0] === "string") return spaced(t);
+    return parts.map((p, k) => (typeof p === "string" ? spaced(p) : <GlossRef key={`g${k}`} word={p.word} entry={p.entry} pageSlug={g.pageSlug} />));
+  };
   const nodes: ReactNode[] = [];
   let lastIndex = 0;
   let i = 0;
@@ -128,10 +140,13 @@ const VIDEO_LINE = /^@video\((\S+)\)$/;
 const FILE_LINE = /^@file\((\S+)\)(?:\[(.*?)\])?$/;
 const ORDERED_LINE = /^\d+[.)]\s(.*)$/;
 const RULE_LINE = /^(-{3,}|\*{3,})$/;
+const GLOSSARY_LINE = /^\{glossary(?: (list|cards|columns))?\}$/;
 const FIGURE_LINE = /^\{(fig|tab):(\d+)\}$/;
 
 export function renderMarkdown(markdown: string, onLinkClick?: (path: string) => void, options?: MarkdownOptions): ReactNode {
   const ext = !!options?.extended;
+  options?.glossary?.used.clear(); // each render links the first mention of every term afresh
+  const headOptions = options?.glossary ? { ...options, glossary: null } : options; // headings stay plain
   const lines = markdown.split("\n");
   const blocks: ReactNode[] = [];
   let listBuffer: string[] = [];
@@ -244,7 +259,11 @@ export function renderMarkdown(markdown: string, onLinkClick?: (path: string) =>
     const ordered = ext ? line.match(ORDERED_LINE) : null;
     const figureLine = ext ? line.match(FIGURE_LINE) : null;
 
-    if (figureLine) {
+    const glossLine = ext ? line.match(GLOSSARY_LINE) : null;
+    if (glossLine) {
+      flushList();
+      blocks.push(<GlossaryList key={stableKey("glossary")} layout={(glossLine[1] as "list" | "cards" | "columns" | undefined) ?? "list"} />);
+    } else if (figureLine) {
       flushList();
       const kind = figureLine[1] as "fig" | "tab";
       const n = Number(figureLine[2]);
@@ -264,21 +283,21 @@ export function renderMarkdown(markdown: string, onLinkClick?: (path: string) =>
       flushList();
       blocks.push(
         <h1 key={key++} id={ext ? `sec-${headingOrdinal++}` : undefined}>
-          {renderInline(line.slice(2), onLinkClick, options)}
+          {renderInline(line.slice(2), onLinkClick, headOptions)}
         </h1>,
       );
     } else if (line.startsWith("## ")) {
       flushList();
       blocks.push(
         <h2 key={key++} id={ext ? `sec-${headingOrdinal++}` : undefined}>
-          {renderInline(line.slice(3), onLinkClick, options)}
+          {renderInline(line.slice(3), onLinkClick, headOptions)}
         </h2>,
       );
     } else if (line.startsWith("### ")) {
       flushList();
       blocks.push(
         <h3 key={key++} id={ext ? `sec-${headingOrdinal++}` : undefined}>
-          {renderInline(line.slice(4), onLinkClick, options)}
+          {renderInline(line.slice(4), onLinkClick, headOptions)}
         </h3>,
       );
     } else if (line.startsWith("- ")) {

@@ -6136,3 +6136,25 @@ select.ox-st { min-width: 7rem; }
 .cite-desc { color: var(--text-dim); display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
 .cite-host { color: var(--text-dim); font-size: 0.68rem; font-family: var(--font-mono, monospace); }
 .cite-by, .cite-by-note { color: var(--text-dim); font-size: 0.72rem; }
+
+/* glossary: auto-linked terms, hover card, and the Glossary page layouts */
+.gloss { position: relative; border-bottom: 1px dotted var(--accent-forum, currentColor); cursor: help; }
+.gloss-card { display: none; position: absolute; left: 0; top: 100%; z-index: 30; width: min(20rem, 80vw); padding: 0.6rem 0.75rem; background: var(--bg-elevated, #12151f); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: 0 6px 24px rgba(0,0,0,.45); font-size: 0.85rem; line-height: 1.4; font-style: normal; font-weight: 400; text-align: left; flex-direction: column; gap: 0.25rem; }
+.gloss:hover > .gloss-card, .gloss:focus > .gloss-card, .gloss:focus-within > .gloss-card { display: flex; }
+.gloss-more { font-size: 0.78rem; }
+.glossary-list { margin: 0; }
+.glossary-item { padding: 0.35rem 0; break-inside: avoid; }
+.glossary-item dt { font-weight: 600; }
+.glossary-item dd { margin: 0.1rem 0 0; }
+.glossary-aka { font-weight: 400; font-size: 0.8rem; color: var(--text-dim); }
+.glossary-item:target dt { color: var(--accent-forum); }
+.glossary-cards { display: grid; gap: 0.7rem; grid-template-columns: repeat(auto-fill, minmax(min(100%, 15rem), 1fr)); }
+.glossary-cards .glossary-item { border: 1px solid var(--border); border-radius: var(--radius); padding: 0.6rem 0.75rem; }
+.glossary-columns { columns: 2 16rem; column-gap: 2rem; }
+
+/* region notes on the audio strip, and the layer chips (one per author) */
+.spec-note-region { position: absolute; bottom: 0; height: 38%; padding: 0; border: 0; border-top: 2px solid var(--layer, #7cf); background: color-mix(in srgb, var(--layer, #7cf) 28%, transparent); cursor: pointer; z-index: 1; min-width: 3px; }
+.spec-note-region:hover, .spec-note-region.is-active { background: color-mix(in srgb, var(--layer, #7cf) 50%, transparent); }
+.spec-layers { display: flex; flex-wrap: wrap; gap: 0.3rem; margin-top: 0.4rem; }
+.spec-layer-chip { font-size: 0.72rem; padding: 0.1rem 0.5rem; border-radius: 99px; border: 1px solid var(--layer, #7cf); background: color-mix(in srgb, var(--layer, #7cf) 20%, transparent); color: inherit; cursor: pointer; }
+.spec-layer-chip.off { opacity: 0.4; background: transparent; text-decoration: line-through; }

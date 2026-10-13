@@ -441,6 +441,7 @@ model TrackComment {
   userId    Int
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   atSeconds Float
+  endSeconds Float? // set when the note covers a stretch (a region) instead of a moment
   body      String
   createdAt DateTime @default(now())
 
@@ -454,6 +455,7 @@ model CommunityTrackComment {
   userId    Int
   user      User           @relation(fields: [userId], references: [id], onDelete: Cascade)
   atSeconds Float
+  endSeconds Float?
   body      String
   createdAt DateTime       @default(now())
 
@@ -1701,5 +1703,14 @@ model Phenomenon {
   exampleTrack   Track? @relation("PhenomenonExample", fields: [exampleTrackId], references: [id], onDelete: SetNull)
   published  Boolean  @default(true)
   createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+}
+
+// A term of the XenoLab glossary. Terms (and their aliases) are auto-linked in studies and articles; the Glossary page is any wiki page that contains a {glossary} line.
+model GlossaryTerm {
+  id         Int      @id @default(autoincrement())
+  term       String   @unique
+  aliases    String[] @default([])
+  definition String   @db.Text
   updatedAt  DateTime @updatedAt
 }

@@ -79,9 +79,23 @@ export function coverColor(url: string | null | undefined): Promise<string | nul
   return p;
 }
 
-export interface TrackComment { id: number; atSeconds: number; body: string; createdAt: string; user: string; avatarUrl: string | null; userId: number }
+export interface TrackComment { id: number; atSeconds: number; endSeconds?: number | null; body: string; createdAt: string; user: string; avatarUrl: string | null; userId: number }
 
-/** Comments heard around a moment, nearest first. */
+/** Comments heard around a moment, nearest first. A region note counts for as long as it covers the moment. */
 export function nearbyComments(list: TrackComment[], t: number, span = 4): TrackComment[] {
-  return list.filter((c) => Math.abs(c.atSeconds - t) <= span).sort((a, b) => Math.abs(a.atSeconds - t) - Math.abs(b.atSeconds - t));
+  return list.filter((c) => Math.abs(c.atSeconds - t) <= span || (c.endSeconds != null && t >= c.atSeconds && t <= c.endSeconds)).sort((a, b) => Math.abs(a.atSeconds - t) - Math.abs(b.atSeconds - t));
+}
+
+/** A steady colour per author, so a layer can be told apart at a glance. */
+export function layerHue(name: string): number {
+  let h = 0;
+  for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) >>> 0;
+  return h % 360;
+}
+
+/** Who has annotated, with how many notes each. */
+export function layersOf(list: TrackComment[]): { user: string; n: number }[] {
+  const m = new Map<string, number>();
+  for (const c of list) m.set(c.user, (m.get(c.user) ?? 0) + 1);
+  return [...m].map(([user, n]) => ({ user, n })).sort((a, b) => b.n - a.n || a.user.localeCompare(b.user));
 }

@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-import { STRIP_H, STRIP_W, paintStrip, rampFor, type TrackComment } from "../lib/specStrip";
+import { STRIP_H, STRIP_W, layerHue, paintStrip, rampFor, type TrackComment } from "../lib/specStrip";
 
 /** The spectrogram picture, a dimmed "not yet played" cover, and comment pins. Painted once; the playhead only moves a CSS transform. */
 export function SpecLayer({ strip, color, pct, comments, duration, onPin, activeId }: {
@@ -12,6 +12,18 @@ export function SpecLayer({ strip, color, pct, comments, duration, onPin, active
       <canvas ref={ref} className="spec-canvas" width={STRIP_W} height={STRIP_H} aria-hidden />
       <div className="spec-unplayed" style={{ transform: `translateX(${Math.min(100, Math.max(0, pct))}%)` }} />
       <div className="spec-head" style={{ left: `${Math.min(100, Math.max(0, pct))}%` }} />
+      {duration > 0 && comments.filter((c) => c.endSeconds != null && c.endSeconds > c.atSeconds).map((c) => (
+        <button
+          key={`r${c.id}`}
+          type="button"
+          className={`spec-note-region${activeId === c.id ? " is-active" : ""}`}
+          style={{ left: `${Math.min(100, (c.atSeconds / duration) * 100)}%`, width: `${Math.max(0.4, Math.min(100, ((c.endSeconds! - c.atSeconds) / duration) * 100))}%`, ["--layer" as string]: `hsl(${layerHue(c.user)} 70% 62%)` }}
+          title={`${c.user}: ${c.body}`}
+          aria-label={`Region note by ${c.user}`}
+          data-testid="note-region"
+          onClick={(e) => { e.stopPropagation(); onPin?.(c); }}
+        />
+      ))}
       {duration > 0 && comments.map((c) => (
         <button
           key={c.id}

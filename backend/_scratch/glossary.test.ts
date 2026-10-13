@@ -1,0 +1,10 @@
+import assert from "node:assert/strict";
+import { cleanGlossary } from "../src/lib/glossary";
+assert.ok("error" in cleanGlossary({}, false));
+assert.ok("error" in cleanGlossary({ term: "a" }, false));
+const r = cleanGlossary({ term: "  Beating  tones ", aliases: ["beat", "BEATING TONES", "beat"], definition: " x " }, false);
+assert.ok("data" in r && r.data.term === "Beating tones" && r.data.aliases!.join() === "beat" && r.data.definition === "x");
+assert.ok("error" in cleanGlossary({ aliases: "x" }, true));
+assert.ok("error" in cleanGlossary({ aliases: Array(13).fill("a") }, true));
+assert.ok("data" in cleanGlossary({ definition: "ok" }, true));
+console.log("glossary ok");

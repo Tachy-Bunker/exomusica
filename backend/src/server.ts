@@ -63,6 +63,7 @@ import { sampleBankAndChallengesRoutes } from "./routes/sampleBankAndChallenges.
 import { questionsRoutes } from "./routes/questions.js";
 import { studiesRoutes } from "./routes/studies.js";
 import { phenomenaRoutes } from "./routes/phenomena.js";
+import { glossaryRoutes } from "./routes/glossary.js";
 import { adminAllTracksRoutes } from "./routes/adminAllTracks.js";
 import { branchContributeRoutes } from "./routes/branchContribute.js";
 import { contributorPointsRoutes } from "./routes/contributorPoints.js";
@@ -141,6 +142,7 @@ await app.register(sampleBankAndChallengesRoutes);
 await app.register(questionsRoutes);
 await app.register(studiesRoutes);
 await app.register(phenomenaRoutes);
+await app.register(glossaryRoutes);
 await app.register(adminAllTracksRoutes);
 await app.register(branchContributeRoutes);
 await app.register(contributorPointsRoutes);

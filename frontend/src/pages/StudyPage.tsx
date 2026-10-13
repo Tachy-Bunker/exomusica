@@ -28,6 +28,7 @@ import { useDocumentTitle } from "../lib/useDocumentTitle";
 import { useToastStore } from "../lib/toastStore";
 import { LogLinks } from "../components/LogLinks";
 import type { Cite } from "../components/CiteRef";
+import { buildGlossary, useGlossaryData } from "../lib/glossary";
 import { StudyChartView, ChartAccentContext } from "../components/StudyChartView";
 import { coverColor } from "../lib/specStrip";
 
@@ -80,6 +81,8 @@ export function StudyPage() {
   const [study, setStudy] = useState<StudyDetail | null>(null);
   const [bgPreview, setBgPreview] = useState<number | null | undefined>(undefined); // the picture strength while the owner drags the slider
   const [cites, setCites] = useState<Cite[]>([]);
+  const glossaryData = useGlossaryData();
+  const glossary = useMemo(() => buildGlossary(glossaryData), [glossaryData]);
   const [pictureColor, setPictureColor] = useState<string | null>(null); // the background picture's average colour: the charts take their colours from it
   const [editing, setEditing] = useState(false);
   const [draftTitle, setDraftTitle] = useState("");
@@ -578,7 +581,7 @@ export function StudyPage() {
           </details>
         )}
         <div className="study-body">
-          {renderMarkdown(study.body, (path) => navigate(path), { extended: true, notes: study.annotations.map((a) => a.text), cites, figures: figs.render, figureCounts: figs.counts, audio: renderAudio, images: { editable: false }, file: renderFile })}
+          {renderMarkdown(study.body, (path) => navigate(path), { extended: true, glossary, notes: study.annotations.map((a) => a.text), cites, figures: figs.render, figureCounts: figs.counts, audio: renderAudio, images: { editable: false }, file: renderFile })}
         </div>
         </>
       )}

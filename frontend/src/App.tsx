@@ -46,6 +46,7 @@ import { WikiAdminPage } from "./pages/admin/WikiAdminPage";
 import { AllTracksAdminPage } from "./pages/admin/AllTracksAdminPage";
 import { StudiesAdminPage } from "./pages/admin/StudiesAdminPage";
 import { ResourcesAdminPage } from "./pages/admin/ResourcesAdminPage";
+import { GlossaryAdminPage } from "./pages/admin/GlossaryAdminPage";
 import { FeaturedAdminPage } from "./pages/admin/FeaturedAdminPage";
 import { RewardsAdminPage } from "./pages/admin/RewardsAdminPage";
 import { HypothesesPage, HypothesisDrawPage } from "./pages/HypothesesPage";
@@ -173,6 +174,7 @@ export default function App() {
                 <Route path="all-tracks" element={<AllTracksAdminPage />} />
                 <Route path="studies" element={<StudiesAdminPage />} />
                 <Route path="resources" element={<ResourcesAdminPage />} />
+                <Route path="glossary" element={<GlossaryAdminPage />} />
                 <Route path="featured" element={<FeaturedAdminPage />} />
                 <Route path="rewards" element={<RewardsAdminPage />} />
                 <Route path="signal" element={<SignalAdminPage />} />

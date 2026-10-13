@@ -23,3 +23,13 @@ export function groupPins<T extends { atSeconds: number }>(items: T[], gap: numb
   }
   return out;
 }
+
+export const MIN_REGION = 0.3;
+/** The end of a region note: after the start by a little at least, never past the end of the track; null when it is a plain moment. */
+export function clampEnd(at: number, v: unknown, duration: number | null): number | null {
+  if (v === undefined || v === null || v === "") return null;
+  const n = Number(v);
+  if (!Number.isFinite(n)) return null;
+  const end = clampAt(n, duration);
+  return end - at >= MIN_REGION ? end : null;
+}

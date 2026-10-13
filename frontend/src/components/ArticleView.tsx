@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import { useAudioStore } from "../lib/audioStore";
 import { stopClip } from "../lib/clipPlayer";
 import { renderMarkdown } from "../lib/markdown";
+import type { GlossaryIndex } from "../lib/glossary";
 import { StudyFile } from "./StudyFile";
 
 /** A plain player (nothing downloads until play is pressed). It pauses the site's music, like the study reader's. */
@@ -22,6 +23,6 @@ export const articleAudio = (url: string): ReactNode => <ArticleAudio url={url} 
 export const articleFile = (url: string, label: string | undefined): ReactNode => <StudyFile url={url} label={label} info={null} />;
 
 /** How a news post or wiki page is drawn for readers: the renderer studies use, and the one the article editor previews with. */
-export function renderArticle(markdown: string, onNavigate: (path: string) => void): ReactNode {
-  return renderMarkdown(markdown, onNavigate, { extended: true, audio: articleAudio, images: { editable: false }, file: articleFile });
+export function renderArticle(markdown: string, onNavigate: (path: string) => void, glossary?: GlossaryIndex | null): ReactNode {
+  return renderMarkdown(markdown, onNavigate, { extended: true, glossary, audio: articleAudio, images: { editable: false }, file: articleFile });
 }

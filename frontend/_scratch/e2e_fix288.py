@@ -68,7 +68,7 @@ def run(playwright):
     page.mouse.click(box["x"] + box["width"] * 0.5, box["y"] + box["height"] * 0.5); page.wait_for_timeout(300)
     t = page.locator(".spec-comment .mono").inner_text()
     check(t.startswith("@0:03") or t.startswith("@0:02"), f"clicking the strip picks the moment ({t})")
-    page.fill("input[aria-label='Comment on this moment']", "  new   idea\n here "); page.click(".spec-comment button")
+    page.fill("input[aria-label='Comment on this moment']", "  new   idea\n here "); page.click(".spec-comment button:has-text('Post')")
     page.wait_for_function("document.querySelectorAll('.spec-pin').length === 2")
     check(posted and abs(posted[0]["atSeconds"] - 3) < 0.6 and posted[0]["body"].strip().startswith("new"), f"posted at the chosen moment {posted[:1]}")
     check("new" in page.locator("[data-testid=spec-caption]").inner_text(), "the new comment shows in the caption")

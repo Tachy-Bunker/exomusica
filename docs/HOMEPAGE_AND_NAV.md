@@ -442,3 +442,13 @@ Phase 1 (this delivery), idea 4:
 - **Phenomena**: XenoLab tab `?tab=phenomena&item=<slug>`. Model `Phenomenon` (title, summary, markdown notes, chain code, example track, published). Public `GET /api/phenomena`; admin `GET/POST/PATCH/DELETE /api/admin/phenomena`. Admins edit inline on the tab. "Reproduce this" opens the Effects tab with the card's chain.
 - Prisma: `fix302b_xenolab` (StudyChart.sourceFileId, Phenomenon).
 - Tests: `_scratch/chartpalette|chainlink.test.ts`, `backend/_scratch/citations|phenomena.test.ts`, `e2e_fix302b.py`.
+
+## fix302c: audio region notes + Glossary
+
+- **Region notes**: `TrackComment`/`CommunityTrackComment.endSeconds` (null = a plain moment). In the expanded player, mark A or B in the A/B panel, press "▭ Region", write the note: it spans that stretch (`clampEnd`, min 0.3 s). Regions draw as bands on the strip in the author's colour; clicking one seeks to its start. A region note stays in the caption while the playhead is inside it.
+- **Layers**: one chip per author (shown when 2+ people have annotated) switches that author's pins and regions on/off. View-only state, nothing stored.
+- **Glossary**: model `GlossaryTerm` (term, aliases, definition). `GET /api/glossary` (public, cached 60 s) returns the terms and the slug of the first wiki page containing a `{glossary` line. Admin CRUD under `/api/admin/glossary`, UI at `/admin/glossary` (it can also create the page).
+- **The Glossary page is a normal wiki page** holding `{glossary}`, `{glossary list}`, `{glossary cards}` or `{glossary columns}` on its own line. So it can be nested under any article in the Log with the wiki admin's parent field and take a font; the layout word is its style switch.
+- **Auto-links**: in studies and Log articles the first mention of each term/alias (whole words, longest match first, headings skipped) gets a dotted underline and a hover/focus card with the definition and a link to `/wiki/<page>#term-<id>`. Not applied to chat. One regex per document, one request per page load.
+- Prisma: `fix302c_glossary_notes` (GlossaryTerm, endSeconds on both comment tables).
+- Tests: `_scratch/glossary|specnotes.test.ts`, `backend/_scratch/glossary|clampend.test.ts`, `e2e_fix302c.py`.

@@ -12,6 +12,7 @@ import { useContentScaleStore } from "../lib/contentScaleStore";
 import { useCustomFont, type FontInfo } from "../lib/useCustomFont";
 import { useDocumentTitle } from "../lib/useDocumentTitle";
 import { useIsDesktop } from "../lib/useIsDesktop";
+import { buildGlossary, useGlossaryData } from "../lib/glossary";
 
 interface WikiFull { id: number; slug: string; title: string; contentMarkdown: string; font: FontInfo | null }
 interface PostFull { id: number; slug: string; title: string; publishedAt: string; contentMarkdown: string; font: FontInfo | null }
@@ -54,6 +55,8 @@ export function LogPage() {
   const { data: posts } = useLoaded(loadPosts);
   const { data: studies } = useLoaded(loadStudies);
   const { user } = useAuth();
+  const glossaryData = useGlossaryData();
+  const glossary = useMemo(() => buildGlossary(glossaryData), [glossaryData]);
   const [page, setPage] = useState<WikiFull | null>(null);
   const [post, setPost] = useState<PostFull | null>(null);
   const font = useCustomFont((isNews ? post : page)?.font);
@@ -172,7 +175,7 @@ export function LogPage() {
               <h1>{post.title}</h1>
               <p className="mono home-dim">{new Date(post.publishedAt).toLocaleDateString()}</p>
               {user?.isAdmin && <p><Link className="home-dim" to={`/admin/blog?edit=${post.slug}`} data-testid="log-edit">Edit this post</Link></p>}
-              {renderArticle(post.contentMarkdown, navigate)}
+              {renderArticle(post.contentMarkdown, navigate, glossary)}
             </>
           )}
         </>
@@ -199,7 +202,7 @@ export function LogPage() {
         !page ? <p>Loading…</p>
         : page.contentMarkdown.trim() === "@branch-index" ? <BranchIndexList />
         : page.contentMarkdown.trim() === "@collaborator-index" ? <CollaboratorIndexList />
-        : <>{user?.isAdmin && <p><Link className="home-dim" to={`/admin/wiki?edit=${page.slug}`} data-testid="log-edit">Edit this page</Link></p>}{renderArticle(page.contentMarkdown, navigate)}</>
+        : <>{user?.isAdmin && <p><Link className="home-dim" to={`/admin/wiki?edit=${page.slug}`} data-testid="log-edit">Edit this page</Link></p>}{renderArticle(page.contentMarkdown, navigate, glossary)}</>
       )}
     </div>
   );

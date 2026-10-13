@@ -1,0 +1,13 @@
+import assert from "node:assert/strict";
+import { buildGlossary, splitTerms } from "../src/lib/glossary";
+const data = { pageSlug: "glossary", terms: [{ id: 1, term: "Beating", aliases: ["beats"], definition: "d" }, { id: 2, term: "Beating tones", aliases: [], definition: "d2" }, { id: 3, term: "C++", aliases: [], definition: "x" }] };
+assert.equal(buildGlossary(null), null); assert.equal(buildGlossary({ terms: [], pageSlug: null }), null);
+const g = buildGlossary(data)!;
+const parts = splitTerms("Two beating tones, then beating again; the Beats. Subbeating no.", g);
+const linked = parts.filter((p) => typeof p !== "string").map((p: any) => p.word + ":" + p.entry.id);
+assert.deepEqual(linked, ["beating tones:2", "beating:1"].slice(0, 1).concat(["beating:1"]).slice(0, 2), "longest first, first mention only");
+assert.equal(parts.join("").length > 0, true);
+assert.equal(parts.map((p: any) => (typeof p === "string" ? p : p.word)).join(""), "Two beating tones, then beating again; the Beats. Subbeating no.");
+const g2 = buildGlossary(data)!; assert.equal(splitTerms("sub-beating, C++ rocks. c++!", g2).filter((p) => typeof p !== "string").length, 2);
+assert.equal(splitTerms("nothing here", buildGlossary(data)!).length, 1);
+console.log("glossary lib ok");

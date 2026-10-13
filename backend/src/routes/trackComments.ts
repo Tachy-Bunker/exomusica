@@ -6,7 +6,7 @@ import { requireAuth } from "../lib/auth.js";
 import { makeLimiter } from "../lib/resourceAccess.js";
 import { UPLOADS_DIR } from "../lib/storage.js";
 import { normalizeStrip, packPoints, runFfmpeg, stripCacheName, stripSource, toPoints } from "../lib/specStrip.js";
-import { cleanCommentBody, clampAt, MAX_COMMENTS_PER_TRACK } from "../lib/trackComments.js";
+import { cleanCommentBody, clampAt, clampEnd, MAX_COMMENTS_PER_TRACK } from "../lib/trackComments.js";
 
 const limiter = makeLimiter(8, 60_000);
 const inflight = new Map<number, Promise<Uint8Array | "missing" | null>>();
@@ -52,10 +52,10 @@ function register(app: FastifyInstance, base: string, offset: number, table: Tab
       where: { trackId: Number(req.params.id) || 0 }, orderBy: { atSeconds: "asc" }, take: MAX_COMMENTS_PER_TRACK,
       include: { user: { select: { username: true, avatarUrl: true } } },
     });
-    return rows.map((c: any) => ({ id: c.id, atSeconds: c.atSeconds, body: c.body, createdAt: c.createdAt, user: c.user.username, avatarUrl: c.user.avatarUrl, userId: c.userId }));
+    return rows.map((c: any) => ({ id: c.id, atSeconds: c.atSeconds, endSeconds: c.endSeconds ?? null, body: c.body, createdAt: c.createdAt, user: c.user.username, avatarUrl: c.user.avatarUrl, userId: c.userId }));
   });
 
-  app.post<{ Params: { id: string }; Body: { atSeconds?: number; body?: string } }>(`${base}/:id/comments`, { preHandler: requireAuth }, async (req, reply) => {
+  app.post<{ Params: { id: string }; Body: { atSeconds?: number; endSeconds?: number | null; body?: string } }>(`${base}/:id/comments`, { preHandler: requireAuth }, async (req, reply) => {
     const me = req.user!.id;
     const id = Number(req.params.id) || 0;
     if (!limiter.hit(String(me))) return reply.code(429).send({ error: "Slow down. Try again in a minute." });
@@ -64,8 +64,9 @@ function register(app: FastifyInstance, base: string, offset: number, table: Tab
     const t = await lookupDur(id);
     if (!t) return reply.code(404).send({ error: "no such track" });
     if ((await table.count({ where: { trackId: id } })) >= MAX_COMMENTS_PER_TRACK) return reply.code(409).send({ error: "This track has all the comments it can hold." });
-    const c = await table.create({ data: { trackId: id, userId: me, atSeconds: clampAt(req.body?.atSeconds, t.durationSeconds), body } });
-    return reply.code(201).send({ id: c.id, atSeconds: c.atSeconds, body: c.body, createdAt: c.createdAt, user: req.user!.username, avatarUrl: null, userId: me });
+    const at = clampAt(req.body?.atSeconds, t.durationSeconds);
+    const c = await table.create({ data: { trackId: id, userId: me, atSeconds: at, endSeconds: clampEnd(at, req.body?.endSeconds, t.durationSeconds), body } });
+    return reply.code(201).send({ id: c.id, atSeconds: c.atSeconds, endSeconds: c.endSeconds ?? null, body: c.body, createdAt: c.createdAt, user: req.user!.username, avatarUrl: null, userId: me });
   });
 
   app.delete<{ Params: { id: string; cid: string } }>(`${base}/:id/comments/:cid`, { preHandler: requireAuth }, async (req, reply) => {
