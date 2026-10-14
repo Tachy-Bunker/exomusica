@@ -1,5 +1,6 @@
 // Draws the room from the eye: 2D canvas, painter's order, no 3D library. Everything is lines and flat fills, so it stays light on weak devices.
 import { DOOR_H, type RoomDoor, type RoomProp, type RoomWorld } from "./roomWorld";
+import type { Shown } from "./roomNet";
 import { EYE_Y, NEAR, clipNear, focalOf, toCam, type Eye, type P3, type Target } from "./roomView";
 
 export const rgba = (hex: string, a: number): string => {
@@ -81,7 +82,7 @@ function prism(ctx: CanvasRenderingContext2D, e: Eye, p: RoomProp, h: number, fi
   if (poly(ctx, e, c.map((a) => [a[0], h, a[1]] as P3), W, H, f)) { ctx.fill(); ctx.stroke(); }
 }
 
-export function paintRoom(ctx: CanvasRenderingContext2D, W: number, H: number, world: RoomWorld, eye: Eye, color: string, target: Target | null): void {
+export function paintRoom(ctx: CanvasRenderingContext2D, W: number, H: number, world: RoomWorld, eye: Eye, color: string, target: Target | null, others: Shown[] = []): void {
   const f = focalOf(W, H), n = world.sides, v = world.verts;
   ctx.fillStyle = "#04080c"; ctx.fillRect(0, 0, W, H);
   const P = (i: number, y: number, k = 1): P3 => [v[i % n][0] * k, y, v[i % n][1] * k];
@@ -109,22 +110,23 @@ export function paintRoom(ctx: CanvasRenderingContext2D, W: number, H: number, w
   ctx.lineWidth = 1; ctx.strokeStyle = rgba(color, 0.2); ctx.stroke(wallLines);
   ctx.lineWidth = 2; ctx.strokeStyle = rgba(color, 0.8); ctx.stroke(edges);
 
-  // things in the room, far to near
-  const props = [...world.props].sort((a, b) => Math.hypot(b.x - eye.x, b.z - eye.z) - Math.hypot(a.x - eye.x, a.z - eye.z));
-  for (const p of props) {
-    const hot = target?.kind === "prop" && target.prop.id === p.id, h = p.kind === "terminal" ? 1.25 : 0.9;
-    const col = p.kind === "terminal" ? hueColor(p.hue, 58) : p.kind === "more" ? color : hueColor(p.hue, 62);
+  // things in the room, far to near: terminals (pedestal with a leaning screen) and the other people
+  type Item = { d: number; prop?: RoomProp; who?: Shown };
+  const items: Item[] = [...world.props.map((p) => ({ d: Math.hypot(p.x - eye.x, p.z - eye.z), prop: p })), ...others.map((o) => ({ d: Math.hypot(o.x - eye.x, o.z - eye.z), who: o }))].sort((a, b) => b.d - a.d);
+  for (const it of items) {
+    if (it.who) { paintPerson(ctx, eye, it.who, W, H, f); continue; }
+    const p = it.prop!, hot = target?.kind === "prop" && target.prop.id === p.id, chat = p.kind === "terminal", h = chat ? 1.0 : 0.9;
+    const col = chat ? hueColor(p.hue, 58) : p.kind === "more" ? color : hueColor(p.hue, 62);
     prism(ctx, eye, p, h, hot ? rgba(color, 0.28) : "rgba(6,12,18,.88)", hot ? "#fff" : col, W, H, f, hot ? 3 : 1.6);
-    const c = camP(eye, p.x, h + (p.kind === "terminal" ? 0.28 : 0.55), p.z);
-    if (c[2] > NEAR) {
-      const s = scr(c, W, H, f), z = c[2], sz = Math.min(44, (p.kind === "terminal" ? 0.3 : 0.24) * f / z);
-      ctx.beginPath();
-      if (p.kind === "terminal") ctx.rect(s[0] - sz * 0.9, s[1] - sz * 0.55, sz * 1.8, sz * 1.1);
-      else { ctx.moveTo(s[0], s[1] - sz); ctx.lineTo(s[0] + sz * 0.7, s[1]); ctx.lineTo(s[0], s[1] + sz); ctx.lineTo(s[0] - sz * 0.7, s[1]); ctx.closePath(); }
-      ctx.fillStyle = rgba(color, 0.0); ctx.fillStyle = p.kind === "terminal" ? "rgba(255,170,60,.28)" : "rgba(255,255,255,.07)"; ctx.fill(); ctx.lineWidth = hot ? 3 : 1.6; ctx.strokeStyle = hot ? "#fff" : col; ctx.stroke();
-      const dist = Math.hypot(p.x - eye.x, p.z - eye.z);
-      if (dist < 7 || hot) text(ctx, p.kind === "terminal" ? "TALK" : p.label.length > 22 ? p.label.slice(0, 21) + "…" : p.label, s[0], s[1] - sz * 1.3 - 4, Math.max(10, Math.min(16, (0.26 * f) / z)), hot ? "#fff" : col);
+    const L = Math.hypot(p.x, p.z) || 1, ux = L > 1e-6 ? -p.x / L : 1, uz = L > 1e-6 ? -p.z / L : 0, tx = -uz, tz = ux, hw = chat ? 0.55 : 0.42, sh = chat ? 0.7 : 0.6;
+    const q = (side: number, up: number): P3 => { const back = -0.28 * up / sh; return [p.x + tx * hw * side + ux * back, h + sh * up, p.z + tz * hw * side + uz * back]; };
+    if (poly(ctx, eye, [q(-1, 0), q(1, 0), q(1, 1), q(-1, 1)], W, H, f)) {
+      ctx.fillStyle = hot ? rgba(color, 0.42) : chat ? "rgba(255,170,60,.26)" : "rgba(120,220,255,.16)"; ctx.fill(); ctx.lineWidth = hot ? 3 : 1.6; ctx.strokeStyle = hot ? "#fff" : col; ctx.stroke();
+      const scan = new Path2D(); for (const u of [0.25, 0.5, 0.75]) seg(scan, eye, q(-0.85, u), q(0.85, u), W, H, f);
+      ctx.lineWidth = 1; ctx.strokeStyle = rgba(hot ? "#ffffff" : "#9fe9ff", 0.35); ctx.stroke(scan);
     }
+    const c = camP(eye, p.x, h + sh + 0.22, p.z);
+    if (c[2] > NEAR && (it.d < 7 || hot)) { const s = scr(c, W, H, f); text(ctx, chat ? "TALK" : p.label.length > 22 ? p.label.slice(0, 21) + "…" : p.label, s[0], s[1], Math.max(10, Math.min(16, (0.26 * f) / c[2])), hot ? "#fff" : col); }
   }
   paintMap(ctx, W, H, world, eye, color);
   // a small cross to aim with
@@ -145,3 +147,19 @@ function paintMap(ctx: CanvasRenderingContext2D, W: number, H: number, world: Ro
   ctx.restore();
 }
 export { EYE_Y };
+
+const hueOf = (s: string): number => { let h = 0; for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0; return h % 360; };
+/** Another member: a lit capsule with a visor on the side they face, and their name. */
+function paintPerson(ctx: CanvasRenderingContext2D, e: Eye, o: Shown, W: number, H: number, f: number): void {
+  const base = camP(e, o.x, 0, o.z); if (base[2] < NEAR) return;
+  const col = hueColor(hueOf(o.name), 62), top = camP(e, o.x, 1.72, o.z), k = f / base[2], cx = W / 2 + base[0] * k;
+  const yb = H / 2 - base[1] * k, yt = H / 2 - top[1] * k, hgt = yb - yt, w = hgt * 0.17;
+  ctx.fillStyle = "rgba(6,12,18,.9)"; ctx.strokeStyle = col; ctx.lineWidth = Math.max(1.2, Math.min(2.5, hgt / 60));
+  ctx.beginPath(); ctx.moveTo(cx - w, yb); ctx.lineTo(cx - w * 0.75, yt + hgt * 0.24); ctx.lineTo(cx + w * 0.75, yt + hgt * 0.24); ctx.lineTo(cx + w, yb); ctx.closePath(); ctx.fill(); ctx.stroke();
+  const hr = hgt * 0.085, hy = yt + hgt * 0.1; ctx.beginPath(); ctx.arc(cx, hy, hr, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+  // which way they look, relative to us: -1 = their left of the screen, +1 = right, hidden when they face away
+  const fx = Math.cos(o.yaw), fz = Math.sin(o.yaw), rx = -Math.sin(e.yaw), rz = Math.cos(e.yaw), vx = Math.cos(e.yaw), vz = Math.sin(e.yaw);
+  const side = fx * rx + fz * rz, toward = -(fx * vx + fz * vz);
+  if (toward > -0.2) { ctx.fillStyle = col; ctx.fillRect(cx + side * hr * 0.6 - hr * 0.55, hy - hr * 0.18, hr * 1.1, hr * 0.36); }
+  if (base[2] < 14) text(ctx, o.name, cx, yt - 6, Math.max(10, Math.min(15, (0.26 * f) / base[2])), col);
+}

@@ -6553,3 +6553,30 @@ body:has(.term-backdrop, .fp-panel, .pocket-pad, .probe-hud, .visor-hud) { touch
 .rm-hint{position:absolute;left:50%;bottom:.5rem;transform:translateX(-50%);margin:0;font-size:.75rem;opacity:.6;pointer-events:none;white-space:nowrap}
 @media (pointer:coarse){.rm-hint{display:none}}
 @media (pointer:fine){.rm-pad{opacity:.55}}
+
+/* fix348: terminal screens and people in the room */
+.rm-here{opacity:.8;font-size:.85rem}
+.rt{position:absolute;inset:0;z-index:6;display:grid;place-items:center;padding:clamp(.5rem,3vmin,2rem);background:rgba(2,5,8,.72)}
+.rt-bezel{width:min(900px,100%);max-height:100%;padding:clamp(8px,1.6vmin,16px);background:linear-gradient(160deg,#16222b,#0a1015 60%,#121c24);border-radius:26px 14px 30px 16px/16px 28px 14px 30px;box-shadow:0 0 0 1px #000,0 0 28px -4px var(--rm),inset 0 0 0 1px rgba(255,255,255,.06);animation:rt-on .22s ease-out both}
+.rt-glass{position:relative;display:flex;flex-direction:column;height:min(78vh,640px);max-height:calc(100vh - 8rem);overflow:hidden;background:radial-gradient(ellipse at 50% 30%,#0d1a22 0%,#060d12 75%);border:1.5px solid var(--rm);border-radius:20px 10px 24px 12px/12px 22px 10px 24px;box-shadow:inset 0 0 36px rgba(0,0,0,.85),inset 0 0 14px -4px var(--rm);outline:none;color:#cfefff}
+.rt-head{display:flex;justify-content:space-between;align-items:center;gap:.6rem;padding:.55rem .9rem;border-bottom:1px solid rgba(255,255,255,.1);font-family:ui-monospace,Menlo,Consolas,monospace;font-size:.85rem}
+.rt-prompt{color:var(--rm);text-shadow:0 0 8px var(--rm)}
+.rt-x{background:none;border:1px solid rgba(255,255,255,.25);color:#cfefff;border-radius:6px;padding:.2rem .5rem;font:inherit;min-height:32px;cursor:pointer}
+.rt-body{flex:1;overflow:auto;padding:.9rem 1rem;font-family:ui-monospace,Menlo,Consolas,monospace;overscroll-behavior:contain}
+.rt-scan{position:absolute;inset:0;pointer-events:none;background:repeating-linear-gradient(0deg,rgba(0,0,0,.2) 0 1px,transparent 1px 3px),radial-gradient(ellipse at 30% 10%,rgba(255,255,255,.06),transparent 55%)}
+.rt-dim{opacity:.7;font-size:.85rem;margin:.2rem 0}
+.rt-album{display:flex;gap:1rem;flex-wrap:wrap}
+.rt-cover{width:clamp(120px,28%,220px);aspect-ratio:1;object-fit:cover;border:1px solid var(--rm);border-radius:6px 14px 6px 14px;filter:saturate(.85) contrast(1.05)}
+.rt-info{flex:1;min-width:220px}
+.rt-title{font-family:inherit;font-weight:600;margin:0 0 .2rem;font-size:1.15rem;color:#fff;text-shadow:0 0 10px var(--rm)}
+.rt-actions{display:flex;gap:.5rem;flex-wrap:wrap;margin:.6rem 0}
+.rt-btn{background:rgba(255,255,255,.04);border:1px solid var(--rm);color:#cfefff;border-radius:6px;padding:.35rem .7rem;font:inherit;font-size:.85rem;min-height:36px;text-decoration:none;display:inline-flex;align-items:center;cursor:pointer}
+.rt-btn:hover,.rt-btn:focus-visible{background:var(--rm);color:#000}
+.rt-btn:disabled{opacity:.4}
+.rt-tracks,.rt-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:2px}
+.rt-track{display:flex;gap:.8rem;width:100%;text-align:left;background:none;border:0;border-left:2px solid transparent;color:#cfefff;font:inherit;font-size:.88rem;padding:.4rem .5rem;min-height:36px;cursor:pointer}
+.rt-track:hover,.rt-track:focus-visible,.rt-track.on{background:rgba(255,255,255,.06);border-left-color:var(--rm)}
+.rt-t{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rt-chat{height:100%;margin:-.9rem -1rem}
+@keyframes rt-on{from{transform:scaleY(.04);filter:brightness(3)}60%{transform:scaleY(1.02);filter:brightness(1.6)}to{transform:none;filter:none}}
+@media (prefers-reduced-motion:reduce){.rt-bezel{animation:none}}

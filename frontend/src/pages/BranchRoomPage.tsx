@@ -16,6 +16,8 @@ import { themeOf } from "../lib/headerTheme";
 import { neon } from "../lib/legibleColor";
 import type { Branch, BranchAlbum } from "../lib/types";
 import { BranchRoom } from "../components/BranchRoom";
+import { AlbumTerminal, ChatTerminal, ListTerminal, RoomTerminal } from "../components/RoomTerminal";
+import type { RoomProp } from "../lib/roomWorld";
 import { Loading } from "../components/Loading";
 
 /** /branch/:slug/room — the branch as a room you walk round. Doors lead the way the rooms lie on the Scan map. */
@@ -35,6 +37,9 @@ function RoomInner({ slug }: { slug: string }) {
   const [outer, setOuter] = useState<boolean | null>(null);
   const [color, setColor] = useState("#5fd3ee");
   const link = useRef<HTMLAnchorElement>(null);
+  const [term, setTerm] = useState<RoomProp | null>(null);
+  const [pick, setPick] = useState<string | null>(null);
+  const openTerm = useCallback((p: RoomProp) => { setPick(null); setTerm(p); }, []);
   useDocumentTitle(branch ? `${branch.name} (room)` : "Room");
 
   const visited = useMemo(() => { const v = visitedSlugs(); for (const k of keysOf(scannedIds())) if (k.startsWith("branch:")) v.add(k.slice(7)); v.add(slug); return v; }, [slug]);
@@ -65,9 +70,9 @@ function RoomInner({ slug }: { slug: string }) {
 
   const back = `/branch/${slug}`;
   useEffect(() => {
-    const on = (e: KeyboardEvent) => { if (e.code === "Escape" && !document.fullscreenElement) { e.stopPropagation(); navigate(back); } };
+    const on = (e: KeyboardEvent) => { if (e.code === "Escape" && !document.fullscreenElement) { e.stopPropagation(); if (term) { setTerm(null); setPick(null); } else navigate(back); } };
     window.addEventListener("keydown", on); return () => window.removeEventListener("keydown", on);
-  }, [navigate, back]);
+  }, [navigate, back, term]);
 
   const go = useCallback((to: string, door: boolean) => {
     const el = link.current; if (!el) return;
@@ -80,7 +85,14 @@ function RoomInner({ slug }: { slug: string }) {
     <div className="hx-page rm-page" data-testid="room-page">
       {branch === false ? <p className="home-dim" style={{ padding: "2rem" }}>There is no room by that name. <Link to="/explore">Scan map</Link></p>
         : !world || !branch ? <Loading />
-        : <BranchRoom world={world} color={color} go={go} mapHref="/explore" backHref={back} onLocked={() => undefined} />}
+        : <BranchRoom world={world} color={color} go={go} mapHref="/explore" backHref={back} onLocked={() => undefined} onProp={openTerm} paused={!!term} />}
+      {term && branch && (() => {
+        const close = () => { setTerm(null); setPick(null); };
+        if (term.kind === "terminal") return <RoomTerminal title={`${branch.name} // talk`} color={color} onClose={close}><ChatTerminal slug={branch.channel?.slug ?? ""} name={branch.name} /></RoomTerminal>;
+        const slugOf = pick ?? (term.kind === "album" ? term.id.slice(2) : null);
+        if (slugOf) return <RoomTerminal title={`${branch.name} // disc`} color={color} onClose={close}><AlbumTerminal slug={slugOf} /></RoomTerminal>;
+        return <RoomTerminal title={`${branch.name} // all albums`} color={color} onClose={close}><ListTerminal albums={(albums ?? []).map((a) => ({ slug: a.slug, title: a.title }))} onPick={setPick} /></RoomTerminal>;
+      })()}
       <a ref={link} href="/" hidden aria-hidden="true" tabIndex={-1} onClick={(e) => { e.preventDefault(); navigate(e.currentTarget.getAttribute("href") ?? "/"); }} />
     </div>
   );

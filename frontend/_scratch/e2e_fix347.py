@@ -54,11 +54,13 @@ def run(pw):
     x0, z0 = at(pg, "x"), at(pg, "z"); walk(pg, "KeyW", 300)
     check(abs(at(pg, "x") - x0) + abs(at(pg, "z") - z0) > 0.4, "W walks (physical key codes: also AZERTY)")
     y0 = at(pg, "yaw"); walk(pg, "KeyD", 300); check(True, "D strafes without error")
-    walk(pg, "ArrowRight", 300); check(abs(at(pg, "yaw") - y0) > 0.3, "Arrow keys turn")
+    walk(pg, "ArrowRight", 300); check(abs(at(pg, "yaw") - y0) > 0.3, "Left/right arrows turn")
+    pg.evaluate("1"); pit = lambda: float(pg.evaluate("document.querySelector('.rm-stage').dataset.pitch"))
+    walk(pg, "ArrowUp", 300); up = pit(); walk(pg, "ArrowDown", 600); check(up > 0.2 and pit() < up - 0.2, f"Up/down arrows look up and down ({up:.2f} -> {pit():.2f})")
     pg.goto(f"{BASE}/branch/solo/room"); pg.wait_for_selector(S); pg.wait_for_timeout(300)
     check(pg.locator("[data-testid^=face-d]").count() == 0, "A branch the map does not know gets a room without doors")
     for i in range(60):
-        walk(pg, "ArrowUp", 100)
+        walk(pg, "KeyW", 100)
         if abs(at(pg, "x")) > 100: break
     r = (at(pg, "x") ** 2 + at(pg, "z") ** 2) ** 0.5
     check(r < 12, f"Walls stop you (distance from middle {r:.1f})")
@@ -88,7 +90,7 @@ def run(pw):
     ci = [i for i, t in enumerate(labels) if "Core" in t]
     check(len(ci) == 1, "A door leads back to Core")
     face(pg, ci[0]); pg.wait_for_timeout(200)
-    walk(pg, "ArrowUp", 2600)
+    walk(pg, "KeyW", 2600)
     pg.wait_for_url(re.compile(r".*/branch/core/room\?from=" + dest), timeout=8000); pg.wait_for_selector(S)
     check(True, "Walking into an open door goes there (no button needed)")
     # locked: b2 has sealed doors to rooms you have not found
@@ -96,7 +98,7 @@ def run(pw):
     labels = pg.locator("[data-testid^=face-d]").all_inner_texts()
     li = [i for i, t in enumerate(labels) if "sealed" in t]
     check(len(li) == 1 and len(labels) == 4, f"A sealed room hung from this one is a sealed door ({labels})")
-    url = pg.url; face(pg, li[0]); pg.wait_for_timeout(150); walk(pg, "ArrowUp", 2600)
+    url = pg.url; face(pg, li[0]); pg.wait_for_timeout(150); walk(pg, "KeyW", 2600)
     check(pg.url == url and "Sealed" in pg.inner_text(".rm-toast"), "A sealed door does not open and says so")
     check(labels[li[0]] == "Face a sealed door", "A sealed door gives no name away")
     pg.keyboard.press("Escape"); pg.wait_for_url(re.compile(r".*/branch/b2$"), timeout=4000)
