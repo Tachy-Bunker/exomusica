@@ -22,7 +22,7 @@ export async function roomTextureRoutes(app: FastifyInstance): Promise<void> {
     if ((await prisma.textureAsset.count()) >= 300) return reply.code(409).send({ error: "The texture library is full (300). Delete some first." });
     const name = String(req.body?.name ?? "").replace(/[\u0000-\u001f]/g, "").trim().slice(0, 60) || (isSky ? "sky" : "texture");
     const stored = isSky ? "sky:" + name.replace(/^sky:/, "") : name.replace(/^sky:/, "");
-    const row = await prisma.textureAsset.create({ data: { name: stored, png: c.bytes }, select: { id: true, name: true, createdAt: true } });
+    const row = await prisma.textureAsset.create({ data: { name: stored, png: new Uint8Array(c.bytes) }, select: { id: true, name: true, createdAt: true } });
     return reply.code(201).send(row);
   });
 
