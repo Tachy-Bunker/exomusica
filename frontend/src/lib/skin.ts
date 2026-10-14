@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { applyEra, useEra } from "./era";
 // Two optional palettes (Chozo: warm gold, calm. Phazon: cold teal, harsh) and an optional HUD frame. Palettes are plain data applied as CSS variables, so a test can check their contrast and nothing is repeated in the stylesheet.
 export type SkinId = "" | "chozo" | "phazon";
 export interface Palette { bg: string; bgElevated: string; bgInset: string; text: string; textDim: string; border: string; accentForum: string; accentForumDim: string; accentAudio: string; accentAudioDim: string; accentDanger: string; radius?: string }
@@ -24,6 +25,7 @@ export function applySkin(id: SkinId, root: HTMLElement = document.documentEleme
   for (const [k, v] of Object.entries(VARS)) { if (p) root.style.setProperty(v, p[k as keyof typeof VARS]); else root.style.removeProperty(v); }
   if (p?.radius) root.style.setProperty("--radius", p.radius); else root.style.removeProperty("--radius");
   if (id) root.dataset.skin = id; else delete root.dataset.skin;
+  applyEra(useEra.getState().unlocked ? useEra.getState().era : null, !!id, root);
 }
 interface S { skin: SkinId; hud: boolean; setSkin: (s: SkinId) => void; setHud: (v: boolean) => void }
 const initSkin = asSkin(get(SKIN_KEY)), initHud = get(HUD_KEY) === "1";

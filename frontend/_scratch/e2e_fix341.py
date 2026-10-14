@@ -78,7 +78,7 @@ def run(pw):
 
     # the door
     ctx = b.new_context(viewport={"width": 1100, "height": 760}, service_workers="block")
-    ctx.add_init_script("localStorage.setItem('exomusica_classic','0');")
+    ctx.add_init_script("localStorage.setItem('exomusica_classic','0');localStorage.setItem('exomusica_door','hex');")
     state = {"slow": False, "held": []}
     def handle(route):
         path = route.request.url.replace(BASE, ""); key_ = path.split("?")[0]

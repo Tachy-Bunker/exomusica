@@ -5,6 +5,8 @@ import { levelOf } from "../lib/access";
 import { branchSlugOf, doorTarget, readyToOpen, sectionOf } from "../lib/doorRoute";
 import { inflight } from "../lib/loadWatch";
 import { themeOf } from "../lib/headerTheme";
+import { useDoorStyle } from "../lib/doorStyle";
+import { BLADES, blade, cornerMask, frameOctagon, isPortrait } from "../lib/doorShape";
 
 type Phase = "idle" | "closing" | "closed" | "opening";
 const LEVEL_COLOR: Record<string, string> = { open: "#ff9d3c", members: "#3fc9bb", staff: "#ff5c8a" };
@@ -21,6 +23,8 @@ const PANELS = [0, 1, 2, 3, 4, 5].map((i) => {
     ty: Math.round(Math.sin((mid * Math.PI) / 180) * 520),
   };
 });
+const SPIKES = Array.from({ length: BLADES }, (_, i) => blade(i));
+const OCT = frameOctagon(), MASK = cornerMask();
 const HEX = [0, 1, 2, 3, 4, 5].map((i) => pt(i * 60, 26)).join(" ");
 
 /** A hexagonal six-panel door between sections. It closes over the page, waits behind it until the next page has finished loading, then opens. One fixed SVG, CSS animations only; classic mode and reduced motion never show it. */
@@ -28,6 +32,8 @@ export function DoorWipe() {
   const { pathname } = useLocation();
   const navigate = useNavigate();
   const classic = useClassicMode((s) => s.classic);
+  const style = useDoorStyle((s) => s.style);
+  const [portrait, setPortrait] = useState(false);
   const [phase, setPhase] = useState<Phase>("idle");
   const [color, setColor] = useState<string | null>(null);
   const [target, setTarget] = useState(pathname);
@@ -36,7 +42,7 @@ export function DoorWipe() {
   const want = useRef<{ to: string; a: Element } | null>(null); // the link the door is covering: clicked again for real once the door is shut
   const bypass = useRef(false);
   const closedAt = useRef(0);
-  const set = (p: Phase) => { phaseRef.current = p; setPhase(p); };
+  const set = (p: Phase) => { if (p === "closing") setPortrait(isPortrait(window.innerWidth, window.innerHeight)); phaseRef.current = p; setPhase(p); };
   const off = (): boolean => classic || (typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches);
   path.current = pathname;
 
@@ -112,6 +118,28 @@ export function DoorWipe() {
 
   if (phase === "idle" || classic) return null;
   const c = color ?? LEVEL_COLOR[levelOf(target)] ?? LEVEL_COLOR.open;
+  if (style === "stronghold") {
+    return (
+      <div className="door-wipe" data-style="stronghold" data-door={levelOf(target)} data-phase={phase} data-portrait={portrait ? "1" : "0"} data-testid="door-wipe" aria-hidden="true" style={{ ["--door" as string]: c }}>
+        <svg viewBox={portrait ? "-50 -80 100 160" : "-80 -50 160 100"} preserveAspectRatio="none" focusable="false">
+          <g transform={portrait ? "rotate(90)" : undefined}>
+            <polygon className="sh-back" points={OCT} />
+            {SPIKES.map((b, i) => (
+              <g key={i} className="sh-b" style={{ ["--tx" as string]: `${b.ox}px`, ["--ty" as string]: `${b.oy}px`, ["--rot" as string]: `${b.rot}deg`, ["--i" as string]: i }} onAnimationEnd={i === BLADES - 1 ? onEnd : undefined}>
+                <path className="sh-blade" d={b.d} />
+                <path className="sh-rib" d={b.rib} />
+              </g>
+            ))}
+            <g className="sh-frame">
+              <path className="sh-mask" d={MASK} fillRule="evenodd" />
+              <polygon className="sh-oct" points={OCT} />
+              <circle className="sh-eye" r="3.2" />
+            </g>
+          </g>
+        </svg>
+      </div>
+    );
+  }
   return (
     <div className="door-wipe" data-door={levelOf(target)} data-phase={phase} data-testid="door-wipe" aria-hidden="true" style={{ ["--door" as string]: c }}>
       <svg viewBox="-100 -100 200 200" preserveAspectRatio="xMidYMid slice" focusable="false">

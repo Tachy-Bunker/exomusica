@@ -6300,6 +6300,26 @@ html.classic .missing-scans{display:none}
 @keyframes dw-fade{to{opacity:0}}
 @media (prefers-reduced-motion:reduce){.door-wipe{display:none}}
 html.classic .door-wipe{display:none}
+/* stronghold door: nine spikes wind into the middle; leaving, each swings out along a wide ellipse the way the spiral turns */
+.door-wipe[data-style="stronghold"] svg{overflow:hidden}
+.sh-back{fill:#05080a}
+.sh-b{will-change:transform}
+.sh-blade{fill:#0b1219;stroke:var(--door);stroke-width:.45;stroke-linejoin:round}
+.sh-rib{fill:none;stroke:var(--door);stroke-width:.35;stroke-opacity:.45;stroke-linecap:round}
+.sh-mask{fill:#05080a}
+.sh-oct{fill:none;stroke:var(--door);stroke-width:2.2;stroke-linejoin:round;filter:drop-shadow(0 0 2.5px var(--door))}
+.sh-eye{fill:var(--door);fill-opacity:.55;filter:drop-shadow(0 0 2px var(--door))}
+.door-wipe[data-style="stronghold"][data-phase="closing"] .sh-b{animation:sh-in 480ms cubic-bezier(.4,0,.6,1) calc(var(--i) * 16ms) both}
+.door-wipe[data-style="stronghold"][data-phase="closed"] .sh-b{transform:none}
+.door-wipe[data-style="stronghold"][data-phase="opening"] .sh-b{animation:sh-out 620ms cubic-bezier(.45,0,.25,1) calc(var(--i) * 16ms) both}
+.door-wipe[data-style="stronghold"][data-phase="opening"] .sh-frame{animation:sh-fade 340ms ease-out 260ms both}
+.door-wipe[data-style="stronghold"][data-phase="opening"]{pointer-events:none}
+@keyframes sh-in{from{transform:rotate(var(--rot)) translate(var(--tx),var(--ty))}82%{transform:rotate(-2.5deg)}to{transform:none}}
+@keyframes sh-out{from{transform:none}18%{transform:rotate(-2.5deg)}to{transform:rotate(var(--rot)) translate(var(--tx),var(--ty))}}
+.door-wipe[data-style="stronghold"][data-phase="closing"] .sh-back{animation:sh-back-in 480ms ease-in both}
+.door-wipe[data-style="stronghold"][data-phase="opening"] .sh-back{animation:sh-fade 240ms ease-out both}
+@keyframes sh-back-in{from{opacity:0}60%{opacity:0}to{opacity:1}}
+@keyframes sh-fade{to{opacity:0}}
 .save-station{font-size:0.8rem;margin:0 0 0.4rem}
 .save-station i{display:inline-block;width:8px;height:8px;border-radius:50%;border:1px solid #ff9d3c;vertical-align:middle}
 .save-station i.on{background:#ff9d3c}

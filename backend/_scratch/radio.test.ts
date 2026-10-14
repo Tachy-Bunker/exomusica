@@ -19,3 +19,21 @@ assert.equal(locate(ord, -10)!.track.id, 3);
 assert.deepEqual(locate([{ id: 9, durationSeconds: 30 }], 100)!.upcoming, []);
 assert.equal(locate([], 5), null);
 console.log("ok");
+
+import { orderCrate, loopElapsed, STATION_EPOCH_MS, locate as loc2 } from "../src/lib/radio.js";
+{
+  const pl = (id: number, tracks: number[]) => ({ id, title: "P" + id, owner: "o" + id, slug: "p" + id, tracks: tracks.map((t) => ({ id: t, durationSeconds: 60 })) });
+  const lists = [pl(1, [1, 2, 3]), pl(2, [4, 5]), pl(3, []), pl(4, [6]), { ...pl(5, [7]), tracks: [{ id: 7, durationSeconds: null }] }];
+  const a = orderCrate(lists, "2026-10-14"), b = orderCrate([...lists].reverse(), "2026-10-14");
+  assert.deepEqual(a.map((e) => e.id), b.map((e) => e.id), "same order for everyone, whatever order the database returns");
+  assert.equal(a.length, 6, "empty and unplayable playlists are left out");
+  const bounds = a.map((e) => e.playlist.slug); // each playlist's tracks stay together, in order
+  assert.ok(["p1", "p2", "p4"].every((s) => bounds.join(",").includes(Array(bounds.filter((x) => x === s).length).fill(s).join(","))));
+  const p1 = a.filter((e) => e.playlist.slug === "p1").map((e) => e.id); assert.deepEqual(p1, [1, 2, 3]);
+  assert.notDeepEqual(orderCrate(lists, "2026-10-15").map((e) => e.playlist.slug), a.map((e) => e.playlist.slug), "a new day, a new running order (very likely)");
+  const at = loc2(a, 125); assert.equal(at!.track.id, a[2].id);
+  assert.equal(at!.track.playlist.slug, a[2].playlist.slug);
+  assert.equal(loopElapsed(STATION_EPOCH_MS + 5000), 5); assert.equal(loopElapsed(0), 0);
+  assert.deepEqual(orderCrate([], "d"), []);
+}
+console.log("stations ok");

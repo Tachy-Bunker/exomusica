@@ -58,6 +58,7 @@ import { PlayerBar } from "./PlayerBar";
 import { AtlasShell } from "./AtlasShell";
 import { takeArrival } from "../lib/arrive";
 import { TrackPreloader } from "./TrackPreloader";
+import { useSeasonShift } from "../lib/useSeasonShift";
 import { resumeSharedContextIfNeeded } from "../lib/oneShotSfx";
 import { resumeAnalyserContextIfNeeded } from "../lib/audioAnalyser";
 
@@ -73,6 +74,7 @@ export function Layout() {
   useEffect(() => { if (user) void loadChoice(); else applyTint(null); }, [user?.id]);
   useEffect(() => { if (user) void syncJingles(); }, [user?.id]); // each pickup jingle plays once per account, on any device
   useGuestOnline(!user);
+  useSeasonShift();
   const loadEmojis = useEmojiStore((s) => s.load);
   useGlobalPlayerShortcuts();
   const pipWindow = useChatPipStore((s) => s.pipWindow);

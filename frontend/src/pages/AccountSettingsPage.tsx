@@ -1,4 +1,6 @@
 import { useClassicMode } from "../lib/classicMode";
+import { asDoorStyle, useDoorStyle } from "../lib/doorStyle";
+import { ERAS, useEra } from "../lib/era";
 import { loadCollective, useJingles, type CollectiveSeed } from "../lib/jingles";
 import { loadMilestones } from "../lib/milestones";
 import { asSkin, SKINS, useSkin } from "../lib/skin";
@@ -67,6 +69,9 @@ export function AccountSettingsPage() {
   const { logout } = useAuth();
   const classic = useClassicMode((s) => s.classic);
   const setClassic = useClassicMode((s) => s.set);
+  const eraState = useEra();
+  const doorStyle = useDoorStyle((s) => s.style);
+  const setDoorStyle = useDoorStyle((s) => s.set);
   const [jOpen, setJOpen] = useState(false); // Collective jingle reached
   useEffect(() => { let alive = true; loadMilestones().then((l) => alive && setJOpen(!!l.find((m) => m.key === "m-jingle")?.reached)).catch(() => undefined); return () => { alive = false; }; }, []);
   const [jSeed, setJSeed] = useState<CollectiveSeed | null>(null);
@@ -310,6 +315,18 @@ export function AccountSettingsPage() {
         <input type="checkbox" checked={classic} onChange={(e) => setClassic(e.target.checked)} data-testid="classic-toggle" /> Classic mode: no Probe mode, wipes, overlays or extra sounds (starts on by itself if your device asks for less motion or is low on memory)
       </label>
 
+      {eraState.unlocked && eraState.era !== null && (
+        <label style={{ display: "block", fontSize: "0.9rem", marginBottom: "0.8rem" }}>
+          <input type="checkbox" checked={eraState.hum} onChange={(e) => eraState.setHum(e.target.checked)} data-testid="hum-toggle" /> Ambient hum: a very quiet drone for the current era ({ERAS[eraState.era]}, day {eraState.days}); pauses while music plays, off in classic mode
+        </label>
+      )}
+      <label style={{ display: "block", fontSize: "0.9rem", marginBottom: "0.5rem" }}>
+        Door between sections{" "}
+        <select value={doorStyle} onChange={(e) => setDoorStyle(asDoorStyle(e.target.value))} data-testid="door-select" aria-label="Door style">
+          <option value="stronghold">Stronghold: nine spikes, octagon frame</option>
+          <option value="hex">Hexagon: six panels</option>
+        </select>
+      </label>
       <label style={{ display: "block", fontSize: "0.9rem", marginBottom: "0.5rem" }}>
         Colours{" "}
         <select value={skin} onChange={(e) => setSkin(asSkin(e.target.value))} data-testid="skin-select" aria-label="Colour scheme">

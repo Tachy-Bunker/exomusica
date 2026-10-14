@@ -1,12 +1,24 @@
 import type { PlayableTrackDTO } from "./types";
 
+export type Station = "branch" | "crate" | "longwave";
+export const STATIONS: { id: Station; label: string; key: string | null; blurb: string }[] = [
+  { id: "branch", label: "Branch of the hour", key: null, blurb: "One branch on air at a time, the same moment for everyone. The branch changes with the time of day (UTC)." },
+  { id: "crate", label: "Crate radio", key: "m-crateradio", blurb: "Public playlists, shuffled anew each day (UTC) and played through one by one. Every song is credited to its playlist." },
+  { id: "longwave", label: "Long wave", key: "m-longwave", blurb: "The whole catalogue in one endless loop. Everyone is at the same point of it." },
+];
+export const asStation = (v: string | null): Station => (v === "crate" || v === "longwave" ? v : "branch");
+export const stationUrl = (s: Station): string => (s === "branch" ? "/api/radio/now" : `/api/radio/station/${s}`);
+
 export interface RadioNow {
-  branch: { slug: string; name: string; channelSlug: string | null };
+  /** Only the branch station has a branch on air. */
+  branch?: { slug: string; name: string; channelSlug: string | null };
+  credit?: { title: string; owner: string; slug: string } | null;
+  locked?: boolean;
   track: PlayableTrackDTO;
   offset: number;
   remaining: number;
   upcoming: { id: number; title: string; albumTitle: string }[];
-  blockEndsAt: number;
+  blockEndsAt?: number;
   serverNow: number;
 }
 

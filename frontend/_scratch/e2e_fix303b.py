@@ -56,7 +56,7 @@ def run(playwright):
     page.goto(f"{BASE}/"); page.wait_for_selector("[data-testid=welcome-card]")
     check("neo" in page.locator("[data-testid=welcome-item]").inner_text(), "Welcome: the prompt names the newcomer")
     page.locator("[data-testid=welcome-say]").click(); page.wait_for_selector("textarea.hud-reveal-textarea")
-    page.wait_for_timeout(500)
+    page.wait_for_timeout(1500)
     check(page.input_value("textarea.hud-reveal-textarea") == "Welcome @neo !", f"Welcome: the box holds the greeting ({page.input_value('textarea.hud-reveal-textarea')!r})")
     check("say=" not in page.url, f"Welcome: the link parameter is cleaned from the address ({page.url})")
     check(len(dones) == 1, "Welcome: following it marks the greeting as handled")

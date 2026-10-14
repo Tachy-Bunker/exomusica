@@ -79,23 +79,38 @@ function Thermal() {
 
 interface Hit { type: string; slug: string; title: string; href: string }
 const traceable = /^\/(branch|album|study|wiki|news|u|topic|collaborator|playlist|community-album)\/[^/]+$/;
-const backCache = new Map<string, Hit[]>();
+interface Back { hits: Hit[]; second: (Hit & { via: string })[] }
+const backCache = new Map<string, Back>();
 
-/** Outlines the page's structure and lists what links to it. */
+/** Outlines the page's structure and lists what links to it; once the community unlocks it, also what links to those pages (two links away). */
 function Xray() {
   const { pathname } = useLocation();
-  const [hits, setHits] = useState<Hit[] | null>(null);
+  const [back, setBack] = useState<Back | null>(null);
   const can = traceable.test(pathname);
   useEffect(() => { document.body.classList.add("lens-xray"); return () => document.body.classList.remove("lens-xray"); }, []);
   useEffect(() => {
-    if (!can) { setHits(null); return; }
+    if (!can) { setBack(null); return; }
     const cached = backCache.get(pathname);
-    if (cached) { setHits(cached); return; }
-    setHits(null);
+    if (cached) { setBack(cached); return; }
+    setBack(null);
     let dead = false;
-    api<Hit[]>(`/api/backlinks?path=${encodeURIComponent(pathname)}`).then((h) => { const list = Array.isArray(h) ? h : []; backCache.set(pathname, list); if (!dead) setHits(list); }).catch(() => { if (!dead) setHits([]); });
+    const q = encodeURIComponent(pathname);
+    void (async () => {
+      const deepOn = (await loadMilestones().catch(() => [])).find((m) => m.key === "m-xray")?.reached === true;
+      let r: Back;
+      if (deepOn) {
+        const d = await api<{ hits?: Hit[]; second?: (Hit & { via: string })[] }>(`/api/backlinks?path=${q}&depth=2`);
+        r = { hits: Array.isArray(d?.hits) ? d.hits : [], second: Array.isArray(d?.second) ? d.second : [] };
+      } else {
+        const h = await api<Hit[]>(`/api/backlinks?path=${q}`);
+        r = { hits: Array.isArray(h) ? h : [], second: [] };
+      }
+      backCache.set(pathname, r);
+      if (!dead) setBack(r);
+    })().catch(() => { if (!dead) setBack({ hits: [], second: [] }); });
     return () => { dead = true; };
   }, [pathname, can]);
+  const hits = back?.hits ?? null, second = back?.second ?? [];
   return (
     <aside className="xray-panel probe-ui" aria-label="X-ray: what links here" data-testid="xray-panel">
       <b>X-RAY</b>
@@ -103,6 +118,7 @@ function Xray() {
         : hits === null ? <p>Tracing…</p>
         : hits.length === 0 ? <p data-testid="xray-none">Nothing links to this page yet.</p>
         : <><p>Linked from {hits.length}:</p><ul>{hits.map((h) => <li key={h.href}><Link to={h.href} data-testid="xray-hit"><small>{h.type}</small> {h.title}</Link></li>)}</ul></>}
+      {can && hits !== null && second.length > 0 && <><p data-testid="xray-second-head">Two links away ({second.length}):</p><ul>{second.map((h) => <li key={h.href}><Link to={h.href} data-testid="xray-second"><small>{h.type}</small> {h.title}</Link> <small className="home-dim">via {h.via}</small></li>)}</ul></>}
     </aside>
   );
 }

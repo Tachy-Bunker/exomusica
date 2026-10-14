@@ -65,7 +65,7 @@ def run(playwright):
 
     # door: six panels, gone when loaded
     p.goto(f"{BASE}/field-log"); p.wait_for_selector("[data-testid=field-log]"); p.click("a[href='/chart']"); p.wait_for_selector("[data-testid=door-wipe]", timeout=1500)
-    check(p.locator("[data-testid=door-wipe] .dw-p").count() == 6, "Door has six panels")
+    check(p.locator("[data-testid=door-wipe] .sh-b").count() == 9, "Door has nine spikes")
     p.wait_for_selector("[data-testid=door-wipe]", state="detached", timeout=5000)
     check(True, "Door opens and goes away once loaded")
 

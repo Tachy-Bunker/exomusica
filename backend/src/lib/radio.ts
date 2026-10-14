@@ -52,3 +52,23 @@ export function locate<T extends RTrack>(ordered: T[], elapsed: number): { track
   }
   return null;
 }
+
+// ---- Stations that are not tied to a branch: Crate radio (public playlists) and Long wave (the whole catalogue). Same idea: a loop everyone locates the same way from the clock.
+/** The loops start counting from here, so "where in the loop are we" is the same for everyone and needs no state. */
+export const STATION_EPOCH_MS = Date.UTC(2026, 0, 1);
+
+export interface CratePlaylist<T extends RTrack = RTrack> { id: number; title: string; owner: string; slug: string; tracks: T[] }
+export interface CrateEntry<T extends RTrack = RTrack> extends RTrack { track: T; playlist: { title: string; owner: string; slug: string } }
+
+/** Playlists are shuffled (new order each UTC day, same for everyone) and each one is played through in its own order. Playlists with nothing playable are skipped. */
+export function orderCrate<T extends RTrack>(playlists: CratePlaylist<T>[], day: string): CrateEntry<T>[] {
+  const lists = playlists.filter((p) => p.tracks.some((t) => (t.durationSeconds ?? 0) >= 1)).sort((a, b) => a.id - b.id);
+  const r = rng(hashStr(`crate-${day}`));
+  for (let i = lists.length - 1; i > 0; i--) { const j = Math.floor(r() * (i + 1)); [lists[i], lists[j]] = [lists[j], lists[i]]; }
+  const out: CrateEntry<T>[] = [];
+  for (const p of lists) for (const t of p.tracks) if ((t.durationSeconds ?? 0) >= 1) out.push({ id: t.id, durationSeconds: t.durationSeconds, track: t, playlist: { title: p.title, owner: p.owner, slug: p.slug } });
+  return out;
+}
+
+/** Seconds into a station's loop at this moment. */
+export const loopElapsed = (now: number): number => Math.max(0, (now - STATION_EPOCH_MS) / 1000);
