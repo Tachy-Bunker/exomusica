@@ -9,6 +9,7 @@ import { saveCommunityTrackAudio, saveCommunityAlbumCover, deleteAttachmentAndRe
 import { slotState } from "../lib/wanted.js";
 import { answeredComment, revisionsToPrune } from "../lib/trackRevisions.js";
 import { resolvePlayableUrl } from "../lib/embeds.js";
+import { isWaveProfile } from "../lib/waveProfile.js";
 import { probeAudioDuration } from "../lib/audioProbe.js";
 import { deletePlaylistPreview, regeneratePlaylistPreview } from "../lib/playlistPreview.js";
 
@@ -119,6 +120,20 @@ export async function communityMusicRoutes(app: FastifyInstance): Promise<void> 
       take: 20,
     });
     return tracks.map((t) => ({ id: t.id, title: t.title, albumTitle: t.album.title }));
+  });
+
+  app.get<{ Params: { id: string } }>("/api/community-tracks/:id/wave-profile", async (req, reply) => {
+    const track = await prisma.communityTrack.findUnique({ where: { id: Number(req.params.id) }, select: { waveProfile: true } });
+    if (!track) return reply.code(404).send({ error: "no such track" });
+    return { profile: track.waveProfile };
+  });
+  app.post<{ Params: { id: string }; Body: { profile: string } }>("/api/community-tracks/:id/wave-profile", async (req, reply) => {
+    if (!isWaveProfile(req.body?.profile)) return reply.code(400).send({ error: "profile is not valid" });
+    const track = await prisma.communityTrack.findUnique({ where: { id: Number(req.params.id) }, select: { waveProfile: true } });
+    if (!track) return reply.code(404).send({ error: "no such track" });
+    if (track.waveProfile !== null) return { status: "already-set" };
+    await prisma.communityTrack.update({ where: { id: Number(req.params.id) }, data: { waveProfile: req.body.profile } });
+    return { status: "ok" };
   });
 
   app.post<{ Params: { id: string }; Body: { gainDb: number } }>("/api/community-tracks/:id/replay-gain", async (req, reply) => {
@@ -486,7 +501,7 @@ export async function communityMusicRoutes(app: FastifyInstance): Promise<void> 
       await keepOldVersion(track, req.query.answers);
       const updated = await prisma.communityTrack.update({
         where: { id: track.id },
-        data: { attachmentId: attachment.id, externalUrl: null, format: formatFromMime(file.mimetype), durationSeconds: null, replayGainDb: null },
+        data: { attachmentId: attachment.id, externalUrl: null, format: formatFromMime(file.mimetype), durationSeconds: null, replayGainDb: null, waveProfile: null },
       });
       void probeAudioDuration(attachment.storagePath)
         .then((seconds) => {
@@ -501,7 +516,7 @@ export async function communityMusicRoutes(app: FastifyInstance): Promise<void> 
     await keepOldVersion(track, req.query.answers);
     const updated = await prisma.communityTrack.update({
       where: { id: track.id },
-      data: { externalUrl: url, attachmentId: null, durationSeconds: null, replayGainDb: null },
+      data: { externalUrl: url, attachmentId: null, durationSeconds: null, replayGainDb: null, waveProfile: null },
     });
     void probeAudioDuration(url)
       .then((seconds) => {

@@ -420,6 +420,7 @@ model Track {
   format          AudioFormat
   durationSeconds Int?
   position        Int         @default(0)
+  waveProfile     String? @map("wave_profile") @db.Text // Morph ball: amplitude + brightness per slice of the track (base64, see lib/waveProfile.ts) - null means not yet worked out
   replayGainDb    Float? @map("replay_gain_db_v2") // sitewide loudness normalization (target -11 LUFS, boost limited by peak) - null means not yet analyzed. The column name changed with the target so every track is measured afresh.
   genres          String[] @default([]) // user-assigned, as many as wanted - drives Venn Views placement
   lyrics          String?  @db.Text // also doubles as the constellation scan panel's logbook description
@@ -1175,6 +1176,7 @@ model CommunityTrack {
   durationSeconds Int?
   position        Int            @default(0)
   permission      TrackPermission @default(LISTEN_ONLY) // creator-set: how others may use this track
+  waveProfile     String? @map("wave_profile") @db.Text // Morph ball: amplitude + brightness per slice of the track (base64, see lib/waveProfile.ts) - null means not yet worked out
   replayGainDb    Float? @map("replay_gain_db_v2") // sitewide loudness normalization (target -11 LUFS, boost limited by peak) - null means not yet analyzed. The column name changed with the target so every track is measured afresh.
   lyrics          String? // also acts as a description; shown expandable on the album page and playlist list view
   genres          String[] @default([]) // user-assigned, as many as wanted - drives Venn Views placement

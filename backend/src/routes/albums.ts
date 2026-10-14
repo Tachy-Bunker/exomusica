@@ -6,6 +6,7 @@ import { prisma } from "../lib/prisma.js";
 import { requireAdmin } from "../lib/auth.js";
 import { trackToDTO } from "../lib/embeds.js";
 import { saveSiteImage, saveGalleryFile, saveTrackFile } from "../lib/storage.js";
+import { isWaveProfile } from "../lib/waveProfile.js";
 import { probeAudioDuration, probeAudioDurationOfBuffer } from "../lib/audioProbe.js";
 
 export async function albumRoutes(app: FastifyInstance): Promise<void> {
@@ -125,6 +126,20 @@ export async function albumRoutes(app: FastifyInstance): Promise<void> {
     if (!track) return reply.code(404).send({ error: "no such track" });
     if (track.replayGainDb !== null) return { status: "already-set" }; // first analysis wins, avoids concurrent-listener races
     await prisma.track.update({ where: { id: Number(req.params.id) }, data: { replayGainDb: clamped } });
+    return { status: "ok" };
+  });
+
+  app.get<{ Params: { id: string } }>("/api/tracks/:id/wave-profile", async (req, reply) => {
+    const track = await prisma.track.findUnique({ where: { id: Number(req.params.id) }, select: { waveProfile: true } });
+    if (!track) return reply.code(404).send({ error: "no such track" });
+    return { profile: track.waveProfile };
+  });
+  app.post<{ Params: { id: string }; Body: { profile: string } }>("/api/tracks/:id/wave-profile", async (req, reply) => {
+    if (!isWaveProfile(req.body?.profile)) return reply.code(400).send({ error: "profile is not valid" });
+    const track = await prisma.track.findUnique({ where: { id: Number(req.params.id) }, select: { waveProfile: true } });
+    if (!track) return reply.code(404).send({ error: "no such track" });
+    if (track.waveProfile !== null) return { status: "already-set" };
+    await prisma.track.update({ where: { id: Number(req.params.id) }, data: { waveProfile: req.body.profile } });
     return { status: "ok" };
   });
 
@@ -362,7 +377,7 @@ export async function albumRoutes(app: FastifyInstance): Promise<void> {
     // A different recording is a different loudness: measure it afresh. Bookmarks and notes stay on the track.
     if (rest.fileUrl) {
       const before = await prisma.track.findUnique({ where: { id: Number(req.params.id) }, select: { fileUrl: true } });
-      if (before && before.fileUrl !== rest.fileUrl) data.replayGainDb = null;
+      if (before && before.fileUrl !== rest.fileUrl) { data.replayGainDb = null; data.waveProfile = null; }
     }
     return prisma.track.update({
       where: { id: Number(req.params.id) },

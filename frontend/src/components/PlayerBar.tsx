@@ -18,6 +18,7 @@ import { SpecLayer } from "./SpecLayer";
 import { TrackVersions } from "./TrackVersions";
 import { answeredIds, uploadNewVersion, useTrackVersions } from "../lib/trackVersions";
 import { coverColor, layerHue, layersOf, loadStrip, trackBase, nearbyComments, type Strip, type TrackComment } from "../lib/specStrip";
+import { MorphBall } from "./MorphBall";
 import { PreviousIcon, NextIcon, LoopIcon, LoopOneIcon, ExpandIcon, CollapseIcon, ShuffleIcon, QueueIcon } from "./Icons";
 
 function formatTime(seconds: number): string {
@@ -209,6 +210,7 @@ export function PlayerBar() {
   // Spectrogram strip + comments for the current track.
   const trackId = currentTrack?.id ?? null;
   const source = currentTrack?.source;
+  const [ball, setBall] = useState(false);
   const [strip, setStrip] = useState<Strip | null>(null);
   const [comments, setComments] = useState<TrackComment[]>([]);
   const [pickAt, setPickAt] = useState<number | null>(null);
@@ -378,6 +380,7 @@ export function PlayerBar() {
         </div>
       )}
 
+      {ball && currentTrack && <MorphBall key={`${currentTrack.source}:${currentTrack.id}`} track={currentTrack} onClose={() => setBall(false)} />}
       {currentTrack && expanded && (
         <div
           className="player-expanded-overlay"
@@ -470,6 +473,7 @@ export function PlayerBar() {
                 {repeatMode === "one" ? <LoopOneIcon size={18} /> : <LoopIcon size={18} />}
               </button>
               <EchoToggle />
+              <button type="button" className="btn" data-testid="player-morph" onClick={() => setBall(true)} title="Roll a ball along this track">Morph ball</button>
             </div>
 
             {AB_TOOLS_ENABLED && <AbPanel />}

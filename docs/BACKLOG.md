@@ -78,3 +78,9 @@ Last updated: fix349. Built milestone rewards are listed in `docs/HOMEPAGE_AND_N
 - fix352 DELIVERED: Echo visor (`m-visor`, 1500 scans, keys V/X/L), Lore logbook, admin "Room lore" page, `LoreEntry` table.
 - Next: fix353 Waveform morph ball (needs waveform peak data); fix354 Echoes of members (server-memory path recording); then the design write-up of music/sound-based bosses.
 - Follow-ups: logbook synced to the account (today per device), lore for tracks/people scans, spectral walls, rooms hum.
+
+
+## Roadmap after fix353
+- fix353 DELIVERED: Morph ball (overlay from the expanded player; profile shared via `wave_profile` columns).
+- Next: fix354 Echoes of members (faint replayed paths of recent visitors; server-memory path recording); then the design write-up of music/sound-based bosses.
+- Morph ball follow-ups: also open it from room terminals/the drone, ball hops on transients, ghost balls of other listeners, A/B loop between two save points, make save points from the ball (needs permission model for bookmarks), spectral-flux "gates" as obstacles.

@@ -892,3 +892,14 @@ No schema change, no server code. Doors between branch rooms no longer play the 
 - **Logbook:** localStorage (`exomusica_logbook`, `exomusica_logbook_rooms`): per-room list, completion % over rooms visited on this device, unscanned items show as ???.
 - **Fixed on the way:** the room loop stopped repainting during the 7 s hold phase of the echo; it now keeps running while echoes are visible.
 - Tests: `echo.test.ts`, backend `lore.test.ts`, `milestones.test.ts`, `e2e_fix352.py` (20 checks).
+
+## fix353 — Morph ball
+
+**Schema change:** `Track.waveProfile` and `CommunityTrack.waveProfile` (nullable text, column `wave_profile`). Run the Prisma commands from the delivery note (migration `wave_profile`).
+- **Where:** the **Morph ball** button in the expanded player opens a full-screen overlay for the track that is playing (`components/MorphBall.tsx`).
+- **What you see:** the ground is the track's loudness (hills), its colour is the brightness (spectral centroid: deep blue-violet dull → gold bright), the ball sits on the ground at the playhead and rolls exactly the distance the music moves; its outline gets spikier the brighter the sound. The bookmarks are pylons (save points); passing one names it. A small whole-track strip sits at the bottom.
+- **Controls:** playing, the ball rides the music. Hold **← → / A D** to roll the head (starts at 0.6×, climbs to 6× over 1.5 s; the player is seeked at 10 Hz so you hear it scratch). **Q / E** jump between save points, **Space** play/pause, **Esc** leaves. Touch/mouse: drag the ground, tap a pylon or the strip, hold the ◀ ▶ buttons.
+- **The profile** (`lib/waveBall.ts`, `lib/waveLoad.ts`): 720 slices × (amplitude byte, brightness byte), base64, 1440 bytes. The first listener's browser decodes the track once at 22.05 kHz (≈0.2 s of analysis for 5 minutes, the decode dominates), POSTs it (`POST /api/tracks/:id/wave-profile`, community: `/api/community-tracks/:id/…`; first one in wins, validated by `backend/src/lib/waveProfile.ts`), and everyone after gets it from `GET` with no decoding. Replacing a track's file clears it. Tracks the browser cannot decode (host without CORS) show a short message.
+- **Light:** the loop runs only while the overlay is open and visible, stops repainting when paused and untouched, repaints ~84 slice-quads per frame, reuses the ScaleGovernor (lower pixel scale / 30 fps on slow devices).
+- Debug attributes on the stage: `data-t`, `data-dir`, `data-drawn`, `data-scale`, `data-ready`, `data-marks`.
+- Tests: `waveball.test.ts`, backend `waveprofile.test.ts`, `e2e_fix353.py` (19 checks).
