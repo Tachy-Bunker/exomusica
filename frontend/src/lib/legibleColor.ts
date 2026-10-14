@@ -1,3 +1,4 @@
+import { fromHsl, toHsl } from "./hsl";
 /** Brightness floor for colours drawn on the dark header: dark branch colours are lifted toward white until they reach `minLum` (relative luminance), keeping their hue. */
 const parse = (hex: string): [number, number, number] | null => {
   const m = /^#?([0-9a-f]{3}|[0-9a-f]{6})$/i.exec(hex.trim());
@@ -19,4 +20,13 @@ export function lift(hex: string, minLum = 0.25): string {
     if (l >= minLum) hi = t; else lo = t;
   }
   return toHex(c.map((v) => v + (255 - v) * hi));
+}
+
+/** The colour pushed to a glowing tube: strongly saturated and bright, same hue. Used for the door. */
+export function neon(hex: string): string {
+  const c = parse(hex);
+  if (!c) return hex;
+  const h = "#" + c.map((v) => v.toString(16).padStart(2, "0")).join("");
+  const [hue, s] = toHsl(h);
+  return lift(fromHsl(hue, Math.max(s, 0.92), 0.58), 0.12);
 }

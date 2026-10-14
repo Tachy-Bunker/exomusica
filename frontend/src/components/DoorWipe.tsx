@@ -6,10 +6,14 @@ import { branchSlugOf, doorTarget, readyToOpen, sectionOf } from "../lib/doorRou
 import { inflight } from "../lib/loadWatch";
 import { themeOf } from "../lib/headerTheme";
 import { useDoorStyle } from "../lib/doorStyle";
+import { setDoorReplay } from "../lib/doorReplay";
+import { neon } from "../lib/legibleColor";
+import { doorTexture } from "../lib/doorTexture";
 import { BLADES, blade, cornerMask, frameOctagon, isPortrait } from "../lib/doorShape";
 
 type Phase = "idle" | "closing" | "closed" | "opening";
-const LEVEL_COLOR: Record<string, string> = { open: "#ff9d3c", members: "#3fc9bb", staff: "#ff5c8a" };
+/** The site's main colour right now (it follows the era and the chosen skin). */
+const sitePrimary = (): string => { try { const v = getComputedStyle(document.documentElement).getPropertyValue("--accent-forum").trim(); return /^#[0-9a-f]{6}$/i.test(v) ? v : "#e2703f"; } catch { return "#e2703f"; } };
 const R = 300;
 const pt = (deg: number, r = R): string => `${(Math.cos((deg * Math.PI) / 180) * r).toFixed(1)},${(Math.sin((deg * Math.PI) / 180) * r).toFixed(1)}`;
 /** Six wedges around the middle. Each one slides in from outside the screen along its own direction. */
@@ -25,6 +29,9 @@ const PANELS = [0, 1, 2, 3, 4, 5].map((i) => {
 });
 const SPIKES = Array.from({ length: BLADES }, (_, i) => blade(i));
 const OCT = frameOctagon(), MASK = cornerMask();
+/** Faint spiral marks in the wall behind the spikes. */
+const SWIRL = Array.from({ length: 28 }, (_, k) => { const t = k / 27, a = t * Math.PI * 4.2, r = 0.5 + t * 4; return `${k ? "L" : "M"}${(Math.cos(a) * r).toFixed(2)},${(Math.sin(a) * r).toFixed(2)}`; }).join(" ");
+const SWIRLS: [number, number, number][] = [[-62, -30, 1], [60, -34, 0.8], [-66, 28, 0.9], [64, 30, 1.1], [-30, -42, 0.6], [34, 42, 0.7], [0, -44, 0.5], [-4, 44, 0.6]];
 const HEX = [0, 1, 2, 3, 4, 5].map((i) => pt(i * 60, 26)).join(" ");
 
 /** A hexagonal six-panel door between sections. It closes over the page, waits behind it until the next page has finished loading, then opens. One fixed SVG, CSS animations only; classic mode and reduced motion never show it. */
@@ -93,7 +100,7 @@ export function DoorWipe() {
       if (want.current) {
         const w = want.current; want.current = null;
         // run the link's own handlers and its navigation now, exactly as a click would have; if the link is gone, just go
-        if (w.a.isConnected) { bypass.current = true; try { w.a.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true, button: 0, view: window })); } finally { bypass.current = false; } }
+        if (w.a.isConnected) { bypass.current = true; setDoorReplay(true); try { w.a.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true, button: 0, view: window })); } finally { bypass.current = false; setDoorReplay(false); } }
         else navigate(w.to);
       }
     } else if (phaseRef.current === "opening") { set("idle"); setColor(null); }
@@ -117,23 +124,41 @@ export function DoorWipe() {
   }, [phase]);
 
   if (phase === "idle" || classic) return null;
-  const c = color ?? LEVEL_COLOR[levelOf(target)] ?? LEVEL_COLOR.open;
+  const c = neon(color ?? sitePrimary());
   if (style === "stronghold") {
+    const tex = doorTexture();
     return (
       <div className="door-wipe" data-style="stronghold" data-door={levelOf(target)} data-phase={phase} data-portrait={portrait ? "1" : "0"} data-testid="door-wipe" aria-hidden="true" style={{ ["--door" as string]: c }}>
         <svg viewBox={portrait ? "-50 -80 100 160" : "-80 -50 160 100"} preserveAspectRatio="none" focusable="false">
+          <defs>
+            {tex && <pattern id="sh-moss" width="26" height="26" patternUnits="userSpaceOnUse"><image href={tex} width="26" height="26" /></pattern>}
+            <pattern id="sh-scan" width=".5" height="100" patternUnits="userSpaceOnUse"><rect width=".22" height="100" fill="#000" /></pattern>
+            <radialGradient id="sh-vig" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="scale(95 60)"><stop offset=".45" stopColor="#000" stopOpacity="0" /><stop offset="1" stopColor="#000" stopOpacity=".7" /></radialGradient>
+          </defs>
           <g transform={portrait ? "rotate(90)" : undefined}>
-            <polygon className="sh-back" points={OCT} />
+            <g className="sh-back">
+              <polygon points={OCT} fill={tex ? "url(#sh-moss)" : "#08100e"} />
+              <polygon points={OCT} className="sh-tint" />
+              <polygon points={OCT} fill="url(#sh-scan)" className="sh-scanlines" />
+              <polygon points={OCT} fill="url(#sh-vig)" />
+              {SWIRLS.map((w, i) => <path key={i} d={SWIRL} className="sh-swirl" transform={`translate(${w[0]} ${w[1]}) scale(${w[2]})`} />)}
+            </g>
             {SPIKES.map((b, i) => (
               <g key={i} className="sh-b" style={{ ["--tx" as string]: `${b.ox}px`, ["--ty" as string]: `${b.oy}px`, ["--rot" as string]: `${b.rot}deg`, ["--i" as string]: i }} onAnimationEnd={i === BLADES - 1 ? onEnd : undefined}>
                 <path className="sh-blade" d={b.d} />
+                <path className="sh-ridge" d={b.rib} />
                 <path className="sh-rib" d={b.rib} />
               </g>
             ))}
+            <g className="sh-over">
+              <polygon points={OCT} fill="url(#sh-scan)" className="sh-scanlines sh-scan-top" />
+              <circle className="sh-eye" r="3.2" />
+            </g>
             <g className="sh-frame">
               <path className="sh-mask" d={MASK} fillRule="evenodd" />
+              <polygon className="sh-glow-wide" points={OCT} />
               <polygon className="sh-oct" points={OCT} />
-              <circle className="sh-eye" r="3.2" />
+              <polygon className="sh-core" points={OCT} />
             </g>
           </g>
         </svg>

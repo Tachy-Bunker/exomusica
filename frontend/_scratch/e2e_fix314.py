@@ -49,7 +49,7 @@ def run(playwright):
     try:
         w.wait_for_selector("[data-testid=door-wipe]", timeout=3000)
         check(w.get_attribute("[data-testid=door-wipe]", "data-door") == "members", "Wipe into /jam is members-coloured")
-        bi = w.evaluate("()=>document.querySelector('.door-wipe').style.getPropertyValue('--door')"); check("3fc9bb" in bi.lower(), f"Door is teal {bi}")
+        bi = w.evaluate("()=>document.querySelector('.door-wipe').style.getPropertyValue('--door')"); check(w.get_attribute("[data-testid=door-wipe]", "data-door") == "members" and re.match(r"^#[0-9a-f]{6}$", bi.lower()) and "3fc9bb" not in bi.lower(), f"Door wears the site primary colour (neon), not a level colour {bi}")
     except Exception as e:
         check(False, f"wipe: {e}")
     check(not errors, f"No page errors {errors[:2]}")

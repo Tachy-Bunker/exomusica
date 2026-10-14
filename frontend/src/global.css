@@ -6302,21 +6302,27 @@ html.classic .missing-scans{display:none}
 html.classic .door-wipe{display:none}
 /* stronghold door: nine spikes wind into the middle; leaving, each swings out along a wide ellipse the way the spiral turns */
 .door-wipe[data-style="stronghold"] svg{overflow:hidden}
-.sh-back{fill:#05080a}
+.sh-tint{fill:var(--door);fill-opacity:.045}
+.sh-scanlines{opacity:.55}
+.sh-scan-top{opacity:.18}
+.sh-swirl{fill:none;stroke:var(--door);stroke-width:.3;stroke-opacity:.28;stroke-linecap:round}
 .sh-b{will-change:transform}
-.sh-blade{fill:#0b1219;stroke:var(--door);stroke-width:.45;stroke-linejoin:round}
-.sh-rib{fill:none;stroke:var(--door);stroke-width:.35;stroke-opacity:.45;stroke-linecap:round}
-.sh-mask{fill:#05080a}
-.sh-oct{fill:none;stroke:var(--door);stroke-width:2.2;stroke-linejoin:round;filter:drop-shadow(0 0 2.5px var(--door))}
-.sh-eye{fill:var(--door);fill-opacity:.55;filter:drop-shadow(0 0 2px var(--door))}
+.sh-blade{fill:color-mix(in srgb,var(--door) 6%,#070c0b);fill-opacity:.62;stroke:color-mix(in srgb,var(--door) 55%,#fff);stroke-width:.4;stroke-linejoin:round;stroke-opacity:.8}
+.sh-ridge{fill:none;stroke:color-mix(in srgb,var(--door) 12%,#d6d3bb);stroke-width:2.1;stroke-opacity:.5;stroke-linecap:round;stroke-linejoin:round}
+.sh-rib{fill:none;stroke:color-mix(in srgb,var(--door) 40%,#fff);stroke-width:.35;stroke-opacity:.7;stroke-linecap:round}
+.sh-mask{fill:#030606}
+.sh-glow-wide{fill:none;stroke:var(--door);stroke-width:11;stroke-opacity:.3;stroke-linejoin:round;filter:blur(3.4px)}
+.sh-oct{fill:none;stroke:var(--door);stroke-width:2.8;stroke-linejoin:round;filter:drop-shadow(0 0 4px var(--door)) drop-shadow(0 0 12px var(--door))}
+.sh-core{fill:none;stroke:color-mix(in srgb,var(--door) 25%,#fff);stroke-width:.9;stroke-linejoin:round;stroke-opacity:.9}
+.sh-eye{fill:var(--door);fill-opacity:.6;filter:drop-shadow(0 0 3px var(--door))}
 .door-wipe[data-style="stronghold"][data-phase="closing"] .sh-b{animation:sh-in 480ms cubic-bezier(.4,0,.6,1) calc(var(--i) * 16ms) both}
 .door-wipe[data-style="stronghold"][data-phase="closed"] .sh-b{transform:none}
 .door-wipe[data-style="stronghold"][data-phase="opening"] .sh-b{animation:sh-out 620ms cubic-bezier(.45,0,.25,1) calc(var(--i) * 16ms) both}
-.door-wipe[data-style="stronghold"][data-phase="opening"] .sh-frame{animation:sh-fade 340ms ease-out 260ms both}
+.door-wipe[data-style="stronghold"][data-phase="opening"] .sh-frame,.door-wipe[data-style="stronghold"][data-phase="opening"] .sh-over{animation:sh-fade 340ms ease-out 260ms both}
 .door-wipe[data-style="stronghold"][data-phase="opening"]{pointer-events:none}
 @keyframes sh-in{from{transform:rotate(var(--rot)) translate(var(--tx),var(--ty))}82%{transform:rotate(-2.5deg)}to{transform:none}}
 @keyframes sh-out{from{transform:none}18%{transform:rotate(-2.5deg)}to{transform:rotate(var(--rot)) translate(var(--tx),var(--ty))}}
-.door-wipe[data-style="stronghold"][data-phase="closing"] .sh-back{animation:sh-back-in 480ms ease-in both}
+.door-wipe[data-style="stronghold"][data-phase="closing"] .sh-back,.door-wipe[data-style="stronghold"][data-phase="closing"] .sh-over{animation:sh-back-in 480ms ease-in both}
 .door-wipe[data-style="stronghold"][data-phase="opening"] .sh-back{animation:sh-fade 240ms ease-out both}
 @keyframes sh-back-in{from{opacity:0}60%{opacity:0}to{opacity:1}}
 @keyframes sh-fade{to{opacity:0}}

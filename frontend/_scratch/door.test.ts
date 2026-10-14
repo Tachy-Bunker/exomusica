@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { lift, luminance } from "../src/lib/legibleColor.js";
+import { lift, luminance, neon } from "../src/lib/legibleColor.js";
 import { branchSlugOf, doorTarget, readyToOpen, sectionOf } from "../src/lib/doorRoute.js";
 assert.equal(lift("#ffffff"), "#ffffff");
 assert.equal(lift("#ff9d3c"), "#ff9d3c");
@@ -24,4 +24,6 @@ assert.equal(doorTarget(ck, { ...an, href: "mailto:a@b.c" }, "/x"), null);
 const r = { onTarget: true, inflight: 0, fog: false, quietMs: 160, closedMs: 300 };
 assert.ok(readyToOpen(r));
 for (const k of [{ onTarget: false }, { inflight: 1 }, { fog: true }, { quietMs: 80 }, { closedMs: 100 }]) assert.ok(!readyToOpen({ ...r, ...k }), JSON.stringify(k));
+for (const c of ["#e2703f", "#4fa8e0", "#10102a", "#888888"]) { const n = neon(c); assert.ok(/^#[0-9a-f]{6}$/.test(n)); assert.ok(luminance(n) >= 0.11, c + " -> " + n); }
+assert.equal(neon("zzz"), "zzz");
 console.log("door ok");

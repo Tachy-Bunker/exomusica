@@ -59,6 +59,7 @@ import { AtlasShell } from "./AtlasShell";
 import { takeArrival } from "../lib/arrive";
 import { TrackPreloader } from "./TrackPreloader";
 import { useSeasonShift } from "../lib/useSeasonShift";
+import { isDoorReplay } from "../lib/doorReplay";
 import { resumeSharedContextIfNeeded } from "../lib/oneShotSfx";
 import { resumeAnalyserContextIfNeeded } from "../lib/audioAnalyser";
 
@@ -181,7 +182,7 @@ export function Layout() {
   useEffect(() => {
     function handleLinkClick(e: MouseEvent) {
       const target = e.target as HTMLElement;
-      if (!target.closest("a")) return;
+      if (!target.closest("a") || isDoorReplay()) return;
       playLinkClickSound();
     }
     document.addEventListener("click", handleLinkClick, true);

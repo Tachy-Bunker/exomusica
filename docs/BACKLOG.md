@@ -1,6 +1,6 @@
 # Exomusica backlog (kept through chat compaction: update this file with every delivery)
 
-Last updated: fix343. Built milestone rewards are listed in `docs/HOMEPAGE_AND_NAV.md`.
+Last updated: fix344. Built milestone rewards are listed in `docs/HOMEPAGE_AND_NAV.md`.
 
 ## Milestone rewards still labelled "reward being built"
 - **Monthly challenge** (100 members): a monthly challenge with a boss brief. Needs a design write-up first (item 91).
@@ -43,3 +43,6 @@ Last updated: fix343. Built milestone rewards are listed in `docs/HOMEPAGE_AND_N
 - Crate radio ignores community tracks in playlists (official tracks only); add if wanted.
 - Season shift: era names and the 52° hue step are guesses; hum is optional and off by default.
 - Next planned by the owner: back to the Explore map and how it connects to the 3D game.
+
+## fix344 notes
+- Door: access levels no longer change its colour (site primary or branch colour only); bring back as a thin accent if wanted. Door sound still open.
