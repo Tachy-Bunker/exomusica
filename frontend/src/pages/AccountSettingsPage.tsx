@@ -1,5 +1,6 @@
 import { useClassicMode } from "../lib/classicMode";
-import { useJingles } from "../lib/jingles";
+import { loadCollective, useJingles, type CollectiveSeed } from "../lib/jingles";
+import { loadMilestones } from "../lib/milestones";
 import { asSkin, SKINS, useSkin } from "../lib/skin";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { useNavigate, Link } from "react-router-dom";
@@ -66,6 +67,11 @@ export function AccountSettingsPage() {
   const { logout } = useAuth();
   const classic = useClassicMode((s) => s.classic);
   const setClassic = useClassicMode((s) => s.set);
+  const [jOpen, setJOpen] = useState(false); // Collective jingle reached
+  useEffect(() => { let alive = true; loadMilestones().then((l) => alive && setJOpen(!!l.find((m) => m.key === "m-jingle")?.reached)).catch(() => undefined); return () => { alive = false; }; }, []);
+  const [jSeed, setJSeed] = useState<CollectiveSeed | null>(null);
+  const jOn0 = useJingles((s) => s.on);
+  useEffect(() => { if (jOpen && jOn0) void loadCollective().then(setJSeed); }, [jOpen, jOn0]);
   const jOn = useJingles((s) => s.on), setJOn = useJingles((s) => s.setOn), jHas = useJingles((s) => Object.keys(s.urls).length > 0), jForget = useJingles((s) => s.forget);
   const skin = useSkin((s) => s.skin), setSkin = useSkin((s) => s.setSkin), hud = useSkin((s) => s.hud), setHud = useSkin((s) => s.setHud);
   const navigate = useNavigate();
@@ -315,10 +321,11 @@ export function AccountSettingsPage() {
         <input type="checkbox" checked={hud} onChange={(e) => setHud(e.target.checked)} data-testid="hud-toggle" /> Visor frame: angled panels, faint scanlines and a curved vignette (off in classic mode)
       </label>
 
-      {jHas && (
+      {(jHas || jOpen) && (
         <label style={{ display: "block", fontSize: "0.9rem", marginBottom: "0.8rem" }}>
           <input type="checkbox" checked={jOn} onChange={(e) => setJOn(e.target.checked)} data-testid="jingle-toggle" /> Pickup sounds: a short recording the first time you scan, hear a track to the end, reply, or finish a Field Log section (off unless you choose; never in classic mode){" "}
           <button type="button" className="btn" onClick={jForget} data-testid="jingle-forget">Let me hear them again</button>
+          {jOpen && <span className="home-dim" data-testid="jingle-collective" style={{ display: "block", marginTop: "0.2rem" }}>Moments without a recording get the collective jingle{jSeed && jSeed.credits.length > 0 ? `, read from tracks by ${jSeed.credits.map((c) => c.by).join(", ")} this month` : ""}.</span>}
         </label>
       )}
 

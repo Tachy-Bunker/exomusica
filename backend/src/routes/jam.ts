@@ -1,12 +1,16 @@
 import type { FastifyInstance } from "fastify";
 import type { WebSocket } from "ws";
 import { requireAuth, verifyToken } from "../lib/auth.js";
-import { applyOp, cleanChat, cleanCursor, guestName, JamRooms, normalizeCode, pushChat, Throttle } from "../lib/jamRoom.js";
+import { getMilestones } from "../lib/milestones.js";
+import { BIG_MEMBERS, MAX_MEMBERS, applyOp, cleanChat, cleanCursor, guestName, JamRooms, normalizeCode, pushChat, Throttle } from "../lib/jamRoom.js";
 
 const rooms = new JamRooms<WebSocket>();
 
 export async function jamRoutes(app: FastifyInstance): Promise<void> {
-  const sweeper = setInterval(() => rooms.sweep(), 60_000);
+  // Room size follows the "Jam grows" milestone. Read now and then (the milestones are cached anyway), never on the join path.
+  const refreshLimit = (): void => { void getMilestones().then((l) => { rooms.limit = l.find((m) => m.key === "m-jam")?.reached ? BIG_MEMBERS : MAX_MEMBERS; }).catch(() => undefined); };
+  refreshLimit();
+  const sweeper = setInterval(() => { rooms.sweep(); refreshLimit(); }, 60_000);
   sweeper.unref();
 
   // Rooms are public: anyone with the code (or from the open list) can join, guests included. Starting one is for members, which keeps the cap from being burned by drive-by scripts.

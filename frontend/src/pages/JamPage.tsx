@@ -5,13 +5,14 @@ import { useAuth } from "../lib/auth";
 import { useDocumentTitle } from "../lib/useDocumentTitle";
 import { useToastStore } from "../lib/toastStore";
 import { JamEngine, renderLoop } from "../lib/jamEngine";
+import { loadMilestones } from "../lib/milestones";
 import type { ChatLine } from "../lib/jamTheory";
 import { applyOp, clockOffset, LANE_NAMES, ROOTS, SCALE_LABEL, SCALE_RATIOS, STEPS, type JamOp, type JamState, type ScaleId } from "../lib/jamTheory";
 
-const CLOSE_TEXT: Record<number, string> = { 4404: "No room with that code. It may have closed after sitting empty.", 4409: "That room is full (6 people)." };
+const CLOSE_TEXT: Record<number, string> = { 4404: "No room with that code. It may have closed after sitting empty.", 4409: "That room is full." };
 const NOTE_ROWS = 8;
 
-interface OpenRoom { code: string; people: number; tempo: number; full: boolean }
+interface OpenRoom { code: string; people: number; max?: number; tempo: number; full: boolean }
 
 function Lobby() {
   const navigate = useNavigate();
@@ -36,13 +37,13 @@ function Lobby() {
   return (
     <div className="page-column" style={{ maxWidth: 560 }} data-testid="jam-lobby">
       <h1>Jam</h1>
-      <p className="home-dim">A small shared loop machine: kick, hat, bass and lead on 16 steps. Up to six people edit the same pattern and hear it together. Rooms are open to everyone, guests too. Every browser makes its own sound, so it stays light.</p>
+      <p className="home-dim">A small shared loop machine: kick, hat, bass and lead on 16 steps. Six people (eight once the community reaches Jam grows) edit the same pattern and hear it together. Rooms are open to everyone, guests too. Every browser makes its own sound, so it stays light.</p>
       <section data-testid="jam-open">
         <h2 style={{ fontSize: "1rem" }}>Open rooms</h2>
         {open.length === 0 ? <p className="home-dim" data-testid="jam-open-empty">Nobody is jamming right now.</p> : (
           <ul className="jam-open-list">
             {open.map((r) => (
-              <li key={r.code}><Link to={`/jam/${r.code}`} className={r.full ? "jam-open-full" : undefined} data-testid="jam-open-room"><b className="mono">{r.code}</b> · {r.people}/6 · {r.tempo} bpm{r.full ? " · full" : ""}</Link></li>
+              <li key={r.code}><Link to={`/jam/${r.code}`} className={r.full ? "jam-open-full" : undefined} data-testid="jam-open-room"><b className="mono">{r.code}</b> · {r.people}/{r.max ?? 6} · {r.tempo} bpm{r.full ? " · full" : ""}</Link></li>
             ))}
           </ul>
         )}
@@ -64,6 +65,8 @@ function Lobby() {
 
 function Room({ code }: { code: string }) {
   useDocumentTitle(`Jam ${code}`);
+  const navigate = useNavigate();
+  const { user } = useAuth();
   const [state, setState] = useState<JamState | null>(null);
   const [members, setMembers] = useState<string[]>([]);
   const [closed, setClosed] = useState("");
@@ -168,6 +171,31 @@ function Room({ code }: { code: string }) {
     const a = document.createElement("a"); a.href = url; a.download = `jam-${code}-${state.tempo}bpm.wav`; a.click();
     setTimeout(() => URL.revokeObjectURL(url), 3000);
   }
+  // Jam grows: print this loop as a new album of yours (a normal community album: rename or delete it like any other).
+  const [printOn, setPrintOn] = useState(false);
+  const [printing, setPrinting] = useState(false);
+  useEffect(() => {
+    if (!user) return;
+    let alive = true;
+    loadMilestones().then((l) => alive && setPrintOn(!!l.find((m) => m.key === "m-jam")?.reached)).catch(() => undefined);
+    return () => { alive = false; };
+  }, [user]);
+  async function printAlbum() {
+    if (!state || !user || printing) return;
+    setPrinting(true);
+    try {
+      const names = members.filter((m) => !/^guest-\d+$/.test(m));
+      const wav = await renderLoop(state, 4);
+      const album = await api<{ id: number; slug: string }>("/api/community-albums", { method: "POST", body: JSON.stringify({ title: `Jam ${code} (draft)`, composer: user.username, description: `Made live in Jam room ${code} with ${members.join(", ")}.` }) });
+      const fd = new FormData();
+      fd.append("title", `Loop ${state.tempo} bpm`); fd.append("composer", names.join(", ") || user.username); fd.append("permission", "LISTEN_ONLY");
+      fd.append("file", new File([wav.buffer as ArrayBuffer], `jam-${code}-${state.tempo}bpm.wav`, { type: "audio/wav" }));
+      await api(`/api/community-albums/${album.id}/tracks`, { method: "POST", body: fd });
+      useToastStore.getState().showToast("Printed as a new album of yours");
+      navigate(`/community-album/${album.slug}`);
+    } catch (e) { useToastStore.getState().showToast(e instanceof Error ? e.message : "Couldn't print it"); }
+    finally { setPrinting(false); }
+  }
   function say(text: string) { if (ws.current?.readyState === 1 && text.trim()) ws.current.send(JSON.stringify({ type: "chat", text })); }
   async function copyLink() {
     try { await navigator.clipboard.writeText(`${location.origin}/jam/${code}`); useToastStore.getState().showToast("Invite link copied"); } catch { useToastStore.getState().showToast(`Room code: ${code}`); }
@@ -203,6 +231,7 @@ function Room({ code }: { code: string }) {
         <label>Scale <select value={state.scale} aria-label="Scale" data-testid="jam-scale" onChange={(e) => send({ t: "scale", v: e.target.value as ScaleId })}>{(Object.keys(SCALE_LABEL) as ScaleId[]).map((s) => <option key={s} value={s}>{SCALE_LABEL[s]}</option>)}</select></label>
         <label>Swing <input type="range" min={0} max={0.6} step={0.05} value={state.swing} aria-label="Swing" onChange={(e) => send({ t: "swing", v: Number(e.target.value) })} /></label>
         <button className="btn" onClick={save} data-testid="jam-save" title="Render two loops to a WAV file">Save loop (WAV)</button>
+        {printOn && user && <button className="btn" onClick={() => void printAlbum()} disabled={printing} data-testid="jam-print" title="Render four loops and put them in a new album of yours, crediting everyone in the room">{printing ? "Printing…" : "Print to draft album"}</button>}
       </div>
 
       <div className="jam-grid" style={{ ["--cell" as string]: "var(--jam-cell)" }} data-testid="jam-grid">

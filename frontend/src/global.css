@@ -6463,3 +6463,37 @@ body:has(.term-backdrop, .fp-panel, .pocket-pad, .probe-hud, .visor-hud) { touch
 .chart-room .chart-pulse-3{opacity:.32}
 @media (prefers-reduced-motion:no-preference){.chart-room .chart-pulse{animation:chart-pulse 3.2s ease-in-out infinite}.chart-room .chart-pulse-3{animation-duration:2s}}
 @keyframes chart-pulse{50%{opacity:.04}}
+
+/* The vault */
+.vault-bar{display:flex;flex-wrap:wrap;align-items:center;gap:.5rem;margin:.6rem 0}
+.vault-bar input[type=range]{flex:1 1 160px;min-width:120px}
+.vault-lines{list-style:none;margin:0;padding:.6rem;border:1px solid var(--border);border-radius:8px;max-height:60vh;overflow:auto;display:flex;flex-direction:column;gap:.55rem;background:#0b0b0e}
+.vault-lines li{display:flex;flex-direction:column;gap:.1rem}
+.vault-lines li:last-child{border-left:2px solid #ff9d3c;padding-left:.5rem}
+.vault-lines li:not(:last-child){opacity:.7}
+
+/* Commons pack */
+.commons-box{display:flex;flex-wrap:wrap;align-items:center;gap:.4rem .6rem;margin:.4rem 0 .8rem;padding:.5rem .7rem;border:1px dashed var(--border);border-radius:8px}
+
+/* Branch explorer (/explore): a ship's scan map. */
+.hx-page{position:fixed;inset:0 0 var(--player-height,0px) 0;z-index:70;background:radial-gradient(ellipse at 50% 45%,#0f1c26 0%,#070b10 70%,#04070a 100%);color:#cfefff}
+.hx{position:absolute;inset:0;overflow:hidden}
+.hx-stage{position:absolute;inset:0;cursor:grab;touch-action:none;outline:none;user-select:none}
+.hx-stage:focus-visible{box-shadow:inset 0 0 0 2px #5fd3ee}
+.hx-stage canvas{display:block}
+.hx-title{position:absolute;left:1rem;top:.8rem;pointer-events:none;font-size:.95rem;text-shadow:0 0 6px #000}
+.hx-dim{opacity:.7;font-size:.85rem}
+.hx-legend{position:absolute;left:1rem;top:3rem;list-style:none;margin:0;padding:.6rem .8rem;display:flex;flex-direction:column;gap:.35rem;background:rgba(5,10,16,.8);border:1px solid #1d3b4a;border-radius:8px;font-size:.88rem;max-width:min(22rem,70vw)}
+.hx-legend li{display:flex;align-items:center;gap:.5rem}
+.hx-sw{width:14px;height:14px;border:1.5px solid;display:inline-block;flex:none}
+.hx-visited{border-color:#ffb347;background:rgba(214,110,20,.4)}.hx-heard{border-color:#8fd8ff;background:rgba(60,140,200,.2)}.hx-unseen{border-color:rgba(100,135,165,.6);border-style:dashed}.hx-sealed{border-color:#c79bff;background:rgba(150,90,220,.2)}.hx-busy{border-color:#4da3ff;background:rgba(77,163,255,.35)}
+.hx-key{width:14px;height:14px;border:1px solid #cfefff;font-size:9px;font-style:normal;display:inline-grid;place-items:center;flex:none}
+.hx-dot{width:8px;height:8px;border-radius:50%;background:#4cff7a;display:inline-block;margin:0 3px;flex:none}
+.hx-diamond{width:10px;height:14px;background:#4cff7a;clip-path:polygon(50% 0,100% 50%,50% 100%,0 50%);display:inline-block;flex:none}
+.hx-ring{width:14px;height:14px;border:2px solid #4da3ff;border-radius:50%;display:inline-block;flex:none}
+.hx-card{position:absolute;right:1rem;bottom:4.6rem;display:flex;flex-direction:column;gap:.35rem;padding:.7rem .9rem;background:rgba(5,10,16,.88);border:1px solid #1d3b4a;border-radius:8px;min-width:12rem;max-width:min(20rem,80vw)}
+.hx-actions{display:flex;gap:.4rem;flex-wrap:wrap}
+.hx-bar{position:absolute;left:0;right:0;bottom:0;display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:.4rem .6rem;padding:.6rem .8rem;background:linear-gradient(transparent,rgba(4,7,10,.9) 40%)}
+.hx-bar kbd,.hx-hints kbd{font:inherit;font-size:.75rem;border:1px solid #2a5366;border-radius:4px;padding:0 .3rem;margin-right:.2rem;color:#9fdcf0}
+.hx-sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+@media (max-width:640px){.hx-hints{display:none}.hx-card{bottom:6.2rem}}

@@ -72,6 +72,8 @@ import { RadioAdminPage } from "./pages/admin/RadioAdminPage";
 import { CapsulePage } from "./pages/CapsulePage";
 import { FieldLogPage } from "./pages/FieldLogPage";
 import { ChartPage } from "./pages/ChartPage";
+import { VaultPage } from "./pages/VaultPage";
+import { ExplorePage } from "./pages/ExplorePage";
 import { AuditLogAdminPage } from "./pages/admin/AuditLogAdminPage";
 import { TrashAdminPage } from "./pages/admin/TrashAdminPage";
 import { InboxAdminPage } from "./pages/admin/InboxAdminPage";
@@ -132,6 +134,8 @@ export default function App() {
             <Route path="capsule" element={<CapsulePage />} />
             <Route path="field-log" element={<FieldLogPage />} />
             <Route path="chart" element={<ChartPage />} />
+            <Route path="vault" element={<VaultPage />} />
+            <Route path="explore" element={<ExplorePage />} />
             <Route path="radio" element={<RadioPage />} />
             <Route path="jam" element={<JamPage />} />
             <Route path="jam/:code" element={<JamPage />} />

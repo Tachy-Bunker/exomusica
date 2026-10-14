@@ -7,7 +7,7 @@ import { scannedIds, syncScans } from "../lib/scanLog";
 import { fireJingle } from "../lib/jingleBus";
 import { entryState, keysOf, sectionStat, shareSummary, type LogSection } from "../lib/fieldLog";
 import { applyTint, type SuitChoice, type SuitData } from "../lib/suit";
-import { nextUp } from "../lib/milestones";
+import { loadMilestones, nextUp } from "../lib/milestones";
 import { MilestoneView } from "../components/MilestoneCard";
 import { Loading } from "../components/Loading";
 
@@ -25,6 +25,8 @@ export function FieldLogPage() {
     const saved = await api<SuitChoice>("/api/upgrades/choice", { method: "PUT", body: JSON.stringify(next) }).catch(() => null);
     if (saved) { setSuit((s) => (s ? { ...s, choice: saved } : s)); applyTint(saved.tint); }
   }
+  const [vaultOpen, setVaultOpen] = useState(false);
+  useEffect(() => { loadMilestones().then((l) => setVaultOpen(!!l.find((m) => m.key === "m-founders")?.reached)).catch(() => undefined); }, []);
   useEffect(() => { api<LogSection[]>("/api/field-log").then((d) => (Array.isArray(d) ? setSections(d) : setFailed(true))).catch(() => setFailed(true)); }, []);
   useEffect(() => { if (user) void syncScans().then(() => setScanned(keysOf(scannedIds()))); }, [user]);
   const stats = useMemo(() => (sections ?? []).map((s) => sectionStat(s, scanned)), [sections, scanned]);
@@ -67,7 +69,7 @@ export function FieldLogPage() {
         return (
           <section key={s.id} data-testid={`log-${s.id}`} style={{ marginBottom: "1.4rem" }}>
             <h2 style={{ marginBottom: "0.2rem" }}>{s.title} <span className="home-dim" data-testid={`log-${s.id}-count`}>{st.found}/{st.total} · {st.pct}%</span></h2>
-            {s.id === "ancients" && <p className="home-dim" style={{ margin: "0.1rem 0 0.3rem", fontSize: "0.85rem" }}>The founders, and the voices of the old Discord. Probe a name in an old log to wake it.</p>}
+            {s.id === "ancients" && <p className="home-dim" style={{ margin: "0.1rem 0 0.3rem", fontSize: "0.85rem" }}>The founders, and the voices of the old Discord. Probe a name in an old log to wake it.{vaultOpen && <> <Link to="/vault" data-testid="vault-link">Open the vault →</Link></>}</p>}
             <div className="log-meter" role="progressbar" aria-valuenow={st.pct} aria-valuemin={0} aria-valuemax={100} aria-label={`${s.title} scanned`}><i style={{ width: `${st.pct}%` }} /></div>
             {s.entries.length === 0 ? <p className="home-dim">Nothing here yet.</p> : (
               <ul className="log-list">

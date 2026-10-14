@@ -18,3 +18,17 @@ assert.equal(chat.length, CHAT_KEEP); assert.equal(chat[0].text, "20");
 assert.deepEqual(cleanCursor(0.5, 0.25), { x: 0.5, y: 0.25 }); assert.deepEqual(cleanCursor(9, -9), { x: 1.2, y: -0.2 });
 assert.equal(cleanCursor(NaN, 1), null); assert.equal(cleanCursor("1", 1), null);
 console.log("ok");
+{
+  // Jam grows: the limit is a property; list() reports it
+  const g = new JamRooms<number>(); const c = g.create()!;
+  for (let i = 1; i <= MAX_MEMBERS; i++) g.join(c, i, { id: 0, username: "u" + i });
+  assert.equal(g.join(c, 99, { id: 0, username: "x" }), "full");
+  g.limit = 8;
+  assert.equal(g.join(c, 100, { id: 0, username: "y" }), "ok");
+  assert.equal(g.join(c, 101, { id: 0, username: "z" }), "ok");
+  assert.equal(g.join(c, 102, { id: 0, username: "w" }), "full");
+  assert.deepEqual([g.list()[0].people, g.list()[0].max, g.list()[0].full], [8, 8, true]);
+  g.limit = 6; // lowered again: nobody is thrown out, nobody new gets in
+  assert.equal(g.rooms.get(c)!.members.size, 8); assert.equal(g.join(c, 103, { id: 0, username: "v" }), "full");
+  console.log("jam grows ok");
+}

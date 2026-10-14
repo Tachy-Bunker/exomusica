@@ -1,0 +1,12 @@
+import assert from "node:assert/strict";
+import { buildVault } from "../src/lib/vault.js";
+const ch = (branch: "VISIBLE" | "HIDDEN" | null, name = "c") => ({ name, branchId: branch ? 1 : null, branch: branch ? { visibility: branch } : null });
+const row = (id: number, text: string, c = ch(null)) => ({ id, createdAt: new Date(1_600_000_000_000 + id * 1000), contentRaw: text, author: { username: "ghost" + id }, channel: c });
+const v = buildVault([row(1, "hello **world** https://x.y"), row(2, "secret", ch("HIDDEN")), row(3, "https://only.link"), row(4, "ok", ch("VISIBLE", "mus")), row(5, "x".repeat(400))]);
+assert.deepEqual(v.map((e) => e.id), [1, 4, 5]);
+assert.equal(v[0].text, "hello world");
+assert.equal(v[1].channel, "mus");
+assert.ok(v[2].text.length <= 241);
+assert.equal(v[0].at, 1_600_000_001);
+assert.equal(buildVault([row(1, "a"), row(2, "b"), row(3, "c")], 2).length, 2);
+console.log("vault ok");

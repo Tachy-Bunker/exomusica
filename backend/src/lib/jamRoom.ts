@@ -4,6 +4,7 @@
 export const LANES = 4; // kick, hat, bass, lead
 export const STEPS = 16;
 export const MAX_MEMBERS = 6;
+export const BIG_MEMBERS = 8; // once the community reaches Jam grows
 export const MAX_ROOMS = 40;
 export const SCALES = ["minor-pent", "dorian", "whole-tone", "phrygian-dom", "just-7"] as const;
 export type ScaleId = (typeof SCALES)[number];
@@ -72,6 +73,8 @@ export class Throttle {
 
 export interface Member { id: number; username: string }
 export class JamRooms<S> {
+  /** How many people a room holds. Raised by the milestone; rooms already over a lowered limit are left alone, new people just can't join. */
+  limit = MAX_MEMBERS;
   rooms = new Map<string, { state: JamState; members: Map<S, Member>; emptySince: number | null; listed: boolean; chat: ChatLine[] }>();
   constructor(private now: () => number = Date.now, private rand: () => number = Math.random) {}
 
@@ -87,7 +90,7 @@ export class JamRooms<S> {
   join(code: string, sock: S, m: Member): "ok" | "missing" | "full" {
     const r = this.rooms.get(code);
     if (!r) return "missing";
-    if (r.members.size >= MAX_MEMBERS && !r.members.has(sock)) return "full";
+    if (r.members.size >= this.limit && !r.members.has(sock)) return "full";
     r.members.set(sock, m); r.emptySince = null;
     return "ok";
   }
@@ -98,9 +101,9 @@ export class JamRooms<S> {
     if (r.members.size === 0) r.emptySince = this.now();
   }
   /** The public list: rooms that chose to be listed and have someone in them, fullest first. */
-  list(): { code: string; people: number; tempo: number; full: boolean }[] {
-    const out: { code: string; people: number; tempo: number; full: boolean }[] = [];
-    for (const [code, r] of this.rooms) if (r.listed && r.members.size > 0) out.push({ code, people: r.members.size, tempo: r.state.tempo, full: r.members.size >= MAX_MEMBERS });
+  list(): { code: string; people: number; max: number; tempo: number; full: boolean }[] {
+    const out: { code: string; people: number; max: number; tempo: number; full: boolean }[] = [];
+    for (const [code, r] of this.rooms) if (r.listed && r.members.size > 0) out.push({ code, people: r.members.size, max: this.limit, tempo: r.state.tempo, full: r.members.size >= this.limit });
     return out.sort((a, b) => b.people - a.people || a.code.localeCompare(b.code)).slice(0, 30);
   }
   /** Rooms empty for more than ten minutes are dropped. */

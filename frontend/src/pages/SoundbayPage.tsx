@@ -28,6 +28,7 @@ import { MAP_VIEW_ENABLED } from "../lib/features";
 import { useUrlParams } from "../lib/useUrlParams";
 import { loadMilestones } from "../lib/milestones";
 import { SpectralWall } from "../components/SpectralWall";
+import { CommonsPack } from "../components/CommonsPack";
 
 /** A steady colour for a name: the same card always has the same tint. */
 const hueOf = (slug: string): number => { let h = 0; for (let i = 0; i < slug.length; i++) h = (h * 31 + slug.charCodeAt(i)) % 360; return h; };
@@ -191,10 +192,11 @@ export function SoundbayPage() {
     return () => { alive = false; };
   }, []);
 
+  const [commonsOn, setCommonsOn] = useState(false);
   const [wallOn, setWallOn] = useState(false); // Spectral wall reached: only then is anything about it requested
   useEffect(() => {
     let alive = true;
-    loadMilestones().then((l) => alive && setWallOn(!!l.find((m) => m.key === "m-spectral")?.reached)).catch(() => {});
+    loadMilestones().then((l) => { if (!alive) return; setWallOn(!!l.find((m) => m.key === "m-spectral")?.reached); setCommonsOn(!!l.find((m) => m.key === "m-commons")?.reached); }).catch(() => {});
     return () => { alive = false; };
   }, []);
   const wallView = wallOn && params.get("view") === "wall";
@@ -302,6 +304,7 @@ export function SoundbayPage() {
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M10 13a5 5 0 0 0 7.07 0l3-3a5 5 0 0 0-7.07-7.07l-1.7 1.7" /><path d="M14 11a5 5 0 0 0-7.07 0l-3 3a5 5 0 0 0 7.07 7.07l1.7-1.7" /></svg>
           </button>
           <PlayGlow active={!isPlaying}><button type="button" className="btn btn-primary icon-btn title-btn" onClick={shuffleAll} disabled={busy} aria-label="Shuffle everything" title="Shuffle everything" data-testid="shuffle-all"><PlayIcon size={18} /></button></PlayGlow>
+          <Link className="btn title-btn" to="/explore" data-testid="open-explorer"><MapIcon size={15} /> Scan map</Link>
           {MAP_VIEW_ENABLED && <Link className="btn title-btn" to="/?map=full" data-testid="open-map"><MapIcon size={15} /> Explore the map</Link>}
         </div>
   );  const branchSection = (id: SectionId, title: string, rows: HomeBranch[]) => rows.length > 0 && (
@@ -361,6 +364,7 @@ export function SoundbayPage() {
           {(albs.length > 0 || !searching) && (
             <section id="sb-albums" className="sb-section" aria-labelledby="sb-albums-h">
               <div className="home-h2-row"><h2 id="sb-albums-h" className="home-h2">Community albums <span className="home-dim sb-count">{albs.length}</span></h2><span className="home-dim sb-sub">from members</span><CreateBox kind="album" label="Name your album" /></div>
+              {commonsOn && <CommonsPack />}
               {albs.length > 0 && <ul className="sb-cards" data-testid="album-list">{albs.map((a) => (
                 <li key={a.slug} className="sb-card" style={{ ["--hue" as string]: hueOf(a.slug) }}>
                   <span className="sb-card-art">{a.coverArtUrl ? <img src={a.coverArtUrl} alt="" loading="lazy" decoding="async" draggable={false} /> : <i className="sb-card-disc" />}</span>

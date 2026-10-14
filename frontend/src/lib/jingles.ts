@@ -4,6 +4,7 @@ import { playOneShotSfx } from "./oneShotSfx";
 import { useClassicMode } from "./classicMode";
 import { JINGLE_EVENTS, type JingleEvent } from "./jingleBus";
 import { api, getToken } from "./api";
+import { playMotif } from "./motif";
 // Pickup sounds are the admin's own recordings. A listener hears each one once, only if they switched them on, never in classic mode.
 const ON = "exomusica_jingles", DONE = "exomusica_jingles_done";
 const rd = (k: string): string => { try { return localStorage.getItem(k) ?? ""; } catch { return ""; } };
@@ -35,6 +36,17 @@ export const useJingles = create<S>((set) => ({
   setUrls: (u) => { const o: Partial<Record<JingleEvent, string>> = {}; if (u && typeof u === "object") for (const e of JINGLE_EVENTS) { const v = (u as Record<string, unknown>)[e]; if (typeof v === "string" && v) o[e] = v; } set({ urls: o }); },
   forget: () => { wr(DONE, ""); if (getToken()) void api("/api/account/jingles-done", { method: "DELETE" }).catch(() => undefined); },
 }));
+/** The collective jingle's notes (null while locked or not yet drawn). Asked for only when a jingle would actually play; a miss is retried after a minute. */
+export interface CollectiveSeed { notes: number[]; credits: { title: string; by: string }[] }
+let seedAt = 0, seedP: Promise<CollectiveSeed | null> | null = null;
+export function loadCollective(): Promise<CollectiveSeed | null> {
+  if (seedP && Date.now() - seedAt < 60_000) return seedP;
+  seedAt = Date.now();
+  seedP = api<{ ready?: boolean; notes?: number[]; credits?: { title: string; by: string }[] }>("/api/collective-jingle")
+    .then((r) => (r?.ready && Array.isArray(r.notes) && r.notes.length >= 4 ? { notes: r.notes, credits: Array.isArray(r.credits) ? r.credits : [] } : null))
+    .catch(() => null);
+  return seedP;
+}
 let installed = false;
 export function installJingles(): void {
   if (installed || typeof window === "undefined") return;
@@ -43,6 +55,16 @@ export function installJingles(): void {
     const event = (e as CustomEvent<string>).detail;
     const { on, urls } = useJingles.getState(), done = readDone();
     const url = (urls as Record<string, string | undefined>)[event];
+    if (!url) { // no recording from the admin for this moment: once the community reaches Collective jingle, it gets the motif instead
+      if (useClassicMode.getState().classic || !on || done.includes(event)) return;
+      void loadCollective().then((seed) => {
+        if (!seed || readDone().includes(event)) return;
+        wr(DONE, JSON.stringify([...readDone(), event]));
+        if (getToken()) void api("/api/account/jingles-done", { method: "POST", body: JSON.stringify({ event }) }).catch(() => undefined);
+        playMotif(seed.notes, getCurrentSfxVolume());
+      });
+      return;
+    }
     if (!shouldPlay({ classic: useClassicMode.getState().classic, on, done, event, url })) return;
     wr(DONE, JSON.stringify([...done, event]));
     if (getToken()) void api("/api/account/jingles-done", { method: "POST", body: JSON.stringify({ event }) }).catch(() => undefined);

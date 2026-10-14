@@ -6,6 +6,7 @@ import { scannedIds } from "../lib/scanLog";
 import { keysOf } from "../lib/fieldLog";
 import { chartTally, layoutChart, roomStates, type ChartBranch } from "../lib/chart";
 import { hashStr } from "../lib/probeCore";
+import { loadChartBranches } from "../lib/chartLoad";
 import { readLastPlay, visitedSlugs } from "../lib/visits";
 import { listDrafts } from "../lib/studyDraft";
 import { loadMilestones } from "../lib/milestones";
@@ -22,18 +23,9 @@ export function ChartPage() {
   // sealed (hidden) rooms arrive without a name or address; one you have already walked into is recognised by a hash of its address and then asked for its name
   const found = useMemo(() => new Set([...visited].map(hashStr)), [visited]);
   useEffect(() => {
-    type Node = { id: number; parentId: number | null; slug?: string; name?: string; secret?: boolean; key?: string };
-    api<Node[]>("/api/chart").then(async (d) => {
-      if (!Array.isArray(d)) { setFailed(true); return; }
-      const bySlug = new Map([...visited].map((s) => [hashStr(s), s]));
-      const nodes: ChartBranch[] = await Promise.all(d.map(async (n) => {
-        if (!n.secret) return { id: n.id, slug: n.slug ?? "", name: n.name ?? "", parentId: n.parentId };
-        const slug = n.key ? bySlug.get(n.key) : undefined;
-        const name = slug ? await api<{ name?: string }>(`/api/branches/${encodeURIComponent(slug)}`).then((b) => b?.name ?? slug).catch(() => slug) : "";
-        return { id: n.id, slug: slug ?? "", name, parentId: n.parentId, secret: true, key: n.key };
-      }));
-      setList(nodes);
-    }).catch(() => setFailed(true));
+    let alive = true;
+    loadChartBranches(visited).then((nodes) => alive && setList(nodes)).catch(() => alive && setFailed(true));
+    return () => { alive = false; };
   }, [visited]);
   // Chart layer: once the community reaches it, rooms members looked at this week pulse. Nothing is asked for before then.
   const [pulses, setPulses] = useState<Record<string, number>>({});
@@ -59,7 +51,7 @@ export function ChartPage() {
   return (
     <div className="chart-page" data-testid="chart-page">
       <h1>Chart</h1>
-      <p className="home-dim">Filled: you have been there. Outlined: heard of. Dark: not yet. A dashed ? is a sealed room: there is a way in somewhere. <span data-testid="chart-tally">{tally.visited} visited · {tally.heard} heard of · {tally.unseen} unseen{tally.sealed > 0 ? ` · ${tally.sealed} sealed` : ""}</span> · <Link to="/field-log">Field Log</Link>{pulsing > 0 && <span data-testid="chart-pulse-note"> · Glowing rooms: other members looked there this week (shown only when at least 2 did).</span>}</p>
+      <p className="home-dim">Filled: you have been there. Outlined: heard of. Dark: not yet. A dashed ? is a sealed room: there is a way in somewhere. <span data-testid="chart-tally">{tally.visited} visited · {tally.heard} heard of · {tally.unseen} unseen{tally.sealed > 0 ? ` · ${tally.sealed} sealed` : ""}</span> · <Link to="/field-log">Field Log</Link> · <Link to="/explore" data-testid="chart-3d">3D map</Link>{pulsing > 0 && <span data-testid="chart-pulse-note"> · Glowing rooms: other members looked there this week (shown only when at least 2 did).</span>}</p>
       {(last || drafts.length > 0) && (
         <div className="chart-continue" data-testid="chart-continue">
           {last && <p><b>Last heard:</b> <Link to={`/branch/${last.branchSlug}`} data-testid="chart-last">{last.title || last.branchSlug}</Link></p>}
