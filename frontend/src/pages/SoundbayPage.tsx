@@ -3,6 +3,7 @@ import { branchHref } from "../lib/branchLinks";
 import { PlayGlow } from "../components/PlayGlow";
 import { BranchStudies } from "../components/BranchStudies";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { Link, useNavigate } from "react-router-dom";
 import { AlbumIcon, ChatIcon, MapIcon } from "../components/ActivityIcons";
 import { Username } from "../components/Username";
@@ -19,11 +20,14 @@ import { FILTER_LABEL, SECTIONS, SORT_LABEL, filterBranches, filterSimple, pinPl
 import type { PlayableTrackDTO } from "../lib/types";
 import { useDocumentTitle } from "../lib/useDocumentTitle";
 import { ShareAutoplay } from "../components/ShareAutoplay";
-import { openListParam, parseAutoplay, parseOpenList } from "../lib/shareState";
+import { branchAutoplaySlug, openListParam, parseAutoplay, parseOpenList } from "../lib/shareState";
+import { ShareModal } from "../components/ShareModal";
 import { useToastStore } from "../lib/toastStore";
 import { useIsDesktop } from "../lib/useIsDesktop";
 import { MAP_VIEW_ENABLED } from "../lib/features";
 import { useUrlParams } from "../lib/useUrlParams";
+import { loadMilestones } from "../lib/milestones";
+import { SpectralWall } from "../components/SpectralWall";
 
 /** A steady colour for a name: the same card always has the same tint. */
 const hueOf = (slug: string): number => { let h = 0; for (let i = 0; i < slug.length; i++) h = (h * 31 + slug.charCodeAt(i)) % 360; return h; };
@@ -66,6 +70,7 @@ function BranchRow({ b, open, onToggle, playing }: { b: HomeBranch; open: boolea
   const [albums, setAlbums] = useState<AlbumLite[] | null>(null);
   const [pictures, setPictures] = useState<BranchPicture[] | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
+  const [share, setShare] = useState<PlayableTrackDTO[] | null>(null);
   const idn = identityOf({ slug: b.slug, color: b.color, glyph: b.glyph, seed: b.seed });
 
   useEffect(() => { // everything about a branch is fetched the first time its row is opened, not for every row up front
@@ -88,6 +93,8 @@ function BranchRow({ b, open, onToggle, playing }: { b: HomeBranch; open: boolea
       addToQueue(rest);
     } finally { setBusy(null); }
   }
+  // Share: a link to this branch, optionally to one of its songs from a moment, optionally starting it. The song list is fetched only when asked for.
+  const openShare = () => { api<PlayableTrackDTO[]>(`/api/branches/${b.slug}/tracks/shuffle`).then((r) => setShare([...r].sort((x, y) => `${x.albumTitle}`.localeCompare(`${y.albumTitle}`) || x.position - y.position))).catch(() => useToastStore.getState().showToast("Could not load this branch's songs")); };
   const shuffle = () => (nowBranch === b.slug ? toggleAudio() : start("shuffle", `/api/branches/${b.slug}/tracks/shuffle`, (r) => r as PlayableTrackDTO[]));
   // Playing an album also lines up the branch's other albums behind it (the ones after it first, then the ones before), so the music carries on in context.
   const playAlbum = async (slug: string) => {
@@ -127,9 +134,11 @@ function BranchRow({ b, open, onToggle, playing }: { b: HomeBranch; open: boolea
           {/* No albums: nothing to play, so no button. Open with albums: the albums below are the way in, so the shuffle fades out (and comes back when closed). */}
           {b.albums > 0 && <PlayGlow when="hover" hostSelector=".sb-row" active={!open}><button type="button" className={`sb-act sb-play${open ? " sb-play-faded" : ""}`} onClick={shuffle} disabled={busy !== null || b.tracks === 0} tabIndex={open ? -1 : undefined} aria-hidden={open ? true : undefined} aria-label={branchOn ? `Pause ${b.name}` : `Play a shuffle of ${b.name}`} title={branchOn ? "Pause" : "Play shuffle"} data-testid="row-play">{branchOn ? <PauseIcon size={13} /> : <PlayIcon size={13} />}</button></PlayGlow>}
           {b.chatSlug && <button type="button" className="sb-act sb-extra" onClick={discuss} data-testid="row-discuss"><ChatIcon size={13} /> Discussion</button>}
+          <button type="button" className="sb-act sb-extra" onClick={openShare} data-testid="row-share">Share</button>
           <Link className="sb-act sb-extra" to={`/?branch=${b.slug}`} data-testid="row-map"><MapIcon size={13} /> Map</Link>
         </div>
       </div>
+      {share && createPortal(<ShareModal title={`Share ${b.name}`} pathname="/soundbay" extra={{ open: b.slug }} tracks={share.map((t) => ({ id: t.id, source: t.source, title: t.title, composer: t.composer }))} onClose={() => setShare(null)} />, document.body)}
       {open && (
         <div className="sb-preview" id={`sb-prev-${b.slug}`} data-testid="branch-preview">
           <div className="sb-prev-body">
@@ -181,6 +190,14 @@ export function SoundbayPage() {
     api<CommunityAlbumRow[]>("/api/community-albums").then((a) => alive && setAlbums(a)).catch(() => alive && setAlbums([]));
     return () => { alive = false; };
   }, []);
+
+  const [wallOn, setWallOn] = useState(false); // Spectral wall reached: only then is anything about it requested
+  useEffect(() => {
+    let alive = true;
+    loadMilestones().then((l) => alive && setWallOn(!!l.find((m) => m.key === "m-spectral")?.reached)).catch(() => {});
+    return () => { alive = false; };
+  }, []);
+  const wallView = wallOn && params.get("view") === "wall";
 
   const filter: BranchFilterKey = params.get("show") === "all" ? "all" : "albums"; // "Has albums" is the default; "All" shows branches that have none yet too
   // Which branches are expanded lives in the address (open=a,b,c), so any view can be linked, and a link can open several at once.
@@ -248,6 +265,15 @@ export function SoundbayPage() {
     api<{ tracks: PlayableTrackDTO[] }>(`/api/albums/${encodeURIComponent(albumSlug)}`).then((a) => alive && setLinkedAlbum(a)).catch(() => {});
     return () => { alive = false; };
   }, [albumSlug, autoplayRequest.play]);
+  // open=<branch>&play=1[&track=..&t=..] (no album=): the same, for a song of a branch. Its songs are fetched only for such a link.
+  const linkBranch = branchAutoplaySlug(params);
+  const [linkedBranch, setLinkedBranch] = useState<PlayableTrackDTO[] | null>(null);
+  useEffect(() => {
+    if (!linkBranch) return;
+    let alive = true;
+    api<PlayableTrackDTO[]>(`/api/branches/${encodeURIComponent(linkBranch)}/tracks/shuffle`).then((r) => alive && Array.isArray(r) && setLinkedBranch([...r].sort((x, y) => `${x.albumTitle}`.localeCompare(`${y.albumTitle}`) || x.position - y.position))).catch(() => {});
+    return () => { alive = false; };
+  }, [linkBranch]);
   const clearQueue = useAudioStore((s) => s.clearQueue);
   const playAt = useAudioStore((s) => s.playAt);
   function copyLink() {
@@ -300,6 +326,7 @@ export function SoundbayPage() {
           <div className="space-chips" role="group" aria-label="Show branches">
             {(["albums", "all"] as BranchFilterKey[]).map((k) => <button key={k} type="button" className="space-chip" aria-pressed={filter === k} onClick={() => setParam("show", k, "albums")} data-testid={`sb-filter-${k}`}>{FILTER_LABEL[k]}</button>)}
           </div>
+          {wallOn && <button type="button" className="space-chip" aria-pressed={wallView} onClick={() => setParam("view", wallView ? "" : "wall", "")} data-testid="sb-wall-chip">Spectral wall</button>}
           <label className="space-sort"><span className="home-dim">Sort</span>
             <select value={sort} onChange={(e) => setParam("sort", e.target.value, "tracks")} aria-label="Sort Soundbay" data-testid="sb-sort">
               {(Object.keys(SORT_LABEL) as SoundbaySort[]).map((k) => <option key={k} value={k}>{SORT_LABEL[k]}</option>)}
@@ -312,11 +339,12 @@ export function SoundbayPage() {
         </div>
       </div>
 
-      {!ready && <div className="home-placeholder" aria-busy={!failed}>{failed ? "Couldn't load the branches. Reload to try again." : "Loading…"}</div>}
-      {ready && totalShown === 0 && (
+      {wallView && <SpectralWall />}
+      {!wallView && !ready && <div className="home-placeholder" aria-busy={!failed}>{failed ? "Couldn't load the branches. Reload to try again." : "Loading…"}</div>}
+      {!wallView && ready && totalShown === 0 && (
         <p className="home-dim" data-testid="sb-empty">Nothing matches{query ? ` "${query}"` : ""}. <button type="button" className="sb-clear" onClick={() => { setParam("q", "", ""); setParam("show", "albums", "albums"); }}>Clear the search and filter</button></p>
       )}
-      {ready && (
+      {!wallView && ready && (
         <>
           {branchSection("sb-branches", "Branches", grown)}
           {branchSection("sb-seeds", "Growing seeds", seeds)}
@@ -342,6 +370,21 @@ export function SoundbayPage() {
           )}
           {searching && totalShown > 0 && <p className="home-dim sb-found">{totalShown} result{totalShown === 1 ? "" : "s"}</p>}
         </>
+      )}
+      {linkedBranch && linkedBranch.length > 0 && (
+        <ShareAutoplay
+          ready
+          tracks={linkedBranch.map((t) => ({ id: t.id, source: t.source, title: t.title, composer: t.composer }))}
+          request={autoplayRequest}
+          start={(index, t) => {
+            const [first, ...rest] = linkedBranch.slice(index);
+            if (!first) return;
+            playAt(first, t);
+            clearQueue();
+            useAudioStore.getState().addToQueue(rest);
+            useAudioStore.getState().setCurrentPlaylist(null);
+          }}
+        />
       )}
       {linkedAlbum && (
         <ShareAutoplay

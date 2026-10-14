@@ -10,6 +10,7 @@ interface Profile {
   id: number;
   username: string;
   avatarUrl: string | null;
+  frame?: string | null;
   bio: string | null;
   links: { label: string; url: string }[] | null;
   isGhost: boolean;
@@ -67,6 +68,8 @@ export function ProfilePage() {
     <div className="page-column" style={{ maxWidth: 480 }}>
       <Link to="/members" className="profile-back" data-testid="profile-back">← Members{isDesktop && <kbd>R</kbd>}</Link>
       <div
+        className={profile.frame ? `avatar-${profile.frame}` : undefined}
+        data-testid="profile-avatar"
         style={{
           width: 64,
           height: 64,

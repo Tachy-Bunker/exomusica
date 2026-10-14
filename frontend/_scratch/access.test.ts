@@ -1,0 +1,17 @@
+import { levelOf, canEnter, viewerOf, lockCss } from "../src/lib/access";
+let bad = 0; const t = (n: string, ok: boolean) => { console.log((ok ? "ok   " : "FAIL ") + n); if (!ok) bad++; };
+t("home open", levelOf("/") === "open");
+t("jam members", levelOf("/jam") === "members" && levelOf("/jam/ABCD") === "members");
+t("prefix not greedy", levelOf("/jammer") === "open" && levelOf("/pmsx") === "open");
+t("query + hash", levelOf("/pms?to=a") === "members" && levelOf("/account#x") === "members");
+t("longest wins", levelOf("/hypotheses/draw") === "members" && levelOf("/hypotheses") === "open" && levelOf("/hypothesis/3") === "open");
+t("admin staff", levelOf("/admin/branches") === "staff");
+t("guest cannot", !canEnter("members", "guest") && !canEnter("staff", "guest") && canEnter("open", "guest"));
+t("member", canEnter("members", "member") && !canEnter("staff", "member"));
+t("staff all", canEnter("staff", "staff") && canEnter("members", "staff"));
+t("viewerOf", viewerOf(null) === "guest" && viewerOf({}) === "member" && viewerOf({ isAdmin: true }) === "staff");
+t("css guest has both", lockCss("guest").includes("--door-members") && lockCss("guest").includes("--door-staff"));
+t("css member only staff", !lockCss("member").includes("--door-members") && lockCss("member").includes("--door-staff"));
+t("css staff empty", lockCss("staff") === "");
+t("css exact selectors", lockCss("guest").includes('a[href="/jam"]') && lockCss("guest").includes('a[href^="/jam/"]'));
+process.exit(bad ? 1 : 0);

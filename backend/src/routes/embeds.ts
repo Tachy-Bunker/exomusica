@@ -1,3 +1,5 @@
+import { fillTokens } from "../lib/newsTokens.js";
+import { getTokenStats } from "../lib/milestones.js";
 import type { FastifyInstance } from "fastify";
 import { prisma } from "../lib/prisma.js";
 import { imagesInMarkdown } from "../lib/resourceAccess.js";
@@ -151,6 +153,11 @@ export async function embedRoutes(app: FastifyInstance): Promise<void> {
       prisma.siteSettings.findUnique({ where: { id: 1 } }),
     ]);
     if (!post) return reply.code(404).send("Not found");
+    const stats = await getTokenStats();
+    post.title = fillTokens(post.title, stats);
+    post.contentMarkdown = fillTokens(post.contentMarkdown, stats);
+    if (post.ogTitle) post.ogTitle = fillTokens(post.ogTitle, stats);
+    if (post.ogDescription) post.ogDescription = fillTokens(post.ogDescription, stats);
     const data = { title: post.title, content: stripMarkdown(post.contentMarkdown) };
     const titleTemplate = post.ogTitle ?? s?.ogNewsDefaultTitle ?? "{title}";
     const descTemplate = post.ogDescription ?? s?.ogNewsDefaultDescription ?? "{content:160}";

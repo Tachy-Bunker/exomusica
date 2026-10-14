@@ -1,0 +1,11 @@
+import { linksTo, validBacklinkPath } from "../src/lib/backlinks";
+let bad = 0; const t = (n: string, ok: boolean) => { console.log((ok ? "ok   " : "FAIL ") + n); if (!ok) bad++; };
+t("valid path", validBacklinkPath("/album/al1") && validBacklinkPath("/u/neo") && validBacklinkPath("/community-album/x_y"));
+t("invalid paths", !validBacklinkPath("/admin/x") && !validBacklinkPath("album/x") && !validBacklinkPath("/album/") && !validBacklinkPath("/album/a/b") && !validBacklinkPath(5) && !validBacklinkPath("/album/" + "a".repeat(200)));
+t("regex chars are inert", !validBacklinkPath("/album/a.*"));
+t("finds markdown link", linksTo("see [x](/album/al1) now", "/album/al1"));
+t("finds full url", linksTo("https://e.com/album/al1?x=1", "/album/al1"));
+t("end of text", linksTo("/album/al1", "/album/al1"));
+t("not a prefix of a longer slug", !linksTo("see /album/al10", "/album/al1") && !linksTo("/album/al1-b", "/album/al1"));
+t("dot in slug is literal", !linksTo("/album/alX1", "/album/al.1") && linksTo("/album/al.1", "/album/al.1"));
+process.exit(bad ? 1 : 0);

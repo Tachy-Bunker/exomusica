@@ -1,3 +1,5 @@
+import { PIN_GLYPH, PIN_LABEL, pinsFor, type PinKind } from "../lib/pins";
+import { useAuth } from "../lib/auth";
 import { useWasdKeys } from "../lib/useWasd";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
@@ -114,6 +116,15 @@ function dist(a: { x: number; y: number }, b: { x: number; y: number }) {
 /** `embedded`: fill the window it is placed in (the Conversations page's Map view) instead of the whole screen. */
 export function ForumMapPage({ embedded = false, onViewAsList }: { embedded?: boolean; onViewAsList?: () => void } = {}) {
   const [nodes, setNodes] = useState<MapNode[]>([]);
+  const { user: me } = useAuth();
+  const [pins, setPins] = useState<Map<string, Set<PinKind>>>(() => new Map());
+  // Pins: drafts and the last-listened branch come from this browser, waiting replies from the member's unread notifications.
+  useEffect(() => {
+    if (!me) { setPins(new Map()); return; }
+    let live = true;
+    api<{ channelSlug: string | null; eventKey: string; read: boolean }[]>("/api/notifications").then((r) => live && setPins(pinsFor((Array.isArray(r) ? r : []).filter((n) => !n.read)))).catch(() => live && setPins(pinsFor([])));
+    return () => { live = false; };
+  }, [me?.id]);
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [zoom, setZoom] = useState(1);
   const [navSpeed, setNavSpeed] = useState(1);
@@ -680,6 +691,13 @@ export function ForumMapPage({ embedded = false, onViewAsList }: { embedded?: bo
                 style={{ "--pulse-r-min": `${radius}px`, "--pulse-r-max": `${radius * 1.15}px`, animation: "forumMapPulse 4s ease-in-out infinite" } as React.CSSProperties}
               />
               <circle r={radius * 0.4} fill="var(--text)" opacity={0.9} />
+              {n.channel && [...(pins.get(n.channel.slug) ?? [])].sort().map((k, i) => (
+                <g key={k} transform={`translate(${radius * 0.9 + i * 15}, ${-radius * 0.9})`} data-testid={`map-pin-${k}`}>
+                  <title>{PIN_LABEL[k]}</title>
+                  <circle r={8} fill="var(--bg-inset)" stroke={k === "reply" ? "#e5484d" : "var(--accent-audio, #7cf)"} strokeWidth={1.5} />
+                  <text textAnchor="middle" dy="0.35em" fontSize={10} fill={k === "reply" ? "#e5484d" : "var(--text)"}>{PIN_GLYPH[k]}</text>
+                </g>
+              ))}
               <text
                 y={radius + 16}
                 textAnchor="middle"

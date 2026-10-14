@@ -1,3 +1,5 @@
+import { playlistSlots } from "./upgrades.js";
+import { parseCoverLink } from "../lib/coverLink.js";
 import { probeAudioTags, titleFor } from "../lib/audioTags.js";
 import type { FastifyInstance } from "fastify";
 import type { Prisma } from "@prisma/client";
@@ -301,9 +303,28 @@ export async function communityMusicRoutes(app: FastifyInstance): Promise<void> 
       const album = await prisma.communityAlbum.findUnique({ where: { id: Number(req.params.id) } });
       if (!album) return reply.code(404).send({ error: "no such album" });
       if (album.ownerId !== req.user!.id) return reply.code(403).send({ error: "not your album" });
-      return prisma.communityAlbum.update({ where: { id: album.id }, data: req.body ?? {} });
+      const b = req.body ?? {};
+      const data: { title?: string; composer?: string; description?: string; coverArtUrl?: string | null } = {};
+      if (typeof b.title === "string") data.title = b.title;
+      if (typeof b.composer === "string") data.composer = b.composer;
+      if (typeof b.description === "string") data.description = b.description;
+      if (b.coverArtUrl !== undefined) { const c = parseCoverLink(b.coverArtUrl); if (!c.ok) return reply.code(400).send({ error: c.error }); data.coverArtUrl = c.url; }
+      return prisma.communityAlbum.update({ where: { id: album.id }, data });
     },
   );
+
+  // A cover given as a link (an image already on the web) instead of a file. An uploaded cover it replaces is deleted; a blank link removes the cover.
+  app.put<{ Params: { id: string }; Body: { url?: string | null } }>("/api/community-albums/:id/cover-link", { preHandler: requireAuth }, async (req, reply) => {
+    const album = await prisma.communityAlbum.findUnique({ where: { id: Number(req.params.id) } });
+    if (!album) return reply.code(404).send({ error: "no such album" });
+    if (album.ownerId !== req.user!.id) return reply.code(403).send({ error: "not your album" });
+    const c = parseCoverLink(req.body?.url);
+    if (!c.ok) return reply.code(400).send({ error: c.error });
+    const previous = album.coverAttachmentId;
+    const updated = await prisma.communityAlbum.update({ where: { id: album.id }, data: { coverArtUrl: c.url, coverAttachmentId: null } });
+    if (previous) await deleteAttachmentAndReclaim(previous).catch((err) => req.log.warn({ err, previous }, "cover link: failed to reclaim the previous uploaded cover"));
+    return updated;
+  });
 
   app.post<{ Params: { id: string } }>("/api/community-albums/:id/cover", { preHandler: requireAuth }, async (req, reply) => {
     const album = await prisma.communityAlbum.findUnique({ where: { id: Number(req.params.id) } });
@@ -417,7 +438,13 @@ export async function communityMusicRoutes(app: FastifyInstance): Promise<void> 
       const track = await prisma.communityTrack.findUnique({ where: { id: Number(req.params.id) }, include: { album: true } });
       if (!track) return reply.code(404).send({ error: "no such track" });
       if (track.album.ownerId !== req.user!.id) return reply.code(403).send({ error: "not your track" });
-      return prisma.communityTrack.update({ where: { id: track.id }, data: req.body ?? {} });
+      // Only the fields the form offers: the body used to go straight to the database (albumId, permission, attachmentId...).
+      const b = (req.body ?? {}) as Record<string, unknown>;
+      const data: Record<string, unknown> = {};
+      for (const k of ["title"] as const) if (typeof b[k] === "string" && (b[k] as string).trim()) data[k] = (b[k] as string).slice(0, 200);
+      for (const k of ["composer", "lyrics"] as const) if (b[k] === null || typeof b[k] === "string") data[k] = b[k] === null ? null : (b[k] as string).slice(0, k === "lyrics" ? 20000 : 200);
+      if (Array.isArray(b.genres) && b.genres.length <= 40 && b.genres.every((g) => typeof g === "string" && g.length <= 60)) data.genres = b.genres;
+      return prisma.communityTrack.update({ where: { id: track.id }, data });
     },
   );
 
@@ -459,7 +486,7 @@ export async function communityMusicRoutes(app: FastifyInstance): Promise<void> 
       await keepOldVersion(track, req.query.answers);
       const updated = await prisma.communityTrack.update({
         where: { id: track.id },
-        data: { attachmentId: attachment.id, externalUrl: null, format: formatFromMime(file.mimetype), durationSeconds: null },
+        data: { attachmentId: attachment.id, externalUrl: null, format: formatFromMime(file.mimetype), durationSeconds: null, replayGainDb: null },
       });
       void probeAudioDuration(attachment.storagePath)
         .then((seconds) => {
@@ -474,7 +501,7 @@ export async function communityMusicRoutes(app: FastifyInstance): Promise<void> 
     await keepOldVersion(track, req.query.answers);
     const updated = await prisma.communityTrack.update({
       where: { id: track.id },
-      data: { externalUrl: url, attachmentId: null, durationSeconds: null },
+      data: { externalUrl: url, attachmentId: null, durationSeconds: null, replayGainDb: null },
     });
     void probeAudioDuration(url)
       .then((seconds) => {
@@ -659,6 +686,8 @@ export async function communityMusicRoutes(app: FastifyInstance): Promise<void> 
   app.post<{ Body: { title: string; description?: string } }>("/api/playlists", { preHandler: requireAuth }, async (req, reply) => {
     const { title, description } = req.body ?? {};
     if (!title) return reply.code(400).send({ error: "title is required" });
+    const slots = await playlistSlots(req.user!.id);
+    if (slots.used >= slots.cap && !req.user!.isAdmin) return reply.code(403).send({ error: `You have ${slots.used} playlists, the most you can own right now is ${slots.cap}. The Suit tab in the Field Log shows how to get more room.` });
     const slug = await uniquePlaylistSlug(title);
     const playlist = await prisma.playlist.create({ data: { ownerId: req.user!.id, slug, title, description } });
     return reply.code(201).send(playlist);

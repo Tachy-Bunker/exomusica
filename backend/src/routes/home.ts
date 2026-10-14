@@ -1,6 +1,8 @@
 import type { FastifyInstance } from "fastify";
 import { prisma } from "../lib/prisma.js";
 import { PUBLIC_CHANNEL_FILTER, isPublicChannel, plainExcerpt, attachmentOnlyLabel } from "../lib/publicChannels.js";
+import { fillTokens, hasTokens } from "../lib/newsTokens.js";
+import { getTokenStats } from "../lib/milestones.js";
 import { mergeActivity, onePerChannel, studyLabel, lastActiveAt, type ActivityItem } from "../lib/homeFeed.js";
 
 const CACHE_MS = 30_000;
@@ -107,7 +109,7 @@ async function buildHome() {
     ...chatItems,
     ...albums.map<ActivityItem>((a) => ({ ...none, kind: "album", label: "New album", title: a.title, detail: `${a.branch.name} · ${a._count.tracks} track${a._count.tracks === 1 ? "" : "s"}`, href: `/album/${a.slug}`, at: a.createdAt.getTime() })),
     ...studies.map<ActivityItem>((s) => ({ kind: "study", label: studyLabel(s.createdAt.getTime(), s.updatedAt.getTime()), title: s.title, by: s.owner.username, text: "", detail: "", href: `/study/${s.slug}`, at: s.updatedAt.getTime() })),
-    ...(post?.publishedAt ? [{ ...none, kind: "update" as const, label: "Update", title: post.title, detail: "", href: `/news/${post.slug}`, at: post.publishedAt.getTime() }] : []),
+    ...(post?.publishedAt ? [{ ...none, kind: "update" as const, label: "Update", title: hasTokens(post.title) ? fillTokens(post.title, await getTokenStats()) : post.title, detail: "", href: `/news/${post.slug}`, at: post.publishedAt.getTime() }] : []),
     ...(challenge ? [{ ...none, kind: "challenge" as const, label: "Challenge", title: challenge.title, detail: `${challenge._count.submissions} ${challenge._count.submissions === 1 ? "entry" : "entries"}`, href: "/challenges", at: challenge.createdAt.getTime() }] : []),
     ...newMembers.map<ActivityItem>((u) => ({ kind: "member", label: "New member", title: u.username, by: u.username, text: "", detail: plainExcerpt(u.bio ?? "", 60), href: `/u/${encodeURIComponent(u.username)}`, at: u.createdAt.getTime() })),
   ];

@@ -5,12 +5,14 @@ import { Link, useSearchParams } from "react-router-dom";
 import { ACTIVITY_ICON } from "../components/ActivityIcons";
 import { HomeExplore } from "../components/HomeExplore";
 import { FeaturedArticles } from "../components/FeaturedArticles";
+import { EchoCard } from "../components/Resurface";
 import { api } from "../lib/api";
 import { useAuth } from "../lib/auth";
 import { useHome, type HomeActivity } from "../lib/home";
 import { useProfileStore } from "../lib/profileStore";
 import { Username } from "../components/Username";
 import { timeAgo } from "../lib/relativeTime";
+import { TourGuide } from "../components/TourGuide";
 import { useDocumentTitle } from "../lib/useDocumentTitle";
 
 interface MyStudy { slug: string; title: string; status: string; updatedAt: string; owner: string }
@@ -81,8 +83,9 @@ export function HomePage() {
   const stats = home?.stats;
   return (
     <div className="home-page" data-testid="home-page">
+      <TourGuide />
       {user ? (
-        <header className="home-hero" data-testid="home-member-hero">
+        <header className="home-hero" data-testid="home-member-hero" data-tour="hero">
           <h1>Welcome back, {user.username}</h1>
           <DigestCard />
           <WelcomeCard />
@@ -101,13 +104,13 @@ export function HomePage() {
         </header>
       ) : (
         <header className="home-hero home-hero-guest" data-testid="home-visitor-hero">
-          <div className="hero-main">
+          <div className="hero-main" data-tour="hero">
             <h1>Alien sonic worlds</h1>
             <p className="home-lede">We want to expand the horizons of music. Here you can listen, chat, research with other Exomusical enthusiasts.</p>
           </div>
           <div className="hero-side">
             <Link className="btn btn-primary hero-join" to="/join" data-testid="hero-join">Join</Link>
-            <p className="home-stats" data-testid="home-stats">
+            <p className="home-stats" data-testid="home-stats" data-tour="stats">
               {stats ? (
                 <>
                   <Link to="/members">{stats.members.toLocaleString()} members</Link>
@@ -121,18 +124,22 @@ export function HomePage() {
         </header>
       )}
 
-      {home ? (
+      <div data-tour="branches">{home ? (
         <HomeExplore branches={home.branches} openFull={params.get("map") === "full"} initialSlug={params.get("branch")} />
       ) : (
         <section className="home-section"><h2 className="sr-only">Explore the branches</h2><div className="home-placeholder" aria-busy={!failed}>{failed ? "Couldn't load the branches. Reload to try again." : "Loading…"}</div></section>
       )}
 
+      </div>
+
       {home && <FeaturedArticles />}
 
-      <section className="home-section" aria-labelledby="home-now-h">
+      <section className="home-section" aria-labelledby="home-now-h" data-tour="now">
         <h2 id="home-now-h" className="sr-only">Happening now</h2>
         {home ? <HappeningNow activity={home.activity} members={home.stats.members} /> : <div className="home-placeholder" aria-busy={!failed}>{failed ? "Couldn't load the latest activity." : "Loading…"}</div>}
       </section>
+
+      {home && <EchoCard />}
 
       {user ? (
         myStudies && myStudies.length > 0 && (
@@ -150,7 +157,7 @@ export function HomePage() {
           </section>
         )
       ) : (
-        <section className="home-join" data-testid="home-join-band" aria-label="Join">
+        <section className="home-join" data-testid="home-join-band" aria-label="Join" data-tour="join">
           <p className="home-dim home-join-text">To chat, create studies, share music, and participate in our cause of musical innovation!</p>
           <Link className="btn btn-primary" to="/join" data-testid="join-us">Join us</Link>
         </section>

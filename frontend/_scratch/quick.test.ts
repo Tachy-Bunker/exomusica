@@ -1,0 +1,18 @@
+import { orderByUse, bump, quoteText, actionForCode, loadCounts, QUICK } from "../src/lib/quickActions";
+let bad = 0; const t = (n: string, ok: boolean) => { console.log((ok ? "ok   " : "FAIL ") + n); if (!ok) bad++; };
+const ids = (c: any) => orderByUse(c).map((a) => a.id).join(",");
+t("default order", ids({}) === "reply,react,quote,pin");
+t("most used first", ids({ pin: 5, react: 2 }) === "pin,react,reply,quote");
+t("ties keep default order", ids({ quote: 3, pin: 3 }) === "quote,pin,reply,react");
+let c = {}; for (let i = 0; i < 4; i++) c = bump(c, "pin"); t("bump counts", (c as any).pin === 4);
+t("letters never move", QUICK.map((a) => a.key).join("") === "REQP" && orderByUse({ pin: 9 }).find((a) => a.id === "pin")!.key === "P");
+let d: any = {}; for (let i = 0; i < 70; i++) d = bump(d, "pin"); d = bump(d, "react");
+t("counts decay, nothing runs away", Object.values(d).reduce((s: number, n: any) => s + n, 0) <= 61 && d.pin < 70);
+let f: any = { pin: 40 }; for (let i = 0; i < 40; i++) f = bump(f, "reply"); t("recent habits overtake old ones", ids(f).startsWith("reply"));
+t("quote format", quoteText("neo", "hello\nworld") === "> neo: hello world\n");
+t("quote drops nested quotes", quoteText("a", "> old\nnew") === "> a: new\n");
+t("quote clips long text", quoteText("a", "x".repeat(500)).length < 260 && quoteText("a", "x".repeat(500)).includes("…"));
+t("quote of nothing", quoteText("a", "   ") === "> a: (no text)\n");
+t("code lookup", actionForCode("KeyQ")?.id === "quote" && actionForCode("KeyZ") === undefined);
+t("storage off is fine", JSON.stringify(loadCounts()) === "{}");
+process.exit(bad ? 1 : 0);

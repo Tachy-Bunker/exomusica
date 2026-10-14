@@ -359,6 +359,11 @@ export async function albumRoutes(app: FastifyInstance): Promise<void> {
     if (rest.fileUrl && rest.durationSeconds === undefined) {
       data.durationSeconds = (await probeAudioDuration(rest.fileUrl)) ?? undefined;
     }
+    // A different recording is a different loudness: measure it afresh. Bookmarks and notes stay on the track.
+    if (rest.fileUrl) {
+      const before = await prisma.track.findUnique({ where: { id: Number(req.params.id) }, select: { fileUrl: true } });
+      if (before && before.fileUrl !== rest.fileUrl) data.replayGainDb = null;
+    }
     return prisma.track.update({
       where: { id: Number(req.params.id) },
       data: data as never, // format, if present, is validated against the AudioFormat enum at the DB layer

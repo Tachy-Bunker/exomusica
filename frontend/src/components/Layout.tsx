@@ -2,8 +2,10 @@ import { useClassicMode } from "../lib/classicMode";
 import { useProbeStore } from "../lib/probeStore";
 import { DEFAULT_COLORS, type ProbeColors } from "../lib/probeCore";
 import { writeLastPlay } from "../lib/visits";
-import { installJingles, useJingles } from "../lib/jingles";
+import { applyTint, loadChoice } from "../lib/suit";
+import { installJingles, syncJingles, useJingles } from "../lib/jingles";
 import { DoorWipe } from "./DoorWipe";
+import { AccessTags } from "./AccessTags";
 import { ProbeLayer } from "./ProbeLayer";
 import { useHeaderThemeStore } from "../lib/headerTheme";
 import { useEffect, useRef, useState } from "react";
@@ -68,6 +70,8 @@ const NAV_SECTIONS: { section: Section; label: string; to: string; letter: strin
 
 export function Layout() {
   const { user } = useAuth();
+  useEffect(() => { if (user) void loadChoice(); else applyTint(null); }, [user?.id]);
+  useEffect(() => { if (user) void syncJingles(); }, [user?.id]); // each pickup jingle plays once per account, on any device
   useGuestOnline(!user);
   const loadEmojis = useEmojiStore((s) => s.load);
   useGlobalPlayerShortcuts();
@@ -428,6 +432,7 @@ export function Layout() {
       <main className="main-content" ref={mainRef} style={{ marginRight: dockOffset }}>
         <Outlet />
         <DoorWipe />
+        <AccessTags />
         <ProbeLayer colors={probeColors} />
       </main>
 

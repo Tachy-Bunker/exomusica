@@ -14,5 +14,13 @@ const fresh = roomStates(list, new Set());
 assert.deepEqual([1, 2, 3, 4, 5].map((i) => fresh.get(i)), ["heard", "unseen", "unseen", "unseen", "heard"]);
 const v = roomStates(list, new Set(["s2"]));
 assert.deepEqual([1, 2, 3, 4, 5].map((i) => v.get(i)), ["heard", "visited", "unseen", "heard", "heard"]); // its parent and its children are known; the sibling is not
-assert.deepEqual(chartTally(v), { visited: 1, heard: 3, unseen: 1 });
+assert.deepEqual(chartTally(v), { visited: 1, heard: 3, unseen: 1, sealed: 0 });
+// sealed rooms
+const S = (id: number, parentId: number | null, key: string) => ({ id, slug: "", name: "", parentId, secret: true, key });
+const sl = [B(1, null), S(2, 1, "kk"), B(3, 2)];
+const a = roomStates(sl, new Set());
+assert.deepEqual([1, 2, 3].map((i) => a.get(i)), ["heard", "sealed", "unseen"]); // a sealed room shows, what is behind it does not
+const b2 = roomStates(sl, new Set(), new Set(["kk"]));
+assert.deepEqual([1, 2, 3].map((i) => b2.get(i)), ["heard", "visited", "heard"]); // found: an ordinary room, its neighbours become known
+assert.equal(chartTally(a).sealed, 1);
 console.log("chart ok");

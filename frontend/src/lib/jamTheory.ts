@@ -61,3 +61,5 @@ export function clockOffset(samples: { sent: number; got: number; server: number
   for (const s of samples) { const rtt = s.got - s.sent; if (rtt >= 0 && rtt < best) { best = rtt; off = s.server + rtt / 2 - s.got; } }
   return off;
 }
+
+export interface ChatLine { by: string; text: string; at: number }

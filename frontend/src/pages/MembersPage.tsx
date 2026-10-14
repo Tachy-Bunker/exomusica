@@ -1,4 +1,5 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { loadMilestones } from "../lib/milestones";
 import { Link } from "react-router-dom";
 import { DmButton } from "../components/DmButton";
 import { useAuth } from "../lib/auth";
@@ -129,7 +130,9 @@ export function MembersPage() {
 
 /** Members as stars: bigger the more they speak, lit and joined by lines when they are in a chat now. Plain SVG, no animation loop; only the lit stars pulse, in CSS. */
 function Sky({ members, inChat }: { members: Member[]; inChat: Set<string> }) {
-  const stars = useMemo(() => layoutStars(members, inChat), [members, inChat]);
+  const [colored, setColored] = useState(false); // Roll call (a community milestone): stars take their member's colour
+  useEffect(() => { let on = true; void loadMilestones().then((ms) => on && setColored(ms.some((m) => m.key === "m-roll" && m.reached))).catch(() => undefined); return () => { on = false; }; }, []);
+  const stars = useMemo(() => layoutStars(members, inChat, colored), [members, inChat, colored]);
   const lines = useMemo(() => chatLines(stars), [stars]);
   return (
     <svg className="sky" viewBox="0 0 100 100" preserveAspectRatio="xMidYMid meet" role="group" aria-label="Members as a constellation" data-testid="members-sky">
@@ -138,7 +141,7 @@ function Sky({ members, inChat }: { members: Member[]; inChat: Set<string> }) {
         <Link key={s.username} to={`/u/${encodeURIComponent(s.username)}`} data-testid="sky-star" data-lit={s.lit ? "1" : "0"}>
           <title>{s.username}{s.lit ? " (in a chat now)" : ""}</title>
           <circle cx={s.x} cy={s.y} r={Math.max(3, s.r * 2.2)} fill="transparent" />
-          <circle cx={s.x} cy={s.y} r={s.r} className={`sky-star${s.lit ? " lit" : ""}`} />
+          <circle cx={s.x} cy={s.y} r={s.r} className={`sky-star${s.lit ? " lit" : ""}`} style={s.color ? ({ "--star": s.color } as React.CSSProperties) : undefined} data-color={s.color ? "1" : undefined} />
           {(s.lit || s.r > 2) && <text x={s.x} y={s.y - s.r - 1.2} className="sky-name">{s.username}</text>}
         </Link>
       ))}

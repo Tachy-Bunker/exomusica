@@ -17,6 +17,8 @@ interface Props {
   /** On a playlist map: which view is showing. */
   view?: "map" | "venn";
   title?: string;
+  /** Extra address parameters the shared page needs, such as Soundbay's open=<branch>. Only on the link, not the embed. */
+  extra?: Record<string, string>;
   onClose: () => void;
 }
 
@@ -24,7 +26,7 @@ interface Props {
  * "Share this": makes a link to exactly what is on screen (the view, which genres are soloed or off), optionally to a song and a moment in
  * it, optionally starting to play; and, for the playlist maps, the code to embed the same thing in another page.
  */
-export function ShareModal({ pathname, embedPath, tracks, genreState, view: initialView = "map", title = "Share this", onClose }: Props) {
+export function ShareModal({ pathname, embedPath, tracks, genreState, view: initialView = "map", title = "Share this", extra, onClose }: Props) {
   const audio = useAudioStore.getState();
   const playingHere = audio.currentTrack ? tracks.find((t) => t.id === audio.currentTrack!.id && (t.source === "community") === (audio.currentTrack!.source === "community")) : undefined;
   const isMap = genreState !== undefined;
@@ -51,6 +53,7 @@ export function ShareModal({ pathname, embedPath, tracks, genreState, view: init
   const mapParams = (embed: boolean) => {
     const p = new URLSearchParams();
     if (isMap || embed) setMapShareParams(p, { view, solo: isMap && withGenres ? genres.solo : [], off: isMap && withGenres ? genres.off : [], hideControls: embed && hideControls });
+    if (!embed && extra) for (const [k, v] of Object.entries(extra)) p.set(k, v);
     setAutoplayParams(p, { play: !!chosen && play, track: chosen, t: time });
     return p;
   };

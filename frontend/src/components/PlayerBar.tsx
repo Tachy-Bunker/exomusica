@@ -1,15 +1,18 @@
+import { noteListened } from "../lib/pins";
 import { playlistHref } from "../lib/playlistSource";
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Link } from "react-router-dom";
 import { bindAudioElement, isActiveEl, useAudioStore } from "../lib/audioStore";
 import { initAnalyser, setActiveForAnalyser } from "../lib/audioAnalyser";
+import { EchoRings, EchoToggle } from "./EchoRings";
 import { startMediaSession } from "../lib/mediaSession";
 import { useIsDesktop } from "../lib/useIsDesktop";
 import { useFixedPortalRoot } from "../lib/useFixedPortalRoot";
 import { api } from "../lib/api";
 import { useAuth } from "../lib/auth";
 import { AbPanel, AbRegions } from "./AbPanel";
+import { AB_TOOLS_ENABLED } from "../lib/features";
 import { ProvenanceStrip } from "./ProvenanceStrip";
 import { SpecLayer } from "./SpecLayer";
 import { TrackVersions } from "./TrackVersions";
@@ -90,6 +93,7 @@ export function PlayerBar() {
   useEffect(() => {
     endedFiredRef.current = false;
   }, [currentTrack?.id]);
+  useEffect(() => { if (currentTrack?.source === "official") noteListened(currentTrack.branchSlug); }, [currentTrack?.id]); // the Forum Map's "you last listened here" pin
 
   // The audio element's own .duration sometimes never resolves for some
   // sources (observed with archive.org-hosted files) even though playback
@@ -213,7 +217,6 @@ export function PlayerBar() {
   const [tint, setTint] = useState<string | null>(null); // the cover's average colour: the strip's main colour
   const [cErr, setCErr] = useState("");
   const [hidden, setHidden] = useState<Set<string>>(() => new Set()); // authors whose layer is switched off
-  const [asRegion, setAsRegion] = useState(false);
   const { user } = useAuth();
   const versions = useTrackVersions(trackId, source);
   const isOwner = !!user && !!versions.data && versions.data.owner === user.username;
@@ -223,7 +226,7 @@ export function PlayerBar() {
     try { await uploadNewVersion(trackId, file, commentId); setCErr(""); versions.reload(); } catch { setCErr("Couldn't upload that version."); }
   }
   useEffect(() => {
-    setStrip(null); setComments([]); setPickAt(null); setActiveId(null); setCErr(""); setHidden(new Set()); setAsRegion(false);
+    setStrip(null); setComments([]); setPickAt(null); setActiveId(null); setCErr(""); setHidden(new Set());
     if (trackId == null) return;
     let live = true;
     loadStrip(trackId, source).then((s) => { if (live) setStrip(s); });
@@ -232,16 +235,13 @@ export function PlayerBar() {
     return () => { live = false; };
   }, [trackId, source]);
   const spec = strip && strip !== "none" ? strip : null;
-  // a region note takes the A or B stretch marked on this track
-  const abNow = useAudioStore((s) => s.ab);
-  const region = asRegion ? [abNow.A, abNow.B].find((r) => r && r.trackId === trackId && r.source === (source ?? "official")) ?? null : null;
   const layers = layersOf(comments);
   const shown = hidden.size ? comments.filter((c) => !hidden.has(c.user)) : comments;
   async function postComment(e: React.FormEvent) {
     e.preventDefault();
     if (trackId == null || !draft.trim()) return;
     try {
-      const c = await api<TrackComment>(`${trackBase(source)}/${trackId}/comments`, { method: "POST", body: JSON.stringify(region ? { atSeconds: region.start, endSeconds: region.end, body: draft } : { atSeconds: pickAt ?? currentTime, body: draft }) });
+      const c = await api<TrackComment>(`${trackBase(source)}/${trackId}/comments`, { method: "POST", body: JSON.stringify({ atSeconds: pickAt ?? currentTime, body: draft }) });
       setComments((l) => [...l, c].sort((a, b) => a.atSeconds - b.atSeconds)); setDraft(""); setCErr(""); setActiveId(c.id);
     } catch (err) { setCErr(err instanceof Error ? err.message : "Couldn't post."); }
   }
@@ -305,9 +305,10 @@ export function PlayerBar() {
       {currentTrack && !expanded && (
         <div className="player-bar-docked">
           <div className={`player-seek-strip${spec ? " has-spec" : ""}`} onClick={handleSeekStripClick}>
+            <EchoRings pct={progressPct} />
             <div className="player-seek-track">
               {spec ? <SpecLayer strip={spec} color={tint} pct={progressPct} comments={shown} duration={effectiveDuration} activeId={activeId} onPin={pinClick} /> : <div className="player-seek-fill" style={{ width: `${progressPct}%` }} />}
-              <AbRegions duration={effectiveDuration} />
+              {AB_TOOLS_ENABLED && <AbRegions duration={effectiveDuration} />}
             </div>
           </div>
           <div
@@ -417,9 +418,10 @@ export function PlayerBar() {
             <div className="seek-row">
               <span className="mono">{formatTime(seekPreview ?? currentTime)}</span>
               <div className={`player-seek-strip player-seek-strip--expanded${spec ? " has-spec" : ""}`} onClick={(e) => { e.stopPropagation(); handleSeekStripClick(e); if (effectiveDuration) { const r = e.currentTarget.getBoundingClientRect(); setPickAt(Math.max(0, Math.min(1, (e.clientX - r.left) / r.width)) * effectiveDuration); setActiveId(null); } }}>
-                <div className="player-seek-track">
+                <EchoRings pct={progressPct} />
+            <div className="player-seek-track">
                   {spec ? <SpecLayer strip={spec} color={tint} pct={progressPct} comments={shown} duration={effectiveDuration} activeId={activeId} onPin={pinClick} /> : <div className="player-seek-fill" style={{ width: `${progressPct}%` }} />}
-              <AbRegions duration={effectiveDuration} />
+              {AB_TOOLS_ENABLED && <AbRegions duration={effectiveDuration} />}
                 </div>
               </div>
               <span className="mono">{formatTime(effectiveDuration)}</span>
@@ -436,10 +438,9 @@ export function PlayerBar() {
               ))}
             </div>
             <form className="spec-comment" onClick={(e) => e.stopPropagation()} onSubmit={postComment}>
-              <span className="mono" title="Click the strip to choose the moment">@{region ? `${formatTime(region.start)}–${formatTime(region.end)}` : formatTime(at)}</span>
-              <button type="button" className={`btn${region ? " btn-primary" : ""}`} aria-pressed={asRegion} disabled={!user || (!asRegion && ![abNow.A, abNow.B].some((r) => r && r.trackId === trackId && r.source === (source ?? "official")))} onClick={() => setAsRegion((v) => !v)} title="Attach this note to the stretch marked A or B (set it in the A/B panel)" data-testid="note-as-region">▭ Region</button>
+              <span className="mono" title="Click the strip to choose the moment">@{formatTime(at)}</span>
               <input className="input" value={draft} maxLength={240} disabled={!user} onChange={(e) => setDraft(e.target.value)} placeholder={user ? "Comment on this moment (click the strip to choose it)" : "Log in to comment"} aria-label="Comment on this moment" />
-              <button className="btn btn-primary" disabled={!user || !draft.trim()}>Post</button>
+              {user ? <button className="btn btn-primary" disabled={!draft.trim()}>Post</button> : <Link className="btn btn-primary" to="/join" data-testid="player-join">Join</Link>}
             </form>
             {cErr && <div className="spec-caption" role="alert">{cErr}</div>}
             {trackId != null && versions.data && <TrackVersions trackId={trackId} data={versions.data} isOwner={isOwner} onChanged={versions.reload} />}
@@ -468,9 +469,10 @@ export function PlayerBar() {
               <button className={`btn ${repeatMode !== "off" ? "btn-primary" : ""}`} onClick={cycleRepeat} title="Repeat: off/all/one">
                 {repeatMode === "one" ? <LoopOneIcon size={18} /> : <LoopIcon size={18} />}
               </button>
+              <EchoToggle />
             </div>
 
-            <AbPanel />
+            {AB_TOOLS_ENABLED && <AbPanel />}
 
             {currentTrack.bookmarks.length > 0 && (
               <div className="bookmarks" style={{ marginTop: "0.8rem" }} onClick={(e) => e.stopPropagation()}>

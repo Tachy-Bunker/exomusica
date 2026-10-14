@@ -28,7 +28,7 @@ export interface ConversationsData {
   conversations: Conversation[];
   recent: RecentMessage[];
 }
-export interface Member { username: string; avatarUrl: string | null; bio: string; joinedAt: number; studies: number; messages: number }
+export interface Member { username: string; avatarUrl: string | null; bio: string; joinedAt: number; tint?: string | null; studies: number; messages: number }
 export interface MembersData { generatedAt: number; count: number; members: Member[] }
 
 /** Lower-case and accent-free, so "cafe" finds "Café" and "ORBIT" finds "orbit". */

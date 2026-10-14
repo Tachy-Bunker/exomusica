@@ -23,7 +23,7 @@ def run(playwright):
         def handle(route):
             req = route.request; path = req.url.replace(BASE, ""); key = path.split("?")[0]
             ok = lambda b, s=200: route.fulfill(status=s, content_type="application/json", body=json.dumps(b))
-            if key == "/api/branches": return ok(BR)
+            if key == "/api/chart": return ok([({"id": b["id"], "parentId": b["parentId"], "secret": True, "key": "zz"} if b["visibility"] == "HIDDEN" else {"id": b["id"], "parentId": b["parentId"], "slug": b["slug"], "name": b["name"]}) for b in BR])
             if key == "/api/field-log": return ok([])
             if key == "/api/studies/mine-1": return ok(STUDY)
             if key == "/api/studies/mine-1/citations": return ok([])

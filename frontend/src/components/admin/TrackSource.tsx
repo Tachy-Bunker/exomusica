@@ -8,7 +8,7 @@ export interface PickedTrack { title: string; fileUrl: string; format: string }
  * Two ways to get a track's file without typing an address: search what is already on this server (other albums' tracks, uploaded files,
  * community tracks), or upload a file from your own computer (for when an outside host such as Archive.org doesn't work).
  */
-export function TrackSource({ onPick }: { onPick: (t: PickedTrack) => void }) {
+export function TrackSource({ onPick, after = "Check the title, then press Add track." }: { onPick: (t: PickedTrack) => void; after?: string }) {
   const [q, setQ] = useState("");
   const [hits, setHits] = useState<TrackHit[] | null>(null);
   const [busy, setBusy] = useState(false);
@@ -25,7 +25,7 @@ export function TrackSource({ onPick }: { onPick: (t: PickedTrack) => void }) {
 
   function choose(h: TrackHit) {
     onPick({ title: h.title, fileUrl: h.fileUrl, format: h.format });
-    setMsg({ kind: "ok", text: `Using “${h.title}”. Check the title, then press Add track.` });
+    setMsg({ kind: "ok", text: `Using “${h.title}”. ${after}` });
     setHits(null);
     setQ("");
   }
@@ -40,7 +40,7 @@ export function TrackSource({ onPick }: { onPick: (t: PickedTrack) => void }) {
       if (!res.ok) throw new Error(body.error ?? "Couldn't upload that file.");
       onPick({ title: body.title, fileUrl: body.url, format: body.format });
       const tagBits = [body.artist, body.album, body.trackNo ? `track ${body.trackNo}` : null, body.year].filter(Boolean).join(" · ");
-      setMsg({ kind: "ok", text: `Uploaded${tagBits ? ` · tags: ${tagBits}` : ""}${body.durationSeconds ? ` (${Math.floor(body.durationSeconds / 60)}:${String(body.durationSeconds % 60).padStart(2, "0")})` : ""}. Check the title, then press Add track.` });
+      setMsg({ kind: "ok", text: `Uploaded${tagBits ? ` · tags: ${tagBits}` : ""}${body.durationSeconds ? ` (${Math.floor(body.durationSeconds / 60)}:${String(body.durationSeconds % 60).padStart(2, "0")})` : ""}. ${after}` });
     } catch (e) {
       setMsg({ kind: "error", text: e instanceof Error ? e.message : "Couldn't upload that file." });
     } finally {

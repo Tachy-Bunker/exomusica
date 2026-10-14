@@ -587,6 +587,10 @@ export function AlbumsAdminPage() {
                         </option>
                       ))}
                     </select>
+                    <div style={{ flex: "1 1 100%" }} data-testid="track-replace-audio">
+                      <div className="home-dim" style={{ fontSize: "0.8rem" }}>Replace the audio: upload a new file or pick one already on the server. Comments, bookmarks and credits stay with the track.</div>
+                      <TrackSource after="Press Save to swap it in." onPick={(p) => setTrackEditForm((f) => ({ ...f, fileUrl: p.fileUrl, format: p.format }))} />
+                    </div>
                     <GenreTextInput
                       value={trackEditForm.genres}
                       onChange={(v) => setTrackEditForm((f) => ({ ...f, genres: v }))}

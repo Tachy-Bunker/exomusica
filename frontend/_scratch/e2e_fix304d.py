@@ -55,7 +55,7 @@ def run(playwright):
     page.click("[aria-label='Kick step 2']")
     check(sent(page)[-1] == {"t": "step", "lane": 0, "step": 1, "v": 1}, "Edit: kick is on/off")
     page.evaluate("window.__ws.onmessage({data: JSON.stringify({type:'op', op:{t:'step', lane:2, step:7, v:3}, by:'neo', epoch:0})})")
-    check(page.locator("[aria-label='Bass step 8 note 3'][aria-pressed=true]").count() == 1, "Sync: someone else's edit appears")
+    page.wait_for_timeout(150); check(page.locator("[aria-label='Bass step 8 note 3'][aria-pressed=true]").count() == 1, "Sync: someone else's edit appears")
     page.select_option("[data-testid=jam-scale]", "dorian")
     check(sent(page)[-1] == {"t": "scale", "v": "dorian"}, "Controls: scale change is shared")
     page.click("[data-testid=jam-mute-1]")

@@ -1,3 +1,5 @@
+import { fillTokens } from "../lib/newsTokens.js";
+import { getTokenStats } from "../lib/milestones.js";
 import type { FastifyInstance } from "fastify";
 import { prisma } from "../lib/prisma.js";
 import { requireAdmin } from "../lib/auth.js";
@@ -19,6 +21,7 @@ async function resolve(kind: Kind, slug: string): Promise<Resolved | null> {
   }
   if (kind === "news") {
     const p = await prisma.blogPost.findUnique({ where: { slug }, select: { slug: true, title: true, contentMarkdown: true, coverImageUrl: true, publishedAt: true } });
+    if (p) { const stats = await getTokenStats(); p.title = fillTokens(p.title, stats); p.contentMarkdown = fillTokens(p.contentMarkdown, stats); }
     return p && p.publishedAt ? { title: p.title, href: `/news/${p.slug}`, by: null, body: p.contentMarkdown, images: imagesInMarkdown(p.contentMarkdown), cover: p.coverImageUrl, updatedAt: p.publishedAt } : null;
   }
   const w = await prisma.wikiPage.findUnique({ where: { slug }, select: { slug: true, title: true, contentMarkdown: true, updatedAt: true } });

@@ -172,8 +172,8 @@ export function StudyPage() {
   );
   const uploadFile = useCallback((blob: Blob, filename: string) => uploadStudyFile(study?.slug ?? "", blob, filename), [study?.slug]);
   const renderAudio = useCallback(
-    (url: string) => <AudioEvidence url={url} canCite={isOwner} clips={clipsByUrl.get(url) ?? []} onCite={addClipNote} onCiteMany={addClipNotes} onAnalysisChart={addAnalysisChart} uploadFile={uploadFile} />,
-    [isOwner, clipsByUrl, addClipNote, addClipNotes, addAnalysisChart, uploadFile],
+    (url: string) => <AudioEvidence url={url} canCite={isOwner} clips={clipsByUrl.get(url) ?? []} onCite={addClipNote} onCiteMany={addClipNotes} onAnalysisChart={addAnalysisChart} uploadFile={uploadFile} replace={isOwner && !editing && study ? { slug: study.slug, onDone: reload } : undefined} />,
+    [isOwner, editing, study?.slug, clipsByUrl, addClipNote, addClipNotes, addAnalysisChart, uploadFile],
   );
   useEffect(() => stopClip, []); // leaving the page silences any clip that's playing
 
@@ -428,14 +428,14 @@ export function StudyPage() {
       {study.backgroundUrl && <img className="study-bg" style={{ ["--bgo" as string]: bgPreview !== undefined ? (bgPreview ?? undefined) : (study.backgroundOpacity ?? undefined) }} src={study.backgroundUrl} alt="" decoding="async" draggable={false} data-testid="study-bg" />}
       {!editing && slug && <LogLinks studySlug={slug} />}
       {editing && <SaveStation at={draftKeptAt} dirty={isDirty} />}
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "1rem" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "1rem", flexWrap: "wrap" }}>
         {editing ? (
           <input value={draftTitle} onChange={(e) => setDraftTitle(e.target.value)} style={{ fontSize: "1.4rem", flex: 1, minWidth: 0 }} />
         ) : (
           <h1 style={{ margin: 0 }}>{study.title}</h1>
         )}
         {!editing && slug && <FeedLink href={`/api/feed/study/${slug}`} title={`${study.title} — study`} />}
-        <div style={{ display: "flex", gap: "0.4rem", alignItems: "center", flexShrink: 0 }}>
+        <div style={{ display: "flex", gap: "0.4rem", alignItems: "center", flexWrap: "wrap", maxWidth: "100%" }}>
           <span
             style={{
               fontSize: "0.7rem",
@@ -481,7 +481,7 @@ export function StudyPage() {
       {!isOwner && <div style={{ display: "flex", gap: "0.4rem", marginBottom: "1rem" }}>{qrButton}</div>}
 
       {isOwner && (
-        <div style={{ display: "flex", gap: "0.4rem", marginBottom: "1rem" }}>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: "0.4rem", marginBottom: "1rem" }}>
           {editing ? (
             <>
               <button className="btn btn-primary" onClick={saveEdit}>

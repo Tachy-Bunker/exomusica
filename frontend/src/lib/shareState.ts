@@ -110,6 +110,12 @@ export function parseOpenList(raw: string | null | undefined): string[] {
   }
   return out;
 }
+/** Soundbay: a link that says "play this song of that branch" has no album=, only open=<branch> plus play/track/t. Returns the branch whose songs to look in, or null. */
+export function branchAutoplaySlug(p: URLSearchParams): string | null {
+  if (p.get("album")) return null; // album links have their own path
+  if (!parseAutoplay(p).play) return null;
+  return parseOpenList(p.get("open"))[0] ?? null;
+}
 export const openListParam = (slugs: string[]): string => slugs.join(",");
 
 export function buildShareUrl(origin: string, pathname: string, params: URLSearchParams, hash = ""): string {

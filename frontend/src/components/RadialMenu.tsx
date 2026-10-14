@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 import { fitCentre, radialSlots } from "../lib/gesture";
 
-export interface RadialItem { id: string; label: string; glyph: React.ReactNode; danger?: boolean }
+export interface RadialItem { id: string; label: string; glyph: React.ReactNode; danger?: boolean; hint?: string }
 export const RADIAL_R = 84;
 
 /** A fan of round buttons around the spot a message was held. Slide onto one and let go, or let go and tap one; tap anywhere else to close. */
@@ -15,7 +15,7 @@ export function RadialMenu({ x, y, items, sel, onPick, onClose }: { x: number; y
       {items.map((it, i) => (
         <button key={it.id} type="button" role="menuitem" className={`radial-btn${sel === i ? " on" : ""}${it.danger ? " danger" : ""}`} style={{ left: c.x + slots[i].x, top: c.y + slots[i].y, animationDelay: `${i * 22}ms` }}
           onClick={() => onPick(it)} aria-label={it.label} data-testid={`radial-${it.id}`}>
-          <span aria-hidden="true">{it.glyph}</span><small>{it.label}</small>
+          <span aria-hidden="true">{it.glyph}</span><small>{it.label}{it.hint && <kbd className="radial-key"> {it.hint}</kbd>}</small>
         </button>
       ))}
     </div>

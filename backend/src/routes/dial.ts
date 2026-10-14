@@ -2,6 +2,7 @@ import type { FastifyInstance } from "fastify";
 import { prisma } from "../lib/prisma.js";
 import { requireAuth } from "../lib/auth.js";
 import { cleanDial, isEmptyDial } from "../lib/dial.js";
+import { addDone, cleanDone } from "../lib/jinglesDone.js";
 
 const slugOk = (s: string): boolean => /^[a-z0-9][a-z0-9_-]{0,63}$/i.test(s);
 
@@ -17,6 +18,23 @@ export async function dialRoutes(app: FastifyInstance): Promise<void> {
     const d = cleanDial(req.body);
     await prisma.user.update({ where: { id: req.user!.id }, data: { dialJson: d as object } });
     return { dial: d };
+  });
+
+  // Which one-time pickup jingles this account has already heard, so each plays once per account, not once per device.
+  app.get("/api/account/jingles-done", { preHandler: requireAuth }, async (req) => {
+    const me = await prisma.user.findUnique({ where: { id: req.user!.id }, select: { jinglesDone: true } });
+    return { done: cleanDone(me?.jinglesDone) };
+  });
+  app.post<{ Body: { event?: unknown } }>("/api/account/jingles-done", { preHandler: requireAuth }, async (req, reply) => {
+    const me = await prisma.user.findUnique({ where: { id: req.user!.id }, select: { jinglesDone: true } });
+    const next = addDone(cleanDone(me?.jinglesDone), req.body?.event);
+    if (!next) return reply.code(400).send({ error: "unknown jingle" });
+    await prisma.user.update({ where: { id: req.user!.id }, data: { jinglesDone: next } });
+    return { done: next };
+  });
+  app.delete("/api/account/jingles-done", { preHandler: requireAuth }, async (req) => {
+    await prisma.user.update({ where: { id: req.user!.id }, data: { jinglesDone: [] } });
+    return { done: [] };
   });
 
   // What the dial's lamps show for the rooms on it: when someone last spoke (and what), how busy the last half hour was, and whether you were

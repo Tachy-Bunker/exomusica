@@ -4,6 +4,8 @@ import { prisma } from "../lib/prisma.js";
 import { requireAdmin } from "../lib/auth.js";
 import { sendTemplatedMail } from "../lib/emailTemplates.js";
 import { sendDiscordAnnouncement } from "../lib/discordBot.js";
+import { fillTokens, hasTokens, TOKEN_HELP } from "../lib/newsTokens.js";
+import { getTokenStats } from "../lib/milestones.js";
 
 export async function blogRoutes(app: FastifyInstance): Promise<void> {
   app.get("/api/admin/newsletter-subscriptions", { preHandler: requireAdmin }, async () => {
@@ -71,18 +73,26 @@ export async function blogRoutes(app: FastifyInstance): Promise<void> {
     return { added: toCreate.length, skippedDuplicates: valid.length - toCreate.length };
   });
 
+  // The list of tokens an author can write, for the editor's hint.
+  app.get("/api/admin/news-tokens", { preHandler: requireAdmin }, async () => TOKEN_HELP);
+
   app.get("/api/blog", async () => {
-    return prisma.blogPost.findMany({
+    const rows = await prisma.blogPost.findMany({
       where: { publishedAt: { not: null } },
       select: { id: true, slug: true, title: true, coverImageUrl: true, publishedAt: true },
       orderBy: { publishedAt: "desc" },
     });
+    if (!rows.some((r) => hasTokens(r.title))) return rows;
+    const stats = await getTokenStats();
+    return rows.map((r) => ({ ...r, title: fillTokens(r.title, stats) }));
   });
 
   app.get<{ Params: { slug: string } }>("/api/blog/:slug", async (req, reply) => {
     const post = await prisma.blogPost.findUnique({ where: { slug: req.params.slug }, include: { font: true } });
     if (!post || !post.publishedAt) return reply.code(404).send({ error: "no such post" });
-    return post;
+    if (![post.title, post.contentMarkdown, post.ogTitle, post.ogDescription].some(hasTokens)) return post;
+    const stats = await getTokenStats();
+    return { ...post, title: fillTokens(post.title, stats), contentMarkdown: fillTokens(post.contentMarkdown, stats), ogTitle: post.ogTitle && fillTokens(post.ogTitle, stats), ogDescription: post.ogDescription && fillTokens(post.ogDescription, stats) };
   });
 
   app.get("/api/admin/blog", { preHandler: requireAdmin }, async () => {
@@ -148,7 +158,9 @@ export async function blogRoutes(app: FastifyInstance): Promise<void> {
       ]);
 
       const seen = new Set<string>();
-      const excerpt = post.contentMarkdown.replace(/[#*`]/g, "").slice(0, 300);
+      const stats = await getTokenStats();
+      post.title = fillTokens(post.title, stats);
+      const excerpt = fillTokens(post.contentMarkdown, stats).replace(/[#*`]/g, "").slice(0, 300);
       let notified = 0;
 
       for (const m of members) {

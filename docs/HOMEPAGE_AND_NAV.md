@@ -591,3 +591,173 @@ Moments: `firstScan` (a new Probe scan), `firstListen` (a track reaches its natu
 - **Door wipe**: 260 ms → 750 ms, eased (in, brief hold, out).
 - Colour settings for the grid/panel/own-notes (Admin → Visor) are unchanged and now belong to Probe.
 - No schema change.
+
+## fix312 — "Scan the core" tour (97), Probe on touch screens, build fix
+
+- **Build fix**: clearing a Json column needs `Prisma.DbNull`, not `null` (jingle upload/remove in `siteSettings.ts`). The same fix covers clearing `probeColors` from the Visor admin page, which would have failed at runtime.
+- **Tour**: `lib/tour.ts` (stops, order, remembered state) + `components/TourGuide.tsx` on the homepage. Five stops in page order: hero, studies/stats, branches, happening now, join band (stops whose element is missing are skipped; members get three). Visitors who never answered see a small invitation ("New here? Scan the core"); members are not nagged. Start turns Probe mode on; the current stop alone is made scannable (`data-probe*` attributes added then removed, so the homepage carries no permanent brackets); scanning it, or pressing Next, moves on; Skip and Esc end it; Finish stores `done`, Probe goes back off. Classic mode: plain highlight + Next, no Probe. Redo: Account settings → "Take the tour again", or `/?tour=1` anywhere on the homepage. State: `exomusica_tour`. Words live in `STOPS` in `lib/tour.ts`; rewrite freely.
+- **Probe on touch**: a tap on a bracket scans it (no follow-the-link); the readout card has **Open** (same-site links) and **Close**; tapping elsewhere puts it away; the HUD says "tap a bracket"; targets are 40–44 px; on narrow screens the HUD wraps and the traces panel stacks beneath it. The traces panel hides during the tour. Mouse behaviour is unchanged (rest or hold).
+- **Layout fix found on the way**: the study owner's button row did not wrap, widening the whole page to 481 px on a phone; it wraps now.
+- No schema change.
+
+## fix313 — Sealed rooms (idea 72)
+
+- Hidden branches now appear on the Chart as dashed "?" rooms (sealed). Not links; title "A sealed room. Somewhere there is a way in."
+- `GET /api/chart` (cached 60 s) sends hidden branches as `{id, parentId, secret, key}` only. `key` = FNV-1a base36 hash of the slug. No name, no address.
+- A browser that has visited the hidden page (visits log or scan log) matches the hash, asks `/api/branches/:slug` for the name, and the room becomes a normal visited room.
+- New `Branch.chartHidden` (admin checkbox "Not on the Chart at all"): never sent to the Chart, not even as a sealed room. Affects the Chart only, not the space map.
+- Tally line adds "· N sealed" when any exist.
+- Migration: `fix313_chart`. Tests: `backend/_scratch/chartdata.test.ts`, `frontend/_scratch/chart.test.ts`, `e2e_fix313.py`.
+
+## fix314 — Doors: who can enter (idea 67)
+
+- `frontend/src/lib/access.ts`: one table `DOORS` (prefix → members | staff). Anything unlisted is open. Longest prefix wins; `/jammer` does not match `/jam`.
+- `AccessTags` (mounted in Layout) injects one `<style data-access>` of attribute selectors: every `<a href>` to a door the viewer can't use gets a small lock after it (teal = members, rose = staff). No per-link JS; links added later are tagged automatically. Staff get no style element. A link can opt out with `data-nolock`.
+- Door wipe edge takes the colour of the destination: amber open, teal members, rose staff (`data-door`).
+- Tags are information, so classic mode keeps them. Screen readers get "members only" / "staff only" through the content alt text.
+- Cosmetic only; the server still enforces access. When adding a members-only route, add its prefix to `DOORS`.
+- Tests: `_scratch/access.test.ts`, `e2e_fix314.py`. No schema change.
+
+## fix315 — Lenses: Thermal and X-ray (ideas 74, 75)
+
+- Probe mode gets a lens switch: chips **Normal / Thermal / X-ray** in the Probe bar, keys **1 / 2 / 3** (ignored in text boxes). The lens lives in `probeStore.lens` and goes back to Normal whenever Probe goes off, so a lens never outlives Probe. Classic mode has neither Probe nor lenses.
+- **Thermal** (`lib/heat.ts`, `LensLayer.tsx`): links to pages with a known last-activity time get `data-heat` 0-4 (≤1 day, ≤3 days, ≤1 week, ≤30 days, older). Sources, all existing endpoints: branches (`lastActivityAt`), discussion topics (`lastMessageAt`), studies (`updatedAt`). Pages with no known time stay neutral. One pass when the lens is switched on, then a debounced (250 ms) repaint when the page's DOM changes; no timers while idle, no canvas, no per-frame work. Data cached 2 minutes. A small legend shows cold → warm. Reduced motion drops the glow.
+- **X-ray**: dashed outlines on links, headings, images and audio, body text dimmed, plus a panel listing what links to the current page. `GET /api/backlinks?path=/album/slug` (new, cached 60 s, path whitelisted to branch/album/study/wiki/news/u/topic/collaborator/playlist/community-album) searches studies, wiki pages and news posts for a real link to that exact path (so `/album/al1` never matches `/album/al10`) and returns up to 20. Per-page client cache. Tracks and chat messages are not searched yet.
+- Phones: the Probe bar moves to the bottom edge and wraps; keyboard hints are hidden on narrow screens, the tap hint stays. Panels sit above it.
+- Also: `AlbumPage` no longer throws when no track is playing and the album has no slug.
+- Tests: `backend/_scratch/backlinks.test.ts`, `frontend/_scratch/heat.test.ts`, `e2e_fix315.py`. No schema change.
+
+## fix316 — Echo: rings from the playhead (idea 76)
+
+- Where: `EchoRings` sits beside the seek track in both the docked bar and the expanded player. A rung of rings leaves the playhead on each hit in the music; louder hits give brighter, wider rings.
+- How (weak-device budget): no canvas. `getRMS()` (the analyser the player already runs) is read about 14 times a second by one `setInterval`. `lib/echo.ts` `makeOnset` is an adaptive detector: it compares the level to its own recent average, so a drone or a held note never fires, and hits closer than 180 ms count as one. At most 4 rings alive; each is one element animated with transform and opacity only (900 ms), removed on `animationend`.
+- Nothing runs while paused, in a hidden tab, in classic mode, with reduced motion, or with Echo off. Silence fires nothing.
+- Control: an **Echo** button in the expanded player's transport row; remembered as `exomusica_echo` (default on).
+- Tests: `_scratch/echo.test.ts` (onset detector), `e2e_fix316.py` (real playback of a generated burst WAV: rings appear, cap, position, toggle persistence, pause, classic). No schema change.
+
+## fix317 — Quick actions: the four-slot fan (idea 77)
+
+- Desktop/keyboard counterpart of the phone hold-fan. Rest the pointer on a message (or Tab into it) and press **A**: a fan of four opens at the pointer: **Reply (R), React (E), Quote (Q), Pin (P)**. Letters are fixed so muscle memory holds; the fan's **order** follows use (most used first, counts in `exomusica_quick`, halved when the total passes 60 so it follows recent habits). Slots can also be clicked, or picked with 1-4.
+- While the fan is open its keys take priority (captured and stopped), so P does not shuffle the player and Q does not open the chat switcher. Esc closes. A never fires in text boxes, on deleted messages, for guests, or with a modifier held.
+- Reply = the normal reply target. React = the fan turns into the first six emoji (keys 1-6, same call as the ⋮ menu). Quote = a one-line `> name: text` (nested quotes dropped, 240 chars) put at the top of the message box, which gets focus. Pin = a personal bookmark (`POST /api/messages/:id/bookmark`, the existing endpoint) with a toast.
+- Cost: one pointermove listener that only stores two numbers, one keydown listener, no polling, nothing rendered until opened. Not an overlay, so classic mode keeps it. The ⋮ menu shows a one-line tip.
+- Files: `lib/quickActions.ts`, `components/QuickRadial.tsx`, `RadialMenu` gets an optional key hint. Tests: `_scratch/quick.test.ts`, `e2e_fix317.py`. No schema change.
+
+## fix318 — Soundbay: share a song of a branch, with a moment, and play (extends the playlist links)
+
+- Every Soundbay branch row has a **Share** button. It opens the same share dialog the playlists use (song, "From" time, "Use what's playing now", "Start playing when opened"), listing that branch's songs by album then position. The branch's song list is fetched only when Share is clicked (`/api/branches/:slug/tracks/shuffle`, the endpoint the row's shuffle already uses). No map options, no embed code. The dialog is portalled to `<body>`.
+- Link format: `/soundbay?open=<branch>&track=<id>&t=1:23&play=1`. `track` is the same reference the playlist links use (`12` official, `c12` community), `t` accepts the same time formats. With no song chosen the link just opens that branch.
+- Opening such a link (no `album=`, `play=1`, first `open=` slug) fetches that branch's songs and hands them to the same `ShareAutoplay` the playlists use: starts at once if the visitor has already interacted with the page, otherwise one "Play" prompt naming the song and moment, then plays from the right second and queues the rest of the branch. A song that has since been removed falls back to the branch's first. Without `play=1` the link only opens the branch and fetches nothing extra.
+- Existing `album=<slug>&play=1&track=&t=` links are untouched (`branchAutoplaySlug` returns null when `album=` is present).
+- `ShareModal` gains an optional `extra` prop (address parameters carried on the link only, not the embed).
+- Tests: `_scratch/share_branch.test.ts`, `e2e_fix318.py` (includes real playback with byte-range seeking and a 390 px check). Test 304d got a 150 ms wait before its sync assertion (it read the DOM before React flushed). No schema change.
+
+## fix319 — player cleanup, cover links, phone sheets
+
+- **A/B + Region hidden.** `AB_TOOLS_ENABLED = false` in `frontend/src/lib/features.ts` gates the A/B panel, the strip stretches and the `\` flip. Flip the flag to bring it back. The Region-note button is removed; existing region notes still draw on the strip.
+- **Guests** see a *Join* link (`/join`) where Post was.
+- **Cover links.** `PUT /api/community-albums/:id/cover-link {url}` (owner only; http/https only; blank removes). Replaces any uploaded cover and reclaims its file. UI in Manage My Music (`cover-link-<id>`, `cover-remove-<id>`). Validation in `backend/src/lib/coverLink.ts`.
+- **Phones.** `html/body { overflow-x: clip }`; Around Here, Pocket, Terminal, Probe bar and X-ray panel end at `--player-height`, so nothing sits under the player. The sideways scroll could not be reproduced in emulation, so this is defensive; report if it persists, with the device.
+
+## fix320 — replacing audio
+
+- **Official tracks (admin → Albums → Manage → Edit track):** a "Replace the audio" box (search the server or upload). Save swaps the file; comments, bookmarks and credits stay on the track. Duration is re-probed, loudness (`replayGainDb`) is reset so it is re-measured, and the spectrogram strip now revalidates (was cached forever under the same URL). Community tracks already had `replace-file`; they also reset loudness now.
+- **Studies:** on each audio block the owner (not while editing) gets *Replace recording*: upload a file, or search `GET /api/studies-audio-search?q=`. `POST /api/studies/:slug/replace-audio {from, uploadUrl | trackId | communityTrackId}` rewrites `@audio(from)` and every `{clip:a-b from}` to the new URL, so markers keep their times; clip `img=` pictures are dropped. Only files hosted at `/uploads/` are accepted (the browser tools need to decode them). Old files are released if nothing uses them; a history entry is recorded. Logic in `backend/src/lib/studyAudioSwap.ts`. No schema change.
+
+## fix321 — public jam rooms, live cursors, side chat
+
+- **Open to everyone.** Guests join by code or from the *Open rooms* list in the lobby (`GET /api/jam/rooms`: listed rooms with people in them, 8 s refresh while the tab is visible). Guests get `guest-NNNN` (unique per room). Starting a room stays members-only (keeps the 503 room cap from being burned by scripts); the *Show it in the open list* checkbox makes an unlisted, code-only room. `POST /api/jam {listed}`.
+- **Chat.** `{type:"chat",text}` → broadcast `{type:"chat",line}`. Plain text, 300 chars, 5 lines / 5 s per person, the last 40 kept in memory and sent to newcomers. Right-hand panel on desktop, under the pattern on phones.
+- **Cursors (desktop with a mouse only, ≥900 px).** `{type:"cur",x,y}` as fractions of the room box, ≤20/s, only sent while someone else is there, relayed to others (never echoed). Drawn by moving DOM nodes (no React re-render); glow glyph + name, colour from the name, fades after 4 s idle, removed on `gone`. Separate throttles, so pointers never starve pattern edits.
+- Logic: `backend/src/lib/jamRoom.ts` (`list`, `guestName`, `cleanChat`, `pushChat`, `cleanCursor`). Tests: `_scratch/jam2.test.ts` and a real-websocket one, `_scratch/jamws.test.ts`. No schema change.
+
+## fix322 — admin red lights
+
+`GET /api/admin/attention` returns, per admin panel, a count and the items behind it (`backend/src/lib/attention.ts`, pure rules; `routes/adminAttention.ts`, queries).
+- **todo** (solid red): join requests, submissions, reward claims.
+- **new** (solid red, clears when you open the panel): studies by others, member questions (Forum topics), deleted messages (Trash). Baseline is `AdminPanelSeen(userId, panel, seenAt)`; the first look starts from "now", so history doesn't flood the lights. `POST /api/admin/attention/seen {panel}`.
+- **missing** (ringed red, stays until fixed): branches without description/cover, albums without tracks/cover/description/composer, tracks without genres/duration, collaborators without bio/picture, empty About page, no favicon.
+- The nav shows each light with its count; **Needs attention** (first in the nav) shows the total and opens `/admin/attention`, which groups everything with links. Polled every 30 s while the tab is visible. The incomplete-things lookup filters in SQL, is capped at 500 per kind and cached for 60 s, so the poll stays cheap.
+- Schema: `AdminPanelSeen` + `User.adminPanelSeen`.
+
+## fix323 — recovered-log headers (idea 63)
+
+Opening an archived day in a chat (calendar or `?day=`) shows a header: `Recovered: 2023-04-12, #drones · 37 entries decoded · 3.5 years down` (`lib/recoveredLog.ts`, styled `.recovered-log`). Live chat is unchanged. Frontend only.
+
+## fix324 — Forum Map "continue" pins (idea 69)
+
+Three small pins on a map node's top-right (`lib/pins.ts`): **●** red, a reply is waiting (your unread notifications that point at that chat); **✎** you left an unsent draft there; **♪** you last listened to that branch (matches the branch's chat, `branch-<slug>`). Drafts are now kept per room in this browser (`exomusica_cdraft_<slug>`, restored on return, dropped when the box is emptied or sent); the last-listened branch is written when an official track starts (`exomusica_pin_listen`). Nothing new on the server, no schema change. Members only.
+
+## fix325 — Add to playlist as an icon
+
+`AddToPlaylistControl` (album and community album track rows) is now one list-icon button (the same glyph as the playlist "View as list" button). Pressing it opens your playlists as buttons; pressing one adds the track, shows ✓ and closes. The `<select>` that widened rows past a phone screen is gone. The playlist list is fetched on first press and shared by all rows for 20 s. The panel is right-anchored and capped at `min(18rem, 100vw - 2rem)`.
+
+## fix326 — pickup jingles once per account
+
+`User.jinglesDone String[]`. `GET/POST/DELETE /api/account/jingles-done` (`routes/dial.ts`, whitelist in `lib/jinglesDone.ts`). On login the client merges the account's list with this device's (`syncJingles`, `mergeDone`), sends up anything only this device knew, and reports each newly played jingle. "Let me hear them again" clears both. Guests keep the old per-browser behaviour. A jingle that fires in the first moments, before the sync returns, can still play once on a fresh device.
+
+## fix327 — Field Log: Ancients (59)
+
+A fourth section, **Ancients**: the founders (accounts linked to a Collaborator) first, then the imported-Discord ghosts (`isGhost`, `DISCORD_IMPORT`, not linked to a real account), one entry per name, capped at 400. Unlocked by probing the person (`user:<name>`, the same scan as any @name); locked ones are `???` with no name in the DOM. Hidden when there are none. Catalogue only (`lib/fieldLog.ts`, `routes/fieldLog.ts`), still one 5-minute shared cache; no schema change.
+
+## fix328 — suit upgrades (89/90)
+
+- Catalogue in `backend/src/lib/upgrades.ts` (`tint`, `frame-spark`, `frame-log`). Holdings in `UserUpgrade`; only the server awards (`awardUpgrades`, called after a new probe scan).
+- Hints: `hintLevel` — <3 days since first seen/re-tuned = precise, <10 = vague, else whisper. Earning anything re-tunes the others (`User.upgradeRetunedAt`). `GET /api/upgrades` creates the rows, which starts the fade.
+- Perks: personal Probe tint (`:root[data-tint]` overrides `--visor-mine`), avatar frames on profile pages (`avatar-frame-spark`, `avatar-frame-log`). Choice saved via `PUT /api/upgrades/choice`.
+- Probe scan POST returns `{earned:[titles]}` when something new is earned; client shows a toast.
+- UI: "Suit" section in the Field Log.
+- Not built: Thermal/X-ray lens hints, playlist/emoji slots, collective-milestone upgrade.
+- Migration: `fix328_suit_upgrades`.
+
+## fix329 — wiki parent, News live numbers, community milestones, playlist cap
+
+- Wiki parent: "top-level" was sent as `undefined` (dropped from JSON), so a parent could never be cleared. Now an explicit `null`; the server rejects a missing parent, itself, or one of its own descendants (`parentProblem`); the editor hides the page and its sub-pages from the choices; saving clears the shared 20 s Log cache (`forgetHubs`).
+- News tokens (`backend/src/lib/newsTokens.ts`, stats in `siteStats.ts`, one query batch cached 60 s): `{{TRACKS}} {{BRANCHTRACKCOUNT}} {{COMMUNITYTRACKS}} {{ALBUMS}} {{COMMUNITYALBUMS}} {{BRANCHES}} {{MEMBERS}} {{POSTS}} {{SCANS}} {{STUDIES}} {{WIKIPAGES}} {{PLAYLISTS}} {{MINUTES}}`, `{{BRANCHTRACKCOUNT:slug}}` / `{{ALBUMS:slug}}` per branch, `{{TOGO:X:N}}`, `{{PCT:X:N}}`. Resolved server-side in the News list, post, homepage "Update" card, embeds/OG, featured cards and the newsletter. Unknown tokens stay as typed. Admin list/editor keep the raw text. Add a metric: one line in `siteStats.ts` + `TOKEN_HELP`.
+- Milestones (`MILESTONES` in `upgrades.ts`): First hundred (100 tracks → +5 playlists for all), Chorus (5000 posts → Chorus frame for all), Wide lens (2000 scans → +5 playlists for all). Edit targets there. Progress is public in the Field Log Suit tab.
+- Playlist cap: base 10 (`PLAYLIST_BASE`) + Deep crate (25 scans, +5) + milestones. Only blocks creating new playlists; admins exempt; nobody loses an existing one.
+- Migration: none (no schema change).
+
+## fix330 — 25 community milestones, editable, embeddable
+
+- Catalogue and default numbers: `backend/src/lib/milestonesCore.ts` (pure, tested without a DB); DB side and a 60 s cache in `milestones.ts`. 25 milestones in five arcs; only `m-tracks`, `m-posts`, `m-scans` have a live reward (`live: true`). The rest count and show, labelled "reward being built". `m-hull` counts the other milestones reached.
+- Admin → Milestones (`MilestoneSetting` table): change a target (null = default), switch one off. Raising a target past the current count un-reaches it; the "reached on" date is stored when first crossed.
+- News embeds: `@milestone(key)` = one card; `@milestones` = the three closest. Titles/text: `{{MNOW:key}} {{MTARGET:key}} {{MTOGO:key}}` follow the admin's number. The public `/api/milestones` is cached 60 s and cards on a page share one request.
+- Field Log Suit tab: closest three open, the rest folded.
+- Playlist cap and the Chorus frame now read the live (admin-edited) milestones.
+- Migration: `fix330_milestones`.
+
+## fix331 — admin profile editor, mass-assignment fixes, Shared lens
+
+- Admin → Users → Manage opens `components/admin/UserEditor.tsx`: username, email, bio, links, admin, storage limit (MB), new password (hashed server-side), clear a worn frame/tint, and the picture: choose a file, drop one, or paste (click the picture box, Ctrl+V: an image, or the address of a file already under `/uploads/`; the Paste button reads the clipboard where the browser allows). Pictures are shrunk to 512 px in the browser (`lib/imageResize.ts`) before upload. Only changed fields are sent. Outside addresses are refused (`hostedImagePath`).
+- Server: `PATCH /api/admin/users/:id` is whitelisted and validated (`lib/profileInput.ts`, tested). It checks username/email uniqueness, refuses removing your own admin, ghost accounts have no email/password, and writes an audit-log row (`user.edit`, field names only, never the password).
+- Security: `/api/account/profile`, `/notifications`, `/visual-effects` and `PATCH /api/community-tracks/:id` used to write the request body straight to the database (a member could have sent `isAdmin: true`). They now take whitelisted, validated fields.
+- Shared lens (milestone `m-sharedlens`, now live): after 500 community scans, the Probe card says how many other members scanned the same thing (`GET /api/scans/seen`, 60 s server cache, a `[kind, key]` index, no request before unlock).
+- Reworded the unbuilt Thermal/X-ray milestone texts: those lenses already exist for everyone; the milestones now promise a second reading (community-scan heat) and two-links-away tracing.
+- Migration: `fix331_profile_edit` (adds the ProbeScan index).
+
+## fix332 — Thermal "Scanned" reading and Roll call colours
+
+- Thermal lens (milestone `m-thermal`, 1000 scans, now live): a Recent / Scanned switch appears in the legend. Scanned paints links by how many members scanned that page (`GET /api/scans/heat`: one grouped query over the 600 most-scanned keys, cached 5 min, aggregated, no names; log scale in `lib/heat.ts` `buildScanHeat`). The data is fetched only when Scanned is chosen. Before the milestone: no switch, no request.
+- Roll call (`m-roll`, 25 members, now live): in the Members Constellation each star takes its member's colour: the Probe tint they chose (`/api/members` now carries `tint`, validated hex), otherwise a stable hue from their name. The Constellation view itself already existed for everyone; the milestone text was corrected to say so.
+- Live milestone rewards so far: First hundred, Chorus, Wide lens, Shared lens, Thermal lens, Roll call.
+- No schema change in this delivery.
+
+## fix333 — Index (Random fragment) and Echo
+
+- Index (`m-index`, 200 wiki pages, live): the Log's front page gets a **Random fragment** button: `GET /api/log/fragment` takes a random wiki page and a readable prose paragraph from it (`pickFragment`: no headings, tables, lists, embeds or `@` lines; links reduced to text; 60-320 characters). No caching, one count and a few rows. Before the milestone: no button.
+- Echo (`m-echo`, 10,000 posts, live): the homepage shows one old message from a public chat, at least 30 days old, text only, readable on its own (40-400 characters, not a command or a bare link), linking to the message (`/topic/<slug>?day=YYYY-MM-DD#m-<id>`). `GET /api/echo` is the same for everyone all UTC day (the day seeds the pick), computed once a day and kept in memory, public cache 10 min. Hidden branches' chats are excluded twice (query filter and `isPublicChannel`). Before the milestone: no section.
+- The "map of how pages connect" half of Index was dropped from the milestone text (the Log already is a page tree).
+- Live milestone rewards: 8 of 25. No schema change.
+
+## fix334 — Outreach list resize, Spectral wall
+- **Outreach**: the contact list has a grip under it (drag, ArrowUp/Down ±40 px, double-click/Home resets). Min 160 px, max 95vh. Remembered per device (`exomusica_ox_list_h`). Height is set on the element directly: no re-render while dragging.
+- **Spectral wall** (milestone `m-spectral`): Soundbay → "Spectral wall" chip (`?view=wall`), visible only once reached. Every official track as its 250×20 strip, coloured by branch (hue from the branch name). 48 per page, "Show more".
+  - `GET /api/spectral-wall?offset=` (tiles) and `GET /api/spectral-wall/strips?ids=` (base64 strips + `pending`). Both return `locked` before the milestone is reached.
+  - Strips come from the same cache as the player (`lib/stripJobs.ts`, shared queue). A call starts at most 2 new drawings and none while 4 are in flight; the page re-asks for pending ones every 8 s, 6 rounds, and not while the tab is hidden.
+  - Official tracks only; community tracks later. No schema change.
+
+## fix335 — Chart layer (`m-chart`, 150 members)
+- `GET /api/chart/pulse`: `{locked, pulses:{branchId: 1..3}}`. Source: first-scan dates of `branch:<slug>` ProbeScans in the last 7 days. Levels: 2–3 people = 1, 4–9 = 2, 10+ = 3; fewer than 2 = nothing. Hidden and chart-hidden branches are never included. One grouped query, cached 5 minutes.
+- ChartPage asks only after `m-chart` is reached; glow is an opacity-only CSS animation (off for reduced motion).
+- No schema change. Pure logic in `lib/chartPulse.ts`, tested in `_scratch/chartpulse.test.ts`.

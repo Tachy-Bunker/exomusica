@@ -1,0 +1,11 @@
+import assert from "node:assert/strict";
+import { layoutStars } from "../src/lib/constellation";
+const mem = (u: string, tint: string | null = null) => ({ username: u, avatarUrl: null, bio: "", joinedAt: 0, tint, studies: 0, messages: 3 });
+const ms = [mem("ann", "#ff00aa"), mem("bob"), mem("cy")];
+assert.ok(layoutStars(ms, new Set()).every((s) => s.color === undefined), "no colour before the milestone");
+const c = layoutStars(ms, new Set(), true);
+assert.equal(c.find((s) => s.username === "ann")!.color, "#ff00aa", "a chosen tint is used");
+assert.match(c.find((s) => s.username === "bob")!.color!, /^hsl\(\d+ 70% 68%\)$/);
+assert.equal(layoutStars(ms, new Set(), true).find((s) => s.username === "bob")!.color, c.find((s) => s.username === "bob")!.color, "stable between renders");
+assert.notEqual(c.find((s) => s.username === "bob")!.color, c.find((s) => s.username === "cy")!.color);
+console.log("skycolor ok");

@@ -6,6 +6,7 @@ import { api } from "../lib/api";
 import { loadPosts, loadStudies, loadWikiPages, useLoaded } from "../lib/hubs";
 import { useAuth } from "../lib/auth";
 import { renderArticle } from "../components/ArticleView";
+import { RandomFragment } from "../components/Resurface";
 import { isTypingTarget } from "../lib/isTypingTarget";
 import { ancestorIds, buildTree, folderIds, visibleRows, type Row } from "../lib/logTree";
 import { useContentScaleStore } from "../lib/contentScaleStore";
@@ -184,6 +185,7 @@ export function LogPage() {
         <>
           <h1>Log</h1>
           <p className="home-dim">The wiki and the news, in one place. Pick a page from the list{isDesktop ? "" : " above"}.</p>
+          <RandomFragment />
           {(studies ?? []).length > 0 && (
             <>
               <h2 className="home-h2" style={{ marginTop: "1.5rem" }}>Recent studies</h2>

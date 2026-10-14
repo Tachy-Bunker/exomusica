@@ -322,6 +322,8 @@ export function AccountSettingsPage() {
         </label>
       )}
 
+      <p style={{ fontSize: "0.9rem", marginBottom: "0.5rem" }}><Link to="/?tour=1" data-testid="tour-redo">Take the tour again</Link> <span className="home-dim">— "Scan the core", about 30 seconds</span></p>
+
       <p style={{ fontSize: "0.9rem", marginBottom: "0.8rem" }}><Link to="/field-log" data-testid="settings-field-log">Your Field Log</Link> <span className="home-dim">— what you have probed so far</span></p>
 
       <h2 style={{ fontSize: "1rem" }}>Bio & links</h2>

@@ -1,4 +1,5 @@
 import { api } from "./api";
+import { useToastStore } from "./toastStore";
 // What has been probed: kept on this device always, and sent to the account when logged in (so the Field Log follows you).
 const KEY = "exomusica_scans";
 const read = (): Set<string> => { try { return new Set(JSON.parse(localStorage.getItem(KEY) ?? "[]") as string[]); } catch { return new Set(); } };
@@ -10,7 +11,7 @@ export const hasScanned = (kind: string, key: string): boolean => read().has(sca
 export function recordScan(kind: string, key: string, loggedIn: boolean): boolean {
   const s = read(), id = scanId(kind, key), fresh = !s.has(id);
   if (fresh) { s.add(id); write(s); }
-  if (loggedIn) void api("/api/scans", { method: "POST", body: JSON.stringify({ kind, key }) }).catch(() => undefined);
+  if (loggedIn) void api<{ earned?: string[] } | undefined>("/api/scans", { method: "POST", body: JSON.stringify({ kind, key }) }).then((r) => { if (r?.earned?.length) useToastStore.getState().showToast(`Suit upgrade: ${r.earned.join(", ")}. See the Field Log.`); }).catch(() => undefined);
   return fresh;
 }
 /** On login: bring the account's scans down, and send up any this device has that the account doesn't. */

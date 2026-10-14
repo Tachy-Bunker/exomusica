@@ -133,6 +133,11 @@ export function BranchesPage() {
     load();
   }
 
+  async function setChartHidden(b: Branch, chartHidden: boolean) {
+    await api(`/api/admin/branches/${b.id}`, { method: "PATCH", body: JSON.stringify({ chartHidden }) });
+    load();
+  }
+
   async function setCrystalCount(b: Branch, crystalCount: number) {
     if (!Number.isFinite(crystalCount) || crystalCount < 1) return;
     await api(`/api/admin/branches/${b.id}`, { method: "PATCH", body: JSON.stringify({ crystalCount: Math.round(crystalCount) }) });
@@ -326,6 +331,9 @@ export function BranchesPage() {
                   <option value="HIDDEN">Hidden</option>
                   <option value="BABY_CRYSTALS">Baby Crystals</option>
                 </select>
+                <label style={{ display: "block", fontSize: "0.72rem", marginTop: "0.2rem" }} title="Hidden branches show on the Chart as sealed rooms that reveal themselves when someone finds them. Tick this to keep this one off the Chart completely.">
+                  <input type="checkbox" checked={!!b.chartHidden} onChange={(e) => void setChartHidden(b, e.target.checked)} data-testid="chart-hidden" /> Not on the Chart at all
+                </label>
                 {b.visibility === "BABY_CRYSTALS" && (
                   <input
                     type="number"

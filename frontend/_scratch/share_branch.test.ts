@@ -1,0 +1,10 @@
+import { branchAutoplaySlug } from "../src/lib/shareState";
+let bad = 0; const t = (n: string, ok: boolean) => { console.log((ok ? "ok   " : "FAIL ") + n); if (!ok) bad++; };
+const q = (s: string) => new URLSearchParams(s);
+t("branch + play", branchAutoplaySlug(q("open=b2&track=5&t=1:23&play=1")) === "b2");
+t("first open slug wins", branchAutoplaySlug(q("open=b2,b3&play=1")) === "b2");
+t("no play, no autoplay", branchAutoplaySlug(q("open=b2&track=5")) === null);
+t("album links keep their own path", branchAutoplaySlug(q("album=al1&open=b2&play=1")) === null);
+t("nothing open", branchAutoplaySlug(q("play=1")) === null);
+t("junk slug ignored", branchAutoplaySlug(q("open=../x&play=1")) === null);
+process.exit(bad ? 1 : 0);

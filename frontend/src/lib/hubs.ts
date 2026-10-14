@@ -4,8 +4,12 @@ import type { ConversationsData, MembersData } from "./spaceHubs";
 import type { PostLite, StudyLite, WikiSummary } from "./logTree";
 
 // Same idea as the homepage data: moving between pages inside a short window reuses the request instead of repeating it.
+const forgetters: (() => void)[] = [];
+/** Call after an admin save so the Log and its panel don't show the old tree for up to 20 s. */
+export function forgetHubs(): void { forgetters.forEach((f) => f()); }
 function shared<T>(url: string, ttl = 20_000) {
   let cached: { at: number; promise: Promise<T> } | null = null;
+  forgetters.push(() => { cached = null; });
   return () => {
     if (!cached || Date.now() - cached.at > ttl) {
       const promise = api<T>(url);

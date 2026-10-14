@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useLocation } from "react-router-dom";
 import { useClassicMode } from "../lib/classicMode";
+import { levelOf } from "../lib/access";
 
 const section = (p: string) => p.split("/")[1] ?? "";
 
@@ -15,5 +16,5 @@ export function DoorWipe() {
     if (s !== last.current) { last.current = s; if (!classic) setN((x) => x + 1); }
   }, [pathname, classic]);
   if (n === 0 || classic) return null;
-  return <div key={n} className="door-wipe" aria-hidden="true" data-testid="door-wipe" onAnimationEnd={() => setN(0)} />;
+  return <div key={n} className="door-wipe" data-door={levelOf(pathname)} aria-hidden="true" data-testid="door-wipe" onAnimationEnd={() => setN(0)} />;
 }

@@ -52,7 +52,7 @@ WITH msgs AS (
 ), studies AS (
   SELECT s."ownerId" AS uid, COUNT(*) AS n FROM "Study" s GROUP BY s."ownerId"
 )
-SELECT u.username, u."avatarUrl", u.bio, u."createdAt",
+SELECT u.username, u."avatarUrl", u.bio, u."createdAt", u."upgradeChoice"->>'tint' AS tint,
        COALESCE(st.n, 0)::int AS studies,
        COALESCE(ms.n, 0)::int AS messages
 FROM "User" u

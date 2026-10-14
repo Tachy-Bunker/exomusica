@@ -20,6 +20,20 @@ interface Font { id: number; name: string }
 
 const EMPTY = { slug: "", title: "", contentMarkdown: "", publish: true, fontId: "", ogTitle: "", ogDescription: "", ogImageUrl: "" };
 
+/** Live numbers: loaded only when the list is opened, so the editor stays light. */
+function TokenHelp() {
+  const [tokens, setTokens] = useState<Record<string, string> | null>(null);
+  return (
+    <details style={{ margin: "0.4rem 0" }} onToggle={(e) => { if ((e.currentTarget as HTMLDetailsElement).open && !tokens) api<Record<string, string>>("/api/admin/news-tokens").then(setTokens).catch(() => undefined); }}>
+      <summary className="home-dim" style={{ cursor: "pointer", fontSize: "0.85rem" }}>Live numbers for titles and text, e.g. {"{{BRANCHTRACKCOUNT}}"} out of 100</summary>
+      <ul className="home-dim" style={{ fontSize: "0.8rem" }} data-testid="token-help">
+        {tokens ? Object.entries(tokens).map(([k, v]) => <li key={k}><code>{`{{${k}}}`}</code> {v}</li>) : <li>Loading...</li>}
+      </ul>
+      <p className="home-dim" style={{ fontSize: "0.8rem" }}>Counts refresh once a minute. Anything misspelled is left as typed.</p>
+    </details>
+  );
+}
+
 /** News posts, written in the same editor as studies, with the SEO tool beside the text. */
 export function BlogAdminPage() {
   const navigate = useNavigate();
@@ -109,6 +123,7 @@ export function BlogAdminPage() {
               </select>
             </div>
           </div>
+          <TokenHelp />
           <ArticleEditor body={form.contentMarkdown} onBodyChange={(next) => setForm((f) => ({ ...f, contentMarkdown: next }))} onNavigate={(path) => navigate(path)} />
           <SeoFieldsEditor
             value={{ ogTitle: form.ogTitle, ogDescription: form.ogDescription, ogImageUrl: form.ogImageUrl }}

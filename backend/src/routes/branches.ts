@@ -205,6 +205,7 @@ export async function branchRoutes(app: FastifyInstance): Promise<void> {
       fontId: number | null;
       parentId: number | null;
       isAnchor: boolean;
+      chartHidden: boolean;
       guideAssetId: number | null;
       voiceoverText: string;
       ogTitle: string | null;
@@ -231,6 +232,7 @@ export async function branchRoutes(app: FastifyInstance): Promise<void> {
       return reply.code(400).send({ error: "longDescription must be text of at most 4000 characters" });
     }
     const data = { ...(req.body ?? {}) };
+    if (data.chartHidden !== undefined && typeof data.chartHidden !== "boolean") return reply.code(400).send({ error: "chartHidden must be true or false" });
     if (typeof data.longDescription === "string") data.longDescription = data.longDescription.trim() || null; // an empty box means none
     if (typeof data.identityColor === "string") data.identityColor = normalizeColor(data.identityColor)!;
     const branch = await prisma.branch.update({ where: { id: Number(req.params.id) }, data });

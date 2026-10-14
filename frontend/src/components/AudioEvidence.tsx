@@ -7,6 +7,7 @@ import { onClipPosition, playClip, stopClip, useClipPlayer } from "../lib/clipPl
 import { useAudioStore } from "../lib/audioStore";
 import { useToastStore } from "../lib/toastStore";
 import { ClipButton } from "./ClipButton";
+import { ReplaceAudio } from "./ReplaceAudio";
 
 export interface EvidenceClip {
   n: number;
@@ -25,6 +26,8 @@ interface Props {
   onAnalysisChart?: (chart: AnalysisChart) => Promise<string>;
   /** Uploads a generated file (the spectrogram) into the study, returning its URL. */
   uploadFile?: (blob: Blob, filename: string) => Promise<string>;
+  /** Owner, not editing: shows the Replace recording control (study slug + refresh). */
+  replace?: { slug: string; onDone: () => void };
 }
 
 const WAVE_HEIGHT = 96;
@@ -71,7 +74,7 @@ function ReaderAudio({ url, clips }: Props) {
 
 type LoadState = { status: "idle" | "loading" | "ready" } | { status: "error"; message: string };
 
-function AudioTools({ url, clips, onCite, onCiteMany, onAnalysisChart, uploadFile }: Props) {
+function AudioTools({ url, clips, onCite, onCiteMany, onAnalysisChart, uploadFile, replace }: Props) {
   const wrapRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const playheadRef = useRef<HTMLDivElement>(null);
@@ -298,6 +301,7 @@ function AudioTools({ url, clips, onCite, onCiteMany, onAnalysisChart, uploadFil
 
   return (
     <div className="audio-tools">
+      {replace && <ReplaceAudio slug={replace.slug} url={url} onDone={replace.onDone} />}
       <div
         ref={wrapRef}
         className="audio-wave"

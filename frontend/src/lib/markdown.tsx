@@ -1,5 +1,6 @@
 import { GlossRef } from "../components/GlossRef";
 import { GlossaryList } from "../components/GlossaryList";
+import { MilestoneEmbed } from "../components/MilestoneCard";
 import { splitTerms } from "./glossary";
 import { CiteRef } from "../components/CiteRef";
 import { IMAGE_LINE, parseImageAttrs, isUploadingUrl, type ImageAttrs } from "./images";
@@ -143,6 +144,7 @@ const VIDEO_LINE = /^@video\((\S+)\)$/;
 const FILE_LINE = /^@file\((\S+)\)(?:\[(.*?)\])?$/;
 const ORDERED_LINE = /^\d+[.)]\s(.*)$/;
 const RULE_LINE = /^(-{3,}|\*{3,})$/;
+const MILESTONE_LINE = /^@milestones?(?:\(([A-Za-z0-9_-]+)\))?$/;
 const GLOSSARY_LINE = /^\{glossary(?: (list|cards|columns))?\}$/;
 const FIGURE_LINE = /^\{(fig|tab):(\d+)\}$/;
 
@@ -263,7 +265,11 @@ export function renderMarkdown(markdown: string, onLinkClick?: (path: string) =>
     const figureLine = ext ? line.match(FIGURE_LINE) : null;
 
     const glossLine = ext ? line.match(GLOSSARY_LINE) : null;
-    if (glossLine) {
+    const milestoneLine = ext ? line.match(MILESTONE_LINE) : null;
+    if (milestoneLine) {
+      flushList();
+      blocks.push(<MilestoneEmbed key={stableKey("milestone")} id={milestoneLine[1]} />);
+    } else if (glossLine) {
       flushList();
       blocks.push(<GlossaryList key={stableKey("glossary")} layout={(glossLine[1] as "list" | "cards" | "columns" | undefined) ?? "list"} />);
     } else if (figureLine) {

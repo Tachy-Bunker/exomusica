@@ -240,6 +240,23 @@ export function MyMusicPage() {
     }
   }
 
+  // A cover from a link: paste the address of an image that is already on the web. Blank removes the cover.
+  const [coverLinks, setCoverLinks] = useState<Record<number, string>>({});
+  async function saveCoverLink(albumId: number) {
+    const url = (coverLinks[albumId] ?? "").trim();
+    setCoverUploadingAlbumId(albumId);
+    try {
+      await api(`/api/community-albums/${albumId}/cover-link`, { method: "PUT", body: JSON.stringify({ url }) });
+      setCoverLinks((m) => { const n = { ...m }; delete n[albumId]; return n; });
+      useToastStore.getState().showToast(url ? "Cover saved ✓" : "Cover removed");
+      loadAlbums();
+    } catch (err) {
+      useToastStore.getState().showToast(err instanceof Error ? err.message : "Could not use that link");
+    } finally {
+      setCoverUploadingAlbumId(null);
+    }
+  }
+
   function handleCoverPaste(e: React.ClipboardEvent, albumId: number) {
     const item = [...e.clipboardData.items].find((i) => i.type.startsWith("image/"));
     if (!item) return;
@@ -364,6 +381,12 @@ export function MyMusicPage() {
                 {coverUploadingAlbumId === a.id ? "Uploading…" : "Set cover"}
               </button>
               <span style={{ fontSize: "0.65rem", color: "var(--text-dim)" }}>or click here + paste</span>
+            </div>
+            <div style={{ display: "flex", gap: "0.4rem", alignItems: "center", marginTop: "0.3rem", flexWrap: "wrap" }}>
+              <input className="input" type="url" inputMode="url" placeholder="…or paste a link to an image (https://…)" aria-label={`Cover image link for ${a.title}`} value={coverLinks[a.id] ?? ""} onChange={(e) => setCoverLinks((m) => ({ ...m, [a.id]: e.target.value }))}
+                onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); void saveCoverLink(a.id); } }} data-testid={`cover-link-${a.id}`} style={{ flex: "1 1 14rem", minWidth: 0 }} />
+              <button className="btn" onClick={() => void saveCoverLink(a.id)} disabled={coverUploadingAlbumId === a.id || (coverLinks[a.id] ?? "").trim() === ""} data-testid={`cover-link-save-${a.id}`}>Use link</button>
+              {a.coverArtUrl && <button className="btn" onClick={() => { setCoverLinks((m) => ({ ...m, [a.id]: "" })); void api(`/api/community-albums/${a.id}/cover-link`, { method: "PUT", body: JSON.stringify({ url: "" }) }).then(() => { useToastStore.getState().showToast("Cover removed"); loadAlbums(); }); }} data-testid={`cover-remove-${a.id}`}>Remove cover</button>}
             </div>
             <div style={{ display: "flex", gap: "0.4rem", alignItems: "center", marginTop: "0.3rem" }}>
               <button className="btn" onClick={() => openAlbumManage(a)}>

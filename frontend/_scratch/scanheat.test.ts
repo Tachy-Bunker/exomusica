@@ -1,0 +1,15 @@
+import assert from "node:assert/strict";
+import { buildScanHeat, pathOfScanKey } from "../src/lib/heat";
+assert.equal(pathOfScanKey("album:rain"), "/album/rain");
+assert.equal(pathOfScanKey("calbum:x"), "/community-album/x");
+assert.equal(pathOfScanKey("user:neo"), "/u/neo");
+assert.equal(pathOfScanKey("wiki:a:b"), "/wiki/a:b");
+for (const k of ["point:abc", "nothing", ":x", "other:y"]) assert.equal(pathOfScanKey(k), null, k);
+const m = buildScanHeat([["album:hot", 1000], ["study:mid", 30], ["wiki:low", 2], ["point:zzz", 999], ["user:none", 0]]);
+assert.equal(m.get("/album/hot"), 4);
+assert.ok((m.get("/study/mid") ?? -1) >= 2 && (m.get("/study/mid") ?? 9) <= 3, String(m.get("/study/mid")));
+assert.ok((m.get("/wiki/low") ?? 9) <= 1);
+assert.ok(!m.has("/u/none") && m.size === 3, "zero counts and point keys are left out");
+assert.equal(buildScanHeat([]).size, 0);
+assert.equal(buildScanHeat([["album:a", 5]]).get("/album/a"), 4, "a lone page is the hottest");
+console.log("scanheat ok");

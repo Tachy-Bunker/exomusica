@@ -7,6 +7,7 @@ import { verifySmtpConnection } from "../lib/mailer.js";
 import { restartDiscordBotIfNeeded, getDiscordBridgeStatus } from "../lib/discordBot.js";
 
 import { probeColorsProblem } from "../lib/probe.js";
+import { Prisma } from "@prisma/client";
 import { isJingleEvent, withJingle } from "../lib/jingles.js";
 
 export async function siteSettingsRoutes(app: FastifyInstance): Promise<void> {
@@ -352,7 +353,7 @@ export async function siteSettingsRoutes(app: FastifyInstance): Promise<void> {
       "spotlightCommunityTrackId",
       "cultActivitiesChannelId",
     ] as const) {
-      if (key in body) data[key] = body[key];
+      if (key in body) data[key] = key === "probeColors" && body[key] === null ? Prisma.DbNull : body[key]; // a Json column is cleared with DbNull, not a bare null
     }
     return prisma.siteSettings.upsert({ where: { id: 1 }, create: { id: 1, ...data }, update: data });
   });
@@ -393,7 +394,7 @@ export async function siteSettingsRoutes(app: FastifyInstance): Promise<void> {
       const { url } = await saveSoundFile(file.filename, file.mimetype, buffer);
       const cur = await prisma.siteSettings.findUnique({ where: { id: 1 }, select: { jingleUrls: true } });
       const next = withJingle(cur?.jingleUrls, req.params.event, url);
-      await prisma.siteSettings.upsert({ where: { id: 1 }, create: { id: 1, jingleUrls: next }, update: { jingleUrls: next } });
+      await prisma.siteSettings.upsert({ where: { id: 1 }, create: { id: 1, jingleUrls: next ?? Prisma.DbNull }, update: { jingleUrls: next ?? Prisma.DbNull } });
       return { jingleUrls: next };
     } catch (err) {
       return reply.code(400).send({ error: err instanceof Error ? err.message : "upload failed" });
@@ -404,7 +405,7 @@ export async function siteSettingsRoutes(app: FastifyInstance): Promise<void> {
     if (!isJingleEvent(req.params.event)) return reply.code(400).send({ error: "unknown event" });
     const cur = await prisma.siteSettings.findUnique({ where: { id: 1 }, select: { jingleUrls: true } });
     const next = withJingle(cur?.jingleUrls, req.params.event, null);
-    await prisma.siteSettings.upsert({ where: { id: 1 }, create: { id: 1, jingleUrls: next }, update: { jingleUrls: next } });
+    await prisma.siteSettings.upsert({ where: { id: 1 }, create: { id: 1, jingleUrls: next ?? Prisma.DbNull }, update: { jingleUrls: next ?? Prisma.DbNull } });
     return { jingleUrls: next };
   });
 

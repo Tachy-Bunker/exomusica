@@ -1,7 +1,7 @@
 // The branch chart, the testable part: where rooms sit, and what you know about each. No DOM here.
-export interface ChartBranch { id: number; slug: string; name: string; parentId: number | null }
+export interface ChartBranch { id: number; slug: string; name: string; parentId: number | null; secret?: boolean; key?: string }
 export interface Room extends ChartBranch { col: number; row: number }
-export type RoomState = "visited" | "heard" | "unseen";
+export type RoomState = "visited" | "heard" | "unseen" | "sealed";
 
 /** A tidy tree: depth is the column, leaves take consecutive rows, a parent sits level with the middle of its children. Cycles and orphans cannot hang it. */
 export function layoutChart(list: ChartBranch[]): { rooms: Room[]; cols: number; rows: number } {
@@ -28,16 +28,19 @@ export function layoutChart(list: ChartBranch[]): { rooms: Room[]; cols: number;
   return { rooms: list.map((b) => out.get(b.id)!), cols, rows: Math.max(row, 1) };
 }
 
-/** Visited: you have been there (or scanned it). Heard of: the entrance, or next to somewhere you have been. Unseen: dark, and its name is not shown. */
-export function roomStates(list: ChartBranch[], visited: ReadonlySet<string>): Map<number, RoomState> {
+/** Visited: you have been there (or scanned it). Heard of: the entrance, or next to somewhere you have been. Unseen: dark, and its name is not shown.
+ *  Sealed: a hidden room nobody has found yet (only its place on the plan is known); once you have walked into it, it is an ordinary visited room.
+ *  `found` holds the keys of hidden rooms this browser has been in. */
+export function roomStates(list: ChartBranch[], visited: ReadonlySet<string>, found: ReadonlySet<string> = new Set()): Map<number, RoomState> {
   const byId = new Map(list.map((b) => [b.id, b]));
+  const been = (b: ChartBranch): boolean => (b.secret ? !!b.key && found.has(b.key) : visited.has(b.slug));
   const known = new Set<number>();
-  for (const b of list) if (visited.has(b.slug)) { known.add(b.id); if (b.parentId != null) known.add(b.parentId); }
-  for (const b of list) if (b.parentId == null || !byId.has(b.parentId) || visited.has(byId.get(b.parentId)!.slug)) known.add(b.id);
+  for (const b of list) if (been(b)) { known.add(b.id); if (b.parentId != null) known.add(b.parentId); }
+  for (const b of list) { const p = b.parentId != null ? byId.get(b.parentId) : undefined; if (!p || been(p)) known.add(b.id); }
   const m = new Map<number, RoomState>();
-  for (const b of list) m.set(b.id, visited.has(b.slug) ? "visited" : known.has(b.id) ? "heard" : "unseen");
+  for (const b of list) m.set(b.id, been(b) ? "visited" : b.secret ? "sealed" : known.has(b.id) ? "heard" : "unseen");
   return m;
 }
-export const chartTally = (states: Map<number, RoomState>): { visited: number; heard: number; unseen: number } => {
-  const t = { visited: 0, heard: 0, unseen: 0 }; for (const s of states.values()) t[s]++; return t;
+export const chartTally = (states: Map<number, RoomState>): { visited: number; heard: number; unseen: number; sealed: number } => {
+  const t = { visited: 0, heard: 0, unseen: 0, sealed: 0 }; for (const s of states.values()) t[s]++; return t;
 };

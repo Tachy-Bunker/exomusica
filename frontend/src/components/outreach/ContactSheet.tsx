@@ -9,6 +9,7 @@ import { normalizeContactsCsv, toVcf, vcfToCsv } from "../../lib/vcard";
 import { zipName, zipStore } from "../../lib/zip";
 import { CaptureModal } from "./CaptureModal";
 import { Cell, DateInput, MultiPick, TextCell } from "./Cells";
+import { ResizeGrip } from "./ResizeGrip";
 import { GroupsModal } from "./GroupsModal";
 import { ColumnsModal } from "./ColumnsModal";
 import { MergeModal } from "./MergeModal";
@@ -171,6 +172,7 @@ export function ContactSheet({ cols, contacts, groups, onGroups, onMembers, toda
   };
   const exportList = selected.size ? contacts.filter((c) => selected.has(c.id)) : rows;
 
+  const scrollBox = useRef<HTMLDivElement>(null);
   return (
     <section className="ox-sheet" aria-label="Contact list" onKeyDown={onKey} tabIndex={-1}>
       <div className="ox-bar">
@@ -227,7 +229,7 @@ export function ContactSheet({ cols, contacts, groups, onGroups, onMembers, toda
         </div>
       )}
       {note && <p className="ox-hint" role="status">{note}</p>}
-      <div className="ox-scroll">
+      <div className="ox-scroll" ref={scrollBox} data-testid="ox-scroll">
         <table className="ox-table">
           <thead>
             <tr>
@@ -248,6 +250,7 @@ export function ContactSheet({ cols, contacts, groups, onGroups, onMembers, toda
           </tbody>
         </table>
       </div>
+      <ResizeGrip target={scrollBox} storeKey="exomusica_ox_list_h" label="Resize the contact list" />
       {rows.length > shown && <button className="btn" onClick={() => setShown(shown + PAGE)}>Show {Math.min(PAGE, rows.length - shown)} more ({rows.length - shown} left)</button>}
       <datalist id="ox-tzs">{ZONES.map((z) => <option key={z} value={z} />)}</datalist>
       {captureOpen && <CaptureModal groups={groups} initialUrl={initialCapture} onAdded={onCaptured} onClose={() => { setCaptureOpen(false); onCaptureDone(); }} />}

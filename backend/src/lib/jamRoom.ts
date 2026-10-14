@@ -72,16 +72,16 @@ export class Throttle {
 
 export interface Member { id: number; username: string }
 export class JamRooms<S> {
-  rooms = new Map<string, { state: JamState; members: Map<S, Member>; emptySince: number | null }>();
+  rooms = new Map<string, { state: JamState; members: Map<S, Member>; emptySince: number | null; listed: boolean; chat: ChatLine[] }>();
   constructor(private now: () => number = Date.now, private rand: () => number = Math.random) {}
 
-  create(): string | null {
+  create(listed = true): string | null {
     this.sweep();
     if (this.rooms.size >= MAX_ROOMS) return null;
     let code = newCode(this.rand);
     for (let i = 0; i < 20 && this.rooms.has(code); i++) code = newCode(this.rand);
     if (this.rooms.has(code)) return null;
-    this.rooms.set(code, { state: defaultState(this.now()), members: new Map(), emptySince: this.now() });
+    this.rooms.set(code, { state: defaultState(this.now()), members: new Map(), emptySince: this.now(), listed, chat: [] });
     return code;
   }
   join(code: string, sock: S, m: Member): "ok" | "missing" | "full" {
@@ -97,8 +97,47 @@ export class JamRooms<S> {
     r.members.delete(sock);
     if (r.members.size === 0) r.emptySince = this.now();
   }
+  /** The public list: rooms that chose to be listed and have someone in them, fullest first. */
+  list(): { code: string; people: number; tempo: number; full: boolean }[] {
+    const out: { code: string; people: number; tempo: number; full: boolean }[] = [];
+    for (const [code, r] of this.rooms) if (r.listed && r.members.size > 0) out.push({ code, people: r.members.size, tempo: r.state.tempo, full: r.members.size >= MAX_MEMBERS });
+    return out.sort((a, b) => b.people - a.people || a.code.localeCompare(b.code)).slice(0, 30);
+  }
   /** Rooms empty for more than ten minutes are dropped. */
   sweep(): void {
     for (const [c, r] of this.rooms) if (r.emptySince !== null && this.now() - r.emptySince > 600_000) this.rooms.delete(c);
   }
+}
+
+// --- Public rooms: guests, the side chat, and cursors ------------------------
+
+export interface ChatLine { by: string; text: string; at: number }
+export const CHAT_KEEP = 40;
+export const CHAT_MAX = 300;
+
+/** A guest's name in a room: guest-1234, never one already in use there. */
+export function guestName(taken: Iterable<string>, rand: () => number = Math.random): string {
+  const used = new Set(taken);
+  for (let i = 0; i < 50; i++) { const n = `guest-${String(Math.floor(rand() * 10000)).padStart(4, "0")}`; if (!used.has(n)) return n; }
+  return `guest-${Date.now() % 100000}`;
+}
+
+/** One chat line: plain text only, whitespace tidied, capped; null when nothing is left. */
+export function cleanChat(text: unknown): string | null {
+  if (typeof text !== "string") return null;
+  // eslint-disable-next-line no-control-regex
+  const t = text.replace(/[\u0000-\u001f\u007f]+/g, " ").replace(/\s+/g, " ").trim().slice(0, CHAT_MAX);
+  return t || null;
+}
+
+export function pushChat(chat: ChatLine[], line: ChatLine): void {
+  chat.push(line);
+  if (chat.length > CHAT_KEEP) chat.splice(0, chat.length - CHAT_KEEP);
+}
+
+/** A pointer position as fractions of the room's box (a little outside it is fine); null if it isn't two finite numbers. */
+export function cleanCursor(x: unknown, y: unknown): { x: number; y: number } | null {
+  if (typeof x !== "number" || typeof y !== "number" || !Number.isFinite(x) || !Number.isFinite(y)) return null;
+  const c = (n: number) => Math.round(Math.max(-0.2, Math.min(1.2, n)) * 1000) / 1000;
+  return { x: c(x), y: c(y) };
 }

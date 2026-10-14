@@ -1,3 +1,5 @@
+import { loadDraft, saveDraft } from "../lib/pins";
+import { recoveredHeader } from "../lib/recoveredLog";
 import { useChatDockStore } from "../lib/chatDockStore";
 import { fireJingle } from "../lib/jingleBus";
 import { VoiceNoteRecorder, type FinishedVoiceNote } from "../components/VoiceNoteRecorder";
@@ -37,6 +39,7 @@ import { EmojiPicker } from "../components/EmojiPicker";
 import { useReactionPalette } from "../lib/reactionPalette";
 import { DmButton } from "../components/DmButton";
 import { QuoteToStudy } from "../components/QuoteToStudy";
+import { QuickRadial } from "../components/QuickRadial";
 import { useRoomName } from "../lib/roomContext";
 import { MentionPicker } from "../components/MentionPicker";
 import { AttachmentPreview } from "../components/AttachmentPreview";
@@ -188,6 +191,7 @@ function MessageMenu({
           >
             Copy link
           </button>
+          {user && <small style={{ display: "block", padding: "0.2rem 0.4rem", color: "var(--text-dim)" }}>Tip: rest on a message and press A for quick actions</small>}
           {canModerate && (
             <button
               className="btn btn-danger"
@@ -420,6 +424,9 @@ export function ChannelPage({ channelSlug, fillHeight, parentControlsHeight }: {
   const [channelBranch, setChannelBranch] = useState<{ slug: string; name: string } | null>(null);
   const [archiveDays, setArchiveDays] = useState<{ day: string; messageCount: number }[]>([]);
   const [draft, setDraft] = useState("");
+  // An unsent message survives leaving the room (and shows as a pin on the Forum Map).
+  useEffect(() => { if (slug) { const d = loadDraft(slug); if (d) setDraft((prev) => prev || d); } }, [slug]);
+  useEffect(() => { if (!slug) return; const id = window.setTimeout(() => saveDraft(slug, draft), 400); return () => window.clearTimeout(id); }, [slug, draft]);
   const [cmdError, setCmdError] = useState<string | null>(null);
   const squelch = useSquelchStore();
   const [typingUsers, setTypingUsers] = useState<Record<string, number>>({});
@@ -1138,6 +1145,8 @@ export function ChannelPage({ channelSlug, fillHeight, parentControlsHeight }: {
         </div>
       )}
 
+      <QuickRadial messages={() => messagesRef.current} canAct={!!user} onReply={handleQuote} onQuote={(t) => { setDraft((d) => t + d); requestAnimationFrame(() => textareaRef.current?.focus()); }} />
+
 
       {(showSquelch || squelch.level > 0) && <div className="squelch" data-testid="squelch" role="group" aria-label="Squelch: how much of the room to hear">
         <span className="squelch-label">Squelch</span>
@@ -1163,6 +1172,10 @@ export function ChannelPage({ channelSlug, fillHeight, parentControlsHeight }: {
           ...(stripOn ? { paddingRight: 18 } : {}),
         }}
       >
+        {mode === "day" && selectedDay && slug && (() => {
+          const h = recoveredHeader(selectedDay, slug, archiveDays.find((d) => d.day === selectedDay)?.messageCount ?? null);
+          return <div className="recovered-log" data-testid="recovered-log"><b>{h.title}</b>{h.sub && <span>{h.sub}</span>}</div>;
+        })()}
         {messages.length === 0 && <p style={{ color: "var(--text-dim)" }}>Nothing here yet.</p>}
         {mode === "search" ? (
           messages.map((m) => (

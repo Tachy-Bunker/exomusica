@@ -1,0 +1,10 @@
+import assert from "node:assert/strict";
+import { parseIds, WALL_PAGE } from "../src/lib/wallIds.js";
+assert.deepEqual(parseIds("1,2,x,3,3"), [1, 2, 3]);
+assert.deepEqual(parseIds("0,-4,1.5,7"), [7]);
+assert.deepEqual(parseIds(undefined), []);
+assert.deepEqual(parseIds(["1"] as any), []);
+assert.deepEqual(parseIds(""), []);
+const many = Array.from({ length: 200 }, (_, i) => i + 1).join(",");
+assert.equal(parseIds(many).length, WALL_PAGE);
+console.log("wall ok");

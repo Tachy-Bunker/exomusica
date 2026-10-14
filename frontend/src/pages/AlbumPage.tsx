@@ -53,7 +53,7 @@ export function AlbumPage() {
   const cur = useAudioStore((s) => s.currentTrack);
   const audioPlaying = useAudioStore((s) => s.isPlaying);
   const toggleAudio = useAudioStore((s) => s.toggle);
-  const albumOn = !!album && cur?.albumSlug === album.slug && cur.source !== "community";
+  const albumOn = !!album && !!cur && cur.albumSlug === album.slug && cur.source !== "community";
   const [searchParams] = useSearchParams();
   const [shareOpen, setShareOpen] = useState(false);
 

@@ -1,3 +1,4 @@
+import { AB_TOOLS_ENABLED } from "./features";
 import { useEffect } from "react";
 import { useAudioStore } from "./audioStore";
 import { useAmbienceStore } from "./ambienceStore";
@@ -18,7 +19,7 @@ export function useGlobalPlayerShortcuts(): void {
         return;
       }
 
-      if (e.code === "Backslash" && !e.ctrlKey && !e.metaKey && !e.altKey && (store.ab.A || store.ab.B)) {
+      if (AB_TOOLS_ENABLED && e.code === "Backslash" && !e.ctrlKey && !e.metaKey && !e.altKey && (store.ab.A || store.ab.B)) {
         e.preventDefault();
         store.abFlip(); // the A/B pair: one key between the two stretches
         return;

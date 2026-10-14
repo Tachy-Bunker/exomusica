@@ -1,6 +1,7 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { api, ApiError } from "../../lib/api";
+import { forgetHubs } from "../../lib/hubs";
 import { ArticleEditor } from "../../components/ArticleEditor";
 import { SeoFieldsEditor } from "../../components/SeoFieldsEditor";
 
@@ -35,6 +36,16 @@ export function WikiAdminPage() {
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
   const [defaultWikiSlug, setDefaultWikiSlug] = useState<string | null>(null);
+
+  // Not offered as a parent: the page itself and everything beneath it.
+  const blocked = new Set<number>();
+  if (editingId) {
+    blocked.add(editingId);
+    for (let grew = true; grew; ) {
+      grew = false;
+      for (const p of pages) if (p.parentId != null && blocked.has(p.parentId) && !blocked.has(p.id)) { blocked.add(p.id); grew = true; }
+    }
+  }
 
   function load() {
     api<WikiSummary[]>("/api/wiki").then(setPages);
@@ -79,7 +90,7 @@ export function WikiAdminPage() {
     e.preventDefault();
     setError(null);
     try {
-      const parentId = form.parentId ? Number(form.parentId) : undefined;
+      const parentId = form.parentId ? Number(form.parentId) : null;
       const fontId = form.fontId ? Number(form.fontId) : null;
       const seo = { ogTitle: form.ogTitle || null, ogDescription: form.ogDescription || null, ogImageUrl: form.ogImageUrl || null };
       if (editingId) {
@@ -89,6 +100,7 @@ export function WikiAdminPage() {
         await api("/api/admin/wiki", { method: "POST", body: JSON.stringify({ slug: form.slug, title: form.title, contentMarkdown: form.contentMarkdown, parentId, fontId, ...seo }) });
         close();
       }
+      forgetHubs();
       load();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Something went wrong");
@@ -99,6 +111,7 @@ export function WikiAdminPage() {
     if (!confirm("Delete this wiki page?")) return;
     await api(`/api/admin/wiki/${id}`, { method: "DELETE" });
     if (editingId === id) close();
+    forgetHubs();
     load();
   }
 
@@ -128,7 +141,7 @@ export function WikiAdminPage() {
             <div className="field">
               <select value={form.parentId} onChange={(e) => setForm((f) => ({ ...f, parentId: e.target.value }))} aria-label="Parent page">
                 <option value="">- top-level page -</option>
-                {pages.filter((p) => p.id !== editingId).map((p) => <option key={p.id} value={p.id}>{p.title}</option>)}
+                {pages.filter((p) => !blocked.has(p.id)).map((p) => <option key={p.id} value={p.id}>{p.title}</option>)}
               </select>
             </div>
             <div className="field">

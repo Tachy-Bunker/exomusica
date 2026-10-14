@@ -40,6 +40,7 @@ enum GhostReason {
 
 model User {
   probeScans ProbeScan[]
+  adminPanelSeen AdminPanelSeen[]
   id                    Int          @id @default(autoincrement())
   username              String       @unique // kept forever, even for ghosts - attribution needs a name
   email                 String?      @unique // null once a ghost: no login, no PII to leak
@@ -48,6 +49,10 @@ model User {
   contributorPointsEntries ContributorPointsEntry[]
   trackComments         TrackComment[]
   communityTrackComments CommunityTrackComment[]
+  upgrades              UserUpgrade[]
+  upgradeChoice         Json?        // { frame, tint }: which earned perks this member has switched on
+  upgradeRetunedAt      DateTime?    // when they last earned something; hints are precise again from here
+  jinglesDone           String[]     @default([]) // pickup jingles this account has already heard once (follows the member across devices)
   dialJson              Json?        // the chat dock's dial: pinned rooms, scenes, sleeping slots (follows the member across devices)
   pointsAwarded             ContributorPointsEntry[] @relation("PointsAwardedBy")
   bio                   String?
@@ -155,6 +160,7 @@ model Branch {
   description String?
   longDescription String? @db.Text // the second, longer description: shown when the branch is expanded in Soundbay (the short one is the row's)
   coverArtUrl String?
+  chartHidden Boolean  @default(false) // never drawn on the Chart, not even as a sealed room
   hidden      Boolean  @default(false) // soft take-down: excluded from public listings, data untouched
   visibility  BranchVisibility @default(VISIBLE) // supersedes `hidden` - kept alongside it rather than migrated destructively; see deploy notes for the backfill
   crystalCount Int @default(5) // number of shard fragments rendered for a Baby Crystals branch, admin-controlled to reflect project progress
@@ -1796,4 +1802,32 @@ model ProbeScan {
   at     DateTime @default(now())
   @@unique([userId, kind, key])
   @@index([userId, kind])
+  @@index([kind, key]) // "how many others looked here" (Shared lens)
+}
+
+// When an admin last opened a panel, so its red light only counts what is new since then. One row per admin and panel.
+model AdminPanelSeen {
+  userId Int
+  user   User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  panel  String   // the admin route segment, e.g. "studies"
+  seenAt DateTime @default(now())
+  @@id([userId, panel])
+}
+
+// Suit upgrades. A row appears the first time a member is shown an upgrade's hint (firstSeenAt, which starts the hint's fade) and gets earnedAt when they earn it. The catalogue itself is in code (lib/upgrades.ts).
+model UserUpgrade {
+  userId      Int
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  key         String
+  firstSeenAt DateTime  @default(now())
+  earnedAt    DateTime?
+  @@id([userId, key])
+}
+
+// Community milestones. The catalogue and its default numbers live in code (lib/milestones.ts); a row exists only once an admin changed something or a milestone was first reached.
+model MilestoneSetting {
+  key       String    @id
+  target    Int?      // null = use the default
+  enabled   Boolean   @default(true)
+  reachedAt DateTime? // set when the community first crossed the target; cleared if the target is raised above where it stands
 }

@@ -1,0 +1,16 @@
+import { makeOnset, addRing } from "../src/lib/echo";
+let bad = 0; const t = (n: string, ok: boolean) => { console.log((ok ? "ok   " : "FAIL ") + n); if (!ok) bad++; };
+const run = (seq: number[], dt = 70) => { const o = makeOnset(); return seq.map((r, i) => o(r, i * dt)); };
+t("silence never fires", run(new Array(50).fill(0)).every((x) => x === 0));
+t("steady drone never fires", run(new Array(60).fill(0.2)).every((x) => x === 0));
+const hits = run([0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.6, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.6]);
+t("each hit fires once", hits.filter((x) => x > 0).length === 2 && hits[6] > 0 && hits[17] > 0);
+t("strength in range", hits.every((x) => x === 0 || (x >= 0.25 && x <= 1)));
+t("louder hit is stronger", run([0.05, 0.05, 0.05, 0.05, 0.9])[4] >= run([0.05, 0.05, 0.05, 0.05, 0.12])[4]);
+t("held note fires at most once", run([0.05, 0.05, 0.05, 0.05, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5]).filter((x) => x > 0).length === 1);
+t("cooldown", (() => { const o = makeOnset(180); for (let i = 0; i < 4; i++) o(0.05, i * 70); const a = o(0.6, 300); o(0.05, 340); const b = o(0.7, 370); return a > 0 && b === 0; })());
+t("junk input is safe", run([NaN, -1, Infinity, 0, 0.1, 0.1]).every((x) => x === 0 || (x >= 0.25 && x <= 1)));
+t("warm-up never fires", run([0.9, 0.9, 0.9])[0] === 0 && run([0.9, 0.9, 0.9]).every((x) => x === 0));
+let r: { id: number; s: number }[] = []; for (let i = 0; i < 9; i++) r = addRing(r, { id: i, s: 1 });
+t("at most four rings, newest kept", r.length === 4 && r[3].id === 8 && r[0].id === 5);
+process.exit(bad ? 1 : 0);

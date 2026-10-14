@@ -1,3 +1,4 @@
+import { adminEdit, memberNotifications, memberProfile, memberVisualEffects } from "../lib/profileInput.js";
 import type { FastifyInstance } from "fastify";
 import { prisma } from "../lib/prisma.js";
 import { requireAuth, requireAdmin, hashPassword, verifyPassword } from "../lib/auth.js";
@@ -96,8 +97,10 @@ export async function accountRoutes(app: FastifyInstance): Promise<void> {
       notifyDiscordFollowedReplies: boolean;
       notifyDiscordPrivateMessage: boolean;
     }>;
-  }>("/api/account/notifications", { preHandler: requireAuth }, async (req) => {
-    return prisma.user.update({ where: { id: req.user!.id }, data: req.body ?? {} });
+  }>("/api/account/notifications", { preHandler: requireAuth }, async (req, reply) => {
+    const { data, bad } = memberNotifications(req.body);
+    if (bad.length) return reply.code(400).send({ error: `Invalid: ${bad.join(", ")}` });
+    return prisma.user.update({ where: { id: req.user!.id }, data, select: { id: true } });
   });
 
   app.patch<{ Body: Partial<{ volumeNotifications: number; volumeSfxIdle: number; volumeSfxPlaying: number; volumeMusic: number }> }>(
@@ -117,16 +120,20 @@ export async function accountRoutes(app: FastifyInstance): Promise<void> {
   app.patch<{ Body: Partial<{ caEnabled: boolean; moireEnabled: boolean; exclusiveMediaPlayback: boolean }> }>(
     "/api/account/visual-effects",
     { preHandler: requireAuth },
-    async (req) => {
-      return prisma.user.update({ where: { id: req.user!.id }, data: req.body ?? {} });
+    async (req, reply) => {
+      const { data, bad } = memberVisualEffects(req.body);
+      if (bad.length) return reply.code(400).send({ error: `Invalid: ${bad.join(", ")}` });
+      return prisma.user.update({ where: { id: req.user!.id }, data, select: { id: true } });
     },
   );
 
   app.patch<{ Body: Partial<{ bio: string; links: { label: string; url: string }[] }> }>(
     "/api/account/profile",
     { preHandler: requireAuth },
-    async (req) => {
-      return prisma.user.update({ where: { id: req.user!.id }, data: req.body ?? {} });
+    async (req, reply) => {
+      const { data, bad } = memberProfile(req.body);
+      if (bad.length) return reply.code(400).send({ error: bad.includes("links") ? "Links must be http(s) addresses (up to 10)" : `Invalid: ${bad.join(", ")}` });
+      return prisma.user.update({ where: { id: req.user!.id }, data, select: { id: true } });
     },
   );
 
@@ -183,17 +190,54 @@ export async function accountRoutes(app: FastifyInstance): Promise<void> {
         isAdmin: true,
         isGhost: true,
         createdAt: true,
+        upgradeChoice: true,
+        storageLimitBytes: true,
+        storageUsedBytes: true,
       },
     });
     if (!user) return reply.code(404).send({ error: "no such user" });
-    return user;
+    const { upgradeChoice, storageLimitBytes, storageUsedBytes, ...rest } = user;
+    const choice = upgradeChoice as { frame?: string | null; tint?: string | null } | null;
+    const frame = choice?.frame ?? null; // validated against what they've earned when they chose it
+    return { ...rest, frame, tint: choice?.tint ?? null, storageLimitMb: Math.round(Number(storageLimitBytes) / 1048576), storageUsedMb: Math.round(Number(storageUsedBytes) / 1048576) };
   });
 
-  app.patch<{
-    Params: { id: string };
-    Body: Partial<{ username: string; bio: string; links: Record<string, string>; isAdmin: boolean }>;
-  }>("/api/admin/users/:id", { preHandler: requireAdmin }, async (req) => {
-    return prisma.user.update({ where: { id: Number(req.params.id) }, data: req.body ?? {} });
+  // What an admin may change on someone's profile (moderation, or filling in a picture they never added).
+  // Whitelisted and validated: see lib/profileInput.ts. Every change is written to the audit log (never the password itself).
+  app.patch<{ Params: { id: string }; Body: Record<string, unknown> }>("/api/admin/users/:id", { preHandler: requireAdmin }, async (req, reply) => {
+    const id = Number(req.params.id);
+    const target = await prisma.user.findUnique({ where: { id }, select: { id: true, isGhost: true, upgradeChoice: true } });
+    if (!target) return reply.code(404).send({ error: "no such user" });
+    const edit = adminEdit(req.body, { isGhost: target.isGhost, self: id === req.user!.id });
+    if (edit.error) return reply.code(400).send({ error: edit.error });
+    if (edit.bad.length) {
+      const why: Record<string, string> = { username: "Username: 3-32 characters, letters, numbers, _ - . only", email: "That isn't a valid email address", password: "Password: 8 to 200 characters", storageLimitMb: "Storage limit: a whole number of MB, 0 to 100000", avatarUrl: "Picture: upload one, or paste an address that starts with /uploads/", links: "Links must be http(s) addresses (up to 10)", bio: "Bio is too long (1000 characters at most)", isAdmin: "Admin must be on or off" };
+      return reply.code(400).send({ error: why[edit.bad[0]!] ?? `Invalid: ${edit.bad.join(", ")}` });
+    }
+    const data: Record<string, unknown> = { ...edit.data };
+    if (typeof data.username === "string") {
+      const clash = await prisma.user.findFirst({ where: { id: { not: id }, username: { equals: data.username, mode: "insensitive" } }, select: { id: true } });
+      if (clash) return reply.code(409).send({ error: "That username is taken" });
+    }
+    if (typeof data.email === "string") {
+      const clash = await prisma.user.findFirst({ where: { id: { not: id }, email: { equals: data.email, mode: "insensitive" } }, select: { id: true } });
+      if (clash) return reply.code(409).send({ error: "Another account already uses that email" });
+    }
+    if (edit.password) data.passwordHash = await hashPassword(edit.password);
+    if (edit.clear.frame || edit.clear.tint) {
+      const cur = (target.upgradeChoice ?? { frame: null, tint: null }) as { frame: string | null; tint: string | null };
+      data.upgradeChoice = { frame: edit.clear.frame ? null : cur.frame, tint: edit.clear.tint ? null : cur.tint };
+    }
+    if (Object.keys(data).length === 0) return { id };
+    try {
+      await prisma.user.update({ where: { id }, data });
+    } catch {
+      return reply.code(409).send({ error: "Save failed: that username or email may already be taken" });
+    }
+    await prisma.auditLog.create({
+      data: { actorId: req.user!.id, action: "user.edit", targetType: "User", targetId: id, meta: { fields: [...Object.keys(edit.data).map((k) => (k === "storageLimitBytes" ? "storageLimit" : k)), ...(edit.password ? ["password"] : []), ...(edit.clear.frame ? ["clearFrame"] : []), ...(edit.clear.tint ? ["clearTint"] : [])] } },
+    }).catch(() => undefined);
+    return { id };
   });
 
   app.post<{ Params: { id: string } }>("/api/admin/users/:id/avatar", { preHandler: requireAdmin, bodyLimit: 1024 * 1024 }, async (req, reply) => {

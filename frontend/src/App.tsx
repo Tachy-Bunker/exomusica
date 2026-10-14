@@ -42,12 +42,14 @@ import { BranchesPage } from "./pages/admin/BranchesPage";
 import { ChannelsPage } from "./pages/admin/ChannelsPage";
 import { UsersPage } from "./pages/admin/UsersPage";
 import { AlbumsAdminPage } from "./pages/admin/AlbumsAdminPage";
+import { AttentionPage } from "./components/admin/Attention";
 import { WikiAdminPage } from "./pages/admin/WikiAdminPage";
 import { AllTracksAdminPage } from "./pages/admin/AllTracksAdminPage";
 import { StudiesAdminPage } from "./pages/admin/StudiesAdminPage";
 import { ResourcesAdminPage } from "./pages/admin/ResourcesAdminPage";
 import { LedgerPage } from "./pages/LedgerPage";
 import { GlossaryAdminPage } from "./pages/admin/GlossaryAdminPage";
+import { MilestonesAdminPage } from "./pages/admin/MilestonesAdminPage";
 import { FeaturedAdminPage } from "./pages/admin/FeaturedAdminPage";
 import { RewardsAdminPage } from "./pages/admin/RewardsAdminPage";
 import { HypothesesPage, HypothesisDrawPage } from "./pages/HypothesesPage";
@@ -182,6 +184,7 @@ export default function App() {
             <Route path="admin" element={<RequireAdmin />}>
               <Route element={<AdminLayout />}>
                 <Route index element={<Navigate to="join-requests" replace />} />
+                <Route path="attention" element={<AttentionPage />} />
                 <Route path="join-requests" element={<JoinRequestsPage />} />
                 <Route path="branches" element={<BranchesPage />} />
                 <Route path="channels" element={<ChannelsPage />} />
@@ -192,6 +195,7 @@ export default function App() {
                 <Route path="studies" element={<StudiesAdminPage />} />
                 <Route path="resources" element={<ResourcesAdminPage />} />
                 <Route path="glossary" element={<GlossaryAdminPage />} />
+                <Route path="milestones" element={<MilestonesAdminPage />} />
                 <Route path="featured" element={<FeaturedAdminPage />} />
                 <Route path="rewards" element={<RewardsAdminPage />} />
                 <Route path="signal" element={<SignalAdminPage />} />

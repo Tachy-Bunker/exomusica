@@ -11,6 +11,7 @@ import { requireAuth } from "../lib/auth.js";
 import { recordStudyRevision } from "../lib/studyRevisions.js";
 import { deleteAttachmentAndReclaim, saveMessageAttachment } from "../lib/storage.js";
 import { deleteAllStudyFiles, releaseStudyFiles, sweepAbandonedStudyFiles, type FileOps } from "../lib/studyFiles.js";
+import { swapStudyAudio, studyAudioUrls } from "../lib/studyAudioSwap.js";
 import { removedFileNames, safeStudyUploadName, uploadedFileNames } from "../lib/studyFileRules.js";
 
 async function uniqueStudySlug(title: string): Promise<string> {
@@ -228,6 +229,68 @@ export async function studiesRoutes(app: FastifyInstance): Promise<void> {
       return updated;
     },
   );
+
+  // --- Replacing a study's recording ------------------------------------------
+  // The recording is swapped everywhere the text points at it (the @audio block and every cited clip), so the
+  // markers stay at the same times. Pick the new sound by uploading it to the study first, or from Exomusica.
+
+  const hostedHere = (u: string | null | undefined): u is string => typeof u === "string" && /^\/uploads\/[^\s]+$/.test(u);
+
+  app.get<{ Querystring: { q?: string } }>("/api/studies-audio-search", { preHandler: requireAuth }, async (req) => {
+    const q = (req.query.q ?? "").trim();
+    if (q.length < 2) return [];
+    const [tracks, community] = await Promise.all([
+      prisma.track.findMany({ where: { title: { contains: q, mode: "insensitive" } }, take: 12, orderBy: { id: "desc" }, select: { id: true, title: true, fileUrl: true, album: { select: { title: true } } } }),
+      prisma.communityTrack.findMany({ where: { title: { contains: q, mode: "insensitive" }, attachmentId: { not: null } }, take: 12, orderBy: { id: "desc" }, select: { id: true, title: true, attachment: { select: { storagePath: true } }, album: { select: { title: true } } } }),
+    ]);
+    return [
+      ...tracks.map((t) => ({ kind: "track" as const, id: t.id, title: t.title, detail: t.album.title, hosted: hostedHere(t.fileUrl) })),
+      ...community.map((t) => ({ kind: "community" as const, id: t.id, title: t.title, detail: `${t.album.title} · community`, hosted: hostedHere(t.attachment?.storagePath) })),
+    ];
+  });
+
+  app.post<{ Params: { slug: string }; Body: { from?: string; uploadUrl?: string; trackId?: number; communityTrackId?: number } }>("/api/studies/:slug/replace-audio", { preHandler: requireAuth }, async (req, reply) => {
+    const study = await prisma.study.findUnique({ where: { slug: req.params.slug }, include: { annotations: true } });
+    if (!study) return reply.code(404).send({ error: "no such study" });
+    if (study.ownerId !== req.user!.id && !req.user!.isAdmin) return reply.code(403).send({ error: "not your study" });
+    const { from, uploadUrl, trackId, communityTrackId } = req.body ?? {};
+    if (typeof from !== "string" || !from) return reply.code(400).send({ error: "say which recording to replace" });
+    if (!studyAudioUrls([study.body, ...study.annotations.map((a) => a.text)]).includes(from)) return reply.code(400).send({ error: "this study doesn't use that recording" });
+
+    let to: string | null = null;
+    if (typeof uploadUrl === "string" && uploadUrl) {
+      const att = await prisma.attachment.findFirst({ where: { storagePath: uploadUrl, studyId: study.id, mimeType: { startsWith: "audio/" } }, select: { id: true } });
+      if (!att) return reply.code(400).send({ error: "upload the new recording to this study first" });
+      to = uploadUrl;
+    } else if (trackId) {
+      to = (await prisma.track.findUnique({ where: { id: Number(trackId) }, select: { fileUrl: true } }))?.fileUrl ?? null;
+    } else if (communityTrackId) {
+      to = (await prisma.communityTrack.findUnique({ where: { id: Number(communityTrackId) }, select: { attachment: { select: { storagePath: true } } } }))?.attachment?.storagePath ?? null;
+    } else return reply.code(400).send({ error: "pick the new recording" });
+    if (!hostedHere(to)) return reply.code(400).send({ error: "that track is hosted outside Exomusica, so the study tools can't analyse it. Upload the file instead" });
+    if (to === from) return reply.code(400).send({ error: "that is already the recording in use" });
+
+    const body = swapStudyAudio(study.body, from, to);
+    let clips = body.clips;
+    let blocks = body.blocks;
+    const notes = study.annotations.map((a) => ({ id: a.id, ...swapStudyAudio(a.text, from, to) }));
+    for (const n of notes) { clips += n.clips; blocks += n.blocks; }
+    if (blocks + clips === 0) return reply.code(400).send({ error: "nothing in the study points at that recording" });
+
+    const oldBody = study.body;
+    const oldNotes = study.annotations.map((a) => a.text);
+    await prisma.$transaction([
+      prisma.study.update({ where: { id: study.id }, data: { body: body.text } }),
+      ...notes.filter((n) => n.clips + n.blocks > 0).map((n) => prisma.studyAnnotation.update({ where: { id: n.id }, data: { text: n.text } })),
+    ]);
+    try {
+      await recordStudyRevision(prisma, study.id, { authorId: req.user!.id, title: study.title, body: body.text });
+      await releaseStudyFiles(filesFor(req), study.id, [...uploadedFileNames([oldBody, ...oldNotes].join("\n"))]); // the old recording and the clip pictures, unless something still uses them
+    } catch (err) {
+      req.log.warn({ err, studyId: study.id }, "study audio swap: history/cleanup failed");
+    }
+    return { ok: true, url: to, blocks, clips };
+  });
 
   // --- Files (audio recordings, spectrograms) uploaded into a study ---
 

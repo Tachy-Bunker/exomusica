@@ -6,19 +6,30 @@ import { buildCatalog, type LogSection } from "../lib/fieldLog.js";
 let cache: { at: number; sections: LogSection[] } | null = null;
 const TTL = 5 * 60_000;
 
-export async function fieldLogRoutes(app: FastifyInstance): Promise<void> {
-  app.get("/api/field-log", async (_req, reply) => {
-    if (!cache || Date.now() - cache.at > TTL) {
-      const [wiki, studies, branches, phenomena, albums] = await Promise.all([
+export async function getFieldLogCatalog(): Promise<LogSection[]> {
+  if (!cache || Date.now() - cache.at > TTL) {
+      const [wiki, studies, branches, phenomena, albums, founders, ghosts] = await Promise.all([
         prisma.wikiPage.findMany({ select: { slug: true, title: true }, orderBy: { title: "asc" }, take: 400 }),
         prisma.study.findMany({ select: { slug: true, title: true }, orderBy: { createdAt: "asc" }, take: 400 }),
         prisma.branch.findMany({ where: { visibility: "VISIBLE" }, select: { slug: true, name: true }, orderBy: { name: "asc" }, take: 400 }),
         prisma.phenomenon.findMany({ where: { published: true }, select: { slug: true, title: true, body: true, chain: true, exampleTrackId: true }, orderBy: { title: "asc" }, take: 400 }),
         prisma.album.findMany({ where: { branch: { visibility: "VISIBLE" } }, select: { slug: true, title: true }, orderBy: { createdAt: "asc" }, take: 400 }),
+        prisma.collaborator.findMany({ where: { linkedUserId: { not: null } }, select: { linkedUser: { select: { username: true } } }, take: 100 }),
+        prisma.user.findMany({ where: { isGhost: true, ghostReason: "DISCORD_IMPORT", linkedUserId: null }, select: { username: true }, orderBy: { username: "asc" }, take: 400 }),
       ]);
-      cache = { at: Date.now(), sections: buildCatalog({ wiki, studies, branches, phenomena: phenomena.map((p) => ({ slug: p.slug, title: p.title, body: p.body, chain: p.chain, hasExample: p.exampleTrackId != null })), albums }) };
+      const ancients = [
+        ...founders.flatMap((f) => (f.linkedUser ? [{ username: f.linkedUser.username, founder: true }] : [])),
+        ...ghosts.map((g) => ({ username: g.username, founder: false })),
+      ];
+      cache = { at: Date.now(), sections: buildCatalog({ wiki, studies, branches, phenomena: phenomena.map((p) => ({ slug: p.slug, title: p.title, body: p.body, chain: p.chain, hasExample: p.exampleTrackId != null })), albums, ancients }) };
     }
+  return cache.sections;
+}
+
+export async function fieldLogRoutes(app: FastifyInstance): Promise<void> {
+  app.get("/api/field-log", async (_req, reply) => {
+    const sections = await getFieldLogCatalog();
     void reply.header("Cache-Control", "public, max-age=300");
-    return cache.sections;
+    return sections;
   });
 }

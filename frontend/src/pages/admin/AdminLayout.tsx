@@ -1,9 +1,11 @@
-import { NavLink, Outlet } from "react-router-dom";
+import { NavLink, Outlet, useLocation } from "react-router-dom";
+import { AdminNavLink, useAttention } from "../../components/admin/Attention";
 import { useEffect, useState } from "react";
 import { api } from "../../lib/api";
 
 export function AdminLayout() {
   const [pendingCount, setPendingCount] = useState(0);
+  const att = useAttention(useLocation().pathname);
 
   useEffect(() => {
     function checkPending() {
@@ -17,121 +19,54 @@ export function AdminLayout() {
   return (
     <div className="admin-layout">
       <nav className="admin-nav">
+        <NavLink to="/admin/attention" className={({ isActive }) => (isActive ? "active" : "")} style={{ display: "inline-flex", alignItems: "center", gap: "0.35rem" }} data-testid="nav-attention">
+          Needs attention
+          {att.total > 0 && <span className="admin-light" data-kind="todo" data-testid="light-total">{att.total > 99 ? "99+" : att.total}</span>}
+        </NavLink>
         <NavLink to="/admin/inbox" className={({ isActive }) => (isActive ? "active" : "")} style={{ display: "inline-flex", alignItems: "center", gap: "0.35rem" }}>
           Inbox
           {pendingCount > 0 && <span className="admin-nav-pending-dot" title={`${pendingCount} waiting`} />}
         </NavLink>
-        <NavLink to="/admin/join-requests" className={({ isActive }) => (isActive ? "active" : "")}>
-          Join requests
-        </NavLink>
-        <NavLink to="/admin/branches" className={({ isActive }) => (isActive ? "active" : "")}>
-          Branches
-        </NavLink>
-        <NavLink to="/admin/channels" className={({ isActive }) => (isActive ? "active" : "")}>
-          Forum topics
-        </NavLink>
-        <NavLink to="/admin/users" className={({ isActive }) => (isActive ? "active" : "")}>
-          Users
-        </NavLink>
-        <NavLink to="/admin/albums" className={({ isActive }) => (isActive ? "active" : "")}>
-          Albums
-        </NavLink>
-        <NavLink to="/admin/all-tracks" className={({ isActive }) => (isActive ? "active" : "")}>
-          All Tracks
-        </NavLink>
-        <NavLink to="/admin/studies" className={({ isActive }) => (isActive ? "active" : "")}>
-          Studies
-        </NavLink>
-        <NavLink to="/admin/resources" className={({ isActive }) => (isActive ? "active" : "")}>
-          Resources
-        </NavLink>
-        <NavLink to="/admin/glossary" className={({ isActive }) => (isActive ? "active" : "")}>
-          Glossary
-        </NavLink>
-        <NavLink to="/admin/featured" className={({ isActive }) => (isActive ? "active" : "")}>
-          Featured
-        </NavLink>
-        <NavLink to="/admin/rewards" className={({ isActive }) => (isActive ? "active" : "")}>
-          Rewards
-        </NavLink>
-        <NavLink to="/admin/signal" className={({ isActive }) => (isActive ? "active" : "")}>
-          Signal
-        </NavLink>
-        <NavLink to="/admin/submissions" className={({ isActive }) => (isActive ? "active" : "")}>
-          Submissions
-        </NavLink>
-        <NavLink to="/admin/contributor-points" className={({ isActive }) => (isActive ? "active" : "")}>
-          Contributor points
-        </NavLink>
-        <NavLink to="/admin/wiki" className={({ isActive }) => (isActive ? "active" : "")}>
-          Wiki
-        </NavLink>
-        <NavLink to="/admin/blog" className={({ isActive }) => (isActive ? "active" : "")}>
-          Blog
-        </NavLink>
-        <NavLink to="/admin/emoji" className={({ isActive }) => (isActive ? "active" : "")}>
-          Emoji
-        </NavLink>
-        <NavLink to="/admin/email-templates" className={({ isActive }) => (isActive ? "active" : "")}>
-          Email templates
-        </NavLink>
-        <NavLink to="/admin/audit-log" className={({ isActive }) => (isActive ? "active" : "")}>
-          Action log
-        </NavLink>
-        <NavLink to="/admin/visor" className={({ isActive }) => (isActive ? "active" : "")}>
-          Scan visor
-        </NavLink>
-        <NavLink to="/admin/radio" className={({ isActive }) => (isActive ? "active" : "")}>
-          Radio
-        </NavLink>
-        <NavLink to="/admin/trash" className={({ isActive }) => (isActive ? "active" : "")}>
-          Trash
-        </NavLink>
-        <NavLink to="/admin/about" className={({ isActive }) => (isActive ? "active" : "")}>
-          About page
-        </NavLink>
-        <NavLink to="/admin/fonts" className={({ isActive }) => (isActive ? "active" : "")}>
-          Fonts &amp; Misc
-        </NavLink>
-        <NavLink to="/admin/fx-settings" className={({ isActive }) => (isActive ? "active" : "")}>
-          Spacemap field
-        </NavLink>
+        <AdminNavLink to="join-requests" label="Join requests" att={att} />
+        <AdminNavLink to="branches" label="Branches" att={att} />
+        <AdminNavLink to="channels" label="Forum topics" att={att} />
+        <AdminNavLink to="users" label="Users" att={att} />
+        <AdminNavLink to="albums" label="Albums" att={att} />
+        <AdminNavLink to="all-tracks" label="All Tracks" att={att} />
+        <AdminNavLink to="studies" label="Studies" att={att} />
+        <AdminNavLink to="resources" label="Resources" att={att} />
+        <AdminNavLink to="glossary" label="Glossary" att={att} />
+        <AdminNavLink to="milestones" label="Milestones" att={att} />
+        <AdminNavLink to="featured" label="Featured" att={att} />
+        <AdminNavLink to="rewards" label="Rewards" att={att} />
+        <AdminNavLink to="signal" label="Signal" att={att} />
+        <AdminNavLink to="submissions" label="Submissions" att={att} />
+        <AdminNavLink to="contributor-points" label="Contributor points" att={att} />
+        <AdminNavLink to="wiki" label="Wiki" att={att} />
+        <AdminNavLink to="blog" label="Blog" att={att} />
+        <AdminNavLink to="emoji" label="Emoji" att={att} />
+        <AdminNavLink to="email-templates" label="Email templates" att={att} />
+        <AdminNavLink to="audit-log" label="Action log" att={att} />
+        <AdminNavLink to="visor" label="Scan visor" att={att} />
+        <AdminNavLink to="radio" label="Radio" att={att} />
+        <AdminNavLink to="trash" label="Trash" att={att} />
+        <AdminNavLink to="about" label="About page" att={att} />
+        <AdminNavLink to="fonts" label="Fonts & Misc" att={att} />
+        <AdminNavLink to="fx-settings" label="Spacemap field" att={att} />
         <NavLink to="/outreach" className={({ isActive }) => (isActive ? "active" : "")} style={{ display: "inline-flex", alignItems: "center", gap: "0.35rem" }} title="Outreach lives outside the admin panel now: shareable with a password">
           Outreach ↗
         </NavLink>
-        <NavLink to="/admin/newsletter" className={({ isActive }) => (isActive ? "active" : "")}>
-          Newsletter
-        </NavLink>
-        <NavLink to="/admin/discord-import" className={({ isActive }) => (isActive ? "active" : "")}>
-          Discord import
-        </NavLink>
-        <NavLink to="/admin/storage" className={({ isActive }) => (isActive ? "active" : "")}>
-          Storage
-        </NavLink>
-        <NavLink to="/admin/discord-bridge" className={({ isActive }) => (isActive ? "active" : "")}>
-          Discord bridge
-        </NavLink>
-        <NavLink to="/admin/collaborators" className={({ isActive }) => (isActive ? "active" : "")}>
-          Collaborators
-        </NavLink>
-        <NavLink to="/admin/embeds" className={({ isActive }) => (isActive ? "active" : "")}>
-          Favicon & Embeds
-        </NavLink>
-        <NavLink to="/admin/icon-library" className={({ isActive }) => (isActive ? "active" : "")}>
-          Icon Library
-        </NavLink>
-        <NavLink to="/admin/forum-map" className={({ isActive }) => (isActive ? "active" : "")}>
-          Forum Map
-        </NavLink>
-        <NavLink to="/admin/notifications" className={({ isActive }) => (isActive ? "active" : "")}>
-          Notification sounds
-        </NavLink>
-        <NavLink to="/admin/guide-assets" className={({ isActive }) => (isActive ? "active" : "")}>
-          Guide assets
-        </NavLink>
-        <NavLink to="/admin/community-spotlight" className={({ isActive }) => (isActive ? "active" : "")}>
-          Community Spotlight
-        </NavLink>
+        <AdminNavLink to="newsletter" label="Newsletter" att={att} />
+        <AdminNavLink to="discord-import" label="Discord import" att={att} />
+        <AdminNavLink to="storage" label="Storage" att={att} />
+        <AdminNavLink to="discord-bridge" label="Discord bridge" att={att} />
+        <AdminNavLink to="collaborators" label="Collaborators" att={att} />
+        <AdminNavLink to="embeds" label="Favicon & Embeds" att={att} />
+        <AdminNavLink to="icon-library" label="Icon Library" att={att} />
+        <AdminNavLink to="forum-map" label="Forum Map" att={att} />
+        <AdminNavLink to="notifications" label="Notification sounds" att={att} />
+        <AdminNavLink to="guide-assets" label="Guide assets" att={att} />
+        <AdminNavLink to="community-spotlight" label="Community Spotlight" att={att} />
       </nav>
       <div>
         <Outlet />
