@@ -1,6 +1,6 @@
 # Rooms, editor and Thanaton — state of the build (read this first after a chat compaction)
 
-Owner: Tachy (designer; no programming knowledge). Last updated: fix364. Update this file with every delivery, together with `docs/BACKLOG.md` (queue) and `docs/HOMEPAGE_AND_NAV.md` (per-fix notes).
+Owner: Tachy (designer; no programming knowledge). Last updated: fix367. Update this file with every delivery, together with `docs/BACKLOG.md` (queue) and `docs/HOMEPAGE_AND_NAV.md` (per-fix notes).
 
 ## Owner preferences (standing)
 - Direct tone, no flattery, rare/on-point ideas. Maximum convenience for the designer (everything via editor UI, no code). Optimised code that runs on weak devices (allocation-free painters, budgets, adaptive resolution).
@@ -36,13 +36,13 @@ Everything is inside a supermassive black hole, **Thanaton**. Members fell in; a
 - Shared GET cache `lib/sharedGet.ts` (`clearShared` after saves). `lib/heat.ts` `pathOfHref` strips `/branch/<slug>/room`.
 
 ## Delivered (rooms line)
-fix347 rooms · 348 people/terminals · 349 drone/player · 352 scan/visor/Logbook · 355 rooms-first · 356 actors+wires editor · 357 floor textures · 358 walls/mood/pools · 359 library pictures, ceiling, zip · 360 skies · 361 artifacts · 362 ambient flock · 363 editable corridors · 364 subtree themes + copy look.
+fix347 rooms · 348 people/terminals · 349 drone/player · 352 scan/visor/Logbook · 355 rooms-first · 356 actors+wires editor · 357 floor textures · 358 walls/mood/pools · 359 library pictures, ceiling, zip · 360 skies · 361 artifacts · 362 ambient flock · 363 editable corridors · 364 subtree themes + copy look · 365 milestone gates (conditional swap) · 366 layout fixes (chat dock beside rooms/map, no joystick on desktop, phone map/room buttons) · 367 prop catalogue.
 
 ## Queue (priority order, from the owner's additions)
 1. (corridors DONE in fix363: own doc `low~high`, things + mood only) Remaining: corridor floor/walls/ceiling/sky/flock, and elevators (not a space in the room view yet: needs the elevator space first).
 2. (DONE fix364) Subtree themes and copy look. Possible extension: themes for materials/floor.
-3. Conditional swap: rooms/things appear after contributions, chats, donations, etc.
-4. Prop catalogue + black-hole debris/frames/ruins props (alien-tribe repairs, things falling through the horizon).
+3. (things DONE fix365) Conditional swap by community milestone. Not built: gating whole rooms/doors, per-member conditions (your own contributions), donations (no milestone metric for them yet).
+4. (first catalogue DONE fix367: 12 props) More props, e.g. tribe repairs, signage, cables, props that react to wires.
 5. Hazards: damage, push, slow zones (never-hard-fail health model).
 6. Logbook entries rewritten from branch descriptions when a room is explored.
 7. Paths and camera shots, prefabs, more wire messages (play sound, set colour, teleport, show text).
@@ -53,6 +53,10 @@ fix347 rooms · 348 people/terminals · 349 drone/player · 352 scan/visor/Logbo
 Older list: see `docs/BACKLOG.md` (Monthly challenge, Twelve Artifacts, Hull, Emoji gate, ABX, instrument maker, processor module, offline app, forum↔Discord bridge, contributor points).
 
 - **Themes** (fix364, `lib/roomTheme.ts`): doc key `theme~<slug>` in the same `room_docs` table holds only grade/sky/flock. A room's effective look = own non-null field, else nearest theme in `lineageOf(chart, slug)` (self, parent, grandparent…) when `doc.inherit` (default true). `actorLayer.look` carries the result; editor Mood tab has inherit checkbox, save/remove theme, copy/paste look (localStorage `exomusica_look`). Editor sliders show the room's own values, not inherited ones. A branch literally named "theme" is fine (key prefix is `theme~`).
+
+- **Gates** (fix365): every actor has `gate` (milestone key from `/api/milestones`, "" = always) and `gateOff` (reverse: there only until reached). `WireRuntime(doc, reached)` shuts gated-out actors (`rt.shut`: off, never enabled, ignore messages, emit nothing). Unknown milestones = not reached. BranchRoom waits for `loadMilestones()` before applying a room doc; milestone state is fixed for the life of the component (reload to refresh). The editor always shows everything (painter draws all in edit mode); test play respects gates. Swap = one thing "there once X", another "there until X". Milestones are community-wide, so everyone sees the same room.
+
+- **Props** (fix367): Actor field `prop` (solid/ghost only). Catalogue = `lib/roomProps.ts` (`PROP_DEFS`: parts = [x, z, w, d, y0, h, sides, turn] as fractions of the actor's w/d/h; ≤8 parts) + `PROP_BLOCKS` in roomDoc.ts (id → blocks you; frames, arches, ribs, scaffold, drifter are walk-through, collision skips them). Painter `propDraw` sorts parts far→near and reuses `prism(..., style, y0)`; `drifter` bobs ±0.12 m at ~0.2 Hz (off with reduced motion). Editor: "+ prop…" menu and a Prop select in the inspector (choosing a prop loads its default size; props have no shape picker). Adding a prop id means editing both roomProps.ts and PROP_BLOCKS.
 
 ## Design docs (Claude Docs artifacts)
 - Room editor — design: https://claude.ai/code/artifact/b6e0382b-19d7-404e-8d6e-c6a7dc668097 (owner-edited; has Wiring section)

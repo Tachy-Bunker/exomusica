@@ -1,0 +1,20 @@
+// The prop catalogue: low-poly black-hole debris and ruins, each a handful of prisms. A prop is a solid or ghost with a `prop` id; its width, depth, height, turn and colour scale and tint all parts.
+// Part = [x, z, w, d, y0, h, sides, turn]: x/z are the centre as a fraction of the actor's w/d (-0.5..0.5), w/d fractions of w/d, y0/h fractions of the actor's height, sides 0 = box, turn in radians.
+export type Part = readonly [number, number, number, number, number, number, number, number];
+export interface PropDef { id: string; name: string; blurb: string; w: number; d: number; h: number; sides: number; block: boolean; bob: boolean; parts: readonly Part[] }
+const P = (id: string, name: string, blurb: string, w: number, d: number, h: number, sides: number, block: boolean, parts: Part[], bob = false): PropDef => ({ id, name, blurb, w, d, h, sides, block, bob, parts });
+export const PROP_DEFS: readonly PropDef[] = [
+  P("spire", "Spire", "A shard that tapers to a point. Blocks you.", 2, 2, 4, 0, true, [[0, 0, 1, 1, 0, 0.45, 6, 0], [0, 0, 0.7, 0.7, 0.45, 0.3, 6, 0.3], [0, 0, 0.4, 0.4, 0.75, 0.25, 6, 0.6]]),
+  P("monolith", "Monolith", "A tall slab, slightly stepped. Blocks you.", 1.6, 0.6, 3.5, 0, true, [[0, 0, 1, 1, 0, 0.85, 0, 0], [0, 0, 0.82, 0.8, 0.85, 0.15, 0, 0]]),
+  P("pylon", "Broken pylon", "A column with a ragged cap. Blocks you.", 1.2, 1.2, 3, 6, true, [[0, 0, 1.3, 1.3, 0, 0.12, 6, 0], [0, 0, 0.8, 0.8, 0.12, 0.62, 6, 0], [0.08, 0, 0.55, 0.55, 0.74, 0.14, 6, 0.4]]),
+  P("totem", "Totem", "Stacked discs, widest in the middle, left by a tribe. Blocks you.", 1.2, 1.2, 3.2, 8, true, [[0, 0, 1, 1, 0, 0.25, 8, 0], [0, 0, 0.7, 0.7, 0.25, 0.25, 8, 0.2], [0, 0, 1, 1, 0.5, 0.2, 8, 0.4], [0, 0, 0.6, 0.6, 0.7, 0.18, 8, 0.1], [0, 0, 0.35, 0.35, 0.88, 0.12, 8, 0.3]]),
+  P("rubble", "Rubble", "A heap of broken pieces. Blocks you.", 2.4, 2.4, 0.9, 0, true, [[-0.2, -0.1, 0.5, 0.45, 0, 0.7, 5, 0.2], [0.25, 0.2, 0.4, 0.4, 0, 1, 6, 0.9], [0.15, -0.3, 0.35, 0.3, 0, 0.5, 0, 0.5], [-0.3, 0.3, 0.3, 0.3, 0, 0.4, 5, 0.1], [0.05, 0.05, 0.3, 0.3, 0.55, 0.45, 0, 0.7]]),
+  P("crates", "Crate stack", "Salvage crates, stacked a little crooked. Blocks you.", 1.8, 1.8, 1.8, 0, true, [[-0.2, -0.2, 0.55, 0.55, 0, 0.33, 0, 0.1], [0.25, -0.15, 0.5, 0.5, 0, 0.33, 0, -0.2], [0, 0.25, 0.55, 0.55, 0, 0.33, 0, 0.05], [-0.15, -0.15, 0.5, 0.5, 0.33, 0.33, 0, 0.5], [-0.1, 0.1, 0.4, 0.4, 0.66, 0.3, 0, -0.1]]),
+  P("hullplate", "Hull plate", "A slab of ship hull propped on struts. Blocks you.", 3, 0.5, 2.2, 0, true, [[0, 0, 1, 1, 0.1, 0.9, 0, 0], [-0.4, 0.9, 0.08, 1.4, 0, 0.55, 0, 0], [0.4, 0.9, 0.08, 1.4, 0, 0.55, 0, 0]]),
+  P("frame", "Empty frame", "A doorway standing on its own. You walk through the gap.", 3, 0.5, 3, 0, false, [[-0.44, 0, 0.12, 1, 0, 1, 0, 0], [0.44, 0, 0.12, 1, 0, 1, 0, 0], [0, 0, 1, 1, 0.88, 0.12, 0, 0]]),
+  P("arch", "Ruined arch", "An arch with one pillar broken short. You walk through.", 4, 0.8, 3.4, 0, false, [[-0.42, 0, 0.16, 1, 0, 1, 0, 0], [0.42, 0, 0.16, 1, 0, 0.55, 0, 0], [-0.18, 0, 0.5, 1, 0.86, 0.14, 0, 0], [0.5, 0.1, 0.12, 0.5, 0, 0.18, 0, 0.5]]),
+  P("ribs", "Ribcage", "Great ribs of something that fell in. You walk between them.", 5, 2.4, 3, 0, false, [[-0.4, 0, 0.05, 1, 0, 0.5, 0, 0], [-0.2, 0, 0.05, 1, 0, 0.8, 0, 0], [0, 0, 0.05, 1, 0, 1, 0, 0], [0.2, 0, 0.05, 1, 0, 0.8, 0, 0], [0.4, 0, 0.05, 1, 0, 0.5, 0, 0], [0, -0.45, 0.9, 0.06, 0, 0.12, 0, 0]]),
+  P("scaffold", "Scaffold", "A repair rig the tribes left half-built. You walk under it.", 3, 3, 3, 0, false, [[-0.45, -0.45, 0.07, 0.07, 0, 1, 0, 0], [0.45, -0.45, 0.07, 0.07, 0, 1, 0, 0], [-0.45, 0.45, 0.07, 0.07, 0, 1, 0, 0], [0.45, 0.45, 0.07, 0.07, 0, 0.6, 0, 0], [0, 0, 1, 1, 0.9, 0.06, 0, 0], [0, 0, 1, 0.1, 0.5, 0.05, 0, 0.78]]),
+  P("drifter", "Drifting rock", "Debris falling slowly towards the horizon. Floats, bobs, you walk under it.", 2.4, 2.4, 1.8, 0, false, [[0, 0, 0.7, 0.7, 0.45, 0.4, 6, 0.2], [0.3, 0.1, 0.35, 0.35, 0.75, 0.25, 5, 0.7], [-0.28, -0.2, 0.3, 0.3, 0.2, 0.2, 5, 0.4]], true),
+];
+export const PROP_BY_ID: ReadonlyMap<string, PropDef> = new Map(PROP_DEFS.map((p) => [p.id, p]));

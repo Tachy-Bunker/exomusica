@@ -18,8 +18,12 @@ interface Geo { room: HullRoom; mesh: ReturnType<typeof roomMesh>; wv: Float32Ar
 interface PipeGeo { from: number; to: number; seg: Float32Array; dashed: boolean; shaft: { x: number; z: number; y: number } | null; a: [number, number, number]; b: [number, number, number] }
 
 export function BranchExplorer({ hull, states, lastSlug, playingSlug, pulses, onExit }: Props) {
-  const wrap = useRef<HTMLDivElement>(null), canvas = useRef<HTMLCanvasElement>(null);
+  const barRef = useRef<HTMLDivElement>(null), wrap = useRef<HTMLDivElement>(null), canvas = useRef<HTMLCanvasElement>(null);
   const cam = useRef<Cam>(defaultCam(hull.radius));
+  useEffect(() => { // the card sits just above the button bar, however many rows it wraps to
+    const el = barRef.current, host = el?.parentElement; if (!el || !host || typeof ResizeObserver === "undefined") return;
+    const ro = new ResizeObserver(() => host.style.setProperty("--hx-bar", `${Math.ceil(el.getBoundingClientRect().height)}px`)); ro.observe(el); return () => ro.disconnect();
+  }, []);
   const size = useRef({ w: 800, h: 600, dpr: 1 });
   const raf = useRef(0), idle = useRef<number | null>(null), interactingUntil = useRef(0);
   const anim = useRef<{ from: Cam; to: Cam; t0: number; ms: number } | null>(null);
@@ -304,7 +308,7 @@ export function BranchExplorer({ hull, states, lastSlug, playingSlug, pulses, on
           ) : <span className="hx-dim">{selState === "sealed" ? "Somewhere there is a way in." : "Walk toward it: go to a room next to it first."}</span>}
         </aside>
       )}
-      <div className="hx-bar" role="toolbar" aria-label="Map controls">
+      <div className="hx-bar" ref={barRef} role="toolbar" aria-label="Map controls">
         <button type="button" className="btn" onClick={onExit} data-testid="ex-exit"><kbd>Esc</kbd> Exit</button>
         <button type="button" className="btn" aria-pressed={legend} onClick={() => setLegend((v) => !v)} data-testid="ex-legend-btn"><kbd>{kn("KeyL")}</kbd> Key / legend</button>
         <span className="hx-dim hx-hints" data-testid="ex-hints"><kbd>drag</kbd> Rotate · <kbd>wheel</kbd> Zoom · <kbd>{kn("KeyW")} {kn("KeyA")} {kn("KeyS")} {kn("KeyD")}</kbd> Move</span>

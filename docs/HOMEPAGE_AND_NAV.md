@@ -1003,3 +1003,20 @@ No schema change, no server code. Doors between branch rooms no longer play the 
 - Mood tab (admin editor): "Use the theme of the branches above" (on by default), "Make this look the theme of this branch and below", "Remove this branch's theme", "Copy look"/"Paste look" (mood, sky, specks; not materials or floor).
 - Stored as doc `theme~<slug>` (existing `room_docs` table, no schema change; backend slug regex extended). Rooms fetch the themes of their ancestors (up to 8) on entry. Own settings win per field; nearest ancestor wins otherwise.
 - Tests: `_scratch/roomtheme.test.ts`, `_scratch/e2e_fix364.py`.
+
+## fix365 — conditional swap (milestone gates)
+- Things tab, any thing: "Appears when the community reaches …" (list of milestones from the Milestones page) and "Reverse: it is there only until that is reached". Solid things stop blocking while shut, triggers stop firing, artifacts can't be scanned, wires can't show them.
+- Editor view always shows gated things; Test play behaves like a visitor.
+- Tests: roomdoc.test.ts (gates), `e2e_fix365.py`. No schema change.
+
+## fix366 — layout fixes
+- Rooms and the Scan map (`.hx-page`) now stop at the chat dock (`right: var(--dock-offset)`), so the player bar no longer looks like a half-width strip next to a hidden dock.
+- Desktop (hover + fine pointer): no joystick and no Use button (Space / E keys). Phones keep them.
+- Scan map on phones: key hints hidden, buttons compact; the room card sits above the button bar however many rows it wraps to (`--hx-bar`, set by a ResizeObserver).
+- Room top buttons wrap and stop short of the dial on phones.
+- Test: `e2e_fix366.py` (347 now clicks Use via dispatch_event).
+
+## fix367 — prop catalogue
+- Things tab: "+ prop…" adds Spire, Monolith, Broken pylon, Totem, Rubble, Crate stack, Hull plate (these block you) and Empty frame, Ruined arch, Ribcage, Scaffold, Drifting rock (walk-through; the rock floats and bobs slowly). Colour, size and turn work as for any thing; wires, gates and hiding work too.
+- Each prop is 3–6 prisms drawn far to near, so cost is a few polygons. No schema change.
+- Tests: roomdoc.test.ts (props), `e2e_fix367.py`.

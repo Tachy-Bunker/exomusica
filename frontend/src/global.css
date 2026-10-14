@@ -6512,7 +6512,7 @@ body:has(.term-backdrop, .fp-panel, .pocket-pad, .probe-hud, .visor-hud) { touch
 .commons-box{display:flex;flex-wrap:wrap;align-items:center;gap:.4rem .6rem;margin:.4rem 0 .8rem;padding:.5rem .7rem;border:1px dashed var(--border);border-radius:8px}
 
 /* Branch explorer (/explore): a ship's scan map. */
-.hx-page{position:fixed;inset:0 0 var(--player-height,0px) 0;z-index:70;background:radial-gradient(ellipse at 50% 45%,#0f1c26 0%,#070b10 70%,#04070a 100%);color:#cfefff}
+.hx-page{position:fixed;inset:0 var(--dock-offset,0px) var(--player-height,0px) 0;z-index:70;background:radial-gradient(ellipse at 50% 45%,#0f1c26 0%,#070b10 70%,#04070a 100%);color:#cfefff}
 .hx{position:absolute;inset:0;overflow:hidden}
 .hx-stage{position:absolute;inset:0;cursor:grab;touch-action:none;outline:none;user-select:none}
 .hx-stage:focus-visible{box-shadow:inset 0 0 0 2px #5fd3ee}
@@ -6527,12 +6527,13 @@ body:has(.term-backdrop, .fp-panel, .pocket-pad, .probe-hud, .visor-hud) { touch
 .hx-dot{width:8px;height:8px;border-radius:50%;background:#4cff7a;display:inline-block;margin:0 3px;flex:none}
 .hx-diamond{width:10px;height:14px;background:#4cff7a;clip-path:polygon(50% 0,100% 50%,50% 100%,0 50%);display:inline-block;flex:none}
 .hx-ring{width:14px;height:14px;border:2px solid #4da3ff;border-radius:50%;display:inline-block;flex:none}
-.hx-card{position:absolute;right:1rem;bottom:4.6rem;display:flex;flex-direction:column;gap:.35rem;padding:.7rem .9rem;background:rgba(5,10,16,.88);border:1px solid #1d3b4a;border-radius:8px;min-width:12rem;max-width:min(20rem,80vw)}
+.hx-card{position:absolute;right:1rem;bottom:calc(var(--hx-bar,3.6rem) + .6rem);display:flex;flex-direction:column;gap:.35rem;padding:.7rem .9rem;background:rgba(5,10,16,.88);border:1px solid #1d3b4a;border-radius:8px;min-width:12rem;max-width:min(20rem,80vw)}
 .hx-actions{display:flex;gap:.4rem;flex-wrap:wrap}
 .hx-bar{position:absolute;left:0;right:0;bottom:0;display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:.4rem .6rem;padding:.6rem .8rem;background:linear-gradient(transparent,rgba(4,7,10,.9) 40%)}
 .hx-bar kbd,.hx-hints kbd{font:inherit;font-size:.75rem;border:1px solid #2a5366;border-radius:4px;padding:0 .3rem;margin-right:.2rem;color:#9fdcf0}
 .hx-sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
-@media (max-width:640px){.hx-hints{display:none}.hx-card{bottom:6.2rem}}
+@media (max-width:640px){.hx-hints{display:none}.hx-card{right:.5rem;max-width:calc(100vw - 1rem)}.hx-bar{gap:.3rem .4rem;padding:.4rem .5rem}.hx-bar .btn{padding:.3rem .55rem;font-size:.82rem}}
+@media (pointer:coarse){.hx-bar kbd{display:none}}
 
 /* fix347: the walkable branch room */
 .rm{position:absolute;inset:0;overflow:hidden;color:#cfefff;--rm:#5fd3ee}
@@ -6543,7 +6544,8 @@ body:has(.term-backdrop, .fp-panel, .pocket-pad, .probe-hud, .visor-hud) { touch
 .rm-prompt{position:absolute;left:50%;bottom:34%;transform:translateX(-50%);max-width:88%;text-align:center;pointer-events:none;opacity:0;transition:opacity .12s;padding:.35rem .7rem;background:rgba(4,8,12,.78);border:1px solid var(--rm);border-radius:6px;font-size:.9rem}
 .rm-prompt:empty{display:none}
 .rm-toast{position:absolute;left:50%;top:22%;transform:translateX(-50%);pointer-events:none;opacity:0;transition:opacity .25s;padding:.4rem .8rem;background:rgba(20,10,6,.9);border:1px solid #ffb347;color:#ffd9a0;border-radius:6px;font-size:.9rem}
-.rm-bar{position:absolute;left:1rem;top:2.6rem;display:flex;gap:.5rem}
+.rm-bar{position:absolute;left:1rem;right:1rem;top:2.6rem;display:flex;flex-wrap:wrap;gap:.4rem .5rem}
+@media (max-width:640px){.rm-bar{left:.5rem;right:5.8rem;gap:.3rem .4rem}.rm-btn{padding:.3rem .6rem;font-size:.8rem;min-height:34px}}
 .rm-btn{padding:.35rem .8rem;background:rgba(4,8,12,.8);border:1px solid var(--rm);color:#cfefff;border-radius:6px;text-decoration:none;font-size:.85rem;min-height:36px;display:inline-flex;align-items:center}
 .rm-pad{position:absolute;left:max(1rem,env(safe-area-inset-left));bottom:max(1rem,env(safe-area-inset-bottom));width:clamp(110px,30vmin,160px);height:clamp(110px,30vmin,160px)}
 .rm-stick{position:relative;width:100%;height:100%;border-radius:50%;border:1.5px solid var(--rm);background:rgba(4,8,12,.45)}
@@ -6552,7 +6554,7 @@ body:has(.term-backdrop, .fp-panel, .pocket-pad, .probe-hud, .visor-hud) { touch
 .rm-use:active{background:var(--rm);color:#000}
 .rm-hint{position:absolute;left:50%;bottom:.5rem;transform:translateX(-50%);margin:0;font-size:.75rem;opacity:.6;pointer-events:none;white-space:nowrap}
 @media (pointer:coarse){.rm-hint{display:none}}
-@media (pointer:fine){.rm-pad{opacity:.55}}
+@media (hover:hover) and (pointer:fine){.rm-pad,.rm-use{display:none}}
 
 /* fix348: terminal screens and people in the room */
 .rm-here{opacity:.8;font-size:.85rem}

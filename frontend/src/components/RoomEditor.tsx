@@ -4,6 +4,8 @@ import { cellAt, decode, encode, floodFill, paintDisc, rectsOf } from "../lib/ro
 import { onTexReady, texSheet } from "../lib/roomTextures";
 import { isUpload, MAX_FLOCK, MAX_SKY_SPEED } from "../lib/roomDoc";
 import { api } from "../lib/api";
+import { loadMilestones, type Milestone } from "../lib/milestones";
+import { PROP_BY_ID, PROP_DEFS } from "../lib/roomProps";
 import { drawSeams, pngOf, squareTexture } from "../lib/textureMake";
 import { composeCube, panoOf, roleOf, skyUrl, type Role } from "../lib/skyMake";
 import { isImageName, listZip } from "../lib/zipRead";
@@ -38,6 +40,8 @@ export function RoomEditor({ themeNote = "", hasTheme = false, themeMsg = "", on
   const fromPx = (px: number, py: number): [number, number] => [(px - PLAN / 2) / scale + cx, (py - PLAN / 2) / scale + cz];
   const a = doc.actors.find((x) => x.id === sel) ?? null;
   const commit = (actors: Actor[], wires: Wire[] = doc.wires) => onDoc(cleanDoc({ ...doc, actors, wires }));
+  const [miles, setMiles] = useState<Milestone[]>([]);
+  useEffect(() => { let dead = false; loadMilestones().then((l) => { if (!dead) setMiles(l); }).catch(() => undefined); return () => { dead = true; }; }, []);
   const patch = (id: string, p: Partial<Actor>) => onDoc(cleanDoc({ ...doc, actors: doc.actors.map((x) => (x.id === id ? { ...x, ...p } : x)) }), "p:" + id + Object.keys(p).join());
 
   // ---- floor painting
@@ -174,8 +178,15 @@ export function RoomEditor({ themeNote = "", hasTheme = false, themeMsg = "", on
   const add = (kind: Kind) => {
     if (doc.actors.length >= MAX_ACTORS) return;
     const e = where(), id = newId(doc.actors.map((x) => x.id)), n = doc.actors.filter((x) => x.kind === kind).length + 1;
-    const o: Actor = { id, kind, name: `${kind} ${n}`, x: snap(e.x + Math.cos(e.yaw) * 3), z: snap(e.z + Math.sin(e.yaw) * 3), w: 2, d: 2, h: 1.5, rot: 0, sides: 0, color: PALETTE[doc.actors.length % PALETTE.length], on: true, pulse: 0, text: "", lore: "", img: 0, mode: 0, visor: false, ...DEFAULTS[kind] };
+    const o: Actor = { id, kind, name: `${kind} ${n}`, x: snap(e.x + Math.cos(e.yaw) * 3), z: snap(e.z + Math.sin(e.yaw) * 3), w: 2, d: 2, h: 1.5, rot: 0, sides: 0, color: PALETTE[doc.actors.length % PALETTE.length], on: true, pulse: 0, text: "", lore: "", img: 0, mode: 0, visor: false, prop: "", gate: "", gateOff: false, ...DEFAULTS[kind] };
     if (kind === "artifact") o.rot = e.yaw + Math.PI; // faces you
+    commit([...doc.actors, o]); setSel(id);
+  };
+  /** Add a catalogue prop (a solid, or a ghost for walk-through ones is not needed: frames and the like never block). */
+  const addProp = (pid: string) => {
+    const def = PROP_BY_ID.get(pid); if (!def || doc.actors.length >= MAX_ACTORS) return;
+    const e = where(), id = newId(doc.actors.map((x) => x.id)), n = doc.actors.filter((x) => x.prop === pid).length + 1;
+    const o: Actor = { id, kind: "solid", name: `${def.name} ${n}`, x: snap(e.x + Math.cos(e.yaw) * 3.5), z: snap(e.z + Math.sin(e.yaw) * 3.5), w: def.w, d: def.d, h: def.h, rot: e.yaw + Math.PI / 2, sides: def.sides, color: PALETTE[doc.actors.length % PALETTE.length], on: true, pulse: 0, text: "", lore: "", img: 0, mode: 0, visor: false, prop: pid, gate: "", gateOff: false };
     commit([...doc.actors, o]); setSel(id);
   };
   const dup = () => { if (!a || doc.actors.length >= MAX_ACTORS) return; const id = newId(doc.actors.map((x) => x.id)); commit([...doc.actors, { ...a, id, name: a.name + " copy", x: a.x + 1, z: a.z + 1 }]); setSel(id); };
@@ -318,6 +329,7 @@ export function RoomEditor({ themeNote = "", hasTheme = false, themeMsg = "", on
       {tab === "things" && <p className="re-note">White dot: you. Drag things to move. New things appear 3 m in front of you.</p>}
       <div className="re-add" hidden={tab !== "things"} role="group" aria-label="Add">
         {KINDS.map((k) => <button key={k} type="button" className="re-b" data-testid={`re-add-${k}`} title={KIND_HELP[k]} onClick={() => add(k)}>+ {k}</button>)}
+        <select className="re-b" data-testid="re-add-prop" value="" aria-label="Add a prop" title="Black-hole debris and ruins" onChange={(e) => { if (e.target.value) addProp(e.target.value); }}><option value="">+ prop…</option>{PROP_DEFS.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</select>
       </div>
       <ul className="re-list" aria-label="Things in this room" hidden={tab !== "things"}>
         {doc.actors.map((o) => <li key={o.id}><button type="button" data-testid={`re-item-${o.id}`} aria-pressed={o.id === sel} onClick={() => setSel(o.id)}><i style={{ background: o.color }} />{o.name}<small>{o.kind}</small></button></li>)}
@@ -335,7 +347,11 @@ export function RoomEditor({ themeNote = "", hasTheme = false, themeMsg = "", on
             <label>Height<input data-testid="re-h" type="number" step={SNAP} min={0} value={a.h} onChange={(e) => patch(a.id, { h: num(e.target.value, a.h) })} /></label>
             <label>Turn°<input type="number" step={5} value={Math.round((a.rot * 180) / Math.PI)} onChange={(e) => patch(a.id, { rot: (num(e.target.value, 0) * Math.PI) / 180 })} /></label>
           </div>
-          {(a.kind === "solid" || a.kind === "ghost" || a.kind === "trigger") && (
+          {(a.kind === "solid" || a.kind === "ghost") && (
+            <label>Prop<select data-testid="re-prop" value={a.prop} onChange={(e) => { const d = PROP_BY_ID.get(e.target.value); patch(a.id, d ? { prop: d.id, w: d.w, d: d.d, h: d.h, sides: d.sides } : { prop: "" }); }}><option value="">plain box / prism</option>{PROP_DEFS.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</select></label>
+          )}
+          {a.prop && <p className="re-note" data-testid="re-propnote">{PROP_BY_ID.get(a.prop)?.blurb} Width, depth, height, turn and colour reshape it.</p>}
+          {(a.kind === "trigger" || ((a.kind === "solid" || a.kind === "ghost") && !a.prop)) && (
             <label>Shape<select data-testid="re-sides" value={a.sides} onChange={(e) => patch(a.id, { sides: Number(e.target.value) })}><option value={0}>Box</option>{[3, 4, 5, 6, 7, 8].map((n) => <option key={n} value={n}>{n} sides</option>)}</select></label>
           )}
           {(a.kind === "light" || a.kind === "pool") && <label>Slow swell (Hz, 0 = steady)<input data-testid="re-pulse" type="number" min={0} max={2} step={0.25} value={a.pulse} onChange={(e) => patch(a.id, { pulse: num(e.target.value, 0) })} /></label>}
@@ -349,6 +365,11 @@ export function RoomEditor({ themeNote = "", hasTheme = false, themeMsg = "", on
               <p className="re-note">{a.lore.length}/{MAX_LORE}. Width and Height size the panel; wall panels hang 0.6 m up.</p>
             </div>
           )}
+          <div className="re-insp" data-testid="re-gate">
+            <label>Appears when the community reaches<select data-testid="re-gatesel" value={a.gate} onChange={(e) => patch(a.id, { gate: e.target.value, gateOff: e.target.value ? a.gateOff : false })}><option value="">always there</option>{miles.map((m) => <option key={m.key} value={m.key}>{m.title} ({m.target} {m.label.toLowerCase()})</option>)}{a.gate && !miles.some((m) => m.key === a.gate) && <option value={a.gate}>{a.gate}</option>}</select></label>
+            {a.gate && <label className="re-chk"><input type="checkbox" data-testid="re-gateoff" checked={a.gateOff} onChange={(e) => patch(a.id, { gateOff: e.target.checked })} />Reverse: it is there only until that is reached</label>}
+            {a.gate && <p className="re-note">Here in the editor you always see it. Visitors see it {a.gateOff ? "until" : "once"} “{miles.find((m) => m.key === a.gate)?.title ?? a.gate}” {a.gateOff ? "is reached" : "is reached"}. Pair a “there until” thing with a “there once” thing to swap one for the other.</p>}
+          </div>
           <label>Colour<input type="color" value={a.color} onChange={(e) => patch(a.id, { color: e.target.value })} /></label>
           <label className="re-chk"><input type="checkbox" data-testid="re-on" checked={a.on} onChange={(e) => patch(a.id, { on: e.target.checked })} />{a.kind === "trigger" ? "Starts enabled" : "Starts visible"}</label>
           <div className="re-row"><button type="button" className="re-b" onClick={dup}>Duplicate</button><button type="button" className="re-b re-del" data-testid="re-delete" onClick={del}>Delete</button></div>

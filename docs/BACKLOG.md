@@ -135,3 +135,5 @@ Ambient flock (dust/fireflies, <=12, wall-clipping, view-culled, weak-device off
 Corridors editable (things, wires, mood). Open: corridor floor/walls/ceiling/sky/flock; elevators as a real space; layout-shift stability of corridor things.
 
 - fix364 done: subtree themes + copy look. Next: conditional swap, prop catalogue.
+- fix365 done: milestone gates on things. Next: prop catalogue + black-hole debris; hazards.
+- fix367 done: 12-prop catalogue. Next: hazards (damage/push/slow zones), more props.\n

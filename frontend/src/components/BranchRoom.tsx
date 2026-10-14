@@ -6,6 +6,7 @@ import { useAudioStore } from "../lib/audioStore";
 import { applyList, glide, isVisible, joinRoom, setVisible, type Shown } from "../lib/roomNet";
 import { clamp, doorWalkedInto, facing, MAX_PITCH, stepEye, wrapYaw, type Eye, type Target } from "../lib/roomView";
 import { actorLayer, corrLayer, painterFor, paintRoom, ScenePaint, type DroneView, type FxView } from "../lib/roomPaint";
+import { loadMilestones } from "../lib/milestones";
 import { cleanDoc, emptyDoc, pushOut, WireRuntime, type RoomDoc } from "../lib/roomDoc";
 import { buildFloor } from "../lib/roomFloor";
 import { getJson, clearShared } from "../lib/sharedGet";
@@ -113,9 +114,11 @@ export function BranchRoom({ tick, world, color, next, wantNext, onAdvance, go, 
     corrScan.current = d ? scannables({ slug: C.key, props: [], doors: [], plaque: null } as unknown as RoomWorld, d.actors.filter((a) => a.kind === "artifact").map((a) => ({ ...a, id: "corr:" + a.id, x: a.x + C.ox, z: a.z + C.oz }))).map((x) => ({ ...x, key: x.key.replace("/artifact/corr:", "/artifact/") })) : []; // the address has the real id, the lock a "corr:" one
     syncArt();
   }, [syncArt]);
+  /** Milestone keys the community has reached (null until known): things with a gate appear or vanish by it. */
+  const reachedRef = useRef<ReadonlySet<string> | null>(null);
   /** Make `d` the live content of the corridor you are in or looking into (its things, its mood). */
   const useCorr = useCallback((d: RoomDoc | null, key: string, run: boolean) => {
-    const C = corrLayer; C.key = key; C.doc = d; C.rt = d ? new WireRuntime(d) : null; C.edit = !!corrEdit.current && !playRef.current; C.sel = corrEdit.current ? C.sel : null; corrAnim.current = !!d?.actors.some((x) => x.pulse > 0);
+    const C = corrLayer; C.key = key; C.doc = d; C.rt = d ? new WireRuntime(d, reachedRef.current) : null; C.edit = !!corrEdit.current && !playRef.current; C.sel = corrEdit.current ? C.sel : null; corrAnim.current = !!d?.actors.some((x) => x.pulse > 0 || x.prop === "drifter");
     if (d && C.rt && run) { const t0 = performance.now() / 1000; C.rt.start(t0); const done = scannedIds(); for (const a of d.actors) if (a.kind === "artifact" && done.has(scanId("lore", `room:${key}/artifact/${a.id}`))) C.rt.emit(a.id, "scanned", t0); }
     reshift(); dirty.current = true; wakeRef.current();
   }, [syncArt, reshift]);
@@ -135,8 +138,8 @@ export function BranchRoom({ tick, world, color, next, wantNext, onAdvance, go, 
     const th = themeRef.current, r = effectiveLook(d, th.docs, th.slugs); actorLayer.look = r.look; actorLayer.skyAnim = !!r.look.sky?.speed; actorLayer.flockAnim = !!r.look.flock; setLookFrom(r.from); dirty.current = true; wakeRef.current();
   }, []);
   const useDoc = useCallback((d: RoomDoc, slug: string, run: boolean) => { // make `d` the live content of the room
-    const rt = new WireRuntime(d); rtRef.current = rt; docSlug.current = slug;
-    actorLayer.slug = slug; actorLayer.doc = d; actorLayer.rt = rt; actorLayer.floor = buildFloor(d.floor, d.tex); actorLayer.anim = !!actorLayer.floor?.scrolls || d.tex.some((t) => t.scroll !== 0) || d.actors.some((x) => x.pulse > 0); actorLayer.edit = editRef.current && !playRef.current;
+    const rt = new WireRuntime(d, reachedRef.current); rtRef.current = rt; docSlug.current = slug;
+    actorLayer.slug = slug; actorLayer.doc = d; actorLayer.rt = rt; actorLayer.floor = buildFloor(d.floor, d.tex); actorLayer.anim = !!actorLayer.floor?.scrolls || d.tex.some((t) => t.scroll !== 0) || d.actors.some((x) => x.pulse > 0 || x.prop === "drifter"); actorLayer.edit = editRef.current && !playRef.current;
     if (run) { const t0 = performance.now() / 1000; rt.start(t0); const done = scannedIds(); for (const a of d.actors) if (a.kind === "artifact" && done.has(scanId("lore", `room:${slug}/artifact/${a.id}`))) rt.emit(a.id, "scanned", t0); } // what you already scanned here stays scanned
     applyLook(d); fxWorld.current = null; syncArt(); // the scanner rebuilds its list with this room's artifacts
     dirty.current = true; wakeRef.current();
@@ -150,7 +153,8 @@ export function BranchRoom({ tick, world, color, next, wantNext, onAdvance, go, 
     Promise.all(slugs.map((sl) => getJson<{ version: number; doc: unknown }>(`/api/room-doc/${themeKey(sl)}`).then((r) => (r.version > 0 ? cleanDoc(r.doc) : null)).catch(() => null))).then((docs) => {
       if (dead) return; themeRef.current = { slugs, docs }; setOwnTheme(!!docs[0]); applyLook(docRef.current);
     });
-    getJson<{ version: number; doc: unknown }>(`/api/room-doc/${world.slug}`).then((r) => {
+    const gates = reachedRef.current ? Promise.resolve() : loadMilestones().then((l) => { reachedRef.current = new Set(l.filter((m) => m.reached).map((m) => m.key)); }).catch(() => { reachedRef.current = new Set(); });
+    Promise.all([getJson<{ version: number; doc: unknown }>(`/api/room-doc/${world.slug}`), gates]).then(([r]) => {
       if (dead) return; const d = cleanDoc({ ...(r.doc as object), version: r.version }); setDoc(d); setSaved(d); useDoc(d, world.slug, true);
     }).catch(() => { if (!dead) { const d = emptyDoc(); setDoc(d); setSaved(d); useDoc(d, world.slug, false); } });
     return () => { dead = true; if (actorLayer.slug === world.slug) { actorLayer.doc = null; actorLayer.rt = null; actorLayer.floor = null; actorLayer.slug = ""; artifactLocks.list = []; fxWorld.current = null; } rtRef.current = null; window.clearTimeout(docT.current); actorLayer.look = { grade: null, sky: null, flock: null }; };

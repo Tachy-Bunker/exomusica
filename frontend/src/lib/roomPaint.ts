@@ -12,6 +12,7 @@ import { frac, type FloorLayer } from "./roomFloor";
 import type { Look } from "./roomTheme";
 import { sheetTile, skyImage, texAvg, texSheet } from "./roomTextures";
 import { inRoom } from "./roomScene";
+import { PROP_BY_ID } from "./roomProps";
 
 /** What the owner built in the room you are in. Set by the room component; the painter draws it when `slug` matches. `edit` shows what visitors never see (triggers, markers, hidden things) and highlights `sel`. */
 export const actorLayer: { slug: string; doc: RoomDoc | null; rt: WireRuntime | null; edit: boolean; sel: string | null; floor: FloorLayer | null; budget: number; now: number; anim: boolean; skyAnim: boolean; skySeen: boolean; visor: boolean; flockAnim: boolean; flockSeen: boolean; look: Look } = { slug: "", doc: null, rt: null, edit: false, sel: null, floor: null, budget: 260, now: 0, anim: false, skyAnim: false, skySeen: false, visor: false, flockAnim: false, flockSeen: false, look: { grade: null, sky: null, flock: null } };
@@ -393,7 +394,8 @@ export class RoomPainter {
     for (let q = 0; q < m; q++) {
       const a = acts[this.aOrd[q]], on = rt.isOn(a.id), sel = L.edit && L.sel === a.id;
       if (L.edit && !on) ctx.globalAlpha = 0.35;
-      if (a.kind === "solid" || a.kind === "ghost") this.prism(a, eye, sel);
+      if (a.prop && (a.kind === "solid" || a.kind === "ghost")) this.propDraw(a, eye, sel);
+      else if (a.kind === "solid" || a.kind === "ghost") this.prism(a, eye, sel);
       else if (a.kind === "light") this.lamp(a, sel);
       else if (a.kind === "pool") this.pool(a, sel);
       else if (a.kind === "artifact") this.artifact(a, eye, sel);
@@ -455,14 +457,30 @@ export class RoomPainter {
     v[0] = a.x - hx * c + hz * s; v[1] = a.z - hx * s - hz * c; v[2] = a.x + hx * c + hz * s; v[3] = a.z + hx * s - hz * c;
     v[4] = a.x + hx * c - hz * s; v[5] = a.z + hx * s + hz * c; v[6] = a.x - hx * c - hz * s; v[7] = a.z - hx * s + hz * c; return 4;
   }
-  private prism(a: Actor, eye: Eye, sel: boolean): void {
-    const st = styleOf(a), n = this.footprint(a), v = this.fv, ctx = this.ctx, h = a.h;
+  private prism(a: Actor, eye: Eye, sel: boolean, st: ActorStyle = styleOf(a), y0 = 0): void {
+    const n = this.footprint(a), v = this.fv, ctx = this.ctx, h = a.h + y0;
     for (let i = 0; i < n; i++) {
       const j = (i + 1) % n, mx = (v[i * 2] + v[j * 2]) / 2, mz = (v[i * 2 + 1] + v[j * 2 + 1]) / 2;
       if ((mx - a.x) * (eye.x - mx) + (mz - a.z) * (eye.z - mz) <= 0) continue; // faces away
-      if (this.quad(v[i * 2], 0, v[i * 2 + 1], v[j * 2], 0, v[j * 2 + 1], v[j * 2], h, v[j * 2 + 1], v[i * 2], h, v[i * 2 + 1])) { ctx.fillStyle = i % 2 ? st.b : st.a; ctx.fill(); ctx.lineWidth = sel ? 2.5 : 1.2; ctx.strokeStyle = sel ? "#ffffff" : st.edge; ctx.stroke(); }
+      if (this.quad(v[i * 2], y0, v[i * 2 + 1], v[j * 2], y0, v[j * 2 + 1], v[j * 2], h, v[j * 2 + 1], v[i * 2], h, v[i * 2 + 1])) { ctx.fillStyle = i % 2 ? st.b : st.a; ctx.fill(); ctx.lineWidth = sel ? 2.5 : 1.2; ctx.strokeStyle = sel ? "#ffffff" : st.edge; ctx.stroke(); }
     }
     if (h < EYE_Y) { for (let i = 0; i < n; i++) { this.wp[i * 3] = v[i * 2]; this.wp[i * 3 + 1] = h; this.wp[i * 3 + 2] = v[i * 2 + 1]; } if (this.poly(n)) { ctx.fillStyle = st.top; ctx.fill(); ctx.lineWidth = sel ? 2.5 : 1.2; ctx.strokeStyle = sel ? "#ffffff" : st.edge; ctx.stroke(); } }
+  }
+  // ---- catalogue props: a few prisms in the actor's frame, farthest first
+  private ps = { id: "", kind: "solid", name: "", x: 0, z: 0, w: 1, d: 1, h: 1, rot: 0, sides: 0, color: "#fff", on: true, pulse: 0, text: "", lore: "", img: 0, mode: 0, visor: false, prop: "", gate: "", gateOff: false } as Actor;
+  private pOrd = new Int8Array(8); private pD = new Float32Array(8);
+  private propDraw(a: Actor, eye: Eye, sel: boolean): void {
+    const def = PROP_BY_ID.get(a.prop); if (!def) { this.prism(a, eye, sel); return; }
+    const st = styleOf(a), ps = this.ps, c = Math.cos(a.rot), s = Math.sin(a.rot), parts = def.parts, np = Math.min(parts.length, 8);
+    const bob = def.bob && !REDUCED ? Math.sin(actorLayer.now * 1.3 + a.x * 0.7 + a.z * 0.5) * 0.12 * Math.min(1, a.h / 1.8) : 0;
+    let m = 0;
+    for (let k = 0; k < np; k++) { const p = parts[k], lx = p[0] * a.w, lz = p[1] * a.d, dx = a.x + lx * c - lz * s - eye.x, dz = a.z + lx * s + lz * c - eye.z, d = dx * dx + dz * dz; let j = m; while (j > 0 && this.pD[j - 1] < d) { this.pD[j] = this.pD[j - 1]; this.pOrd[j] = this.pOrd[j - 1]; j--; } this.pD[j] = d; this.pOrd[j] = k; m++; }
+    ps.kind = a.kind; ps.color = a.color;
+    for (let q = 0; q < m; q++) {
+      const p = parts[this.pOrd[q]], lx = p[0] * a.w, lz = p[1] * a.d;
+      ps.x = a.x + lx * c - lz * s; ps.z = a.z + lx * s + lz * c; ps.w = Math.max(0.05, p[2] * a.w); ps.d = Math.max(0.05, p[3] * a.d); ps.rot = a.rot + p[7]; ps.sides = p[6]; ps.h = Math.max(0.02, p[5] * a.h);
+      this.prism(ps, eye, sel, st, p[4] * a.h + bob + (def.bob ? 0.3 * Math.min(1, a.h / 1.8) : 0));
+    }
   }
   private lamp(a: Actor, sel: boolean): void {
     this.cam(a.x, Math.max(0.4, a.h), a.z); if (this.qz < NEAR) return;

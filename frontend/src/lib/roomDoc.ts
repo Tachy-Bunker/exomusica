@@ -49,8 +49,16 @@ export interface Actor {
   img: number;                         // library picture id shown on the panel, 0 = none
   mode: number;                        // 0 on a wall (fixed), 1 on the floor, 2 billboard (always faces you)
   visor: boolean;                      // only visible through the scan visor
+  prop: string;                        // solid/ghost only: a catalogue prop ("" = plain box or prism)
+  gate: string;                        // community milestone key; the thing exists only once it is reached ("" = always)
+  gateOff: boolean;                    // with a gate: the opposite, it exists only until the milestone is reached
 }
 export const MAX_LORE = 1500, MAX_TEXT = 60;
+/** Catalogue props (shapes in `roomProps.ts`): id -> blocks you? Frames, arches and the like are walk-through. */
+export const PROP_BLOCKS: Record<string, boolean> = { spire: true, monolith: true, pylon: true, totem: true, rubble: true, crates: true, hullplate: true, frame: false, arch: false, ribs: false, scaffold: false, drifter: false };
+export const GATE = /^[a-z0-9][a-z0-9-]{0,31}$/;
+/** True when the actor is shut away by its milestone gate: `reached` holds the milestone keys the community has reached. */
+export const gatedOut = (a: Pick<Actor, "gate" | "gateOff">, reached: ReadonlySet<string> | null): boolean => !!a.gate && (reached?.has(a.gate) === true) === a.gateOff;
 export interface Wire { from: string; ev: string; to: string; msg: string; delay: number; once: boolean }
 /** Looping floor textures. `kind` picks a procedural pattern; a room has up to MAX_TEX materials, and each floor cell is 0 (none) or a material number (1-based). */
 export const TEX_KINDS = ["noise", "scan", "grid", "diamond", "circuit", "water", "brick", "static"] as const;
@@ -100,6 +108,8 @@ export function cleanDoc(raw: unknown): RoomDoc {
       on: o.on === false ? false : true, pulse: kind === "light" || kind === "pool" ? Math.round(num(o.pulse, 0, 2, 0) * 4) / 4 : 0,
       text: kind === "artifact" ? str(o.text, MAX_TEXT, "") : "", lore: kind === "artifact" ? str(o.lore, MAX_LORE, "") : "",
       img: kind === "artifact" ? Math.round(num(o.img, 0, 1e9, 0)) : 0, mode: kind === "artifact" ? Math.round(num(o.mode, 0, 2, 0)) : 0, visor: kind === "artifact" && o.visor === true,
+      prop: (kind === "solid" || kind === "ghost") && typeof o.prop === "string" && Object.hasOwn(PROP_BLOCKS, o.prop) ? o.prop : "",
+      gate: typeof o.gate === "string" && GATE.test(o.gate) ? o.gate : "", gateOff: typeof o.gate === "string" && GATE.test(o.gate) && o.gateOff === true,
     });
   }
   const seen = new Set<string>();
@@ -164,13 +174,16 @@ export class WireRuntime {
   changed: string[] = [];
   /** Called whenever a message reaches a marker/trigger "fire". */
   onFire: ((id: string) => void) | null = null;
-  constructor(readonly doc: RoomDoc) {
-    for (const a of doc.actors) { this.on.set(a.id, a.on); this.enabled.set(a.id, a.on); }
+  /** Actors shut away by a milestone gate: always off, whatever wires say. */
+  shut = new Set<string>();
+  constructor(readonly doc: RoomDoc, reached: ReadonlySet<string> | null = null) {
+    for (const a of doc.actors) { const g = gatedOut(a, reached); if (g) this.shut.add(a.id); this.on.set(a.id, a.on && !g); this.enabled.set(a.id, a.on && !g); }
     for (const w of doc.wires) { const k = w.from + "|" + w.ev; const l = this.byEvent.get(k); if (l) l.push(w); else this.byEvent.set(k, [w]); }
   }
   isOn(id: string) { return this.on.get(id) === true; }
   /** An actor emits an event now (time t, seconds). Delayed wires are queued. */
   emit(id: string, ev: string, t: number) {
+    if (this.shut.has(id)) return;
     const ws = this.byEvent.get(id + "|" + ev); if (!ws) return;
     for (const w of ws) {
       if (w.once && this.spent.has(w)) continue;
@@ -195,7 +208,7 @@ export class WireRuntime {
     }
   }
   private deliver(id: string, msg: string, t: number) {
-    const a = this.doc.actors.find((x) => x.id === id); if (!a) return;
+    const a = this.doc.actors.find((x) => x.id === id); if (!a || this.shut.has(id)) return;
     if (a.kind === "trigger") {
       if (msg === "fire") { this.onFire?.(id); this.emit(id, "enter", t); return; }
       const v = msg === "enable"; if (this.enabled.get(id) !== v) { this.enabled.set(id, v); this.changed.push(id); } return;
@@ -234,7 +247,7 @@ export function insideBox(a: Actor, px: number, pz: number): boolean {
 export function pushOut(doc: RoomDoc, rt: WireRuntime, x: number, z: number, r: number, out: { x: number; z: number }): boolean {
   out.x = x; out.z = z; let moved = false;
   for (const a of doc.actors) {
-    if (a.kind !== "solid" || !rt.isOn(a.id)) continue;
+    if (a.kind !== "solid" || !rt.isOn(a.id) || (a.prop && !PROP_BLOCKS[a.prop])) continue;
     const dx0 = out.x - a.x, dz0 = out.z - a.z;
     if (a.sides >= 3) {
       const rr = Math.min(a.w, a.d) / 2 + r, dist = Math.hypot(dx0, dz0);
