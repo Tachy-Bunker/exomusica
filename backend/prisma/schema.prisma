@@ -1739,6 +1739,15 @@ model GlossaryTerm {
   updatedAt  DateTime @updatedAt
 }
 
+// Lore the owner writes for things in the 3D rooms (a room's wall, a door, a terminal, a pedestal, a sealed door). `key` is the same address the scan uses: e.g. branch:slug, album:slug, room:slug/terminal, room:slug/door/other-slug, room:slug/seal/<hash>.
+model LoreEntry {
+  id        Int      @id @default(autoincrement())
+  key       String   @unique
+  title     String
+  body      String   @db.Text
+  updatedAt DateTime @updatedAt
+}
+
 // Each approved newcomer is paired with one existing member, who gets a single prompt to say hello.
 model WelcomeBuddy {
   id        Int       @id @default(autoincrement())

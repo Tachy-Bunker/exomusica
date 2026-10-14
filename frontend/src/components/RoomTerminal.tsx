@@ -6,6 +6,8 @@ import { setDroneWanted } from "../lib/roomDrone";
 import { useAuth } from "../lib/auth";
 import type { PlayableTrackDTO } from "../lib/types";
 import { MiniChat } from "./MiniChat";
+import { scannedIds } from "../lib/scanLog";
+import { completion, loadLog, loadRooms, type Lore } from "../lib/roomLore";
 
 const mmss = (s: number | null): string => (s == null ? "" : `${Math.floor(s / 60)}:${String(Math.round(s % 60)).padStart(2, "0")}`);
 
@@ -99,6 +101,38 @@ export function DroneTerminal({ onClose }: { onClose: () => void }) {
         <button type="button" className="rt-btn" onClick={st.clearQueue} disabled={!st.queue.length} data-testid="drone-clear">Clear queue</button>
         <button type="button" className="rt-btn" onClick={away} data-testid="drone-away">Send the drone away</button>
       </div>
+    </div>
+  );
+}
+
+/** The logbook: how much of the rooms you have been in is scanned, room by room, and what each scan said. */
+export function LogbookTerminal({ lore }: { lore: ReadonlyMap<string, Lore> | null }) {
+  const [open, setOpen] = useState<string | null>(null);
+  const rooms = loadRooms(), log = loadLog(), scanned = scannedIds(), comp = completion(rooms, scanned);
+  if (!comp.rooms.length) return <p className="rt-dim" data-testid="logbook-empty">Nothing recorded yet. Lock on to a door, a pedestal, a terminal or the inscription on a wall and press X to scan it.</p>;
+  return (
+    <div className="lb" data-testid="logbook">
+      <p className="lb-total" data-testid="logbook-total"><b>{comp.pct}%</b> of the rooms you have been in is scanned <span className="rt-dim">({comp.done} of {comp.total})</span></p>
+      <div className="lb-bar" aria-hidden="true"><i style={{ width: `${comp.pct}%` }} /></div>
+      <ul className="lb-rooms">
+        {comp.rooms.map((r) => (
+          <li key={r.slug} data-testid="logbook-room">
+            <button type="button" className="rt-track" aria-expanded={open === r.slug} onClick={() => setOpen(open === r.slug ? null : r.slug)}>
+              <span className="rt-t">{r.name}</span><span className="lb-n">{r.done}/{r.total} · {r.pct}%</span>
+            </button>
+            {open === r.slug && (
+              <ul className="lb-items">
+                {rooms[r.slug].items.map((it) => {
+                  const got = scanned.has(`lore|${it.key}`), e = log[it.key], l = lore?.get(it.key);
+                  return got
+                    ? <li key={it.key} data-testid="logbook-entry"><b>{l ? l.title : e?.title ?? it.label}</b>{l && <span className="lb-owner"> ✦</span>}<p>{l ? l.body : e?.text ?? "Scanned on another device. Scan it here to read it again."}</p></li>
+                    : <li key={it.key} className="lb-unknown" data-testid="logbook-unknown"><b>???</b> <span className="rt-dim">{it.what === "seal" ? "a sealed door" : it.what === "wall" ? "an inscription" : it.what}</span></li>;
+                })}
+              </ul>
+            )}
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }

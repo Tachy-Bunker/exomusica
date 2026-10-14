@@ -37,6 +37,19 @@ def run(pw):
         return pg, errs
     S = "[data-testid=room-stage]"
     at = lambda pg, k: float(pg.get_attribute(S, "data-" + k))
+    def through(pg, key, to=None, ms=22000, hold=True):
+        """Keep walking until the room you are in changes (no page load happens any more: the URL is replaced in place). A person steers round corridor corners; so does this."""
+        start = pg.get_attribute(S, "data-room"); last = None; still = 0
+        if hold: pg.keyboard.down(key)
+        for i in range(ms // 100):
+            pg.wait_for_timeout(100)
+            r = pg.get_attribute(S, "data-room")
+            if r != start and (to is None or r == to): break
+            pos = (pg.get_attribute(S, "data-x"), pg.get_attribute(S, "data-z"))
+            still = still + 1 if pos == last else 0; last = pos
+            if hold and still >= 6: pg.keyboard.down("ArrowRight"); pg.wait_for_timeout(180); pg.keyboard.up("ArrowRight"); still = 0
+        if hold: pg.keyboard.up(key)
+        return pg.get_attribute(S, "data-room")
     face = lambda pg, i: pg.evaluate(f"document.querySelector('[data-testid=face-d{i}]').click()")
     def walk(pg, key, ms): pg.keyboard.down(key); pg.wait_for_timeout(ms); pg.keyboard.up(key)
     def pixels(pg): return pg.evaluate("(()=>{const c=document.querySelector('.rm-stage canvas');const d=c.getContext('2d').getImageData(0,0,c.width,c.height).data;let n=0;for(let i=0;i<d.length;i+=4)if(d[i]+d[i+1]+d[i+2]>60)n++;return n})()")
@@ -78,9 +91,8 @@ def run(pw):
     tg = pg.get_attribute(S, "data-target")
     check(tg.startswith("Go through: "), f"Facing a door names where it goes ({tg})")
     dest_name = tg.replace("Go through: ", "")
-    pg.keyboard.press("Space"); pg.wait_for_url(re.compile(r".*/branch/b\d/room\?from=core"), timeout=8000)
-    pg.wait_for_selector(S); pg.wait_for_timeout(1500)
-    dest = re.search(r"/branch/(b\d)/room", pg.url).group(1)
+    pg.keyboard.press("Space"); dest = through(pg, "KeyW"); pg.wait_for_timeout(500)
+    check(re.search(r"/branch/b\d/room$", pg.url) is not None, f"The address follows you into the next room ({pg.url})")
     check(next(n for n in NODES if n.get("slug") == dest)["name"] == dest_name, "The door led to the room it named")
     check(pg.get_attribute(S, "data-room") == dest, "The next room is shown")
     sx, sz = at(pg, "x"), at(pg, "z"); check((sx * sx + sz * sz) ** 0.5 > 2.5, "You arrive inside the door you came through, not in the middle")
@@ -90,9 +102,7 @@ def run(pw):
     ci = [i for i, t in enumerate(labels) if "Core" in t]
     check(len(ci) == 1, "A door leads back to Core")
     face(pg, ci[0]); pg.wait_for_timeout(200)
-    walk(pg, "KeyW", 2600)
-    pg.wait_for_url(re.compile(r".*/branch/core/room\?from=" + dest), timeout=8000); pg.wait_for_selector(S)
-    check(True, "Walking into an open door goes there (no button needed)")
+    check(through(pg, "KeyW") == "core", "Walking into an open door goes there (no button needed)")
     # locked: b2 has sealed doors to rooms you have not found
     pg.goto(f"{BASE}/branch/b2/room"); pg.wait_for_selector(S); pg.wait_for_timeout(400)
     labels = pg.locator("[data-testid^=face-d]").all_inner_texts()
@@ -141,9 +151,10 @@ def run(pw):
         if pg.get_attribute(S, "data-target").startswith("Go through"): break
     ev("pointerup", cx, cy)
     check(pg.get_attribute(S, "data-target").startswith("Go through"), "Aiming at a door shows the prompt")
-    pg.locator("[data-testid=room-use]").click(); pg.wait_for_url(re.compile(r".*/branch/b\d/room\?from=core"), timeout=8000)
-    check(True, "The Use button goes through the door")
-    pg.wait_for_selector(S); pg.wait_for_timeout(1300)
+    pg.locator("[data-testid=room-use]").click()
+    ev("pointerdown", cx, cy); ev("pointermove", cx, cy - bb["height"] * 0.3)
+    check(re.match(r"b\d", through(pg, "", hold=False)) is not None, "The Use button and the stick take you through the door")
+    ev("pointerup", cx, cy); pg.wait_for_timeout(500)
     check(pg.locator("[data-testid=room-map]").get_attribute("href") == "/explore" and pg.locator("[data-testid=room-back]").count() == 1, "Map and Back buttons are there")
     check(not errs, f"No page errors on the phone {errs}")
     b.close()

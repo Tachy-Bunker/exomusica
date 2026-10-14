@@ -2,10 +2,10 @@ import assert from "node:assert/strict";
 import { MILESTONES, resolveMilestones, cleanTarget, MAX_TARGET } from "../src/lib/milestonesCore.js";
 import { fillTokens } from "../src/lib/newsTokens.js";
 
-assert.equal(MILESTONES.length, 25);
-assert.equal(new Set(MILESTONES.map((m) => m.key)).size, 25, "keys are unique");
+assert.equal(MILESTONES.length, 26);
+assert.equal(new Set(MILESTONES.map((m) => m.key)).size, 26, "keys are unique");
 assert.ok(MILESTONES.every((m) => m.target >= 1 && m.title && m.perk));
-assert.deepEqual(MILESTONES.filter((m) => m.live).map((m) => m.key).sort(), ["m-chart", "m-commons", "m-crateradio", "m-echo", "m-founders", "m-index", "m-jam", "m-jingle", "m-longwave", "m-offline", "m-posts", "m-ring", "m-roll", "m-scans", "m-season", "m-sharedlens", "m-spectral", "m-storm", "m-thermal", "m-tracks", "m-xray"]);
+assert.deepEqual(MILESTONES.filter((m) => m.live).map((m) => m.key).sort(), ["m-chart", "m-commons", "m-crateradio", "m-echo", "m-founders", "m-index", "m-jam", "m-jingle", "m-longwave", "m-offline", "m-posts", "m-ring", "m-roll", "m-scans", "m-season", "m-sharedlens", "m-spectral", "m-storm", "m-thermal", "m-tracks", "m-visor", "m-xray"]);
 
 const NOW = new Date("2026-10-14T00:00:00Z");
 const by = (list: ReturnType<typeof resolveMilestones>, k: string) => list.find((m) => m.key === k)!;
@@ -27,7 +27,7 @@ r = resolveMilestones(MILESTONES, [{ key: "m-tracks", target: null, enabled: fal
 assert.equal(by(r, "m-tracks").reached, false); assert.equal(by(r, "m-tracks").enabled, false);
 // Hull counts the others
 r = resolveMilestones(MILESTONES, [], { TRACKS: 1e6, SCANS: 1e6, POSTS: 1e6, MEMBERS: 1e6, STUDIES: 1e6, WIKIPAGES: 1e6, PLAYLISTS: 1e6, BRANCHES: 1e6, COMMUNITYTRACKS: 1e6, COMMUNITYALBUMS: 1e6, MINUTES: 1e6, DAYS: 1e6 }, NOW);
-assert.equal(by(r, "m-hull").now, 24); assert.equal(by(r, "m-hull").reached, true);
+assert.equal(by(r, "m-hull").now, 25); assert.equal(by(r, "m-hull").reached, true);
 r = resolveMilestones(MILESTONES, [], {}, NOW);
 assert.equal(by(r, "m-hull").now, 0);
 

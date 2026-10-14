@@ -9,11 +9,21 @@ export interface RoomDoor {
   tx: number; tz: number;    // unit vector along the wall
   hw: number;                // half width
   edge: number; angle: number;
+  /** Address hash of a sealed room hung from this door (what its scan and its note are made from). */
+  key?: string;
 }
 export interface RoomProp { id: string; kind: "album" | "terminal" | "more"; x: number; z: number; r: number; label: string; href: string; hue: number }
 export interface RoomWorld {
   slug: string; name: string; sides: number; rot: number; R: number; inr: number; H: number;
   verts: [number, number][]; doors: RoomDoor[]; props: RoomProp[]; spawn: { x: number; z: number; yaw: number };
+  /** An inscription on one wall (scan it for the branch's text), if a wall is free. */
+  plaque: { x: number; z: number; nx: number; nz: number; tx: number; tz: number; edge: number } | null;
+  /** The branch's own description (shown when the inscription is scanned). */
+  blurb?: string;
+  /** Where this room lies on the Scan map (used to place the corridor and the room behind a door). */
+  map: { x: number; z: number };
+  /** The branch's colour; set by the page once the theme is known. */
+  color?: string;
 }
 export interface AlbumLite { slug: string; title: string }
 export interface BuildOpts { hull: Hull | null; slug: string; name: string; states: Map<number, RoomState> | null; albums: AlbumLite[]; channelSlug: string | null; from?: string | null }
@@ -39,7 +49,7 @@ export function wallPoint(n: number, R: number, rot: number, angle: number): { x
   return { x: Math.cos(angle) * d, z: Math.sin(angle) * d, edge: k };
 }
 
-interface Want { slug: string | null; name: string | null; state: "open" | "locked"; kind: RoomDoor["kind"]; angle: number }
+interface Want { slug: string | null; name: string | null; state: "open" | "locked"; kind: RoomDoor["kind"]; angle: number; key?: string }
 
 /** The doors a room has: one to its parent, one to each child, one to each sealed room hung from it. */
 function wantedDoors(hull: Hull, me: HullRoom, states: Map<number, RoomState> | null): Want[] {
@@ -49,7 +59,7 @@ function wantedDoors(hull: Hull, me: HullRoom, states: Map<number, RoomState> | 
     if (l.from !== me.id && l.to !== me.id) continue;
     const other = byId.get(l.from === me.id ? l.to : l.from); if (!other) continue;
     const st = states?.get(other.id) ?? "unseen", open = (st === "visited" || st === "heard") && !!other.slug;
-    out.push({ slug: open ? other.slug : null, name: open ? other.name : null, state: open ? "open" : "locked", kind: other.outer ? "sealed" : l.to === me.id ? "parent" : "child", angle: Math.atan2(other.z - me.z, other.x - me.x) });
+    out.push({ slug: open ? other.slug : null, name: open ? other.name : null, state: open ? "open" : "locked", kind: other.outer ? "sealed" : l.to === me.id ? "parent" : "child", angle: Math.atan2(other.z - me.z, other.x - me.x), key: open ? undefined : other.key || String(other.id) });
   }
   return out;
 }
@@ -82,7 +92,7 @@ export function buildRoom(o: BuildOpts): RoomWorld {
   const doors: RoomDoor[] = items.map(({ w, s }, i) => {
     const k = Math.min(n - 1, Math.floor(s / E)), t = (s - k * E) / E, a = verts[k], b = verts[(k + 1) % n];
     const x = a[0] + (b[0] - a[0]) * t, z = a[1] + (b[1] - a[1]) * t, mid = rot + (k + 0.5) * ((Math.PI * 2) / n);
-    return { id: `d${i}`, toSlug: w.slug, name: w.name, state: w.state, kind: w.kind, x, z, nx: Math.cos(mid), nz: Math.sin(mid), tx: -Math.sin(mid), tz: Math.cos(mid), hw, edge: k, angle: Math.atan2(z, x) };
+    return { id: `d${i}`, toSlug: w.slug, name: w.name, state: w.state, kind: w.kind, x, z, nx: Math.cos(mid), nz: Math.sin(mid), tx: -Math.sin(mid), tz: Math.cos(mid), hw, edge: k, angle: Math.atan2(z, x), key: w.key };
   });
 
   // things to look at: one pedestal per album on a ring, a chat terminal against the emptiest wall
@@ -103,9 +113,19 @@ export function buildRoom(o: BuildOpts): RoomWorld {
     props.push({ id: "terminal", kind: "terminal", x: Math.cos(mid) * d, z: Math.sin(mid) * d, r: 0.6, label: "Talk: this branch's room", href: `/topic/${o.channelSlug}`, hue: 30 });
   }
 
+  // an inscription on a wall that has no door and no terminal
+  let plaque: RoomWorld["plaque"] = null;
+  {
+    const usedEdges = new Set(doors.map((d) => d.edge)); const term = props.find((p) => p.kind === "terminal");
+    if (term) usedEdges.add(Math.round((Math.atan2(term.z, term.x) - rot) / ((Math.PI * 2) / n) - 0.5 + n * 4) % n);
+    let best = -1, bestScore = -1;
+    for (let k = 0; k < n; k++) { if (usedEdges.has(k)) continue; const score = 1 + (((k + seed * 7) % 5) === 0 ? 1 : 0); if (score > bestScore) { bestScore = score; best = k; } }
+    if (best >= 0) { const mid = rot + (best + 0.5) * ((Math.PI * 2) / n), d = inr - 0.04; plaque = { x: Math.cos(mid) * d, z: Math.sin(mid) * d, nx: Math.cos(mid), nz: Math.sin(mid), tx: -Math.sin(mid), tz: Math.cos(mid), edge: best }; }
+  }
+
   // where you stand when you arrive: inside the door you came through, looking in; otherwise the middle, looking at the first door
   const via = o.from ? doors.find((d) => d.toSlug === o.from) : undefined;
   const spawn = via ? { x: via.x - via.nx * 2, z: via.z - via.nz * 2, yaw: Math.atan2(-via.nz, -via.nx) }
     : { x: 0, z: 0, yaw: doors.length ? Math.atan2(doors[0].z, doors[0].x) : 0 };
-  return { slug: o.slug, name: o.name, sides: n, rot, R, inr, H, verts, doors, props, spawn };
+  return { slug: o.slug, name: o.name, sides: n, rot, R, inr, H, verts, doors, props, spawn, plaque, map: { x: me?.x ?? 0, z: me?.z ?? 0 } };
 }

@@ -15,8 +15,9 @@ export function droneHome(e: Eye, t: number): Drone {
 }
 export const startDrone = (e: Eye): Drone => droneHome(e, 0);
 /** One step: it glides toward its spot (so it trails when you turn or run), and stays inside the walls and out of the pedestals. Returns true when it moved. */
-export function stepDrone(d: Drone, e: Eye, world: RoomWorld, t: number, dt: number): boolean {
+/** `world` null: you are in a corridor, where it simply follows. */
+export function stepDrone(d: Drone, e: Eye, world: RoomWorld | null, t: number, dt: number): boolean {
   const h = droneHome(e, t), k = 1 - Math.exp(-dt * FOLLOW), nx = d.x + (h.x - d.x) * k, nz = d.z + (h.z - d.z) * k;
-  const c = collide(world, nx, nz), ny = h.y + (d.y - h.y) * Math.exp(-dt * 8);
+  const c = world ? collide(world, nx, nz) : { x: nx, z: nz }, ny = h.y + (d.y - h.y) * Math.exp(-dt * 8);
   const moved = Math.abs(c.x - d.x) + Math.abs(c.z - d.z) + Math.abs(ny - d.y) > 5e-4; d.x = c.x; d.z = c.z; d.y = ny; return moved;
 }

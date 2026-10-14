@@ -6584,3 +6584,13 @@ body:has(.term-backdrop, .fp-panel, .pocket-pad, .probe-hud, .visor-hud) { touch
 .rt-seek{display:flex;align-items:center;gap:.6rem;font-size:.8rem;margin:.5rem 0}
 .rt-seek input{flex:1;accent-color:var(--rm);min-height:28px}
 .rm-perf{position:absolute;left:1rem;bottom:.4rem;font:11px ui-monospace,monospace;color:#9fe9ff;background:rgba(0,0,0,.6);padding:2px 6px;border-radius:4px;pointer-events:none}
+
+/* echo visor, scan result card, logbook */
+.rm-card{position:absolute;left:12px;bottom:calc(14px + env(safe-area-inset-bottom,0px));max-width:min(360px,70vw);padding:.55rem .7rem;border:1px solid #ffb347;border-radius:10px 3px 10px 3px;background:rgba(6,10,14,.82);color:#ffe4bd;font:12px/1.35 ui-monospace,Menlo,Consolas,monospace;pointer-events:none;z-index:4;box-shadow:0 0 18px rgba(255,179,71,.18)}
+.rm-card b{display:block;color:#ffb347;margin-bottom:.15rem}.rm-card p{margin:0}.rm-card i{display:block;margin-top:.2rem;color:#ffb347;font-style:normal;opacity:.8}
+.rm-btn[aria-disabled="true"]{opacity:.5}
+.lb-total{margin:.2rem 0 .4rem}.lb-total b{font-size:1.4rem;color:#ffb347}
+.lb-bar{height:6px;border-radius:3px;background:rgba(255,179,71,.15);margin-bottom:.7rem;overflow:hidden}.lb-bar i{display:block;height:100%;background:#ffb347}
+.lb-rooms,.lb-items{list-style:none;margin:0;padding:0}.lb-items{margin:.2rem 0 .5rem .8rem;border-left:1px solid rgba(255,179,71,.3);padding-left:.6rem}
+.lb-items li{margin:.3rem 0}.lb-items p{margin:.1rem 0 0;opacity:.85}.lb-owner{color:#ffb347}.lb-unknown{opacity:.6}.lb-n{margin-left:auto;opacity:.8}
+.lb-rooms .rt-track{display:flex;width:100%}

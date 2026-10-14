@@ -66,3 +66,15 @@ Last updated: fix349. Built milestone rewards are listed in `docs/HOMEPAGE_AND_N
 - fix352: Waveform morph ball (roll a ball along a track's waveform; height = amplitude, colour = spectral centroid, bookmarks = save points, position = playback position).
 - fix353: Echoes of members (faint replayed paths of recent visitors, asynchronous).
 - Then: design write-up of **bosses built on music and sound** (mechanisms), consistent with Monthly challenge and Twelve Artifacts.
+
+
+## Roadmap after fix351 (corridors)
+- fix351 DELIVERED: corridors behind doors matching the map, portal view, two rooms held at a time, door opens on approach and shuts behind you, address follows, presence moves.
+- Next: fix352 Echo visor + Lore logbook; fix353 Waveform morph ball; fix354 Echoes of members; then the design write-up of music/sound-based bosses.
+- Corridor follow-ups: map shafts as ramps/lifts (floor is flat today), corner sliding feels sticky when pushing dead-straight into an outer corner, people visible in corridors (presence is per room), rooms hum / sound through doors (low-passed bed per room, opens as the door opens), a corridor ambience per link.
+
+
+## Roadmap after fix352
+- fix352 DELIVERED: Echo visor (`m-visor`, 1500 scans, keys V/X/L), Lore logbook, admin "Room lore" page, `LoreEntry` table.
+- Next: fix353 Waveform morph ball (needs waveform peak data); fix354 Echoes of members (server-memory path recording); then the design write-up of music/sound-based bosses.
+- Follow-ups: logbook synced to the account (today per device), lore for tracks/people scans, spectral walls, rooms hum.

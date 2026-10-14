@@ -39,6 +39,7 @@ export const MILESTONES: MilestoneDef[] = [
   { key: "m-commons", title: "Commons pack", metric: "COMMUNITYTRACKS", target: 500, live: true, perk: "A sample ZIP of tracks whose creators allow reuse, rebuilt monthly." },
   { key: "m-jingle", title: "Collective jingle", metric: "TRACKS", target: 150, live: true, perk: "The default site jingle is replaced by one made from community stems." },
   { key: "m-ring", title: "Second ring", metric: "BRANCHES", target: 20, live: true, perk: "The scan map gains an outer ring where hidden branches show as sealed rooms." },
+  { key: "m-visor", title: "Echo visor", metric: "SCANS", target: 1500, live: true, perk: "In the 3D rooms the visor can ping: a ring sweeps the room, sealed doors answer with their own note, and anything left to scan lights up." },
   { key: "m-crateradio", title: "Crate radio", metric: "PLAYLISTS", target: 100, live: true, perk: "An always-on station shuffling public playlists, credited by playlist." },
   { key: "m-longwave", title: "Long wave", metric: "MINUTES", target: 600, live: true, perk: "A radio station looping the whole catalogue, with a shared position everyone hears together." },
   { key: "m-chart", title: "Chart layer", metric: "MEMBERS", target: 150, live: true, perk: "The Chart shows where members' recent activity sits, as anonymous pulses." },

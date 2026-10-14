@@ -105,12 +105,15 @@ def run(pw):
     pg2.keyboard.down("KeyW")
     for i in range(60):
         pg2.wait_for_timeout(50)
-        if any(r.startswith("/api/branches/b") for r in reqs) or "/room?from" in pg2.url: break
-    seen = any(r.split("?")[0] in ("/api/branches/b2", "/api/branches/b3", "/api/branches/b4", "/api/branches/b5") for r in reqs) and "from=core" not in pg2.url
+        if any(r.startswith("/api/branches/b") for r in reqs) or pg2.get_attribute(S, "data-room") != "core": break
+    seen = any(r.split("?")[0] in ("/api/branches/b2", "/api/branches/b3", "/api/branches/b4", "/api/branches/b5") for r in reqs) and pg2.get_attribute(S, "data-room") == "core"
     check(seen, "Walking toward a door fetches the room behind it before you arrive")
     if False: check(any(r.split("?")[0] in ("/api/branches/b2", "/api/branches/b3", "/api/branches/b4", "/api/branches/b5") for r in reqs) and "from=core" not in pg2.url, "Walking toward a door fetches the room behind it before you arrive")
-    pg2.wait_for_url(re.compile(r".*/branch/b\d/room\?from=core"), timeout=9000); pg2.wait_for_selector(S); pg2.wait_for_timeout(800)
-    dest = re.search(r"/branch/(b\d)/room", pg2.url).group(1)
+    for i in range(150):
+        pg2.wait_for_timeout(100)
+        if pg2.get_attribute(S, "data-room") != "core": break
+    pg2.keyboard.up("KeyW"); pg2.wait_for_timeout(500)
+    dest = pg2.get_attribute(S, "data-room"); check(dest != "core" and dest.startswith("b"), f"…and you walk into it without a page load ({dest})")
     n = len([r for r in reqs if r.split("?")[0] == f"/api/branches/{dest}"]); n2 = len([r for r in reqs if r.split("?")[0] == f"/api/branches/{dest}/albums"])
     check(n == 1 and n2 == 1, f"The room reuses what was fetched (branch x{n}, albums x{n2})")
     check(not e2, f"No page errors {e2}")

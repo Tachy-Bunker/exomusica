@@ -1,0 +1,12 @@
+import assert from "node:assert/strict";
+import { cleanLore } from "../src/lib/lore";
+assert.ok("error" in cleanLore({}, false));
+assert.ok("error" in cleanLore({ key: "nope", title: "t", body: "b" }, false));
+assert.ok("error" in cleanLore({ key: "room:core/terminal", title: "", body: "b" }, false));
+assert.ok("error" in cleanLore({ key: "room:core/terminal", title: "t", body: "x".repeat(3001) }, false));
+const r = cleanLore({ key: " room:core/door/b2 ", title: "  The  first   door ", body: " It hums. " }, false);
+assert.ok("data" in r && r.data.key === "room:core/door/b2" && r.data.title === "The first door" && r.data.body === "It hums.");
+assert.ok("error" in cleanLore({ title: "x".repeat(81) }, true));
+assert.ok("data" in cleanLore({ body: "ok" }, true));
+for (const k of ["branch:core", "album:alb-one", "room:b2/seal/123456", "room:core/door/b2"]) assert.ok("data" in cleanLore({ key: k, title: "t", body: "b" }, false), k);
+console.log("lore ok");

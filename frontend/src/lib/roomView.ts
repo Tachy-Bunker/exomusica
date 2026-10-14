@@ -52,12 +52,12 @@ export function collide(world: RoomWorld, x: number, z: number): { x: number; z:
   return { x, z, touched };
 }
 /** One step of walking and turning. `dt` in seconds. */
-export function stepEye(world: RoomWorld, e: Eye, m: Move, dt: number): { eye: Eye; into: { nx: number; nz: number; edge: number } | null; moved: boolean } {
+export function stepEye(world: RoomWorld, e: Eye, m: Move, dt: number, solve?: (x: number, z: number) => { x: number; z: number; touched: number | null }): { eye: Eye; into: { nx: number; nz: number; edge: number } | null; moved: boolean } {
   const yaw = e.yaw + m.turn * TURN * dt, pitch = clamp(e.pitch + m.look * TURN * dt, -MAX_PITCH, MAX_PITCH);
   const sp = (m.run ? RUN : WALK) * dt, fx = Math.cos(yaw), fz = Math.sin(yaw), rx = -Math.sin(yaw), rz = Math.cos(yaw);
   let vx = (fx * m.forward + rx * m.strafe), vz = (fz * m.forward + rz * m.strafe);
   const L = Math.hypot(vx, vz); if (L > 1) { vx /= L; vz /= L; }
-  const wantX = e.x + vx * sp, wantZ = e.z + vz * sp, r = collide(world, wantX, wantZ);
+  const wantX = e.x + vx * sp, wantZ = e.z + vz * sp, r = solve ? solve(wantX, wantZ) : collide(world, wantX, wantZ);
   const pushed = Math.hypot(wantX - r.x, wantZ - r.z) > 1e-4;
   let into: { nx: number; nz: number; edge: number } | null = null;
   if (pushed && r.touched != null) { const a = world.rot + (r.touched + 0.5) * ((Math.PI * 2) / world.sides); const nx = Math.cos(a), nz = Math.sin(a); if (vx * nx + vz * nz > 0.15) into = { nx, nz, edge: r.touched }; }
