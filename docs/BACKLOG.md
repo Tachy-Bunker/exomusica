@@ -107,3 +107,20 @@ Last updated: fix355. Built milestone rewards are listed in `docs/HOMEPAGE_AND_N
 - Ideas from the Retro interviews: one universal message system, prefabs, camera shots as first-class, engine owns performance.
 - Draw order: solids vs terminals/people are not depth-sorted together; fix when height lands.
 - Actors in the far room (seen through a corridor) are not drawn or collided.
+
+## fix357 notes (floor painting done) + owner's edits to the editor design doc
+- Answers: no licence/credit field on uploaded textures; zones are NOT scannable; the Logbook fills from rewritten branch descriptions when a room is explored; styles apply per room AND per branch subtree (children inherit unless overridden); corridors/elevators are rooms and must be editable.
+- Queue (owner's additions): black-hole debris/frames/ruins props (alien tribes' repairs, things falling through the horizon); artifacts (text, logo, small image; billboard or fixed; scan-visor-only invisible objects; can open doors when scanned; can hold a big Logbook lore entry); sky/ceiling texture swap + import `.env.zip` (compressed on import); ambient dust/fireflies as a small flock (<= ~12, may pass through walls and objects, reappear elsewhere, not drawn out of view, off on weak devices); prop catalogue; copy style; conditional swap (rooms/things appear after contributions, chats, donations...); optional pulsing light pools.
+- Next: fix358 = wall bands + uploaded textures + fog/grade + light pools (E2/E3 core); then artifacts + Logbook; then particles; then corridors-as-rooms; then hazards/paths/cameras; then height; then admin map overrides.
+
+## fix358 notes
+- Done: wall strips, mood (tint + fog), light pools with slow swell.
+- Next: fix359 uploaded textures + sky/ceiling + `.env.zip` import (TextureAsset table; seam preview; compressed on import); then artifacts + Logbook entries from branch descriptions; ambient flock particles; corridors/elevators as editable rooms; subtree themes + copy style; conditional swap; then hazards/paths/cameras; height; admin map overrides.
+
+
+## Done in fix359
+Uploaded textures + seam preview, ceiling material, .env.zip import (as zip of pictures). Not done: panorama skybox (ceiling only).
+Queue next: artifacts + Logbook entries, ambient flock, corridors/elevators editable, subtree themes, conditional swap, prop catalogue, debris props, hazards.
+
+## Done in fix360
+Skies (replace ceiling, wrap-around turning, skybox zip / six faces / one wide picture). Still open: vertical flow, per-room sky tint, sky on corridors, sky seen through windows (rooms have no windows yet).

@@ -1761,6 +1761,16 @@ model RoomDoc {
   @@map("room_docs")
 }
 
+// A texture the owner uploaded for the room editor: a small square PNG (64, 128 or 256 px), made by the browser from whatever image or zip the owner chose. Rooms refer to it as material kind "u<id>".
+model TextureAsset {
+  id        Int      @id @default(autoincrement())
+  name      String
+  png       Bytes
+  createdAt DateTime @default(now())
+
+  @@map("texture_assets")
+}
+
 // Each approved newcomer is paired with one existing member, who gets a single prompt to say hello.
 model WelcomeBuddy {
   id        Int       @id @default(autoincrement())

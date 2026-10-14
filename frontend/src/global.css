@@ -6633,3 +6633,16 @@ body:has(.term-backdrop, .fp-panel, .pocket-pad, .probe-hud, .visor-hud) { touch
 .re-err{color:#ff9a9a;margin:0}
 .re-foot{position:sticky;bottom:-8px;background:rgba(8,10,18,.95);padding:6px 0}
 .re>*{flex-shrink:0}
+.re-tabs{display:flex;gap:6px}
+.re-tabs .re-b[aria-selected=true]{background:rgba(122,255,200,.25)}
+.re-mats{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(4,1fr);gap:4px}
+.re-mats button{width:100%;display:flex;flex-direction:column;align-items:center;gap:2px;background:none;border:1px solid transparent;color:inherit;font:inherit;font-size:10px;padding:2px;border-radius:5px;cursor:pointer}
+.re-mats button[aria-pressed=true]{border-color:#fff}
+.re-mats canvas{width:32px;height:32px;border-radius:3px}
+.re-floor{display:flex;flex-direction:column;gap:6px}
+.re-inline{display:flex;flex-direction:row;align-items:center;gap:4px;margin-left:auto}
+[hidden].re-add,[hidden].re-list{display:none}
+.re-seam{width:128px;height:128px;border:1px solid rgba(255,255,255,.3);image-rendering:pixelated;align-self:flex-start}
+.re-mats li{position:relative}
+.re-x{position:absolute;top:0;right:0;background:rgba(0,0,0,.6);border:0;color:#fff;font-size:10px;width:16px;height:16px;border-radius:50%;cursor:pointer;padding:0;line-height:1}
+label.re-b{display:inline-block;cursor:pointer}

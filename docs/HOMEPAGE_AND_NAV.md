@@ -933,3 +933,43 @@ No schema change, no server code. Doors between branch rooms no longer play the 
 - **API:** public `GET /api/room-doc/:slug` (cached 30 s), admin `PUT /api/admin/room-doc/:slug {doc, baseVersion}` (409 on conflict), admin `DELETE`.
 - **Known limits:** solids are drawn before terminals and people (a person standing behind a solid may be drawn in front of it); collision is at floor level only until the height delivery; no texture painting yet (fix357); actors exist only in the room you are in, not in the far room seen through a corridor.
 - Tests: `roomdoc.test.ts` (22), backend `roomdoc.test.ts`, `e2e_fix356.py` (14).
+
+## fix357 — Room editor, part 2: painted floors
+
+**No schema change** (floors live inside the `RoomDoc` document: new fields `tex` and `floor`).
+- **Floor tab** in the editor: add up to 16 *materials* per room (pattern, metres per repeat, flow speed, colour), pick one, and paint cells (0.5 m) on the plan view. Tools: **brush** (size 1–5), **fill**, **erase**, **pick up** (take the material under the cursor). **Undo / redo** (buttons, Ctrl+Z, Ctrl+Shift+Z) now cover everything in the editor (things, wires, paint, materials), 50 steps; a drag or a brush stroke counts as one step.
+- **Patterns** (generated in the browser, nothing downloaded, always tileable): noise, scan, grid, diamond, circuit, water, brick, static.
+- **How it is drawn** (`lib/roomFloor.ts`, `lib/roomTextures.ts`, `RoomPainter.floorPaint`): painted cells are merged into a few rectangles drawn flat first (the average colour), clipped to the room's floor; then 1 m or 0.5 m blocks within 10 m are drawn as affine-mapped tiles from a 128 px sheet. Because each block samples an exact piece of the sheet, the pattern repeats without seams. Budget: 260 tiles per frame, 120 when the resolution governor has dropped a step, none (flat colour only) when it is lower. Flowing floors repaint ~15 times a second; still floors cost nothing.
+- **Look:** near tiles show the affine wobble (expected, and the same family as the PS1 look); the floor never leaves the room's walls.
+- **Storage:** `floor` is run-length coded over an 80×80 grid centred on the room (covers ±20 m), usually a few hundred bytes. The server clamps and validates it like the rest of the document.
+- Fixed on the way: Save stayed disabled after changes that touched only paint or materials.
+- Tests: `roomfloor.test.ts` (18), `e2e_fix357.py` (11). Backend copy of `roomDoc.ts` stays identical (backend test).
+- **Not yet** (your design notes, queued): wall bands, uploaded textures and sky/.env.zip import, artifacts (text/logo on a wall, scan-only objects, door activation, logbook entries), light pools, fog/grade, particles (dust, black-hole debris), prop catalogue, copy style and subtree themes, conditional swap. Corridors and elevators will become editable rooms.
+
+## fix358 — Room editor, part 3: walls, mood, light pools
+
+**No schema change** (new fields in the room document: `bands`, `grade`, and a `pulse` on actors).
+- **Walls tab:** click a wall on the plan (dashed), pick a material (made in the Floor tab), set where along the wall (from % to %) and how high (low m to high m), "Add strip". "Whole wall" fills it. Up to 12 strips per wall, 96 per room. Strips are drawn behind doors.
+- **Mood tab:** one colour tint (strength 0 to 0.4) and one fog band across the horizon (colour, density 0 to 1). Drawn as one translucent fill and one cached gradient stamped once per frame.
+- **Light pools:** new thing "pool": a soft disc of light on the floor (size, colour), shown/hidden by wires like a light. **Slow swell** (0 to 2 Hz, smooth sine, never a flash) works on pools and lights; this keeps to the strobe rule.
+- **Cost:** wall tiles share the floor's tile budget (walls take at most half), only within 12 m, only strips of at most 70 tiles; beyond that, or when the governor has dropped, strips are a flat tint. A room with pulsing or flowing things repaints ~15 times a second; otherwise nothing.
+- Tests: `roomstyle.test.ts` (7), `e2e_fix358.py` (11).
+- Next: uploaded textures and sky (needs a table), artifacts and the Logbook, particles, corridors as rooms.
+
+## fix359 — Uploaded pictures, ceiling material, zip import
+
+- **Library**: Floor tab → "Add a picture" (any image → centre-cropped square, 128 px, PNG ≤ 100 KB) with a 2×2 seam preview so you can see whether it tiles; "Save to library". "Import a zip" (the `.env.zip` idea) shrinks every picture inside (max 24 per zip, 200 entries, 8 MB each) and adds it. Zip is read with the browser's `DecompressionStream`, no library.
+- **Use**: a library picture becomes a material (`kind: "u<id>"`) like any pattern: floor, wall strips, ceiling.
+- **Ceiling**: Mood tab → Ceiling select (`RoomDoc.ceil`, 1-based material, 0 none). This is the sky; no panorama skybox yet.
+- **Backend**: table `texture_assets` (id, name, png Bytes). Public `GET /api/room-textures/:id` (immutable cache); admin list/POST/DELETE (max 300, body ≤ 300 kB, PNG square 64/128/256).
+- **Perf**: uploaded pictures load async and draw flat (average colour) until ready; same per-frame tile budget as built-ins. Editor is a lazy chunk (26 kB), visitors never download it.
+- Tests: `roomdoc.test.ts` (27), `zipread.test.ts` (5), backend `png.test.ts`, `e2e_fix359.py` (12).
+
+## fix360 — Skies (`.env.zip` = skybox)
+
+- **Sky replaces the ceiling** as an open view overhead (`RoomDoc.sky = {id, speed}`; wins over the ceiling material). Mood tab → Sky: pick from the library, "Turning" slider −30…30 °/s in 0.5 steps; the panorama wraps round forever, so a starfield can drift.
+- **Import**: "Import a skybox zip" or "Add a sky" (select six files at once, or one wide picture). Faces are recognised by name: front/back/left/right/up/down, ft/bk/lf/rt/up/dn, px/nx/py/ny/pz/nz (CamelCase too). At least the four sides are needed (missing top/bottom stay dark). A single wide picture is stretched to 2:1. The editor composes a 1024×512 equirectangular panorama, stored as JPEG (≤ 300 KB; falls back to 512×256).
+- **Storage**: same `texture_assets` table, name prefixed `sky:` (no new schema change after fix359). `GET /api/room-textures/:id` now serves PNG or JPEG by signature. Admin POST accepts `{sky:true}`; list returns `sky` flag; sky pictures are hidden from the floor picture grid.
+- **Perf**: one clipped `drawImage` (two when wrapping) per frame, only inside the ceiling polygon. A turning sky repaints ~15 Hz only while the ceiling is actually on screen; looking down or a speed of 0 costs nothing.
+- Assumptions: up/down faces follow the OpenGL cubemap orientation; sides are unmirrored as seen from inside. Horizontal mapping is linear in angle (slight stretch at the edges on wide screens).
+- Tests: `roomdoc.test.ts` (32), `skymake.test.ts` (24), backend `png.test.ts`, `e2e_fix360.py` (15).

@@ -8,15 +8,18 @@ import type { Drone } from "./roomDrone";
 import type { Lock } from "./roomLock";
 import { EYE_Y, NEAR, focalOf, type Eye, type Target } from "./roomView";
 import type { Actor, RoomDoc, WireRuntime } from "./roomDoc";
+import { frac, type FloorLayer } from "./roomFloor";
+import { sheetTile, skyImage, texAvg, texSheet } from "./roomTextures";
+import { inRoom } from "./roomScene";
 
 /** What the owner built in the room you are in. Set by the room component; the painter draws it when `slug` matches. `edit` shows what visitors never see (triggers, markers, hidden things) and highlights `sel`. */
-export const actorLayer: { slug: string; doc: RoomDoc | null; rt: WireRuntime | null; edit: boolean; sel: string | null } = { slug: "", doc: null, rt: null, edit: false, sel: null };
-interface ActorStyle { a: string; b: string; top: string; edge: string; faint: string; glowCol: string }
+export const actorLayer: { slug: string; doc: RoomDoc | null; rt: WireRuntime | null; edit: boolean; sel: string | null; floor: FloorLayer | null; budget: number; now: number; anim: boolean; skyAnim: boolean; skySeen: boolean } = { slug: "", doc: null, rt: null, edit: false, sel: null, floor: null, budget: 260, now: 0, anim: false, skyAnim: false, skySeen: false };
+interface ActorStyle { a: string; b: string; top: string; edge: string; faint: string; glowCol: string; pool1: string; pool2: string }
 const styles = new WeakMap<Actor, ActorStyle>();
 function styleOf(a: Actor): ActorStyle {
   let st = styles.get(a); if (st) return st;
   const ghost = a.kind === "ghost", c = a.color;
-  st = { a: rgba(c, ghost ? 0.14 : 0.62), b: rgba(c, ghost ? 0.1 : 0.46), top: rgba(c, ghost ? 0.18 : 0.78), edge: rgba(c, ghost ? 0.55 : 0.95), faint: rgba(c, 0.3), glowCol: c };
+  st = { a: rgba(c, ghost ? 0.14 : 0.62), b: rgba(c, ghost ? 0.1 : 0.46), top: rgba(c, ghost ? 0.18 : 0.78), edge: rgba(c, ghost ? 0.55 : 0.95), faint: rgba(c, 0.3), glowCol: c, pool1: rgba(c, 0.2), pool2: rgba(c, 0.34) };
   styles.set(a, st); return st;
 }
 
@@ -112,6 +115,7 @@ export class RoomPainter {
     this.qx = cx; this.qy = dy * this.cp - cz * this.sp; this.qz = cz * this.cp + dy * this.sp;
   }
   /** The world points in `wp` (n of them) as a screen path, cut at the near plane; false when none is in front. */
+  private pm = 0;
   private poly(n: number): boolean {
     const wp = this.wp, cc = this.cc, cl = this.cl;
     for (let i = 0; i < n; i++) { this.cam(wp[i * 3], wp[i * 3 + 1], wp[i * 3 + 2]); cc[i * 3] = this.qx; cc[i * 3 + 1] = this.qy; cc[i * 3 + 2] = this.qz; }
@@ -122,6 +126,7 @@ export class RoomPainter {
       if (ain !== bin) { const t = (NEAR - az) / (bz - az); cl[m * 3] = cc[i * 3] + (cc[j * 3] - cc[i * 3]) * t; cl[m * 3 + 1] = cc[i * 3 + 1] + (cc[j * 3 + 1] - cc[i * 3 + 1]) * t; cl[m * 3 + 2] = NEAR; m++; }
     }
     if (m < 3) return false;
+    this.pm = m;
     const ctx = this.ctx, hw = this.W / 2, hh = this.H / 2, f = this.f; ctx.beginPath();
     for (let i = 0; i < m; i++) { const z = cl[i * 3 + 2], x = hw + (cl[i * 3] * f) / z, y = hh - (cl[i * 3 + 1] * f) / z; if (i) ctx.lineTo(x, y); else ctx.moveTo(x, y); }
     ctx.closePath(); this.stats.polys++; return true;
@@ -153,7 +158,7 @@ export class RoomPainter {
     this.view(ctx, W, H, eye); this.fx = fx;
     ctx.fillStyle = BG; ctx.fillRect(0, 0, W, H);
     if (sp && sp.link && sp.corridor) this.corridorView(eye, sp);
-    else { this.shell(eye, -1, target, sp && sp.link ? sp : null); this.actors(eye); this.things(eye, target, others); }
+    else { this.tilesLeft = actorLayer.budget; this.shell(eye, -1, target, sp && sp.link ? sp : null); this.floorPaint(eye); this.ceilPaint(eye); this.actors(eye); this.things(eye, target, others); this.grade(); }
     if (fx?.echo) this.echo(fx.echo, fx.now);
     if (lock) this.bracket(lock);
     if (fx?.scan && fx.scan.p > 0) this.scanRing(fx.scan);
@@ -185,6 +190,7 @@ export class RoomPainter {
       const i = this.order[oi]; if (i === skip) continue;
       const a = v[i], b = v[(i + 1) % n], near = this.dist[i] < 256;
       if (this.quad(a[0], 0, a[1], b[0], 0, b[1], b[0], Hh, b[1], a[0], Hh, a[1])) { ctx.fillStyle = i % 2 ? C.wallB : C.wallA; ctx.fill(); }
+      if (actorLayer.doc?.bands.length) this.bands(i, eye);
       ctx.beginPath();
       this.seg(a[0], 0.35, a[1], b[0], 0.35, b[1]); this.seg(a[0], Hh - 0.4, a[1], b[0], Hh - 0.4, b[1]);
       if (near) { const cols = Math.max(2, Math.round(this.wallLen[i] / 1.8)); for (let c = 1; c < cols; c++) { const t = c / cols, x = a[0] + (b[0] - a[0]) * t, z = a[1] + (b[1] - a[1]) * t; this.seg(x, 0.35, z, x, Hh - 0.4, z); } }
@@ -192,6 +198,144 @@ export class RoomPainter {
       ctx.beginPath(); this.seg(a[0], 0, a[1], a[0], Hh, a[1]); ctx.lineWidth = 2; ctx.strokeStyle = C.edge; ctx.stroke();
       for (let di = 0; di < world.doors.length; di++) if (world.doors[di].edge === i) this.door(di, eye, target?.kind === "door" && target.door.id === world.doors[di].id, sp);
     }
+  }
+
+  // ---- the painted floor: flat colour for every painted rectangle, then textured tiles near the eye until the budget is spent
+  /** The sky: the ceiling becomes an open view. One wide picture, sampled by direction, turning `speed` degrees a second and wrapping round (two draws at most per frame). */
+  private skyPaint(eye: Eye, sky: { id: number; speed: number }): void {
+    const ctx = this.ctx, n = this.n, v = this.v, Hh = this.H3, img = skyImage(sky.id);
+    for (let i = 0; i < n; i++) { this.wp[i * 3] = v[i][0]; this.wp[i * 3 + 1] = Hh; this.wp[i * 3 + 2] = v[i][1]; }
+    if (!this.poly(n)) { actorLayer.skySeen = false; return; }
+    { const hh = this.H / 2, f = this.f, cl = this.cl; let top = 1e9, bot = -1e9; for (let i = 0; i < this.pm; i++) { const y = hh - (cl[i * 3 + 1] * f) / cl[i * 3 + 2]; if (y < top) top = y; if (y > bot) bot = y; } actorLayer.skySeen = bot > 0 && top < this.H; }
+    if (!actorLayer.skySeen) { this.ctx.beginPath(); return; }
+    ctx.save(); ctx.clip(); ctx.fillStyle = "#05060c"; ctx.fillRect(0, 0, this.W, this.H);
+    if (img) {
+      const W = this.W, H = this.H, f = this.f, iw = img.naturalWidth, ih = img.naturalHeight, TAU = Math.PI * 2;
+      const ha = Math.atan(W / 2 / f), va = Math.atan(H / 2 / f), yaw = eye.yaw + (sky.speed * Math.PI / 180) * actorLayer.now;
+      let u0 = (yaw - ha) / TAU; u0 -= Math.floor(u0);
+      const sw = (2 * ha / TAU) * iw, sx = u0 * iw;
+      const top = eye.pitch + va, bot = eye.pitch - va; // elevations of the screen's top and bottom edge
+      let sy0 = (0.5 - top / Math.PI) * ih, sy1 = (0.5 - bot / Math.PI) * ih, dy0 = 0, dy1 = H;
+      if (sy0 < 0) { dy0 = (-sy0 / (sy1 - sy0)) * H; sy0 = 0; } if (sy1 > ih) { dy1 = H - ((sy1 - ih) / (sy1 - (0.5 - top / Math.PI) * ih)) * H; sy1 = ih; }
+      const sh = sy1 - sy0, dh = dy1 - dy0;
+      if (sh > 0 && dh > 0) {
+        const first = Math.min(sw, iw - sx), dw = (first / sw) * W;
+        ctx.drawImage(img, sx, sy0, first, sh, 0, dy0, dw, dh);
+        if (first < sw) ctx.drawImage(img, 0, sy0, sw - first, sh, dw, dy0, W - dw, dh);
+      }
+    }
+    ctx.restore();
+  }
+  private ceilCells: { x: number; z: number }[] | null = null; private ceilKey = "";
+  /** The ceiling: one material over the whole of it, flat first and then tiles overhead while half of what is left of the budget lasts. */
+  private ceilPaint(eye: Eye): void {
+    const L = actorLayer, doc = L.doc; if (!doc || L.slug !== this.world.slug) return;
+    if (doc.sky) { this.skyPaint(eye, doc.sky); return; }
+    if (!doc.ceil) return;
+    const t = doc.tex[doc.ceil - 1]; if (!t) return;
+    const ctx = this.ctx, n = this.n, v = this.v, Hh = this.H3;
+    for (let i = 0; i < n; i++) { this.wp[i * 3] = v[i][0]; this.wp[i * 3 + 1] = Hh; this.wp[i * 3 + 2] = v[i][1]; }
+    if (!this.poly(n)) return;
+    ctx.save(); ctx.clip(); ctx.fillStyle = this.flatOf(t.kind, t.tint); ctx.fillRect(0, 0, this.W, this.H);
+    const sheet = texSheet(t.kind, t.tint), s = Math.min(1, t.scale);
+    if (sheet && this.tilesLeft > L.budget / 2) {
+      const key = s + ":" + t.scale; if (!this.ceilCells || this.ceilKey !== key) {
+        this.ceilKey = key; const cells: { x: number; z: number }[] = []; let m = 0; for (const p of v) m = Math.max(m, Math.abs(p[0]), Math.abs(p[1]));
+        for (let x = -Math.ceil(m / s) * s; x < m; x += s) for (let z = -Math.ceil(m / s) * s; z < m; z += s) if (inRoom(this.world, x + s / 2, z + s / 2)) cells.push({ x, z });
+        this.ceilCells = cells;
+      }
+      const base = ctx.getTransform().a, hw = this.W / 2, hh = this.H / 2, f = this.f, T = sheetTile(sheet); let left = Math.floor(this.tilesLeft - L.budget / 2);
+      for (const c of this.ceilCells!) {
+        const cx = c.x + s / 2 - eye.x, cz = c.z + s / 2 - eye.z; if (cx * cx + cz * cz > 100) continue;
+        this.cam(c.x, Hh, c.z); if (this.qz < NEAR) continue; const ax = hw + (this.qx * f) / this.qz, ay = hh - (this.qy * f) / this.qz;
+        this.cam(c.x + s, Hh, c.z); if (this.qz < NEAR) continue; const bx = hw + (this.qx * f) / this.qz, by = hh - (this.qy * f) / this.qz;
+        this.cam(c.x, Hh, c.z + s); if (this.qz < NEAR) continue; const dx = hw + (this.qx * f) / this.qz, dy = hh - (this.qy * f) / this.qz;
+        ctx.setTransform(base * (bx - ax), base * (by - ay), base * (dx - ax), base * (dy - ay), base * ax, base * ay);
+        ctx.drawImage(sheet, frac((c.x + t.scroll * L.now) / t.scale) * T, frac(c.z / t.scale) * T, (T * s) / t.scale, (T * s) / t.scale, 0, 0, 1, 1);
+        this.tilesLeft--; if (--left <= 0) break;
+      }
+      ctx.setTransform(base, 0, 0, base, 0, 0);
+    }
+    ctx.restore();
+  }
+  private flatCol = new Map<string, string>(); private tilesLeft = 0;
+  private flatOf(kind: string, tint: string): string { const a = texAvg(kind); if (a) return a; let c = this.flatCol.get(tint); if (!c) { c = rgba(tint, 0.2); this.flatCol.set(tint, c); } return c; }
+  /** Strips of texture on wall `i`: a flat tint for the whole strip, then tiles of up to 1 m within 12 m while the budget lasts (walls take at most half of it). */
+  private bands(i: number, eye: Eye): void {
+    const L = actorLayer, doc = L.doc; if (!doc || L.slug !== this.world.slug) return;
+    const a = this.v[i], b = this.v[(i + 1) % this.n], len = this.wallLen[i], ctx = this.ctx, dx = b[0] - a[0], dz = b[1] - a[1], hw = this.W / 2, hh = this.H / 2, f = this.f;
+    for (const bd of doc.bands) {
+      if (bd.e !== i) continue; const t = doc.tex[bd.m - 1]; if (!t) continue;
+      const x0 = a[0] + dx * bd.u0, z0 = a[1] + dz * bd.u0, x1 = a[0] + dx * bd.u1, z1 = a[1] + dz * bd.u1;
+      const col = this.flatOf(t.kind, t.tint);
+      if (this.quad(x0, bd.y0, z0, x1, bd.y0, z1, x1, bd.y1, z1, x0, bd.y1, z0)) { ctx.fillStyle = col; ctx.fill(); }
+      const mx = (x0 + x1) / 2 - eye.x, mz = (z0 + z1) / 2 - eye.z;
+      if (this.tilesLeft <= L.budget / 2 || mx * mx + mz * mz > 144) continue;
+      const sheet = texSheet(t.kind, t.tint); if (!sheet) continue;
+      const span = (bd.u1 - bd.u0) * len, H = bd.y1 - bd.y0, s = Math.min(1, t.scale), nx = Math.ceil(span / s), ny = Math.ceil(H / s); if (nx * ny > 70) continue;
+      const base = ctx.getTransform().a;
+      for (let kx = 0; kx < nx; kx++) {
+        const w = Math.min(s, span - kx * s), uA = bd.u0 * len + kx * s, fa = uA / len, fb = (uA + w) / len;
+        for (let ky = 0; ky < ny; ky++) {
+          const h = Math.min(s, H - ky * s), top = bd.y1 - ky * s;
+          this.cam(a[0] + dx * fa, top, a[1] + dz * fa); if (this.qz < NEAR) continue; const px = hw + (this.qx * f) / this.qz, py = hh - (this.qy * f) / this.qz;
+          this.cam(a[0] + dx * fb, top, a[1] + dz * fb); if (this.qz < NEAR) continue; const rx = hw + (this.qx * f) / this.qz, ry = hh - (this.qy * f) / this.qz;
+          this.cam(a[0] + dx * fa, top - h, a[1] + dz * fa); if (this.qz < NEAR) continue; const qx = hw + (this.qx * f) / this.qz, qy = hh - (this.qy * f) / this.qz;
+          const T = sheetTile(sheet), sx = frac((uA + (t.scroll * L.now)) / t.scale) * T, sy = frac(-top / t.scale) * T;
+          ctx.setTransform(base * (rx - px), base * (ry - py), base * (qx - px), base * (qy - py), base * px, base * py);
+          ctx.drawImage(sheet, sx, sy, (T * w) / t.scale, (T * h) / t.scale, 0, 0, 1, 1);
+          this.tilesLeft--;
+        }
+      }
+      ctx.setTransform(base, 0, 0, base, 0, 0);
+    }
+  }
+  private fogImg: HTMLCanvasElement | null = null; private fogKey = "";
+  /** The room's mood: a colour veil, then a fog band across the horizon (one cached gradient stamped once). */
+  private grade(): void {
+    const L = actorLayer, g = L.doc?.grade; if (!g || L.slug !== this.world.slug) return;
+    const ctx = this.ctx;
+    if (g.fogD > 0 && typeof document !== "undefined") {
+      const key = g.fog + g.fogD; if (key !== this.fogKey || !this.fogImg) {
+        const c = this.fogImg ?? document.createElement("canvas"); c.width = 4; c.height = 128; const gg = c.getContext("2d");
+        if (gg) { const gr = gg.createLinearGradient(0, 0, 0, 128); gr.addColorStop(0, rgba(g.fog, 0)); gr.addColorStop(0.5, rgba(g.fog, Math.min(0.85, g.fogD * 0.7))); gr.addColorStop(1, rgba(g.fog, 0)); gg.clearRect(0, 0, 4, 128); gg.fillStyle = gr; gg.fillRect(0, 0, 4, 128); }
+        this.fogImg = c; this.fogKey = key;
+      }
+      const hy = Math.max(-this.H, Math.min(2 * this.H, this.H / 2 + (this.f * this.sp) / Math.max(0.2, this.cp))), bh = this.H * 1.3;
+      ctx.drawImage(this.fogImg, 0, hy - bh / 2, this.W, bh);
+    }
+    if (g.tintA > 0) { ctx.globalAlpha = g.tintA; ctx.fillStyle = g.tint; ctx.fillRect(0, 0, this.W, this.H); ctx.globalAlpha = 1; }
+  }
+  floorPaint(eye: Eye): void {
+    const L = actorLayer, fl = L.floor; if (!fl || L.slug !== this.world.slug) return;
+    const ctx = this.ctx, n = this.n, v = this.v;
+    for (let i = 0; i < n; i++) { this.wp[i * 3] = v[i][0]; this.wp[i * 3 + 1] = 0; this.wp[i * 3 + 2] = v[i][1]; }
+    if (!this.poly(n)) return;
+    ctx.save(); ctx.clip();                     // paint never leaves the room's own floor
+    for (const r of fl.rects) {
+      const t = fl.tex[r.t - 1]; if (!t) continue;
+      const col = this.flatOf(t.kind, t.tint);
+      if (this.quad(r.x0, 0, r.z0, r.x1, 0, r.z0, r.x1, 0, r.z1, r.x0, 0, r.z1)) { ctx.fillStyle = col; ctx.fill(); }
+    }
+    let budget = this.tilesLeft; if (budget <= 0) { ctx.restore(); return; }
+    const base = ctx.getTransform().a, R2 = 100, hw = this.W / 2, hh = this.H / 2, f = this.f;
+    // screen position of three corners of each block (cam() is the only projection used)
+    for (const b of fl.blocks) {
+      const cx = b.x + b.s / 2 - eye.x, cz = b.z + b.s / 2 - eye.z;
+      if (cx * cx + cz * cz > R2) continue;
+      const t = fl.tex[b.t - 1]; if (!t) continue;
+      const sheet = texSheet(t.kind, t.tint); if (!sheet) continue;
+      this.cam(b.x, 0, b.z); if (this.qz < NEAR) continue; const ax = hw + (this.qx * f) / this.qz, ay = hh - (this.qy * f) / this.qz;
+      this.cam(b.x + b.s, 0, b.z); if (this.qz < NEAR) continue; const bx = hw + (this.qx * f) / this.qz, by = hh - (this.qy * f) / this.qz;
+      this.cam(b.x, 0, b.z + b.s); if (this.qz < NEAR) continue; const dx = hw + (this.qx * f) / this.qz, dy = hh - (this.qy * f) / this.qz;
+      this.cam(b.x + b.s, 0, b.z + b.s); if (this.qz < NEAR) continue;
+      const T = sheetTile(sheet), u = frac(b.x / t.scale + (t.scroll * L.now) / t.scale) * T, v = frac(b.z / t.scale) * T, sw = (T * b.s) / t.scale;
+      ctx.setTransform(base * (bx - ax), base * (by - ay), base * (dx - ax), base * (dy - ay), base * ax, base * ay);
+      ctx.drawImage(sheet, u, v, sw, sw, 0, 0, 1, 1);
+      if (--budget <= 0) break;
+    }
+    this.tilesLeft = budget;
+    ctx.setTransform(base, 0, 0, base, 0, 0); ctx.restore();
   }
 
   // ---- what the owner built (solids, ghosts, lights; in edit mode also triggers and markers)
@@ -210,6 +354,7 @@ export class RoomPainter {
       if (L.edit && !on) ctx.globalAlpha = 0.35;
       if (a.kind === "solid" || a.kind === "ghost") this.prism(a, eye, sel);
       else if (a.kind === "light") this.lamp(a, sel);
+      else if (a.kind === "pool") this.pool(a, sel);
       else this.marker(a, eye, sel);
       if (L.edit && !on) ctx.globalAlpha = 1;
     }
@@ -233,8 +378,21 @@ export class RoomPainter {
   private lamp(a: Actor, sel: boolean): void {
     this.cam(a.x, Math.max(0.4, a.h), a.z); if (this.qz < NEAR) return;
     const x = this.W / 2 + (this.qx * this.f) / this.qz, y = this.H / 2 - (this.qy * this.f) / this.qz, size = Math.min(this.W, (Math.max(a.w, a.d) * 4 * this.f) / this.qz);
-    const g = glow(a.color, 0.55); if (g && size > 2) this.ctx.drawImage(g, x - size / 2, y - size / 2, size, size);
+    const g = glow(a.color, 0.55), keep = this.ctx.globalAlpha; if (a.pulse > 0) this.ctx.globalAlpha = Math.min(1, keep * (0.75 + 0.25 * Math.sin(actorLayer.now * Math.PI * 2 * a.pulse) + 0.25));
+    if (g && size > 2) this.ctx.drawImage(g, x - size / 2, y - size / 2, size, size);
+    this.ctx.globalAlpha = keep;
     if (this.ctx.globalAlpha < 1 || sel) { this.ctx.strokeStyle = sel ? "#ffffff" : styleOf(a).edge; this.ctx.lineWidth = 1.5; this.ctx.strokeRect(x - 5, y - 5, 10, 10); }
+  }
+  /** A pool of light on the floor: two soft discs, optionally swelling slowly (never flashing). */
+  private pool(a: Actor, sel: boolean): void {
+    const st = styleOf(a), ctx = this.ctx, keep = ctx.globalAlpha, r = Math.max(a.w, a.d) / 2;
+    if (a.pulse > 0) ctx.globalAlpha = Math.min(1, keep * (0.8 + 0.2 * Math.sin(actorLayer.now * Math.PI * 2 * a.pulse)));
+    for (let pass = 0; pass < 2; pass++) {
+      const rr = pass ? r * 0.55 : r;
+      for (let k = 0; k < 16; k++) { const t = (k * Math.PI * 2) / 16; this.wp[k * 3] = a.x + Math.cos(t) * rr; this.wp[k * 3 + 1] = 0.02; this.wp[k * 3 + 2] = a.z + Math.sin(t) * rr; }
+      if (this.poly(16)) { ctx.fillStyle = pass ? st.pool2 : st.pool1; ctx.fill(); if (sel && !pass) { ctx.lineWidth = 2; ctx.strokeStyle = "#fff"; ctx.stroke(); } }
+    }
+    ctx.globalAlpha = keep;
   }
   /** Triggers (a footprint on the floor with posts) and markers (a post with a diamond). Only drawn in edit mode. */
   private marker(a: Actor, eye: Eye, sel: boolean): void {

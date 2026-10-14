@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import type { RoomDoor, RoomProp, RoomWorld } from "../lib/roomWorld";
 import { startDrone, stepDrone, droneWanted, setDroneWanted } from "../lib/roomDrone";
@@ -7,9 +7,11 @@ import { applyList, glide, isVisible, joinRoom, setVisible, type Shown } from ".
 import { clamp, doorWalkedInto, facing, MAX_PITCH, stepEye, wrapYaw, type Eye, type Target } from "../lib/roomView";
 import { actorLayer, painterFor, paintRoom, ScenePaint, type DroneView, type FxView } from "../lib/roomPaint";
 import { cleanDoc, emptyDoc, pushOut, WireRuntime, type RoomDoc } from "../lib/roomDoc";
+import { buildFloor } from "../lib/roomFloor";
 import { getJson, clearShared } from "../lib/sharedGet";
 import { api } from "../lib/api";
-import { RoomEditor } from "./RoomEditor";
+import { onTexReady } from "../lib/roomTextures";
+const RoomEditor = lazy(() => import("./RoomEditor").then((m) => ({ default: m.RoomEditor }))); // the editor is only downloaded when an admin opens it
 import { makePool, parseGhosts, stepGhosts, type Ghost } from "../lib/roomGhosts";
 import { buildLink, crossed, eyeSpace, flipLink, inRoom, resolveMove, type Link as RoomLink } from "../lib/roomScene";
 import { ScaleGovernor } from "../lib/roomPerf";
@@ -95,18 +97,36 @@ export function BranchRoom({ tick, world, color, next, wantNext, onAdvance, go, 
   editRef.current = editing; playRef.current = playTest;
   const useDoc = useCallback((d: RoomDoc, slug: string, run: boolean) => { // make `d` the live content of the room
     const rt = new WireRuntime(d); rtRef.current = rt; docSlug.current = slug;
-    actorLayer.slug = slug; actorLayer.doc = d; actorLayer.rt = rt; actorLayer.edit = editRef.current && !playRef.current;
+    actorLayer.slug = slug; actorLayer.doc = d; actorLayer.rt = rt; actorLayer.floor = buildFloor(d.floor, d.tex); actorLayer.anim = !!actorLayer.floor?.scrolls || d.tex.some((t) => t.scroll !== 0) || d.actors.some((x) => x.pulse > 0); actorLayer.skyAnim = !!d.sky?.speed; actorLayer.edit = editRef.current && !playRef.current;
     if (run) rt.start(performance.now() / 1000);
     dirty.current = true; wakeRef.current();
   }, []);
   useEffect(() => { // load the room's document
-    let dead = false; setEditing(false); setPlayTest(false); setSel(null); setErr("");
+    hist.current = { undo: [], redo: [], key: "", at: 0 }; let dead = false; setEditing(false); setPlayTest(false); setSel(null); setErr("");
     getJson<{ version: number; doc: unknown }>(`/api/room-doc/${world.slug}`).then((r) => {
       if (dead) return; const d = cleanDoc({ ...(r.doc as object), version: r.version }); setDoc(d); setSaved(d); useDoc(d, world.slug, true);
     }).catch(() => { if (!dead) { const d = emptyDoc(); setDoc(d); setSaved(d); useDoc(d, world.slug, false); } });
-    return () => { dead = true; if (actorLayer.slug === world.slug) { actorLayer.doc = null; actorLayer.rt = null; actorLayer.slug = ""; } rtRef.current = null; window.clearTimeout(docT.current); };
+    return () => { dead = true; if (actorLayer.slug === world.slug) { actorLayer.doc = null; actorLayer.rt = null; actorLayer.floor = null; actorLayer.slug = ""; } rtRef.current = null; window.clearTimeout(docT.current); };
   }, [world.slug, useDoc]);
-  const changeDoc = useCallback((d: RoomDoc) => { setDoc(d); useDoc(d, wref.current.slug, false); }, [useDoc]);
+  useEffect(() => onTexReady(() => { dirty.current = true; wakeRef.current(); }), []);
+  const docRef = useRef(doc); docRef.current = doc;
+  const hist = useRef<{ undo: RoomDoc[]; redo: RoomDoc[]; key: string; at: number }>({ undo: [], redo: [], key: "", at: 0 }), [, setHistN] = useState(0);
+  const changeDoc = useCallback((d: RoomDoc, key = "") => { // `key` groups a drag or a brush stroke into one undo step
+    const h = hist.current, t = performance.now();
+    if (!(key && key === h.key && t - h.at < 900)) { h.undo.push(docRef.current); if (h.undo.length > 50) h.undo.shift(); }
+    h.redo.length = 0; h.key = key; h.at = t; setHistN((n) => n + 1);
+    setDoc(d); useDoc(d, wref.current.slug, false);
+  }, [useDoc]);
+  const undoDoc = useCallback(() => { const h = hist.current, p = h.undo.pop(); if (!p) return; h.redo.push(docRef.current); h.key = ""; setHistN((n) => n + 1); setDoc(p); useDoc(p, wref.current.slug, false); }, [useDoc]);
+  const redoDoc = useCallback(() => { const h = hist.current, p = h.redo.pop(); if (!p) return; h.undo.push(docRef.current); h.key = ""; setHistN((n) => n + 1); setDoc(p); useDoc(p, wref.current.slug, false); }, [useDoc]);
+  useEffect(() => {
+    if (!editing) return;
+    const k = (e: KeyboardEvent) => {
+      if (!(e.ctrlKey || e.metaKey) || isTypingTarget(e.target)) return;
+      if (e.code === "KeyZ" && !e.shiftKey) { e.preventDefault(); undoDoc(); } else if ((e.code === "KeyZ" && e.shiftKey) || e.code === "KeyY") { e.preventDefault(); redoDoc(); }
+    };
+    window.addEventListener("keydown", k); return () => window.removeEventListener("keydown", k);
+  }, [editing, undoDoc, redoDoc]);
   const setPlay = useCallback((on: boolean) => { setPlayTest(on); playRef.current = on; useDoc(doc, wref.current.slug, on); }, [doc, useDoc]);
   const closeEditor = useCallback(() => { setEditing(false); setPlayTest(false); editRef.current = false; playRef.current = false; actorLayer.edit = false; useDoc(saved, wref.current.slug, true); setDoc(saved); }, [saved, useDoc]);
   const saveDoc = useCallback(async () => {
@@ -114,7 +134,7 @@ export function BranchRoom({ tick, world, color, next, wantNext, onAdvance, go, 
     try { const r = await api<{ version: number; doc: RoomDoc }>(`/api/admin/room-doc/${wref.current.slug}`, { method: "PUT", body: JSON.stringify({ doc, baseVersion: saved.version }) }); clearShared(); const d = cleanDoc(r.doc); setSaved(d); setDoc(d); useDoc(d, wref.current.slug, false); }
     catch (e) { setErr(e instanceof Error ? e.message : "Could not save"); } finally { setBusy(false); }
   }, [doc, saved, useDoc]);
-  const sameDoc = JSON.stringify({ a: doc.actors, w: doc.wires }) === JSON.stringify({ a: saved.actors, w: saved.wires });
+  const sameDoc = JSON.stringify({ a: doc.actors, w: doc.wires, t: doc.tex, f: doc.floor, b: doc.bands, g: doc.grade, c: doc.ceil, k: doc.sky }) === JSON.stringify({ a: saved.actors, w: saved.wires, t: saved.tex, f: saved.floor, b: saved.bands, g: saved.grade, c: saved.ceil, k: saved.sky });
   useEffect(() => { dirty.current = true; wakeRef.current(); }, [track?.id, playing, droneOn]);
   useEffect(() => { const on = () => setDroneOn(droneWanted()); window.addEventListener("exomusica-drone-pref", on); return () => window.removeEventListener("exomusica-drone-pref", on); }, []);
 
@@ -251,7 +271,8 @@ export function BranchRoom({ tick, world, color, next, wantNext, onAdvance, go, 
       } else { const v = scanView.current; v.x = sc.s.x; v.y = sc.s.y; v.z = sc.s.z; v.p = p; scanTick = true; }
     }
     const animating = wantsDrone && a.playing && !document.hidden; // a playing drone breathes: repaint about 11 times a second, not 60
-    const tick = animating && now - lastPaint.current >= 90;
+    const scrolling = (actorLayer.anim || (actorLayer.skyAnim && actorLayer.skySeen)) && actorLayer.slug === W.slug && !document.hidden; // flowing floors: about 15 a second
+    const tick = (animating && now - lastPaint.current >= 90) || (scrolling && now - lastPaint.current >= 66);
     const changed = r.moved || !!la.yaw || !!la.pitch || gliding || droneMoved || tick || aimMoved || linkMoved || echoTick || scanTick || ghostTick || docMoved; eye.current = r.eye;
     if (!traveling.current && !still) {
       const d = doorWalkedInto(W, r.eye, r.into);
@@ -277,6 +298,7 @@ export function BranchRoom({ tick, world, color, next, wantNext, onAdvance, go, 
         if (w && h) {
           const ctx = c.getContext("2d");
           if (ctx) {
+            actorLayer.now = now / 1000; actorLayer.budget = gov.current.scale >= 1 ? 260 : gov.current.scale >= 0.75 ? 120 : 0;
             lastPaint.current = now; const dv = dview.current; dv.playing = a.playing; dv.title = a.title; dv.t = now / 1000;
             const fv = fxv.current; fv.now = now; fv.echo = echoBusy ? ef : null; fv.scan = scanSt.current ? scanView.current : null;
             const L = linkRef.current, spo = sp.current; spo.link = L; spo.open = L ? L.open : 0; spo.corridor = !!L && spaceRef.current === "corridor";
@@ -289,7 +311,7 @@ export function BranchRoom({ tick, world, color, next, wantNext, onAdvance, go, 
         ++drawn.current; if (now - dsAt2.current > 100) { dsAt2.current = now; st.dataset.scale = String(gov.current.scale); const hh = dview.current.hit; st.dataset.drone = wantsDrone && hh ? `${Math.round(hh.x)},${Math.round(hh.y)}` : ""; st.dataset.drawn = String(drawn.current); }
       }
     }
-    const more = !!(changed || animating || echoBusy || pendingPaint.current || dirty.current || (!still && (k.size || stick.current.x || stick.current.y || drag.current)));
+    const more = !!(changed || animating || scrolling || echoBusy || pendingPaint.current || dirty.current || (!still && (k.size || stick.current.x || stick.current.y || drag.current)));
     if (more || gpool.current.active) raf.current = requestAnimationFrame(frame); else { last.current = 0; flushDs(); if (ghosts.current.length) { window.clearTimeout(ghostT.current); ghostT.current = window.setTimeout(() => wakeRef.current(), Math.min(30000, Math.max(250, gpool.current.nextStartMs)) + 40); } }
   }, [color, go, onLocked, showToast, flushDs, solve, openLink, ensureFx, showCard]);
 
@@ -384,7 +406,7 @@ export function BranchRoom({ tick, world, color, next, wantNext, onAdvance, go, 
         <button type="button" className="rm-btn" data-testid="room-lock" aria-pressed={locked} onClick={toggleLock}>{locked ? "Unlock" : "Lock on"}</button>
         <button type="button" className="rm-btn" aria-pressed={visible} data-testid="room-visible" title={visible ? "Others in this room can see you. Press to hide (you will not see them either)." : "You are hidden. Press to appear."} onClick={() => { const v = !visible; setVisible(v); setVis(v); }}>{visible ? "Visible" : "Hidden"}</button>
       </div>
-      {isAdmin && editing && <RoomEditor world={world} doc={doc} onDoc={changeDoc} sel={sel} setSel={(id) => { setSel(id); actorLayer.sel = id; dirty.current = true; wakeRef.current(); }} where={() => eye.current} dirty={!sameDoc} busy={busy} error={err} playing={playTest} onPlay={setPlay} onSave={saveDoc} onRevert={() => { setDoc(saved); useDoc(saved, wref.current.slug, false); }} onClose={closeEditor} />}
+      {isAdmin && editing && <Suspense fallback={null}><RoomEditor world={world} doc={doc} onDoc={changeDoc} onUndo={undoDoc} onRedo={redoDoc} canUndo={hist.current.undo.length > 0} canRedo={hist.current.redo.length > 0} sel={sel} setSel={(id) => { setSel(id); actorLayer.sel = id; dirty.current = true; wakeRef.current(); }} where={() => eye.current} dirty={!sameDoc} busy={busy} error={err} playing={playTest} onPlay={setPlay} onSave={saveDoc} onRevert={() => { setDoc(saved); useDoc(saved, wref.current.slug, false); }} onClose={closeEditor} /></Suspense>}
       <div className="rm-pad"><RoomStick onChange={onStick} /></div>
       <button type="button" className="rm-use" data-testid="room-use" onClick={() => { use(); }} onPointerDown={(e) => e.stopPropagation()}>Use</button>
       <p className="rm-hint">W A S D move · arrows look · Q E turn · Space use · right-click / Z lock on · X scan · V ping · L logbook · C drone · Esc leave</p>

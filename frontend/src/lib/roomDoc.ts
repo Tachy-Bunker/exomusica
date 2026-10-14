@@ -8,8 +8,8 @@ export const MAX_PER_ACTOR_TICK = 8;       // per target, so a loop cannot run a
 export const MAX_DELAY = 600;              // seconds
 export const RANGE = 200;                  // metres, positions are clamped to +-RANGE
 
-export type Kind = "solid" | "ghost" | "trigger" | "light" | "marker";
-export const KINDS: Kind[] = ["solid", "ghost", "trigger", "light", "marker"];
+export type Kind = "solid" | "ghost" | "trigger" | "light" | "marker" | "pool";
+export const KINDS: Kind[] = ["solid", "ghost", "trigger", "light", "marker", "pool"];
 
 /** Events an actor can emit, per kind. "start" fires once when the room loads. */
 export const EVENTS: Record<Kind, string[]> = {
@@ -18,6 +18,7 @@ export const EVENTS: Record<Kind, string[]> = {
   trigger: ["enter", "exit", "start"],
   light: ["shown", "hidden", "start"],
   marker: ["scanned", "start"],
+  pool: ["shown", "hidden", "start"],
 };
 /** Messages an actor accepts. */
 export const MESSAGES: Record<Kind, string[]> = {
@@ -26,6 +27,7 @@ export const MESSAGES: Record<Kind, string[]> = {
   trigger: ["enable", "disable", "fire"],
   light: ["show", "hide", "toggle"],
   marker: ["fire"],
+  pool: ["show", "hide", "toggle"],
 };
 
 export interface Actor {
@@ -38,11 +40,27 @@ export interface Actor {
   sides: number;                       // 0 = box, 3..8 = regular prism
   color: string;                       // #rrggbb
   on: boolean;                         // starts visible/active
+  pulse: number;                       // lights and pools: a slow smooth swell, 0..2 Hz (never a flash)
 }
 export interface Wire { from: string; ev: string; to: string; msg: string; delay: number; once: boolean }
-export interface RoomDoc { v: 1; version: number; actors: Actor[]; wires: Wire[] }
+/** Looping floor textures. `kind` picks a procedural pattern; a room has up to MAX_TEX materials, and each floor cell is 0 (none) or a material number (1-based). */
+export const TEX_KINDS = ["noise", "scan", "grid", "diamond", "circuit", "water", "brick", "static"] as const;
+export const MAX_TEX = 16, GRID = 80;      // the floor grid is GRID x GRID cells of 0.5 m, centred on the room's middle
+export interface Tex { kind: string; scale: number; scroll: number; tint: string }
+/** `floor` is run-length coded: [count, value, count, value, ...] over GRID*GRID cells, row by row; empty means no paint. */
+/** A strip of texture on a wall: wall edge `e`, from `u0` to `u1` along it (0..1), from height `y0` to `y1`, material `m` (1-based). */
+export interface Band { e: number; u0: number; u1: number; y0: number; y1: number; m: number }
+export const MAX_BANDS = 96, MAX_BANDS_PER_WALL = 12;
+/** The room's mood: a colour veil over everything (strength 0..0.4) and a fog band at the horizon (density 0..1). */
+export interface Grade { tint: string; tintA: number; fog: string; fogD: number }
+/** `ceil` is the material (1-based, 0 = none) tiled over the whole ceiling. A material's `kind` is a built-in pattern or `u<id>`, a picture from the texture library. */
+export const isUpload = (k: string): boolean => /^u\d{1,9}$/.test(k);
+/** The sky: a 2:1 panorama from the library (`id`), seen overhead instead of a ceiling, turning `speed` degrees a second (wraps around). */
+export interface Sky { id: number; speed: number }
+export const MAX_SKY_SPEED = 30;
+export interface RoomDoc { v: 1; version: number; actors: Actor[]; wires: Wire[]; tex: Tex[]; floor: number[]; bands: Band[]; grade: Grade | null; ceil: number; sky: Sky | null }
 
-export const emptyDoc = (): RoomDoc => ({ v: 1, version: 0, actors: [], wires: [] });
+export const emptyDoc = (): RoomDoc => ({ v: 1, version: 0, actors: [], wires: [], tex: [], floor: [], bands: [], grade: null, ceil: 0, sky: null });
 
 const num = (x: unknown, lo: number, hi: number, d: number) => { const n = typeof x === "number" && Number.isFinite(x) ? x : d; return Math.min(hi, Math.max(lo, n)); };
 const str = (x: unknown, max: number, d = "") => (typeof x === "string" ? x.replace(/[\u0000-\u001f]/g, "").slice(0, max) : d);
@@ -67,7 +85,7 @@ export function cleanDoc(raw: unknown): RoomDoc {
       w: num(o.w, 0.1, 60, 2), d: num(o.d, 0.1, 60, 2), h: num(o.h, 0, 30, kind === "solid" || kind === "ghost" ? 1.5 : 2),
       rot: num(o.rot, -7, 7, 0), sides: sides === 1 || sides === 2 ? 0 : sides,
       color: typeof o.color === "string" && COLOR.test(o.color) ? o.color.toLowerCase() : "#7a8cff",
-      on: o.on === false ? false : true,
+      on: o.on === false ? false : true, pulse: kind === "light" || kind === "pool" ? Math.round(num(o.pulse, 0, 2, 0) * 4) / 4 : 0,
     });
   }
   const seen = new Set<string>();
@@ -82,6 +100,35 @@ export function cleanDoc(raw: unknown): RoomDoc {
     const key = `${wire.from}|${wire.ev}|${wire.to}|${wire.msg}|${wire.delay}`;
     if (seen.has(key)) continue;
     seen.add(key); out.wires.push(wire);
+  }
+  if (Array.isArray(r.tex)) for (const t of r.tex) {
+    if (out.tex.length >= MAX_TEX || !t || typeof t !== "object") continue;
+    const o = t as Record<string, unknown>;
+    out.tex.push({ kind: TEX_KINDS.find((k) => k === o.kind) ?? (typeof o.kind === "string" && isUpload(o.kind) ? o.kind : "noise"), scale: Math.round(num(o.scale, 0.5, 8, 2) * 4) / 4, scroll: Math.round(num(o.scroll, -2, 2, 0) * 20) / 20, tint: typeof o.tint === "string" && COLOR.test(o.tint) ? o.tint.toLowerCase() : "#7a8cff" });
+  }
+  if (Array.isArray(r.floor) && r.floor.length % 2 === 0 && r.floor.length <= GRID * GRID * 2) {
+    let total = 0, ok = true; const f: number[] = [];
+    for (let i = 0; i < r.floor.length; i += 2) {
+      const c = r.floor[i], v = r.floor[i + 1];
+      if (typeof c !== "number" || typeof v !== "number" || !Number.isInteger(c) || !Number.isInteger(v) || c < 1) { ok = false; break; }
+      total += c; f.push(c, v >= 1 && v <= out.tex.length ? v : 0);
+    }
+    if (ok && total === GRID * GRID) out.floor = f;
+  }
+  const perWall = new Map<number, number>();
+  if (Array.isArray(r.bands)) for (const b of r.bands) {
+    if (out.bands.length >= MAX_BANDS || !b || typeof b !== "object" || !out.tex.length) continue;
+    const o = b as Record<string, unknown>, e = Math.round(num(o.e, 0, 31, 0)), m = Math.round(num(o.m, 1, out.tex.length, 1));
+    const u0 = num(o.u0, 0, 1, 0), u1 = num(o.u1, 0, 1, 1), y0 = num(o.y0, 0, 30, 0), y1 = num(o.y1, 0, 30, 2);
+    if (u1 - u0 < 0.01 || y1 - y0 < 0.1 || (perWall.get(e) ?? 0) >= MAX_BANDS_PER_WALL) continue;
+    perWall.set(e, (perWall.get(e) ?? 0) + 1);
+    out.bands.push({ e, u0: Math.round(u0 * 1000) / 1000, u1: Math.round(u1 * 1000) / 1000, y0: Math.round(y0 * 100) / 100, y1: Math.round(y1 * 100) / 100, m });
+  }
+  out.ceil = Math.round(num(r.ceil, 0, out.tex.length, 0));
+  if (r.sky && typeof r.sky === "object") { const k = r.sky as Record<string, unknown>, id = Number(k.id); if (Number.isInteger(id) && id >= 1 && id <= 1e9) out.sky = { id, speed: Math.round(num(k.speed, -MAX_SKY_SPEED, MAX_SKY_SPEED, 0) * 2) / 2 }; }
+  if (r.grade && typeof r.grade === "object") {
+    const g = r.grade as Record<string, unknown>, tintA = Math.round(num(g.tintA, 0, 0.4, 0) * 100) / 100, fogD = Math.round(num(g.fogD, 0, 1, 0) * 100) / 100;
+    if (tintA > 0 || fogD > 0) out.grade = { tint: typeof g.tint === "string" && COLOR.test(g.tint) ? g.tint.toLowerCase() : "#7a8cff", tintA, fog: typeof g.fog === "string" && COLOR.test(g.fog) ? g.fog.toLowerCase() : "#202040", fogD };
   }
   return out;
 }
