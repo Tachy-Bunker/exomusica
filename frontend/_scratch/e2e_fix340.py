@@ -73,7 +73,7 @@ def run(pw):
     # picking: N goes to a room and selects it
     pg.keyboard.press("KeyR"); pg.wait_for_timeout(700)
     pg.keyboard.press("KeyE"); pg.wait_for_selector("[data-testid=explorer-card]"); pg.wait_for_timeout(700)
-    check("Core" in pg.inner_text("[data-testid=explorer-card]") and pg.get_attribute("[data-testid=explorer-open]", "href") == "/branch/core", "N selects the first room (the hub): its card links to the branch")
+    check("Core" in pg.inner_text("[data-testid=explorer-card]") and pg.get_attribute("[data-testid=explorer-room]", "href") == "/branch/core/room" and pg.locator("[data-testid=explorer-open]").count() == 0, "N selects the first room (the hub): its card has one button, into the room")
     # clicking the middle of the screen picks the selected room again
     pg.keyboard.press("Escape") if False else None
     pg.mouse.click(650, 400); pg.wait_for_timeout(200)
@@ -85,7 +85,7 @@ def run(pw):
         t = pg.inner_text("[data-testid=explorer-card]")
         if "Not found yet" in t:
             seen_unseen += 1
-            if pg.locator("[data-testid=explorer-open]").count() or "Branch" in t or "Deep" in t: leaked = True
+            if pg.locator("[data-testid=explorer-room]").count() or "Branch" in t or "Deep" in t: leaked = True
     check(seen_unseen >= 1 and not leaked, f"Unseen rooms show ??? and no link ({seen_unseen} checked)")
     html = pg.inner_html("[data-testid=explorer-list]")
     import re as _re
@@ -100,7 +100,7 @@ def run(pw):
     for _ in range(len(NODES) + 2):
         pg.keyboard.press("KeyE"); pg.wait_for_timeout(50)
         t = pg.inner_text("[data-testid=explorer-card]")
-        if "A sealed room" in t and (pg.locator("[data-testid=explorer-open]").count() or "Sealed One" in t): sealed_leak = True
+        if "A sealed room" in t and (pg.locator("[data-testid=explorer-room]").count() or "Sealed One" in t): sealed_leak = True
     check(not sealed_leak, "A sealed room is not a doorway and has no name")
     check(hits["pulse"] == 0, "Chart layer not reached: no pulse request")
     pg, errs, hits = mk(False, pulses=True)

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { getJson } from "../lib/sharedGet";
+import { api } from "../lib/api";
 import { useDocumentTitle } from "../lib/useDocumentTitle";
 import { scannedIds } from "../lib/scanLog";
 import { keysOf } from "../lib/fieldLog";
@@ -19,6 +20,7 @@ import { BranchRoom } from "../components/BranchRoom";
 import { AlbumTerminal, ChatTerminal, DroneTerminal, ListTerminal, LogbookTerminal, RoomTerminal } from "../components/RoomTerminal";
 import type { Lore } from "../lib/roomLore";
 import type { RoomProp } from "../lib/roomWorld";
+import { previewLines } from "../lib/roomPreview";
 import { Loading } from "../components/Loading";
 
 const noop = (): void => undefined;
@@ -44,6 +46,7 @@ function RoomInner({ slug }: { slug: string }) {
   const link = useRef<HTMLAnchorElement>(null);
   const [term, setTerm] = useState<RoomProp | null>(null);
   const [pick, setPick] = useState<string | null>(null);
+  const [tick, setTick] = useState(0);
   const [droneOpen, setDroneOpen] = useState(false), [logOpen, setLogOpen] = useState(false);
   const [lore, setLore] = useState<Map<string, Lore> | null>(null), [visor, setVisor] = useState({ on: false, hint: "The echo visor is not unlocked yet." });
   const openTerm = useCallback((p: RoomProp) => { setPick(null); setDroneOpen(false); setLogOpen(false); setTerm(p); }, []);
@@ -66,6 +69,7 @@ function RoomInner({ slug }: { slug: string }) {
     const color = theme ? neon(theme.color) : "#5fd3ee";
     const world = buildRoom({ hull: g.hull, slug: s, name: branch.name, states, albums: (albums ?? []).map((a) => ({ slug: a.slug, title: a.title })), channelSlug: branch.channel?.slug ?? null, from: via });
     world.color = color; world.blurb = branch.description ?? undefined;
+    if (branch.channel?.slug) { const m = await getJson<unknown>(`/api/channels/${branch.channel.slug}/messages?limit=3`).catch(() => null); const l = previewLines(m); if (l.length) world.chat = l; }
     return { slug: s, branch, albums: albums ?? [], color, world };
   }, []);
 
@@ -109,7 +113,7 @@ function RoomInner({ slug }: { slug: string }) {
   const here = cur || null, name = here ? here.branch.name : "";
   const back = `/branch/${here ? here.slug : slug}`;
   useEffect(() => {
-    const on = (e: KeyboardEvent) => { if (e.code === "Escape" && !document.fullscreenElement) { e.stopPropagation(); if (term || droneOpen || logOpen) { setTerm(null); setPick(null); setDroneOpen(false); setLogOpen(false); } else navigate(back); } };
+    const on = (e: KeyboardEvent) => { if (e.code === "Escape" && !document.fullscreenElement) { e.stopPropagation(); if (term || droneOpen || logOpen) { setTerm(null); setPick(null); setDroneOpen(false); setLogOpen(false); } else navigate("/explore"); } };
     window.addEventListener("keydown", on); return () => window.removeEventListener("keydown", on);
   }, [navigate, back, term, droneOpen, logOpen]);
 
@@ -125,11 +129,11 @@ function RoomInner({ slug }: { slug: string }) {
     <div className="hx-page rm-page" data-testid="room-page">
       {cur === false || graph === false ? <p className="home-dim" style={{ padding: "2rem" }}>There is no room by that name. <Link to="/explore">Scan map</Link></p>
         : !here ? <Loading />
-        : <BranchRoom world={here.world} color={color} next={next ? next.world : null} wantNext={wantNext} onAdvance={advance} go={go} mapHref="/explore" backHref={back} onLocked={noop} onProp={openTerm} onDrone={openDrone} visor={visor} lore={lore} onLogbook={openLog} paused={!!term || droneOpen || logOpen} />}
+        : <BranchRoom tick={tick} world={here.world} color={color} next={next ? next.world : null} wantNext={wantNext} onAdvance={advance} go={go} mapHref="/explore" backHref={back} onLocked={noop} onProp={openTerm} onDrone={openDrone} visor={visor} lore={lore} onLogbook={openLog} paused={!!term || droneOpen || logOpen} />}
       {droneOpen && branch && <RoomTerminal title="drone // player" color={color} onClose={() => setDroneOpen(false)}><DroneTerminal onClose={() => setDroneOpen(false)} /></RoomTerminal>}
       {logOpen && branch && <RoomTerminal title="logbook" color={color} onClose={() => setLogOpen(false)}><LogbookTerminal lore={lore} /></RoomTerminal>}
       {term && branch && here && (() => {
-        const close = () => { setTerm(null); setPick(null); };
+        const close = () => { setTerm(null); setPick(null); if (term.kind === "terminal" && branch.channel?.slug) void api<unknown>(`/api/channels/${branch.channel.slug}/messages?limit=3`).then((m) => { const l = previewLines(m); if (l.length) { here.world.chat = l; setTick((t) => t + 1); } }).catch(() => undefined); };
         if (term.kind === "terminal") return <RoomTerminal title={`${name} // talk`} color={color} onClose={close}><ChatTerminal slug={branch.channel?.slug ?? ""} name={name} /></RoomTerminal>;
         const slugOf = pick ?? (term.kind === "album" ? term.id.slice(2) : null);
         if (slugOf) return <RoomTerminal title={`${name} // disc`} color={color} onClose={close}><AlbumTerminal slug={slugOf} /></RoomTerminal>;

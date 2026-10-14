@@ -903,3 +903,33 @@ No schema change, no server code. Doors between branch rooms no longer play the 
 - **Light:** the loop runs only while the overlay is open and visible, stops repainting when paused and untouched, repaints ~84 slice-quads per frame, reuses the ScaleGovernor (lower pixel scale / 30 fps on slow devices).
 - Debug attributes on the stage: `data-t`, `data-dir`, `data-drawn`, `data-scale`, `data-ready`, `data-marks`.
 - Tests: `waveball.test.ts`, backend `waveprofile.test.ts`, `e2e_fix353.py` (19 checks).
+
+## fix354 — Echoes of members
+
+**No schema change** (server memory only, so echoes are lost when the backend restarts).
+- **What:** in a branch room you see faint figures retracing what recent members did there. They fade in, walk the path they walked (up to the last minute of a visit), fade out, wait ~6 s and come round again, each on its own phase. Label: "name · 3 h ago" (only when close). An echo is hidden while its owner is in the room for real, and while it is outside the walls (it leaves through a door).
+- **Recording** (`backend/src/lib/roomGhosts.ts`, `GhostStore`, wired in `routes/roomPresence.ts`): each live room socket records a sample (x, z, yaw) at most every 400 ms, latest 150 (60 s). When the socket ends, a walk of ≥8 samples and ≥4 m becomes that person's echo in that room: one per person per room, 10 per room, dropped after 48 h. A visitor receives the room's echoes (never their own) once, as `{t:"echoes"}` on connect (≈2.7 KB each at most).
+- **Privacy:** only people who are visible in rooms are recorded (guests and invisible members have no socket), and only those people see echoes. Switching to **invisible** calls `POST /api/rooms/forget-echoes`, which removes your echoes from every room and clears what is being recorded. Echoes carry the username, like live presence.
+- **Light** (`lib/roomGhosts.ts`): a preallocated pool, no allocation per frame; while an echo walks the room repaints ~15×/s (not 60) and between walks nothing runs; one timer wakes the loop for the next walk. Echoes are drawn as the normal figure at 42 % alpha (`Shown.ghost`, `Shown.note`), are not lockable and do not count in "n here".
+- Debug attribute: `data-ghosts` (echoes drawn now).
+- Tests: backend `roomghosts.test.ts`, `ghosts.test.ts`, `e2e_fix354.py` (8 checks).
+
+## fix355 — Rooms first, terminal preview
+
+**No schema change.**
+- **Rooms first:** every branch link (explorer card, homepage, Study, header chip, radio, chart, channel tether) goes to `/branch/<slug>/room` via `branchHref` (`lib/branchLinks.ts`, `lib/roomFirst.ts`). The explorer card has one **Enter** button. Direct `/branch/:slug` still opens the classic page.
+- **Classic via a switch:** the "Classic view" button in the room, and the checkbox "Open branches as 3D rooms" on the branch page. Stored in localStorage `exomusica_rooms3d`; default is on unless classic mode is auto-detected (reduced motion, weak device, save-data).
+- **Esc** in a room now goes to the map (`/explore`).
+- **Terminal preview:** the chat terminal's screen shows the last 3 messages (24 chars each, "(quiet in here)" when empty), only within 6 m and when the text would be at least 7 px. Refreshed when the terminal closes (`lib/roomPreview.ts`, `RoomWorld.chat`).
+- Tests: `preview.test.ts`, `roomfirst.test.ts`, `e2e_fix355.py` (11 checks). Older e2e 340, 347, 297 updated for the new links.
+
+## fix356 — Room editor, part 1: actors and wires
+
+**Schema change:** new table `RoomDoc` (`room_docs`: slug, version, doc JSON). Run the Prisma commands from the delivery note (migration `room_docs`).
+- **Idea (from Retro's RUDE):** everything the owner builds in a room is an *Actor*; Actors talk by *wires* (event of one → message to another, optional delay, optional "only once"). No code.
+- **Actors:** `solid` (blocks you; box or 3–8 sided prism), `ghost` (cosmetic), `trigger` (zone: sends enter/exit; invisible to visitors), `light` (glow), `marker` (named point). Messages: show / hide / toggle (solid, ghost, light), enable / disable / fire (trigger), fire (marker). Events: shown / hidden, enter / exit, scanned, and `start` (when the room loads).
+- **Editor (admin only):** the "Edit room" button in a room opens a panel with a plan view (click to select, drag to move, 0.25 m snap), a list, an inspector (name, X, Z, width, depth, height, turn, shape, colour, starts visible) and a wire builder. New things appear 3 m in front of you. **Test play** runs the room live (triggers, wires, collision); Stop returns to editing. **Save** sends the whole document with the version you loaded; if someone saved in between it says so.
+- **Runtime** (`lib/roomDoc.ts`, a copy in `backend/src/lib/roomDoc.ts`, kept identical by a backend test): wires are a flat list; nothing runs per frame unless a trigger exists or a delayed wire is waiting (one timer wakes the room). Guard rails: 150 actors, 400 wires, 8 messages per target per tick, 64 per tick, delays up to 600 s. `cleanDoc` clamps everything and drops dangling wires on both sides.
+- **API:** public `GET /api/room-doc/:slug` (cached 30 s), admin `PUT /api/admin/room-doc/:slug {doc, baseVersion}` (409 on conflict), admin `DELETE`.
+- **Known limits:** solids are drawn before terminals and people (a person standing behind a solid may be drawn in front of it); collision is at floor level only until the height delivery; no texture painting yet (fix357); actors exist only in the room you are in, not in the far room seen through a corridor.
+- Tests: `roomdoc.test.ts` (22), backend `roomdoc.test.ts`, `e2e_fix356.py` (14).

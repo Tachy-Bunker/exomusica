@@ -28,6 +28,8 @@ export class RoomHub {
     const x = Math.max(-LIMIT, Math.min(LIMIT, p.x)), z = Math.max(-LIMIT, Math.min(LIMIT, p.z));
     m.pose = { x, z, yaw: Math.max(-7, Math.min(7, p.yaw)) }; m.at = now; m.posed = true; this.dirty.add(m.room); return true;
   }
+  /** The vetted (clamped) position last accepted for this socket. */
+  poseOf(key: number): Pose | null { return this.members.get(key)?.pose ?? null; }
   count(room: string): number { let n = 0; for (const m of this.members.values()) if (m.room === room) n++; return n; }
   /** Drop people who stopped talking (closed laptop, lost signal). */
   sweep(now = Date.now()): number[] {

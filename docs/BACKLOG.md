@@ -1,6 +1,6 @@
 # Exomusica backlog (kept through chat compaction: update this file with every delivery)
 
-Last updated: fix349. Built milestone rewards are listed in `docs/HOMEPAGE_AND_NAV.md`.
+Last updated: fix355. Built milestone rewards are listed in `docs/HOMEPAGE_AND_NAV.md`.
 
 ## Milestone rewards still labelled "reward being built"
 - **Monthly challenge** (100 members): a monthly challenge with a boss brief. Needs a design write-up first (item 91).
@@ -84,3 +84,26 @@ Last updated: fix349. Built milestone rewards are listed in `docs/HOMEPAGE_AND_N
 - fix353 DELIVERED: Morph ball (overlay from the expanded player; profile shared via `wave_profile` columns).
 - Next: fix354 Echoes of members (faint replayed paths of recent visitors; server-memory path recording); then the design write-up of music/sound-based bosses.
 - Morph ball follow-ups: also open it from room terminals/the drone, ball hops on transients, ghost balls of other listeners, A/B loop between two save points, make save points from the ball (needs permission model for bookmarks), spectral-flux "gates" as obstacles.
+
+## Roadmap after fix354
+- fix354 DELIVERED: Echoes of members (in-memory, per room, 48 h, forget on invisible).
+- Next: the design write-up of music/sound-based bosses (consistent with Monthly challenge and Twelve Artifacts).
+- Echo follow-ups: persist echoes across restarts (needs a table), echoes in corridors, "echo of the owner" in branches (author walks a tour), echoes that stop at what they scanned, a Morph-ball ghost per listener.
+
+## fix355 notes
+- Done: rooms first, terminal preview. Design write-ups written: Room editor, Bosses made of sound (artifacts in claude.ai; recommendation: call-and-response boss first).
+- Next: fix356 height (Eye.y, level ramps, platforms, ceilings, jump, look up/down); fix357 admin map overrides (new table MapOverride).
+- Editor (E1-E5) waits for the owner's go-ahead after height.
+
+## Vision (owner, fix355 round): THANATON
+- Setting: everything inside a supermassive black hole, Thanaton. Members fell in; alien lifeforms and tribes adapted and built the ephemeral rooms. Solo campaign by default (players see each other until they choose a boss/puzzle, which is solo; co-op later). Opens with a scan lore, then the player is dropped into a room.
+- Room editor (admin first): low-poly shapes that collide or are cosmetic, damaging or not; textures that loop painted on zones. Exovisual later (psychedelic/entoptic graphics).
+- Doc: "Thanaton — 100 possibilities" (claude.ai artifact e3fb55a7-081c-4b81-9a98-482b63b18383). Also "Room editor — design" and "Bosses made of sound — design".
+- Order: fix356 height (platform prisms) -> fix357 editor E1-E2 (RoomStyle table, solid/ghost prisms) -> fix358 hazards/triggers -> fix359 admin map overrides. Strobe-safe cap (<3 flashes/s) is a hard rule.
+
+## fix356 notes (editor part 1 done)
+- Done: RoomDoc table, actors (solid/ghost/trigger/light/marker), wires, plan-view editor, test play, save with version.
+- Next (owner: "editors first", Retro RUDE-inspired): fix357 texture zones painted on floor/walls + prefabs ("assemblies") + more messages (play sound, set colour, teleport, show text). Then paths + camera shots, emitters, hazards (damage/push/slow), then height, then admin map overrides.
+- Ideas from the Retro interviews: one universal message system, prefabs, camera shots as first-class, engine owns performance.
+- Draw order: solids vs terminals/people are not depth-sorted together; fix when height lands.
+- Actors in the far room (seen through a corridor) are not drawn or collided.

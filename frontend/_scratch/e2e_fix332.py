@@ -38,6 +38,7 @@ def run(playwright):
     p.keyboard.press("i"); p.wait_for_selector("[data-testid=probe-hud]"); p.keyboard.press("2")
     p.wait_for_selector("[data-testid=heat-scanned]", timeout=4000)
     check(p.get_attribute("[data-testid=heat-recent]", "aria-pressed") == "true", "Unlocked: Thermal opens on the familiar Recent reading")
+    p.wait_for_function("()=>document.getElementById('h').dataset.heat", timeout=3000)
     check(p.evaluate("()=>document.getElementById('h').dataset.heat") == "4", "Recent: the recently active branch is hot")
     check(len(heat_calls) == 0, "…and the community data isn't fetched until asked for")
     p.click("[data-testid=heat-scanned]"); p.wait_for_function("()=>document.getElementById('c').dataset.heat==='4'", timeout=4000)

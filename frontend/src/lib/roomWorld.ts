@@ -18,6 +18,8 @@ export interface RoomWorld {
   verts: [number, number][]; doors: RoomDoor[]; props: RoomProp[]; spawn: { x: number; z: number; yaw: number };
   /** An inscription on one wall (scan it for the branch's text), if a wall is free. */
   plaque: { x: number; z: number; nx: number; nz: number; tx: number; tz: number; edge: number } | null;
+  /** What the chat terminal's screen shows (the last few lines said in the room); set by the page. */
+  chat?: string[];
   /** The branch's own description (shown when the inscription is scanned). */
   blurb?: string;
   /** Where this room lies on the Scan map (used to place the corridor and the room behind a door). */

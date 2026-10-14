@@ -1,3 +1,5 @@
+import { branchHref } from "../lib/branchLinks";
+import { roomsFirst } from "../lib/roomFirst";
 import { PlayGlow } from "./PlayGlow";
 import { BranchStudies } from "./BranchStudies";
 import { memo, startTransition, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
@@ -218,7 +220,7 @@ export function HomeExplore({ branches, openFull = false, initialSlug = null }: 
           {current && idn && (
             <article className="explore-card" data-testid="explore-card" aria-live="off">
               {current.seed && <Link className="explore-needs" to={`/xenolab?tab=contribute&branch=${current.slug}`} data-testid="explore-needs">needs contribution</Link>}
-              <Link className="explore-head" to={`/soundbay?open=${current.slug}`} data-testid="explore-head" title={`Open ${current.name} in Soundbay`}>
+              <Link className="explore-head" to={branchHref(current.slug)} data-testid="explore-head" title={roomsFirst() ? `Walk into ${current.name}` : `Open ${current.name} in Soundbay`}>
                 <BranchEmblem glyph={idn.glyph} color={idn.color} size={56} imageUrl={current.image} />
                 <h3 className="explore-name">{current.name}</h3>
               </Link>
@@ -245,7 +247,7 @@ export function HomeExplore({ branches, openFull = false, initialSlug = null }: 
               <ul className="explore-pics" aria-label={`More pictures from ${below.name}`} data-testid="explore-pics">
                 {below.pics.map((p) => (
                   <li key={p.url} data-kind={p.kind}>
-                    <Link to={p.albumSlug ? `/album/${p.albumSlug}` : `/soundbay?open=${below.slug}`} title={p.label} aria-label={p.albumSlug ? `${p.label} (album)` : p.label} tabIndex={below.open ? undefined : -1}>
+                    <Link to={p.albumSlug ? `/album/${p.albumSlug}` : branchHref(below.slug)} title={p.label} aria-label={p.albumSlug ? `${p.label} (album)` : p.label} tabIndex={below.open ? undefined : -1}>
                       <img src={p.url} alt="" loading="lazy" decoding="async" />
                       {p.kind === "album-cover" && <span className="pic-album-icon" data-testid="pic-album-icon"><AlbumIcon size={15} /></span>}
                     </Link>

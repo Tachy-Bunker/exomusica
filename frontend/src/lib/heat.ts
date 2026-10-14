@@ -25,7 +25,7 @@ export function buildHeatMap(branches: Branch[], channels: Channel[], studies: S
 
 /** The path of an href when it points at this site, without query or hash. */
 export function pathOfHref(href: string, origin: string): string | null {
-  try { const u = new URL(href, origin); return u.origin === origin ? u.pathname.replace(/\/$/, "") || "/" : null; } catch { return null; }
+  try { const u = new URL(href, origin); return u.origin === origin ? u.pathname.replace(/\/$/, "").replace(/^(\/branch\/[^/]+)\/room$/, "$1") || "/" : null; } catch { return null; }
 }
 
 /** Thermal's second reading (a community milestone): warm = scanned by many members. */

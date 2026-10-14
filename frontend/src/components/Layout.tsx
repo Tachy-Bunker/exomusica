@@ -1,3 +1,4 @@
+import { branchHref } from "../lib/branchLinks";
 import { useClassicMode } from "../lib/classicMode";
 import { useProbeStore } from "../lib/probeStore";
 import { DEFAULT_COLORS, type ProbeColors } from "../lib/probeCore";
@@ -374,7 +375,7 @@ export function Layout() {
             ))}
           </nav>
         </div>
-        {headerTheme && <Link to={`/branch/${headerTheme.slug}`} className="hdr-branch" data-testid="hdr-branch" title={`You're in ${headerTheme.name}`}>{headerTheme.name}</Link>}
+        {headerTheme && <Link to={branchHref(headerTheme.slug)} className="hdr-branch" data-testid="hdr-branch" title={`You're in ${headerTheme.name}`}>{headerTheme.name}</Link>}
         <Link to="/" className="brand" aria-current={location.pathname === "/" ? "page" : undefined}>
           {isDesktop ? <>⩽ {underlineLetter("EXOMUSICA", "c")} ⪖</> : "⩽EXOMUSICA⪖"}
         </Link>

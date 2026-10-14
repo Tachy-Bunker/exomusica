@@ -1,3 +1,4 @@
+import { roomsFirst, setRoomsFirst } from "../lib/roomFirst";
 import { FeedLink } from "../components/FeedLink";
 import { useHeaderTheme } from "../lib/headerTheme";
 import { ChatSheet } from "../components/ChatSheet";
@@ -19,6 +20,7 @@ import { isTypingTarget } from "../lib/isTypingTarget";
 export function BranchPage() {
   const { slug } = useParams<{ slug: string }>();
   const navigate = useNavigate();
+  const [rooms3d, setRooms3d] = useState(roomsFirst);
   const [branch, setBranch] = useState<Branch | null>(null);
   const [albums, setAlbums] = useState<BranchAlbum[]>([]);
   const play = useAudioStore((s) => s.play);
@@ -109,7 +111,7 @@ export function BranchPage() {
           <Link to="/soundbay">{isDesktop ? "← Soundbay (R)" : "← Soundbay"}</Link>
         </p>
         <h1>{branch.name}</h1>
-        <p style={{ margin: "0 0 .4rem" }}><Link to={`/branch/${branch.slug}/room`} data-testid="branch-room-link">Walk into this room (3D)</Link></p>
+        <p style={{ margin: "0 0 .4rem" }}><Link to={`/branch/${branch.slug}/room`} data-testid="branch-room-link">Walk into this room (3D)</Link> · <label style={{ fontSize: "0.85rem" }}><input type="checkbox" data-testid="rooms-first" checked={rooms3d} onChange={(e) => { setRoomsFirst(e.target.checked); setRooms3d(e.target.checked); }} /> Open branches as 3D rooms</label></p>
         <FeedLink href={`/api/feed/branch/${branch.slug}`} title={`${branch.name} — new work`} />
         {branch.description && <p style={{ color: "var(--text-dim)", maxWidth: 640 }}>{branch.description}</p>}
       </div>

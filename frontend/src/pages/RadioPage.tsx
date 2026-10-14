@@ -1,3 +1,4 @@
+import { branchHref } from "../lib/branchLinks";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { api } from "../lib/api";
@@ -68,7 +69,7 @@ export function RadioPage() {
       <p className="home-dim" style={{ fontSize: "0.85rem" }} data-testid="radio-blurb">{st.blurb}</p>
       {empty ? <p className="home-dim" data-testid="radio-empty">Nothing is on air yet.</p> : !now ? <p className="home-dim">Tuning…</p> : now.locked ? <p className="home-dim" data-testid="radio-empty">This station is not open yet.</p> : (
         <div className="radio-card" data-testid="radio-card" data-station={station}>
-          {station === "branch" && now.branch && <div className="radio-branch">On air · <Link to={`/branch/${now.branch.slug}`}>{now.branch.name}</Link> {now.blockEndsAt != null && <span className="home-dim">· switches in {untilText(now.blockEndsAt - now.serverNow)}</span>}</div>}
+          {station === "branch" && now.branch && <div className="radio-branch">On air · <Link to={branchHref(now.branch.slug)}>{now.branch.name}</Link> {now.blockEndsAt != null && <span className="home-dim">· switches in {untilText(now.blockEndsAt - now.serverNow)}</span>}</div>}
           {station === "crate" && now.credit && <div className="radio-branch" data-testid="radio-credit">From the playlist <Link to={`/playlist/${now.credit.slug}`}>{now.credit.title}</Link> <span className="home-dim">by {now.credit.owner}</span></div>}
           {station === "longwave" && <div className="radio-branch" data-testid="radio-loop">Long wave <span className="home-dim">· one loop is {untilText(((now as RadioNow & { loopSeconds?: number }).loopSeconds ?? 0) * 1000)}</span></div>}
           <div className="radio-title" data-testid="radio-title">{now.track.title}</div>

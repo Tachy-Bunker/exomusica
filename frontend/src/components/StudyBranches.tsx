@@ -1,3 +1,4 @@
+import { branchHref } from "../lib/branchLinks";
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../lib/api";
@@ -23,7 +24,7 @@ export function StudyBranches({ studySlug, linked, canEdit, onChange }: { studyS
     <div className="study-branches" data-testid="study-branches">
       <span className="home-dim">Branches: </span>
       {linked.length === 0 && <span className="home-dim">none</span>}
-      {linked.map((b, i) => <span key={b.slug}>{i > 0 && ", "}<Link to={`/soundbay?open=${b.slug}`}>{b.name}</Link></span>)}
+      {linked.map((b, i) => <span key={b.slug}>{i > 0 && ", "}<Link to={branchHref(b.slug)}>{b.name}</Link></span>)}
       {canEdit && !editing && <> · <button type="button" className="link-btn" onClick={() => { setPicked(linked.map((b) => b.slug)); setEditing(true); }} data-testid="study-edit-branches">edit</button></>}
       {editing && (
         <div className="study-branch-picker">

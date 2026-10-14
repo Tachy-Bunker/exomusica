@@ -1,3 +1,4 @@
+import { roomHref, roomsFirst } from "../lib/roomFirst";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { clampCam, defaultCam, focalOf, isTopView, panBy, pick, project, upsideDown, wrapAngle, type Cam } from "../lib/hullCamera";
@@ -262,7 +263,7 @@ export function BranchExplorer({ hull, states, lastSlug, playingSlug, pulses, on
     else if (code === "KeyL") { manual = false; setLegend((v) => !v); }
     else if (code === "KeyF") { manual = false; toggleFs(); }
     else if (code === "KeyE") { manual = false; cycle(1); } else if (code === "KeyQ") { manual = false; cycle(-1); }
-    else if (key === "Enter" && selected != null) { const r = byId.get(selected), st = stateOf(selected); if (r && (st === "visited" || st === "heard")) window.location.assign(`/branch/${r.slug}`); }
+    else if (key === "Enter" && selected != null) { const r = byId.get(selected), st = stateOf(selected); if (r && (st === "visited" || st === "heard")) window.location.assign(roomsFirst() ? roomHref(r.slug) : `/branch/${r.slug}`); }
     else used = false;
     if (used) { e.preventDefault(); e.stopPropagation(); if (manual) { anim.current = null; invalidate(true); } }
   };
@@ -297,7 +298,9 @@ export function BranchExplorer({ hull, states, lastSlug, playingSlug, pulses, on
           <b>{selState === "unseen" ? "???" : selState === "sealed" ? "A sealed room" : sel.name}</b>
           <span className="hx-dim">{STATE_WORD[selState]}{(selState === "visited" || selState === "heard") ? ` · ${sel.albums} album${sel.albums === 1 ? "" : "s"} · ${sel.tracks} track${sel.tracks === 1 ? "" : "s"}` : ""}</span>
           {(selState === "visited" || selState === "heard") ? (
-            <span className="hx-actions"><Link className="btn" to={`/branch/${sel.slug}`} data-testid="explorer-open">Open</Link><Link className="btn" to={`/branch/${sel.slug}/room`} data-testid="explorer-room">Walk in</Link><Link className="btn" to={`/soundbay?open=${sel.slug}`} data-testid="explorer-soundbay">In Soundbay</Link></span>
+            roomsFirst()
+              ? <span className="hx-actions"><Link className="btn" to={roomHref(sel.slug)} data-testid="explorer-room">Enter</Link></span>
+              : <span className="hx-actions"><Link className="btn" to={`/branch/${sel.slug}`} data-testid="explorer-open">Open</Link><Link className="btn" to={roomHref(sel.slug)} data-testid="explorer-room">Walk in</Link><Link className="btn" to={`/soundbay?open=${sel.slug}`} data-testid="explorer-soundbay">In Soundbay</Link></span>
           ) : <span className="hx-dim">{selState === "sealed" ? "Somewhere there is a way in." : "Walk toward it: go to a room next to it first."}</span>}
         </aside>
       )}
@@ -312,7 +315,7 @@ export function BranchExplorer({ hull, states, lastSlug, playingSlug, pulses, on
         <button type="button" className="btn" onClick={toggleFs} aria-pressed={fs} data-testid="ex-fs"><kbd>{kn("KeyF")}</kbd> Full screen</button>
       </div>
       <ul className="hx-sr" data-testid="explorer-list" aria-label="Rooms you know">
-        {known.map((r) => <li key={r.id}><Link to={`/branch/${r.slug}`}>{r.name}</Link> ({STATE_WORD[stateOf(r.id)]})</li>)}
+        {known.map((r) => <li key={r.id}><Link to={roomsFirst() ? roomHref(r.slug) : `/branch/${r.slug}`}>{r.name}</Link> ({STATE_WORD[stateOf(r.id)]})</li>)}
       </ul>
     </div>
   );

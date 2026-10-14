@@ -28,7 +28,8 @@ export function hrefOf(type: EntityType, id: string): string {
 export function focusOf(pathname: string, search = ""): { type: EntityType; id: string } | null {
   const seg = pathname.replace(/\/+$/, "").split("/").filter(Boolean);
   const one = (t: EntityType, prefix: string): { type: EntityType; id: string } | null => (seg.length === 2 && seg[0] === prefix ? { type: t, id: decodeURIComponent(seg[1]).toLowerCase() } : null);
-  const hit = one("study", "study") ?? one("branch", "branch") ?? one("album", "album") ?? one("wiki", "wiki") ?? one("news", "news") ?? one("topic", "topic");
+  const room = seg.length === 3 && seg[0] === "branch" && seg[2] === "room" ? { type: "branch" as EntityType, id: decodeURIComponent(seg[1]).toLowerCase() } : null; // the 3D room of a branch is that branch
+  const hit = room ?? one("study", "study") ?? one("branch", "branch") ?? one("album", "album") ?? one("wiki", "wiki") ?? one("news", "news") ?? one("topic", "topic");
   if (hit) return hit;
   if (seg[0] === "xenolab" && seg.length === 1) {
     const q = new URLSearchParams(search);

@@ -1,3 +1,4 @@
+import { branchHref } from "../lib/branchLinks";
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../lib/api";
@@ -54,7 +55,7 @@ export function ChartPage() {
       <p className="home-dim">Filled: you have been there. Outlined: heard of. Dark: not yet. A dashed ? is a sealed room: there is a way in somewhere. <span data-testid="chart-tally">{tally.visited} visited · {tally.heard} heard of · {tally.unseen} unseen{tally.sealed > 0 ? ` · ${tally.sealed} sealed` : ""}</span> · <Link to="/field-log">Field Log</Link> · <Link to="/explore" data-testid="chart-3d">3D map</Link>{pulsing > 0 && <span data-testid="chart-pulse-note"> · Glowing rooms: other members looked there this week (shown only when at least 2 did).</span>}</p>
       {(last || drafts.length > 0) && (
         <div className="chart-continue" data-testid="chart-continue">
-          {last && <p><b>Last heard:</b> <Link to={`/branch/${last.branchSlug}`} data-testid="chart-last">{last.title || last.branchSlug}</Link></p>}
+          {last && <p><b>Last heard:</b> <Link to={branchHref(last.branchSlug)} data-testid="chart-last">{last.title || last.branchSlug}</Link></p>}
           {drafts.map((d) => <p key={d.slug}><b>Draft:</b> <Link to={`/study/${d.slug}`} data-testid="chart-draft">{d.title}</Link></p>)}
         </div>
       )}
@@ -75,7 +76,7 @@ export function ChartPage() {
                 {last?.branchSlug === r.slug && <circle className="chart-pin" cx={W - 8} cy={8} r={5} data-testid="chart-pin"><title>Last heard here</title></circle>}
               </g>
             );
-            return st === "unseen" || st === "sealed" ? <g key={r.id}>{st === "sealed" && <title>A sealed room. Somewhere there is a way in.</title>}{body}</g> : <a key={r.id} href={`/branch/${r.slug}`} aria-label={r.name}>{body}</a>;
+            return st === "unseen" || st === "sealed" ? <g key={r.id}>{st === "sealed" && <title>A sealed room. Somewhere there is a way in.</title>}{body}</g> : <a key={r.id} href={branchHref(r.slug)} aria-label={r.name}>{body}</a>;
           })}
         </svg>
       </div>

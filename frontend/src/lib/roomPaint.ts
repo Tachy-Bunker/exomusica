@@ -7,6 +7,18 @@ import type { Shown } from "./roomNet";
 import type { Drone } from "./roomDrone";
 import type { Lock } from "./roomLock";
 import { EYE_Y, NEAR, focalOf, type Eye, type Target } from "./roomView";
+import type { Actor, RoomDoc, WireRuntime } from "./roomDoc";
+
+/** What the owner built in the room you are in. Set by the room component; the painter draws it when `slug` matches. `edit` shows what visitors never see (triggers, markers, hidden things) and highlights `sel`. */
+export const actorLayer: { slug: string; doc: RoomDoc | null; rt: WireRuntime | null; edit: boolean; sel: string | null } = { slug: "", doc: null, rt: null, edit: false, sel: null };
+interface ActorStyle { a: string; b: string; top: string; edge: string; faint: string; glowCol: string }
+const styles = new WeakMap<Actor, ActorStyle>();
+function styleOf(a: Actor): ActorStyle {
+  let st = styles.get(a); if (st) return st;
+  const ghost = a.kind === "ghost", c = a.color;
+  st = { a: rgba(c, ghost ? 0.14 : 0.62), b: rgba(c, ghost ? 0.1 : 0.46), top: rgba(c, ghost ? 0.18 : 0.78), edge: rgba(c, ghost ? 0.55 : 0.95), faint: rgba(c, 0.3), glowCol: c };
+  styles.set(a, st); return st;
+}
 
 export const rgba = (hex: string, a: number): string => {
   const m = /^#?([0-9a-f]{6})$/i.exec(hex); if (!m) return `rgba(120,220,255,${a})`;
@@ -141,7 +153,7 @@ export class RoomPainter {
     this.view(ctx, W, H, eye); this.fx = fx;
     ctx.fillStyle = BG; ctx.fillRect(0, 0, W, H);
     if (sp && sp.link && sp.corridor) this.corridorView(eye, sp);
-    else { this.shell(eye, -1, target, sp && sp.link ? sp : null); this.things(eye, target, others); }
+    else { this.shell(eye, -1, target, sp && sp.link ? sp : null); this.actors(eye); this.things(eye, target, others); }
     if (fx?.echo) this.echo(fx.echo, fx.now);
     if (lock) this.bracket(lock);
     if (fx?.scan && fx.scan.p > 0) this.scanRing(fx.scan);
@@ -180,6 +192,61 @@ export class RoomPainter {
       ctx.beginPath(); this.seg(a[0], 0, a[1], a[0], Hh, a[1]); ctx.lineWidth = 2; ctx.strokeStyle = C.edge; ctx.stroke();
       for (let di = 0; di < world.doors.length; di++) if (world.doors[di].edge === i) this.door(di, eye, target?.kind === "door" && target.door.id === world.doors[di].id, sp);
     }
+  }
+
+  // ---- what the owner built (solids, ghosts, lights; in edit mode also triggers and markers)
+  private fv = new Float64Array(16); private aOrd = new Int16Array(160); private aD = new Float64Array(160);
+  actors(eye: Eye): void {
+    const L = actorLayer; if (!L.doc || !L.rt || L.slug !== this.world.slug) return;
+    const acts = L.doc.actors, rt = L.rt; let m = 0;
+    for (let i = 0; i < acts.length && i < 160; i++) {
+      const a = acts[i]; if (!L.edit && (a.kind === "trigger" || a.kind === "marker" || !rt.isOn(a.id))) continue;
+      const d = (a.x - eye.x) * (a.x - eye.x) + (a.z - eye.z) * (a.z - eye.z);
+      let j = m; while (j > 0 && this.aD[j - 1] < d) { this.aD[j] = this.aD[j - 1]; this.aOrd[j] = this.aOrd[j - 1]; j--; } this.aD[j] = d; this.aOrd[j] = i; m++;
+    }
+    const ctx = this.ctx;
+    for (let q = 0; q < m; q++) {
+      const a = acts[this.aOrd[q]], on = rt.isOn(a.id), sel = L.edit && L.sel === a.id;
+      if (L.edit && !on) ctx.globalAlpha = 0.35;
+      if (a.kind === "solid" || a.kind === "ghost") this.prism(a, eye, sel);
+      else if (a.kind === "light") this.lamp(a, sel);
+      else this.marker(a, eye, sel);
+      if (L.edit && !on) ctx.globalAlpha = 1;
+    }
+  }
+  private footprint(a: Actor): number {
+    const v = this.fv;
+    if (a.sides >= 3) { const r = Math.min(a.w, a.d) / 2; for (let k = 0; k < a.sides; k++) { const t = a.rot + (k * Math.PI * 2) / a.sides; v[k * 2] = a.x + Math.cos(t) * r; v[k * 2 + 1] = a.z + Math.sin(t) * r; } return a.sides; }
+    const c = Math.cos(a.rot), s = Math.sin(a.rot), hx = a.w / 2, hz = a.d / 2;
+    v[0] = a.x - hx * c + hz * s; v[1] = a.z - hx * s - hz * c; v[2] = a.x + hx * c + hz * s; v[3] = a.z + hx * s - hz * c;
+    v[4] = a.x + hx * c - hz * s; v[5] = a.z + hx * s + hz * c; v[6] = a.x - hx * c - hz * s; v[7] = a.z - hx * s + hz * c; return 4;
+  }
+  private prism(a: Actor, eye: Eye, sel: boolean): void {
+    const st = styleOf(a), n = this.footprint(a), v = this.fv, ctx = this.ctx, h = a.h;
+    for (let i = 0; i < n; i++) {
+      const j = (i + 1) % n, mx = (v[i * 2] + v[j * 2]) / 2, mz = (v[i * 2 + 1] + v[j * 2 + 1]) / 2;
+      if ((mx - a.x) * (eye.x - mx) + (mz - a.z) * (eye.z - mz) <= 0) continue; // faces away
+      if (this.quad(v[i * 2], 0, v[i * 2 + 1], v[j * 2], 0, v[j * 2 + 1], v[j * 2], h, v[j * 2 + 1], v[i * 2], h, v[i * 2 + 1])) { ctx.fillStyle = i % 2 ? st.b : st.a; ctx.fill(); ctx.lineWidth = sel ? 2.5 : 1.2; ctx.strokeStyle = sel ? "#ffffff" : st.edge; ctx.stroke(); }
+    }
+    if (h < EYE_Y) { for (let i = 0; i < n; i++) { this.wp[i * 3] = v[i * 2]; this.wp[i * 3 + 1] = h; this.wp[i * 3 + 2] = v[i * 2 + 1]; } if (this.poly(n)) { ctx.fillStyle = st.top; ctx.fill(); ctx.lineWidth = sel ? 2.5 : 1.2; ctx.strokeStyle = sel ? "#ffffff" : st.edge; ctx.stroke(); } }
+  }
+  private lamp(a: Actor, sel: boolean): void {
+    this.cam(a.x, Math.max(0.4, a.h), a.z); if (this.qz < NEAR) return;
+    const x = this.W / 2 + (this.qx * this.f) / this.qz, y = this.H / 2 - (this.qy * this.f) / this.qz, size = Math.min(this.W, (Math.max(a.w, a.d) * 4 * this.f) / this.qz);
+    const g = glow(a.color, 0.55); if (g && size > 2) this.ctx.drawImage(g, x - size / 2, y - size / 2, size, size);
+    if (this.ctx.globalAlpha < 1 || sel) { this.ctx.strokeStyle = sel ? "#ffffff" : styleOf(a).edge; this.ctx.lineWidth = 1.5; this.ctx.strokeRect(x - 5, y - 5, 10, 10); }
+  }
+  /** Triggers (a footprint on the floor with posts) and markers (a post with a diamond). Only drawn in edit mode. */
+  private marker(a: Actor, eye: Eye, sel: boolean): void {
+    const st = styleOf(a), ctx = this.ctx; ctx.strokeStyle = sel ? "#ffffff" : st.edge; ctx.lineWidth = sel ? 2.5 : 1.2; ctx.setLineDash([5, 4]);
+    ctx.beginPath();
+    if (a.kind === "trigger") {
+      const n = this.footprint(a), v = this.fv;
+      for (let i = 0; i < n; i++) { const j = (i + 1) % n; this.seg(v[i * 2], 0.03, v[i * 2 + 1], v[j * 2], 0.03, v[j * 2 + 1]); this.seg(v[i * 2], 0.03, v[i * 2 + 1], v[i * 2], Math.min(a.h, 2.5), v[i * 2 + 1]); }
+    } else { this.seg(a.x, 0, a.z, a.x, 1.6, a.z); this.seg(a.x - 0.25, 1.6, a.z, a.x + 0.25, 1.6, a.z); this.seg(a.x, 1.6, a.z - 0.25, a.x, 1.6, a.z + 0.25); }
+    ctx.stroke(); ctx.setLineDash([]);
+    this.cam(a.x, a.kind === "trigger" ? 0.6 : 1.9, a.z);
+    if (this.qz >= NEAR) { const x = this.W / 2 + (this.qx * this.f) / this.qz, y = this.H / 2 - (this.qy * this.f) / this.qz; this.text(a.name, x, y, Math.min(16, (0.16 * this.f) / this.qz), st.edge); }
   }
 
   /** The things in the room, far to near: terminals (pedestal with a leaning screen) and the other people. */
@@ -320,14 +387,20 @@ export class RoomPainter {
       for (let s = 1; s <= 3; s++) { const u = s * 0.25, bk = back * u, y = h + sh * u; this.seg(p.x - tx * hw * 0.85 + ux * bk, y, p.z - tz * hw * 0.85 + uz * bk, p.x + tx * hw * 0.85 + ux * bk, y, p.z + tz * hw * 0.85 + uz * bk); }
       ctx.lineWidth = 1; ctx.strokeStyle = hot ? "rgba(255,255,255,.35)" : this.C.scan; ctx.stroke();
     }
+    const cl = chat && d < 6 ? this.world.chat : undefined; // the screen reads out the last things said in this room
+    if (cl) for (let i = 0; i < cl.length && i < 3; i++) {
+      const u = 0.78 - i * 0.24; this.cam(p.x + ux * back * u, h + sh * u, p.z + uz * back * u);
+      if (this.qz > NEAR) { const sz = (0.105 * this.f) / this.qz; if (sz >= 7) this.text(cl[i], this.W / 2 + (this.qx * this.f) / this.qz, this.H / 2 - (this.qy * this.f) / this.qz, sz, hot ? "#fff" : "#ffd9a0"); }
+    }
     this.cam(p.x, h + sh + 0.22, p.z);
     if (this.qz > NEAR && (d < 7 || hot)) this.text(this.propLabel[k], this.W / 2 + (this.qx * this.f) / this.qz, this.H / 2 - (this.qy * this.f) / this.qz, (0.26 * this.f) / this.qz, hot ? "#fff" : col);
   }
 
   /** Another member: a lit capsule with a visor on the side they face, and their name. */
   private person(o: Shown, e: Eye): void {
-    const ctx = this.ctx, W = this.W, H = this.H, f = this.f;
+    const ctx = this.ctx, W = this.W, H = this.H, f = this.f, ghost = o.ghost !== undefined;
     this.cam(o.x, 0, o.z); if (this.qz < NEAR) return; const bx = this.qx, by = this.qy, bz = this.qz;
+    if (ghost) ctx.globalAlpha = Math.max(0, Math.min(1, o.ghost!)) * 0.42; // an echo: the same figure, faint
     this.cam(o.x, 1.72, o.z); const ty = this.qy;
     let col = this.personCol.get(o.name); if (!col) { col = hueColor(hueOf(o.name), 62); this.personCol.set(o.name, col); }
     const k = f / bz, cx = W / 2 + bx * k, yb = H / 2 - by * k, yt = H / 2 - ty * k, hgt = yb - yt, w = hgt * 0.17;
@@ -336,7 +409,8 @@ export class RoomPainter {
     const hr = hgt * 0.085, hy = yt + hgt * 0.1; ctx.beginPath(); ctx.arc(cx, hy, hr, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
     const fx = Math.cos(o.yaw), fz = Math.sin(o.yaw), rx = -this.sy, rz = this.cy, vx = this.cy, vz = this.sy, side = fx * rx + fz * rz, toward = -(fx * vx + fz * vz);
     if (toward > -0.2) { ctx.fillStyle = col; ctx.fillRect(cx + side * hr * 0.6 - hr * 0.55, hy - hr * 0.18, hr * 1.1, hr * 0.36); }
-    if (bz < 14) this.text(o.name, cx, yt - 6, (0.26 * f) / bz, col);
+    if (bz < (ghost ? 9 : 14)) this.text(ghost ? (o.note ?? o.name) : o.name, cx, yt - 6, (0.26 * f) / bz, col);
+    if (ghost) ctx.globalAlpha = 1;
     void e;
   }
 

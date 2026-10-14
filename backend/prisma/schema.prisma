@@ -1750,6 +1750,17 @@ model LoreEntry {
   updatedAt DateTime @updatedAt
 }
 
+// What the owner built inside a 3D room with the room editor: actors (solids, ghosts, triggers, lights, markers) and the wires between them, as one validated JSON document. `version` goes up on every save so two editors cannot silently overwrite each other.
+model RoomDoc {
+  id        Int      @id @default(autoincrement())
+  slug      String   @unique
+  version   Int      @default(1)
+  doc       String   @db.Text
+  updatedAt DateTime @updatedAt
+
+  @@map("room_docs")
+}
+
 // Each approved newcomer is paired with one existing member, who gets a single prompt to say hello.
 model WelcomeBuddy {
   id        Int       @id @default(autoincrement())

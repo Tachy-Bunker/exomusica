@@ -110,7 +110,7 @@ def run(playwright):
     # ---- tether chip in the room header (desktop width, standalone room)
     ctx = new_ctx(1440, 900, touch=False); page = ctx.new_page(); watch(page)
     page.goto(f"{BASE}/topic/hall"); page.wait_for_selector("[data-testid=tether]")
-    check("Branch Two" in page.locator("[data-testid=tether]").inner_text() and page.locator("[data-testid=tether]").get_attribute("href").startswith("/soundbay"), "Tether: the room shows the branch it belongs to")
+    check("Branch Two" in page.locator("[data-testid=tether]").inner_text() and page.locator("[data-testid=tether]").get_attribute("href").startswith(("/soundbay", "/branch/")), "Tether: the room shows the branch it belongs to")
     ctx.close()
 
     check(not errors, "no page errors: " + "; ".join(errors[:3]))
