@@ -1,11 +1,16 @@
 // The explorer's camera: orbit around a target, perspective, no DOM. Pure, so projection, panning and picking are tested without a browser.
 export interface Cam { yaw: number; pitch: number; dist: number; tx: number; ty: number; tz: number }
 export const FOV_K = 1.15; // focal length as a multiple of the viewport's shorter side
-export const MIN_PITCH = 0.05, MAX_PITCH = Math.PI / 2 - 0.02;
 
 export const clamp = (n: number, a: number, b: number): number => Math.max(a, Math.min(b, n));
 export const defaultCam = (radius: number): Cam => ({ yaw: -0.55, pitch: 0.62, dist: Math.max(18, radius * 2.3), tx: 0, ty: 0, tz: 0 });
-export const clampCam = (c: Cam, radius: number): Cam => ({ ...c, yaw: ((c.yaw % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2), pitch: clamp(c.pitch, MIN_PITCH, MAX_PITCH), dist: clamp(c.dist, 5, Math.max(40, radius * 6)) });
+/** Any angle wraps round into (-PI, PI]: nothing stops the view at the top or the bottom, it just keeps turning (and goes upside down), like a trackball. */
+export const wrapAngle = (a: number): number => { const t = Math.PI * 2, m = ((a % t) + t) % t; return m > Math.PI ? m - t : m; };
+export const clampCam = (c: Cam, radius: number): Cam => ({ ...c, yaw: wrapAngle(c.yaw), pitch: wrapAngle(c.pitch), dist: clamp(c.dist, 5, Math.max(40, radius * 6)) });
+/** True when the map is turned so far that its up is down: left and right then have to swap for dragging to feel the same. */
+export const upsideDown = (c: Cam): boolean => Math.cos(c.pitch) < 0;
+/** Whether the view is (near enough) straight down from above. */
+export const isTopView = (c: Cam): boolean => Math.abs(wrapAngle(c.pitch) - Math.PI / 2) < 0.08;
 
 export function focalOf(w: number, h: number): number { return Math.min(w, h) * FOV_K; }
 

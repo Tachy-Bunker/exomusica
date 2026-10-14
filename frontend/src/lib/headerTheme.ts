@@ -2,19 +2,20 @@ import { useEffect } from "react";
 import { create } from "zustand";
 import { api } from "./api";
 import { identityOf } from "./branchIdentity";
+import { lift } from "./legibleColor";
 import type { Branch } from "./types";
 
 interface Theme { slug: string; name: string; color: string; glyph: string }
 export const useHeaderThemeStore = create<{ theme: Theme | null; set: (t: Theme | null) => void }>((set) => ({ theme: null, set: (theme) => set({ theme }) }));
 
 const cache = new Map<string, Promise<Theme | null>>();
-function themeOf(slug: string): Promise<Theme | null> {
+export function themeOf(slug: string): Promise<Theme | null> {
   let p = cache.get(slug);
   if (!p) {
     p = api<Branch>(`/api/branches/${slug}`).then((b) => {
       if (!b || !b.slug) return null;
       const id = identityOf({ slug: b.slug, color: b.identityColor, glyph: b.identityGlyph, seed: (b as { visibility?: string }).visibility === "BABY_CRYSTALS" });
-      return { slug: b.slug, name: b.name, color: id.color, glyph: id.glyph };
+      return { slug: b.slug, name: b.name, color: lift(id.color), glyph: id.glyph };
     }).catch(() => { cache.delete(slug); return null; });
     cache.set(slug, p);
   }

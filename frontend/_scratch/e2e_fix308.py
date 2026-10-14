@@ -54,7 +54,7 @@ def run(playwright):
     w.goto(f"{BASE}/field-log"); w.wait_for_selector("[data-testid=field-log]")
     w.click("a[href='/chart']"); w.wait_for_selector("[data-testid=door-wipe]", timeout=1500)
     check(True, "Wipe: moving between sections plays it")
-    w.wait_for_timeout(1100)
+    w.wait_for_selector("[data-testid=door-wipe]", state="detached", timeout=5000)
     check(w.locator("[data-testid=door-wipe]").count() == 0, "Wipe: gone again after it ends")
     cw = mk(ME, None, "1")
     cw.goto(f"{BASE}/field-log"); cw.wait_for_selector("[data-testid=field-log]"); cw.click("a[href='/chart']"); cw.wait_for_selector("[data-testid=chart-page]"); cw.wait_for_timeout(150)

@@ -63,12 +63,11 @@ def run(playwright):
     link1 = p.evaluate("document.querySelector('a[href$=\"/album/al1\"]').getBoundingClientRect().top")
     check(p.evaluate("window.scrollY") > 200 and abs((top0 - top1) - (link0 - link1)) < 2, f"Card moves with the page when scrolling ({top0:.0f} -> {top1:.0f}, link {link0:.0f} -> {link1:.0f})")
 
-    # door wipe pace
+    # door: six panels, gone when loaded
     p.goto(f"{BASE}/field-log"); p.wait_for_selector("[data-testid=field-log]"); p.click("a[href='/chart']"); p.wait_for_selector("[data-testid=door-wipe]", timeout=1500)
-    dur = p.evaluate("getComputedStyle(document.querySelector('[data-testid=door-wipe]')).animationDuration")
-    check(dur == "0.75s", f"Door wipe is slower ({dur})")
-    p.wait_for_timeout(500)
-    check(p.locator("[data-testid=door-wipe]").count() == 1, "Door wipe still running half a second in")
+    check(p.locator("[data-testid=door-wipe] .dw-p").count() == 6, "Door has six panels")
+    p.wait_for_selector("[data-testid=door-wipe]", state="detached", timeout=5000)
+    check(True, "Door opens and goes away once loaded")
 
     c = mk(ME, "1")
     c.goto(f"{BASE}/study/mine-1"); c.wait_for_selector("[data-testid=faceplate]"); c.wait_for_timeout(300)

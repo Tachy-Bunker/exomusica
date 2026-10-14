@@ -1,4 +1,5 @@
 import { outreachHeaders } from "./outreachSession";
+import { loadBegin, loadEnd } from "./loadWatch";
 
 const TOKEN_KEY = "exomusica_token";
 
@@ -19,6 +20,11 @@ export class ApiError extends Error {
 }
 
 export async function api<T>(path: string, options: RequestInit = {}): Promise<T> {
+  loadBegin();
+  try { return await apiInner<T>(path, options); } finally { loadEnd(); }
+}
+
+async function apiInner<T>(path: string, options: RequestInit): Promise<T> {
   const token = getToken();
   const isFormData = options.body instanceof FormData;
   const res = await fetch(path, {

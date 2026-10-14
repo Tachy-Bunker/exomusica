@@ -15,6 +15,9 @@ import { useAudioStore } from "../lib/audioStore";
 import { BranchExplorer } from "../components/BranchExplorer";
 import { Loading } from "../components/Loading";
 
+/** Off for now (the 2D Chart still shows them): rooms others looked at this week as a wash on the roof. */
+const SHOW_PULSES = false;
+
 /** The branch explorer, full screen: the Chart's rooms (and what you know of them) as a wireframe world you can turn, zoom and move through. */
 export function ExplorePage() {
   useDocumentTitle("Scan map");
@@ -36,7 +39,7 @@ export function ExplorePage() {
     loadMilestones().then(async (l) => {
       if (!alive) return;
       setOuter(!!l.find((m) => m.key === "m-ring")?.reached); // Second ring: sealed rooms get an outer ring
-      if (l.find((m) => m.key === "m-chart")?.reached) { // Chart layer: rooms others looked at this week
+      if (SHOW_PULSES && l.find((m) => m.key === "m-chart")?.reached) { // Chart layer: rooms others looked at this week
         const r = await api<{ locked: boolean; pulses: Record<string, number> }>("/api/chart/pulse").catch(() => null);
         if (alive && r && !r.locked) setPulses(r.pulses ?? {});
       }

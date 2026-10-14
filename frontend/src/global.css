@@ -6284,8 +6284,20 @@ html.classic .missing-scans{display:none}
 .chart-room.heard rect{stroke-opacity:0.7}
 .chart-pin{fill:#4da3ff}
 .chart-continue{margin:0.4rem 0}.chart-continue p{margin:0.15rem 0}
-.door-wipe{position:fixed;inset:0;z-index:9000;pointer-events:none;background:linear-gradient(90deg,#05070b 0 94%,var(--door-edge,#ff9d3c) 94% 96%,transparent 96%);transform:translateX(-102%);animation:door-wipe 750ms cubic-bezier(.65,0,.35,1) forwards}
-@keyframes door-wipe{0%{transform:translateX(-102%)}38%{transform:translateX(0)}62%{transform:translateX(0)}100%{transform:translateX(102%)}}
+.door-wipe{position:fixed;inset:0;z-index:9000;pointer-events:auto;--door:#ff9d3c;contain:strict}
+.door-wipe svg{position:absolute;inset:0;width:100%;height:100%;display:block}
+.dw-p{transform-box:fill-box;will-change:transform}
+.dw-tri{fill:#070a10;stroke:var(--door);stroke-width:.5;stroke-linejoin:round}
+.dw-win{fill:var(--door);fill-opacity:.1;stroke:var(--door);stroke-width:.7;stroke-opacity:.85}
+.dw-hex{fill:#05070b;stroke:var(--door);stroke-width:1.4;filter:drop-shadow(0 0 3px var(--door))}
+.door-wipe[data-phase="closing"] .dw-p{animation:dw-in 420ms cubic-bezier(.5,0,.8,.4) both}
+.door-wipe[data-phase="closed"] .dw-p{transform:none}
+.door-wipe[data-phase="opening"] .dw-p{animation:dw-out 560ms cubic-bezier(.3,0,.2,1) both}
+.door-wipe[data-phase="opening"]{pointer-events:none}
+.door-wipe[data-phase="opening"] .dw-hex{animation:dw-fade 300ms ease-out both}
+@keyframes dw-in{from{transform:translate(var(--tx),var(--ty))}to{transform:none}}
+@keyframes dw-out{from{transform:none}to{transform:translate(var(--tx),var(--ty))}}
+@keyframes dw-fade{to{opacity:0}}
 @media (prefers-reduced-motion:reduce){.door-wipe{display:none}}
 html.classic .door-wipe{display:none}
 .save-station{font-size:0.8rem;margin:0 0 0.4rem}
@@ -6337,8 +6349,6 @@ body.touring .visor-hud{display:none}
 
 /* Doors: Open = amber, Members = teal, Staff = rose. Tags are information, so classic mode keeps them. */
 :root{--door-open:#ff9d3c;--door-members:#3fc9bb;--door-staff:#ff5c8a;--lock-mask:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 15'><path d='M3 6V4.5a3 3 0 0 1 6 0V6h1a1 1 0 0 1 1 1v7a1 1 0 0 1-1 1H2a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1zm1.5 0h3V4.5a1.5 1.5 0 0 0-3 0z'/></svg>")}
-.door-wipe[data-door="members"]{--door-edge:var(--door-members)}
-.door-wipe[data-door="staff"]{--door-edge:var(--door-staff)}
 
 /* Lenses: Thermal and X-ray. Only match while Probe is on and a lens is chosen. */
 .lens-chips{display:inline-flex;gap:2px}

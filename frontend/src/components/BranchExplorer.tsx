@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
-import { clampCam, defaultCam, focalOf, panBy, pick, project, type Cam } from "../lib/hullCamera";
+import { clampCam, defaultCam, focalOf, isTopView, panBy, pick, project, upsideDown, wrapAngle, type Cam } from "../lib/hullCamera";
 import { pipeSegments, roomMesh, type Hull, type HullRoom } from "../lib/hullLayout";
 import type { RoomState } from "../lib/chart";
 
@@ -167,7 +167,7 @@ export function BranchExplorer({ hull, states, lastSlug, playingSlug, pulses, on
     const calm = typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
     if (calm) { cam.current = next; invalidate(); return; }
     // the shorter way round
-    let dy = next.yaw - cam.current.yaw; dy = ((dy + Math.PI) % (Math.PI * 2) + Math.PI * 2) % (Math.PI * 2) - Math.PI; next.yaw = cam.current.yaw + dy;
+    next.yaw = cam.current.yaw + wrapAngle(next.yaw - cam.current.yaw); next.pitch = cam.current.pitch + wrapAngle(next.pitch - cam.current.pitch);
     anim.current = { from: cam.current, to: next, t0: performance.now(), ms: 420 }; invalidate();
   }, [hull.radius, invalidate]);
   const focusRoom = useCallback((id: number) => { const r = byId.get(id); if (r) { setSelected(id); fly({ tx: r.x, ty: r.y + r.h / 2, tz: r.z, dist: Math.min(cam.current.dist, Math.max(16, hull.radius * 0.7)) }); } }, [byId, fly, hull.radius]);
@@ -224,7 +224,7 @@ export function BranchExplorer({ hull, states, lastSlug, playingSlug, pulses, on
     }
     anim.current = null;
     if (g.pan) cam.current = panBy(cam.current, dx, dy, w, h);
-    else cam.current = clampCam({ ...cam.current, yaw: cam.current.yaw - dx * 0.0072, pitch: cam.current.pitch + dy * 0.0058 }, hull.radius);
+    else cam.current = clampCam({ ...cam.current, yaw: cam.current.yaw - dx * 0.0072 * (upsideDown(cam.current) ? -1 : 1), pitch: cam.current.pitch + dy * 0.0058 }, hull.radius);
     invalidate(true);
   };
   const onUp = (e: React.PointerEvent) => {
@@ -243,34 +243,44 @@ export function BranchExplorer({ hull, states, lastSlug, playingSlug, pulses, on
   useEffect(() => { const on = () => setFs(!!document.fullscreenElement); document.addEventListener("fullscreenchange", on); return () => document.removeEventListener("fullscreenchange", on); }, []);
 
   const cycle = (dir: 1 | -1) => { if (!order.length) return; const i = selected == null ? (dir > 0 ? -1 : 0) : order.indexOf(selected); focusRoom(order[(i + dir + order.length) % order.length]); };
+  // Keys are read by their place on the keyboard (e.code), not by the letter printed on them: W A S D is Z Q S D on an AZERTY board, and the map follows the board.
   const onKey = (e: React.KeyboardEvent) => {
     const c = cam.current, { w, h } = size.current; let used = true, manual = true;
-    const key = e.key.toLowerCase();
-    if (e.shiftKey && key.startsWith("arrow")) cam.current = panBy(c, key === "arrowleft" ? 40 : key === "arrowright" ? -40 : 0, key === "arrowup" ? 40 : key === "arrowdown" ? -40 : 0, w, h);
-    else if (key === "arrowleft") cam.current = clampCam({ ...c, yaw: c.yaw + 0.1 }, hull.radius);
-    else if (key === "arrowright") cam.current = clampCam({ ...c, yaw: c.yaw - 0.1 }, hull.radius);
-    else if (key === "arrowup") cam.current = clampCam({ ...c, pitch: c.pitch - 0.07 }, hull.radius);
-    else if (key === "arrowdown") cam.current = clampCam({ ...c, pitch: c.pitch + 0.07 }, hull.radius);
-    else if (key === "a") cam.current = panBy(c, 40, 0, w, h); else if (key === "d") cam.current = panBy(c, -40, 0, w, h);
-    else if (key === "w") cam.current = panBy(c, 0, 40, w, h); else if (key === "s") cam.current = panBy(c, 0, -40, w, h);
-    else if (key === "+" || key === "=" || key === "pageup") cam.current = clampCam({ ...c, dist: c.dist * 0.85 }, hull.radius);
-    else if (key === "-" || key === "_" || key === "pagedown") cam.current = clampCam({ ...c, dist: c.dist / 0.85 }, hull.radius);
-    else if (key === "t") { manual = false; fly({ pitch: c.pitch > 1.3 ? defaultCam(hull.radius).pitch : Math.PI / 2 - 0.02 }); }
-    else if (key === "r" || key === "home") { manual = false; setSelected(null); fly(defaultCam(hull.radius)); }
-    else if (key === "l") setLegend((v) => !v);
-    else if (key === "f") toggleFs();
-    else if (key === "n") { manual = false; cycle(1); } else if (key === "p") { manual = false; cycle(-1); }
-    else if (key === "enter" && selected != null) { const r = byId.get(selected), st = stateOf(selected); if (r && (st === "visited" || st === "heard")) window.location.assign(`/branch/${r.slug}`); }
+    const code = e.code, key = e.key, flip = upsideDown(c) ? -1 : 1;
+    if (e.ctrlKey || e.metaKey || e.altKey) return;
+    if (e.shiftKey && key.startsWith("Arrow")) cam.current = panBy(c, key === "ArrowLeft" ? 40 : key === "ArrowRight" ? -40 : 0, key === "ArrowUp" ? 40 : key === "ArrowDown" ? -40 : 0, w, h);
+    else if (key === "ArrowLeft") cam.current = clampCam({ ...c, yaw: c.yaw + 0.1 * flip }, hull.radius);
+    else if (key === "ArrowRight") cam.current = clampCam({ ...c, yaw: c.yaw - 0.1 * flip }, hull.radius);
+    else if (key === "ArrowUp") cam.current = clampCam({ ...c, pitch: c.pitch - 0.07 }, hull.radius);
+    else if (key === "ArrowDown") cam.current = clampCam({ ...c, pitch: c.pitch + 0.07 }, hull.radius);
+    else if (code === "KeyA") cam.current = panBy(c, 40, 0, w, h); else if (code === "KeyD") cam.current = panBy(c, -40, 0, w, h);
+    else if (code === "KeyW") cam.current = panBy(c, 0, 40, w, h); else if (code === "KeyS") cam.current = panBy(c, 0, -40, w, h);
+    else if (key === "+" || key === "=" || code === "NumpadAdd" || code === "PageUp") cam.current = clampCam({ ...c, dist: c.dist * 0.85 }, hull.radius);
+    else if (key === "-" || key === "_" || code === "NumpadSubtract" || code === "PageDown") cam.current = clampCam({ ...c, dist: c.dist / 0.85 }, hull.radius);
+    else if (code === "KeyT") { manual = false; fly({ pitch: isTopView(c) ? defaultCam(hull.radius).pitch : Math.PI / 2 }); }
+    else if (code === "KeyR" || code === "Home") { manual = false; setSelected(null); fly(defaultCam(hull.radius)); }
+    else if (code === "KeyL") { manual = false; setLegend((v) => !v); }
+    else if (code === "KeyF") { manual = false; toggleFs(); }
+    else if (code === "KeyE") { manual = false; cycle(1); } else if (code === "KeyQ") { manual = false; cycle(-1); }
+    else if (key === "Enter" && selected != null) { const r = byId.get(selected), st = stateOf(selected); if (r && (st === "visited" || st === "heard")) window.location.assign(`/branch/${r.slug}`); }
     else used = false;
-    if (used) { e.preventDefault(); if (manual) { anim.current = null; invalidate(true); } }
+    if (used) { e.preventDefault(); e.stopPropagation(); if (manual) { anim.current = null; invalidate(true); } }
   };
+
+  // what the keys are called on this keyboard (Chromium can tell us); everywhere else the usual names
+  const [kl, setKl] = useState<Record<string, string>>({});
+  useEffect(() => {
+    const k = (navigator as unknown as { keyboard?: { getLayoutMap?: () => Promise<Map<string, string>> } }).keyboard;
+    k?.getLayoutMap?.().then((m) => { const o: Record<string, string> = {}; for (const c of ["KeyW", "KeyA", "KeyS", "KeyD", "KeyQ", "KeyE", "KeyR", "KeyT", "KeyL", "KeyF"]) { const v = m.get(c); if (v) o[c] = v.toUpperCase(); } setKl(o); }).catch(() => undefined);
+  }, []);
+  const kn = (code: string): string => kl[code] ?? code.slice(3);
 
   const sel = selected != null ? byId.get(selected) ?? null : null, selState = sel ? stateOf(sel.id) : null;
   const known = hull.rooms.filter((r) => { const s = stateOf(r.id); return s === "visited" || s === "heard"; });
   const tally = { visited: 0, heard: 0, unseen: 0, sealed: 0 }; for (const r of hull.rooms) tally[stateOf(r.id)]++;
   return (
     <div className="hx" data-testid="explorer">
-      <div className="hx-stage" ref={wrap} tabIndex={0} role="application" aria-label="Branch map. Arrow keys turn it, plus and minus zoom, W A S D slide, N and P go to the next or previous room, T looks from above, R resets."
+      <div className="hx-stage" ref={wrap} tabIndex={0} role="application" aria-label="Branch map. Arrow keys turn it, plus and minus zoom, the four keys where W A S D are on a QWERTY keyboard slide it, the keys where Q and E are go to the previous or next room, the key where T is looks from above, and the key where R is resets."
         onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp} onPointerCancel={onUp} onPointerLeave={() => { if (hover.current != null && ptrs.current.size === 0) { hover.current = null; invalidate(); } }} onContextMenu={(e) => e.preventDefault()} onKeyDown={onKey} data-testid="explorer-stage" data-rooms={hull.rooms.length} data-selected={selected ?? ""}>
         <canvas ref={canvas} aria-hidden="true" data-testid="explorer-canvas" />
       </div>
@@ -279,7 +289,7 @@ export function BranchExplorer({ hull, states, lastSlug, playingSlug, pulses, on
         <ul className="hx-legend" data-testid="explorer-legend" aria-label="Key">
           <li><i className="hx-sw hx-visited" /> Visited</li><li><i className="hx-sw hx-heard" /> Heard of</li><li><i className="hx-sw hx-unseen" /> Not found yet</li>
           <li><i className="hx-sw hx-sealed" /> Sealed room (outer ring)</li><li><i className="hx-key">E</i> Elevator: a pipe that changes floor</li>
-          <li><i className="hx-dot" /> Door between two visited rooms</li><li><i className="hx-diamond" /> Where you last listened</li><li><i className="hx-ring" /> Playing now</li><li><i className="hx-sw hx-busy" /> Visited by others this week</li>
+          <li><i className="hx-dot" /> Door between two visited rooms</li><li><i className="hx-diamond" /> Where you last listened</li><li><i className="hx-ring" /> Playing now</li>
         </ul>
       )}
       {sel && selState && (
@@ -293,12 +303,13 @@ export function BranchExplorer({ hull, states, lastSlug, playingSlug, pulses, on
       )}
       <div className="hx-bar" role="toolbar" aria-label="Map controls">
         <button type="button" className="btn" onClick={onExit} data-testid="ex-exit"><kbd>Esc</kbd> Exit</button>
-        <button type="button" className="btn" aria-pressed={legend} onClick={() => setLegend((v) => !v)} data-testid="ex-legend-btn"><kbd>L</kbd> Key / legend</button>
-        <span className="hx-dim hx-hints"><kbd>drag</kbd> Rotate · <kbd>wheel</kbd> Zoom · <kbd>shift</kbd>+drag Move</span>
-        <button type="button" className="btn" onClick={() => fly({ pitch: cam.current.pitch > 1.3 ? defaultCam(hull.radius).pitch : Math.PI / 2 - 0.02 })} data-testid="ex-top"><kbd>T</kbd> Top view</button>
-        <button type="button" className="btn" onClick={() => { setSelected(null); fly(defaultCam(hull.radius)); }} data-testid="ex-reset"><kbd>R</kbd> World map</button>
-        <button type="button" className="btn" onClick={() => cycle(1)} data-testid="ex-next"><kbd>N</kbd> Next room</button>
-        <button type="button" className="btn" onClick={toggleFs} aria-pressed={fs} data-testid="ex-fs"><kbd>F</kbd> Full screen</button>
+        <button type="button" className="btn" aria-pressed={legend} onClick={() => setLegend((v) => !v)} data-testid="ex-legend-btn"><kbd>{kn("KeyL")}</kbd> Key / legend</button>
+        <span className="hx-dim hx-hints" data-testid="ex-hints"><kbd>drag</kbd> Rotate · <kbd>wheel</kbd> Zoom · <kbd>{kn("KeyW")} {kn("KeyA")} {kn("KeyS")} {kn("KeyD")}</kbd> Move</span>
+        <button type="button" className="btn" onClick={() => fly({ pitch: isTopView(cam.current) ? defaultCam(hull.radius).pitch : Math.PI / 2 })} data-testid="ex-top"><kbd>{kn("KeyT")}</kbd> Top view</button>
+        <button type="button" className="btn" onClick={() => { setSelected(null); fly(defaultCam(hull.radius)); }} data-testid="ex-reset"><kbd>{kn("KeyR")}</kbd> World map</button>
+        <button type="button" className="btn" onClick={() => cycle(-1)} data-testid="ex-prev"><kbd>{kn("KeyQ")}</kbd> Previous room</button>
+        <button type="button" className="btn" onClick={() => cycle(1)} data-testid="ex-next"><kbd>{kn("KeyE")}</kbd> Next room</button>
+        <button type="button" className="btn" onClick={toggleFs} aria-pressed={fs} data-testid="ex-fs"><kbd>{kn("KeyF")}</kbd> Full screen</button>
       </div>
       <ul className="hx-sr" data-testid="explorer-list" aria-label="Rooms you know">
         {known.map((r) => <li key={r.id}><Link to={`/branch/${r.slug}`}>{r.name}</Link> ({STATE_WORD[stateOf(r.id)]})</li>)}

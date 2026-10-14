@@ -45,8 +45,8 @@ def run(pw):
     check(int(pg.get_attribute("[data-testid=explorer-stage]", "data-rooms")) == real, f"All {real} rooms are in the world; sealed ones are left out before Second ring")
     check("8 visited" in pg.inner_text("[data-testid=explorer-tally]") and "sealed" not in pg.inner_text("[data-testid=explorer-tally]"), "Tally: visited and heard-of counted, no sealed yet")
     check(pg.locator("[data-testid=explorer-legend]").count() == 0, "Legend starts closed")
-    pg.keyboard.press("l"); check(pg.locator("[data-testid=explorer-legend]").count() == 1, "L opens the legend")
-    pg.keyboard.press("l"); check(pg.locator("[data-testid=explorer-legend]").count() == 0, "…and closes it")
+    pg.keyboard.press("KeyL"); check(pg.locator("[data-testid=explorer-legend]").count() == 1, "L opens the legend")
+    pg.keyboard.press("KeyL"); check(pg.locator("[data-testid=explorer-legend]").count() == 0, "…and closes it")
     # the picture is really there
     px = pg.evaluate("(()=>{const c=document.querySelector('[data-testid=explorer-canvas]');const d=c.getContext('2d').getImageData(0,0,c.width,c.height).data;let n=0;for(let i=3;i<d.length;i+=4)if(d[i]>0)n++;return n})()")
     check(px > 2000, f"Something is drawn ({px} pixels)")
@@ -59,9 +59,9 @@ def run(pw):
     tx0, tz0 = num(pg, "tx"), num(pg, "tz")
     pg.keyboard.down("Shift"); pg.mouse.move(650, 400); pg.mouse.down(); pg.mouse.move(560, 360, steps=6); pg.mouse.up(); pg.keyboard.up("Shift"); pg.wait_for_timeout(300)
     check(abs(num(pg, "tx") - tx0) + abs(num(pg, "tz") - tz0) > 0.3, "Shift-drag moves it")
-    pg.keyboard.press("r"); pg.wait_for_timeout(900)
+    pg.keyboard.press("KeyR"); pg.wait_for_timeout(900)
     check(abs(num(pg, "pitch") - 0.62) < 0.02 and num(pg, "tx") == 0, "R brings back the whole map")
-    pg.keyboard.press("t"); pg.wait_for_timeout(900)
+    pg.keyboard.press("KeyT"); pg.wait_for_timeout(900)
     check(num(pg, "pitch") > 1.5, "T looks from above")
     # cheap: nothing runs while nothing happens, and a burst of moves is not a burst of frames
     pg.wait_for_timeout(500); a = int(pg.get_attribute("[data-testid=explorer-stage]", "data-drawn")); pg.wait_for_timeout(900)
@@ -71,8 +71,8 @@ def run(pw):
     pg.mouse.up(); pg.wait_for_timeout(500); n = int(pg.get_attribute("[data-testid=explorer-stage]", "data-drawn")) - a
     check(n <= 62 + 2, f"60 pointer moves cost {n} frames at most")
     # picking: N goes to a room and selects it
-    pg.keyboard.press("r"); pg.wait_for_timeout(700)
-    pg.keyboard.press("n"); pg.wait_for_selector("[data-testid=explorer-card]"); pg.wait_for_timeout(700)
+    pg.keyboard.press("KeyR"); pg.wait_for_timeout(700)
+    pg.keyboard.press("KeyE"); pg.wait_for_selector("[data-testid=explorer-card]"); pg.wait_for_timeout(700)
     check("Core" in pg.inner_text("[data-testid=explorer-card]") and pg.get_attribute("[data-testid=explorer-open]", "href") == "/branch/core", "N selects the first room (the hub): its card links to the branch")
     # clicking the middle of the screen picks the selected room again
     pg.keyboard.press("Escape") if False else None
@@ -81,7 +81,7 @@ def run(pw):
     # walk through every room: an unseen one never gives its name or a link away
     seen_unseen = 0; leaked = False
     for _ in range(len(NODES)):
-        pg.keyboard.press("n"); pg.wait_for_timeout(60)
+        pg.keyboard.press("KeyE"); pg.wait_for_timeout(60)
         t = pg.inner_text("[data-testid=explorer-card]")
         if "Not found yet" in t:
             seen_unseen += 1
@@ -98,14 +98,14 @@ def run(pw):
     check(int(pg.get_attribute("[data-testid=explorer-stage]", "data-rooms")) == real + 2 and "2 sealed" in pg.inner_text("[data-testid=explorer-tally]"), "Second ring: the sealed rooms appear on the outer ring")
     sealed_leak = False
     for _ in range(len(NODES) + 2):
-        pg.keyboard.press("n"); pg.wait_for_timeout(50)
+        pg.keyboard.press("KeyE"); pg.wait_for_timeout(50)
         t = pg.inner_text("[data-testid=explorer-card]")
         if "A sealed room" in t and (pg.locator("[data-testid=explorer-open]").count() or "Sealed One" in t): sealed_leak = True
     check(not sealed_leak, "A sealed room is not a doorway and has no name")
     check(hits["pulse"] == 0, "Chart layer not reached: no pulse request")
     pg, errs, hits = mk(False, pulses=True)
     pg.goto(f"{BASE}/explore"); pg.wait_for_selector("[data-testid=explorer-canvas]"); pg.wait_for_timeout(700)
-    check(hits["pulse"] == 1, "Chart layer reached: one pulse request")
+    check(hits["pulse"] == 0, "Pulses are switched off for now: no request even when reached")
     # leaving
     pg, errs, hits = mk(False)
     pg.goto(f"{BASE}/explore"); pg.wait_for_selector("[data-testid=explorer-canvas]"); pg.keyboard.press("Escape"); pg.wait_for_url(re.compile(r".*/soundbay$"), timeout=5000)

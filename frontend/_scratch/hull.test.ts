@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { layoutHull, pipeSegments, roomMesh, shapeOf, type HullNode } from "../src/lib/hullLayout.js";
-import { clampCam, defaultCam, panBy, pick, project, type Cam } from "../src/lib/hullCamera.js";
+import { clampCam, defaultCam, isTopView, panBy, pick, project, upsideDown, wrapAngle, type Cam } from "../src/lib/hullCamera.js";
 const N = (id: number, parentId: number | null, over: Partial<HullNode> = {}): HullNode => ({ id, parentId, slug: `b${id}`, name: `B${id}`, tracks: id * 3, albums: 1, ...over });
 
 // --- layout
@@ -81,7 +81,11 @@ for (const [yaw, pitch] of [[0, 0.5], [1.3, 0.9], [4, 0.2], [2.2, 1.4]]) {
 }
 // clamps
 const cl = clampCam({ yaw: -1, pitch: 9, dist: 0.1, tx: 0, ty: 0, tz: 0 }, 50);
-assert.ok(cl.yaw >= 0 && cl.yaw < Math.PI * 2 && cl.pitch < Math.PI / 2 && cl.dist >= 5);
+assert.ok(Math.abs(cl.yaw) <= Math.PI && Math.abs(cl.pitch) <= Math.PI && cl.dist >= 5);
+assert.ok(Math.abs(wrapAngle(Math.PI * 2 + 0.5) - 0.5) < 1e-9 && Math.abs(wrapAngle(-Math.PI * 1.5) - Math.PI / 2) < 1e-9);
+assert.ok(Math.abs(clampCam({ yaw: 0, pitch: 4, dist: 20, tx: 0, ty: 0, tz: 0 }, 50).pitch - (4 - Math.PI * 2)) < 1e-9, "pitch wraps past the top instead of stopping");
+assert.ok(!upsideDown({ yaw: 0, pitch: 0.6, dist: 20, tx: 0, ty: 0, tz: 0 }) && upsideDown({ yaw: 0, pitch: 2.5, dist: 20, tx: 0, ty: 0, tz: 0 }));
+assert.ok(isTopView({ yaw: 0, pitch: Math.PI / 2, dist: 20, tx: 0, ty: 0, tz: 0 }) && !isTopView({ yaw: 0, pitch: 0.6, dist: 20, tx: 0, ty: 0, tz: 0 }));
 assert.ok(defaultCam(100).dist > defaultCam(1).dist);
 // picking
 const rooms = [{ id: 1, x: 0, y: 0, z: 0, r: 2 }, { id: 2, x: 10, y: 0, z: 0, r: 2 }];

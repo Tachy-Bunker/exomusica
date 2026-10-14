@@ -49,7 +49,7 @@ def run(playwright):
     try:
         w.wait_for_selector("[data-testid=door-wipe]", timeout=3000)
         check(w.get_attribute("[data-testid=door-wipe]", "data-door") == "members", "Wipe into /jam is members-coloured")
-        bi = w.evaluate("()=>getComputedStyle(document.querySelector('.door-wipe')).backgroundImage"); check("63, 201, 187" in bi, f"Wipe edge is teal {bi[:90]}")
+        bi = w.evaluate("()=>document.querySelector('.door-wipe').style.getPropertyValue('--door')"); check("3fc9bb" in bi.lower(), f"Door is teal {bi}")
     except Exception as e:
         check(False, f"wipe: {e}")
     check(not errors, f"No page errors {errors[:2]}")

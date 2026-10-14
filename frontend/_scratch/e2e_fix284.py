@@ -50,7 +50,7 @@ def run(playwright):
     page.click("[data-testid=fp-lens]"); page.wait_for_selector("[data-testid=landmarks]")
     page.click("[data-testid=leave-mark]"); page.wait_for_url("**/pms?at=study%3Amine-1")
     # compose: ink, text, stamp
-    page.wait_for_selector("[data-testid=comp-sheet]")
+    page.wait_for_selector("[data-testid=comp-sheet]"); page.wait_for_selector("[data-testid=door-wipe]", state="detached", timeout=5000)
     box = page.locator("[data-testid=comp-sheet]").bounding_box()
     page.mouse.move(box["x"] + 100, box["y"] + 100); page.mouse.down()
     for i in range(1, 40): page.mouse.move(box["x"] + 100 + i * 8, box["y"] + 100 + (i % 7) * 6)

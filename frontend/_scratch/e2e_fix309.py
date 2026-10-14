@@ -79,7 +79,7 @@ def run(playwright):
     check("forgotten" in cls("Old Thread"), "Forgotten: quiet 100 days, never visited")
     check("forgotten" not in cls("Fresh Thread") and "forgotten" not in cls("Empty Thread"), "Not forgotten: recent, or no messages yet")
     check("forgotten" not in cls("Revisited Thread"), "Not forgotten: old, but you visited lately")
-    t.click("a:text-is('Old Thread')"); t.wait_for_timeout(300)
+    t.click("a:text-is('Old Thread')"); t.wait_for_timeout(1000)
     vis = t.evaluate("localStorage.getItem('exomusica_thread_visits')")
     check(vis and "old" in json.loads(vis), f"Opening it records the visit {vis}")
     t2 = mk(ME, {"exomusica_thread_visits": vis})
