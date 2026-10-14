@@ -80,15 +80,20 @@ export type Target = { kind: "door"; door: RoomDoor; label: string } | { kind: "
 /** What "Use" would act on: the nearest thing in front of you, within reach. Doors count from a little further away. */
 export function facing(world: RoomWorld, e: Eye, reach = 2.7): Target | null {
   const fx = Math.cos(e.yaw), fz = Math.sin(e.yaw);
-  let best: Target | null = null, bestScore = Infinity;
-  const consider = (x: number, z: number, max: number, t: Target) => {
-    const dx = x - e.x, dz = z - e.z, d = Math.hypot(dx, dz); if (d > max) return;
-    const cos = d < 1e-6 ? 1 : (dx * fx + dz * fz) / d; if (cos < 0.82) return; // about 35 degrees either side
-    const score = d * (2 - cos); if (score < bestScore) { bestScore = score; best = t; }
-  };
-  for (const p of world.props) consider(p.x, p.z, reach, { kind: "prop", prop: p, label: p.kind === "album" ? `Open album: ${p.label}` : p.kind === "terminal" ? p.label : p.label });
-  for (const d of world.doors) consider(d.x, d.z, reach + 1.8, { kind: "door", door: d, label: d.state === "open" ? `Go through: ${d.name}` : "Sealed: not found yet" });
-  return best;
+  let bestKind = 0, bestIdx = -1, bestScore = Infinity; // 1 = prop, 2 = door; the Target (and its label) is only built for the winner
+  for (let i = 0; i < world.props.length; i++) {
+    const p = world.props[i], dx = p.x - e.x, dz = p.z - e.z, d = Math.hypot(dx, dz); if (d > reach) continue;
+    const cos = d < 1e-6 ? 1 : (dx * fx + dz * fz) / d; if (cos < 0.82) continue; // about 35 degrees either side
+    const score = d * (2 - cos); if (score < bestScore) { bestScore = score; bestKind = 1; bestIdx = i; }
+  }
+  for (let i = 0; i < world.doors.length; i++) {
+    const dr = world.doors[i], dx = dr.x - e.x, dz = dr.z - e.z, d = Math.hypot(dx, dz); if (d > reach + 1.8) continue;
+    const cos = d < 1e-6 ? 1 : (dx * fx + dz * fz) / d; if (cos < 0.82) continue;
+    const score = d * (2 - cos); if (score < bestScore) { bestScore = score; bestKind = 2; bestIdx = i; }
+  }
+  if (bestKind === 1) { const p = world.props[bestIdx]; return { kind: "prop", prop: p, label: p.kind === "album" ? `Open album: ${p.label}` : p.label }; }
+  if (bestKind === 2) { const d = world.doors[bestIdx]; return { kind: "door", door: d, label: d.state === "open" ? `Go through: ${d.name}` : "Sealed: not found yet" }; }
+  return null;
 }
 
 /** Door quad corners on the wall (slightly inside, so it draws over the wall). */

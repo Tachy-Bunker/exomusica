@@ -860,3 +860,13 @@ No schema change, no server code. A small drone hovers ahead and to the right of
 - Interact: tap/click it (hit radius from where it was drawn; works with a finger, a tap never moves the view), key **C**, or the **Drone** HUD button. It opens `DroneTerminal` on the same terminal glass: now playing (album link, playlist), seek bar, prev / play-pause / next, shuffle, repeat, the **queue** (click a line to jump there), clear queue, "Send the drone away" (the HUD button brings it back).
 - Light: nothing repaints while idle and nothing plays. While music plays the room repaints ~11×/s (not 60) and only when the tab is visible; sending the drone away removes that cost.
 - Tests: `drone.test.ts` (follows, settles, never in walls/pedestals, rests), `e2e_fix349.py` (visible and positioned, idle = no repaint, returns after moving/turning, tap/C/button open it, playing/queue/next/prev/shuffle/repeat/clear, away and back, phone tap).
+
+## fix350 — room performance + lock-on
+
+No schema change, no server code.
+- **Adaptive resolution** (`lib/roomPerf.ts` `ScaleGovernor`): measures paint time per frame; steps the canvas pixel scale 1 → 0.85 → 0.7 → 0.55 → 0.42 after sustained slow frames (>11 ms), back up after a long run of fast ones (<4 ms), 2.5 s hold between changes; from step 3 on, also caps to 30 fps. CSS size is unchanged, so the room just looks softer on weak devices.
+- **Allocation-free painter**: `RoomPainter` class with preallocated Float64 scratch buffers, no per-frame arrays/closures/strings; `facing()` builds its target object only for the winner. Measured in the browser with the heap sampling profiler: ~0.4 KB per frame (was several KB). Dataset debug attributes are throttled to 100 ms and flushed when the loop idles.
+- **Door prefetch** (`lib/roomPrefetch.ts`, `lib/sharedGet.ts`): walking toward a door fetches the room behind it (branch + albums) through a shared GET cache, so arriving costs no requests and no duplicate fetches.
+- **Lock-on** (`lib/roomLock.ts`): right mouse button, **Z**, or the Lock button (touch). Picks the most centred/nearest person, door, terminal or pedestal inside a cone (reach 14); the view follows the target, strafing circles it, turn keys are ignored while locked; drops when the target leaves (22) or is lost. The prompt shows "Locked: …".
+- **Debug:** `?perf` shows ms avg / p95 / scale / polygons; `?perfmul=N` multiplies measured paint time (test hook for slow devices).
+- Tests: `roomperf.test.ts`, `paintbench.ts` (node alloc bench), `e2e_fix350.py` (19 checks).

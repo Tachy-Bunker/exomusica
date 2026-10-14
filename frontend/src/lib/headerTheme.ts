@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 import { create } from "zustand";
-import { api } from "./api";
+import { getJson } from "./sharedGet";
 import { identityOf } from "./branchIdentity";
 import { lift } from "./legibleColor";
 import type { Branch } from "./types";
@@ -12,7 +12,7 @@ const cache = new Map<string, Promise<Theme | null>>();
 export function themeOf(slug: string): Promise<Theme | null> {
   let p = cache.get(slug);
   if (!p) {
-    p = api<Branch>(`/api/branches/${slug}`).then((b) => {
+    p = getJson<Branch>(`/api/branches/${slug}`).then((b) => {
       if (!b || !b.slug) return null;
       const id = identityOf({ slug: b.slug, color: b.identityColor, glyph: b.identityGlyph, seed: (b as { visibility?: string }).visibility === "BABY_CRYSTALS" });
       return { slug: b.slug, name: b.name, color: lift(id.color), glyph: id.glyph };

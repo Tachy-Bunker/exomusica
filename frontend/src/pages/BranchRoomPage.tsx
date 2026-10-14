@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
-import { api } from "../lib/api";
+import { getJson } from "../lib/sharedGet";
 import { useDocumentTitle } from "../lib/useDocumentTitle";
 import { scannedIds } from "../lib/scanLog";
 import { keysOf } from "../lib/fieldLog";
@@ -50,8 +50,8 @@ function RoomInner({ slug }: { slug: string }) {
   useEffect(() => {
     let alive = true;
     recordVisit(slug);
-    api<Branch>(`/api/branches/${slug}`).then((b) => alive && setBranch(b && b.slug ? b : false)).catch(() => alive && setBranch(false));
-    api<BranchAlbum[]>(`/api/branches/${slug}/albums`).then((a) => alive && setAlbums(a ?? [])).catch(() => alive && setAlbums([]));
+    getJson<Branch>(`/api/branches/${slug}`).then((b) => alive && setBranch(b && b.slug ? b : false)).catch(() => alive && setBranch(false));
+    getJson<BranchAlbum[]>(`/api/branches/${slug}/albums`).then((a) => alive && setAlbums(a ?? [])).catch(() => alive && setAlbums([]));
     loadChartBranches(visited).then((n) => alive && setList(n)).catch(() => alive && setList(false));
     loadHome().then((h) => alive && setHome(h)).catch(() => alive && setHome(false));
     loadMilestones().then((l) => alive && setOuter(!!l.find((m) => m.key === "m-ring")?.reached)).catch(() => alive && setOuter(false));

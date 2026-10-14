@@ -59,3 +59,10 @@ Last updated: fix349. Built milestone rewards are listed in `docs/HOMEPAGE_AND_N
 - Built (fix348): people in rooms (live, opt-out, in memory), terminals for albums and chat, arrows look. Follow-ups: member colours and avatars on figures (now hashed from the name), emotes/waves, voice-chat-free "ping", wiki/news/studies/playlists as terminals, per-room guest ghosts, Tab to cycle terminals, door colour per destination, footsteps.
 
 - Built (fix349): the drone = audio player in rooms. Follow-ups: volume and A/B on the drone screen, drone looks per branch/era, drone reacts to the music (level from an analyser), drone visible to other members in the room (position is its owner's, title optional), drone in the normal pages as a corner companion, remove-from-queue and reorder.
+
+## Roadmap after fix349 (owner approved, in this order; bosses based on music/sound are designed AFTER these)
+- fix350 DELIVERED: adaptive resolution, allocation-free painter, door prefetch, lock-on (Z / right mouse / Lock button). Next: fix351 Echo visor + Lore logbook, fix352 morph ball, fix353 member echoes, then boss design.
+- fix351: Echo visor (ping rings reveal sealed doors / secret branches by sound; unlocked by a milestone) and Lore logbook (scan terminals/walls/doors; completion %, lore authored by owner).
+- fix352: Waveform morph ball (roll a ball along a track's waveform; height = amplitude, colour = spectral centroid, bookmarks = save points, position = playback position).
+- fix353: Echoes of members (faint replayed paths of recent visitors, asynchronous).
+- Then: design write-up of **bosses built on music and sound** (mechanisms), consistent with Monthly challenge and Twelve Artifacts.

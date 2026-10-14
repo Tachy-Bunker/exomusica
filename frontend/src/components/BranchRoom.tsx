@@ -6,6 +6,9 @@ import { useAudioStore } from "../lib/audioStore";
 import { applyList, glide, isVisible, joinRoom, setVisible, type Shown } from "../lib/roomNet";
 import { clamp, doorWalkedInto, facing, MAX_PITCH, stepEye, wrapYaw, type Eye, type Target } from "../lib/roomView";
 import { paintRoom, type DroneView } from "../lib/roomPaint";
+import { ScaleGovernor } from "../lib/roomPerf";
+import { aimAt, pickLock, refreshLock, type Lock } from "../lib/roomLock";
+import { prefetchRoom } from "../lib/roomPrefetch";
 import { isTypingTarget } from "../lib/isTypingTarget";
 import { RoomStick } from "./RoomStick";
 
@@ -14,7 +17,7 @@ const KEYS: Record<string, [number, number, number, number]> = { // forward, str
   KeyA: [0, -1, 0, 0], KeyD: [0, 1, 0, 0], ArrowLeft: [0, 0, -1, 0], ArrowRight: [0, 0, 1, 0], KeyQ: [0, 0, -1, 0], KeyE: [0, 0, 1, 0],
   PageUp: [0, 0, 0, 1], PageDown: [0, 0, 0, -1],
 };
-const useLabel = (t: Target | null): string => (t ? t.label : "");
+const NO_ONE: Shown[] = [];
 
 interface Props {
   world: RoomWorld; color: string;
@@ -38,6 +41,9 @@ export function BranchRoom({ world, color, go, mapHref, backHref, onLocked, onPr
   const lookAcc = useRef({ yaw: 0, pitch: 0 }), drawn = useRef(0);
   const others = useRef(new Map<number, Shown>()), link = useRef<ReturnType<typeof joinRoom>>(null), pausedRef = useRef(paused), [visible, setVis] = useState(isVisible), [here, setHere] = useState(0);
   pausedRef.current = paused;
+  const gov = useRef(new ScaleGovernor()), dprBase = useRef(1), lock = useRef<Lock | null>(null), [locked, setLocked] = useState(false), pendingPaint = useRef(false), prefetchAt = useRef(0), perfEl = useRef<HTMLDivElement>(null), perfAt = useRef(0), dsAt = useRef(0), dsAt2 = useRef(0);
+  const perfMul = useRef(typeof location !== "undefined" ? Number(/[?&]perfmul=(\d+)/.exec(location.search)?.[1] ?? 1) : 1); // test hook: pretend the device is N times slower
+  const perfOn = useRef(typeof location !== "undefined" && /[?&]perf\b/.test(location.search));
   const drone = useRef(startDrone({ ...world.spawn, pitch: 0 })), dview = useRef<DroneView>({ d: drone.current, playing: false, title: "", t: 0, hit: null }), lastPaint = useRef(0);
   const [droneOn, setDroneOn] = useState(droneWanted), droneOnRef = useRef(droneOn); droneOnRef.current = droneOn;
   const track = useAudioStore((s) => s.currentTrack), playing = useAudioStore((s) => s.isPlaying);
@@ -45,6 +51,12 @@ export function BranchRoom({ world, color, go, mapHref, backHref, onLocked, onPr
   useEffect(() => { dirty.current = true; wakeRef.current(); }, [track?.id, playing, droneOn]);
   useEffect(() => { const on = () => setDroneOn(droneWanted()); window.addEventListener("exomusica-drone-pref", on); return () => window.removeEventListener("exomusica-drone-pref", on); }, []);
 
+  const fitRef = useRef(() => {});
+  const flushDs = useCallback(() => { // the test/debug attributes: written at most every 100 ms while moving, and always once the room goes still
+    const st = stage.current; if (!st) return; const e = eye.current, hh = dview.current.hit;
+    st.dataset.x = e.x.toFixed(2); st.dataset.z = e.z.toFixed(2); st.dataset.yaw = e.yaw.toFixed(3); st.dataset.pitch = e.pitch.toFixed(3); st.dataset.target = shown.current; st.dataset.lock = lock.current ? lock.current.id : "";
+    st.dataset.scale = String(gov.current.scale); st.dataset.drone = droneOnRef.current && hh ? `${Math.round(hh.x)},${Math.round(hh.y)}` : ""; st.dataset.drawn = String(drawn.current);
+  }, []);
   const showToast = useCallback((s: string) => { const t = toast.current; if (!t) return; t.textContent = s; t.style.opacity = "1"; window.clearTimeout((t as unknown as { _t?: number })._t); (t as unknown as { _t?: number })._t = window.setTimeout(() => { t.style.opacity = "0"; }, 1800); }, []);
 
   const use = useCallback(() => {
@@ -61,34 +73,56 @@ export function BranchRoom({ world, color, go, mapHref, backHref, onLocked, onPr
     const c = canvas.current, st = stage.current; if (!c || !st) return;
     const dt = Math.min(0.05, last.current ? (now - last.current) / 1000 : 0.016); last.current = now;
     const k = keys.current, still = pausedRef.current; let f = 0, s = 0, tr = 0, lk = 0;
-    const gliding = glide(others.current, dt);
+    const gliding = glide(others.current, dt); let aimMoved = false;
     if (!still) for (const code of k) { const v = KEYS[code]; if (v) { f += v[0]; s += v[1]; tr += v[2]; lk += v[3]; } }
     if (!still) { f += stick.current.y; s += stick.current.x; }
     const run = k.has("ShiftLeft") || k.has("ShiftRight") || Math.hypot(stick.current.x, stick.current.y) > 0.93;
     const la = lookAcc.current; lookAcc.current = { yaw: 0, pitch: 0 };
-    let e = eye.current; if (la.yaw || la.pitch) e = { ...e, yaw: wrapYaw(e.yaw + la.yaw), pitch: clamp(e.pitch + la.pitch, -MAX_PITCH, MAX_PITCH) };
+    let e = eye.current;
+    if (lock.current && !still) { // locked on: the view follows the target, keys and drags no longer turn it
+      const nl = refreshLock(lock.current, world, e, others.current.values());
+      if (!nl) { lock.current = null; setLocked(false); showToast("Lock lost"); } else { lock.current = nl; const a2 = aimAt(e, nl, dt); if (Math.abs(a2.yaw - e.yaw) + Math.abs(a2.pitch - e.pitch) > 1e-4) aimMoved = true; e = a2; tr = 0; lk = 0; la.yaw = 0; la.pitch = 0; }
+    }
+    if (la.yaw || la.pitch) e = { ...e, yaw: wrapYaw(e.yaw + la.yaw), pitch: clamp(e.pitch + la.pitch, -MAX_PITCH, MAX_PITCH) };
     const r = still ? { eye: e, into: null, moved: false } : stepEye(world, e, { forward: clamp(f, -1, 1), strafe: clamp(s, -1, 1), turn: clamp(tr, -1, 1), look: clamp(lk, -1, 1), run }, dt);
     const wantsDrone = droneOnRef.current, a = audioRef.current;
     const droneMoved = wantsDrone ? stepDrone(drone.current, r.eye, world, a.playing ? now / 1000 : 0, dt) : false;
     const animating = wantsDrone && a.playing && !document.hidden; // a playing drone breathes: repaint about 11 times a second, not 60
     const tick = animating && now - lastPaint.current >= 90;
-    const changed = r.moved || !!la.yaw || !!la.pitch || gliding || droneMoved || tick; eye.current = r.eye;
+    const changed = r.moved || !!la.yaw || !!la.pitch || gliding || droneMoved || tick || aimMoved; eye.current = r.eye;
+    if (!still && now - prefetchAt.current > 300) { prefetchAt.current = now; for (const d of world.doors) if (d.state === "open" && d.toSlug && Math.hypot(d.x - r.eye.x, d.z - r.eye.z) < 5.5) prefetchRoom(d.toSlug); } // walking toward a door fetches the room behind it
     if (!traveling.current && !still) {
       const d = doorWalkedInto(world, r.eye, r.into);
       if (d?.toSlug) { traveling.current = true; go(`/branch/${d.toSlug}/room?from=${encodeURIComponent(world.slug)}`, true); }
       else if (r.into && world.doors.some((x) => x.edge === r.into!.edge && x.state === "locked" && Math.abs((r.eye.x - x.x) * x.tx + (r.eye.z - x.z) * x.tz) <= x.hw)) { if (!bumped.current) { bumped.current = true; showToast("Sealed. You have not found that room yet."); onLocked(); } }
       else if (!r.into) bumped.current = false;
     }
-    if (changed || dirty.current) {
-      dirty.current = false;
+    if (changed || dirty.current || pendingPaint.current) {
       const t = facing(world, r.eye); tgt.current = t;
-      const label = useLabel(t); if (label !== shown.current) { shown.current = label; if (prompt.current) { prompt.current.textContent = label; prompt.current.style.opacity = label ? "1" : "0"; } }
-      const w = size.current.w, h = size.current.h; if (w && h) { const ctx = c.getContext("2d"); if (ctx) { lastPaint.current = now; const dv = dview.current; dv.playing = a.playing; dv.title = a.title; dv.t = now / 1000; paintRoom(ctx, w, h, world, r.eye, color, t, [...others.current.values()], wantsDrone ? dv : null); if (!wantsDrone) dv.hit = null; } }
+      const label = t ? t.label : lock.current ? `Locked: ${lock.current.label}` : "";
+      if (label !== shown.current) { shown.current = label; if (prompt.current) { prompt.current.textContent = label; prompt.current.style.opacity = label ? "1" : "0"; } }
       link.current?.sendPose(r.eye.x, r.eye.z, r.eye.yaw);
-      st.dataset.x = r.eye.x.toFixed(2); st.dataset.z = r.eye.z.toFixed(2); st.dataset.yaw = r.eye.yaw.toFixed(3); st.dataset.pitch = r.eye.pitch.toFixed(3); st.dataset.target = label; { const hh = dview.current.hit; st.dataset.drone = wantsDrone && hh ? `${Math.round(hh.x)},${Math.round(hh.y)}` : ""; } st.dataset.drawn = String(++drawn.current);
+      if (now - dsAt.current > 100) { dsAt.current = now; st.dataset.x = r.eye.x.toFixed(2); st.dataset.z = r.eye.z.toFixed(2); st.dataset.yaw = r.eye.yaw.toFixed(3); st.dataset.pitch = r.eye.pitch.toFixed(3); st.dataset.target = label; st.dataset.lock = lock.current ? lock.current.id : ""; }
+      if (gov.current.minGap && now - lastPaint.current < gov.current.minGap) pendingPaint.current = true; // slow device: paint at ~30 fps
+      else {
+        pendingPaint.current = false; dirty.current = false;
+        const w = size.current.w, h = size.current.h;
+        if (w && h) {
+          const ctx = c.getContext("2d");
+          if (ctx) {
+            lastPaint.current = now; const dv = dview.current; dv.playing = a.playing; dv.title = a.title; dv.t = now / 1000;
+            const t0 = performance.now(); const stt = paintRoom(ctx, w, h, world, r.eye, color, t, others.current.size ? [...others.current.values()] : NO_ONE, wantsDrone ? dv : null, lock.current); const ms = (performance.now() - t0) * perfMul.current;
+            if (!wantsDrone) dv.hit = null;
+            if (gov.current.observe(ms, now) !== null) { fitRef.current(); dirty.current = true; }
+            if (perfOn.current && perfEl.current && now - perfAt.current > 500) { perfAt.current = now; perfEl.current.textContent = `${gov.current.averageMs.toFixed(1)} ms avg · ${gov.current.p95().toFixed(1)} p95 · scale ${gov.current.scale} · ${stt.polys} polys`; }
+          }
+        }
+        ++drawn.current; if (now - dsAt2.current > 100) { dsAt2.current = now; st.dataset.scale = String(gov.current.scale); const hh = dview.current.hit; st.dataset.drone = wantsDrone && hh ? `${Math.round(hh.x)},${Math.round(hh.y)}` : ""; st.dataset.drawn = String(drawn.current); }
+      }
     }
-    if (changed || animating || (!still && (k.size || stick.current.x || stick.current.y || drag.current))) raf.current = requestAnimationFrame(frame); else last.current = 0;
-  }, [world, color, go, onLocked, showToast]);
+    const more = !!(changed || animating || pendingPaint.current || dirty.current || (!still && (k.size || stick.current.x || stick.current.y || drag.current)));
+    if (more) raf.current = requestAnimationFrame(frame); else { last.current = 0; flushDs(); }
+  }, [world, color, go, onLocked, showToast, flushDs]);
 
   function wake() { if (!raf.current) raf.current = requestAnimationFrame(frame); }
   const wakeRef = useRef(wake); wakeRef.current = wake;
@@ -96,11 +130,13 @@ export function BranchRoom({ world, color, go, mapHref, backHref, onLocked, onPr
   // size the canvas to the stage (device pixels capped: 1.5, or 1 on small CPUs)
   useEffect(() => {
     const st = stage.current, c = canvas.current; if (!st || !c) return;
-    const fit = () => {
-      const w = st.clientWidth, h = st.clientHeight, dpr = Math.min(window.devicePixelRatio || 1, (navigator.hardwareConcurrency ?? 8) <= 4 ? 1 : 1.5);
-      c.width = Math.round(w * dpr); c.height = Math.round(h * dpr); size.current = { w, h };
+    const fit = () => { // device pixels capped (1.5, or 1 on small CPUs), then scaled down by the governor when painting is slow
+      const w = st.clientWidth, h = st.clientHeight; dprBase.current = Math.min(window.devicePixelRatio || 1, (navigator.hardwareConcurrency ?? 8) <= 4 ? 1 : 1.5);
+      const dpr = dprBase.current * gov.current.scale;
+      c.width = Math.max(1, Math.round(w * dpr)); c.height = Math.max(1, Math.round(h * dpr)); size.current = { w, h };
       c.getContext("2d")?.setTransform(dpr, 0, 0, dpr, 0, 0); dirty.current = true; wakeRef.current();
     };
+    fitRef.current = fit;
     fit(); const ro = new ResizeObserver(fit); ro.observe(st); return () => ro.disconnect();
   }, []);
 
@@ -108,6 +144,7 @@ export function BranchRoom({ world, color, go, mapHref, backHref, onLocked, onPr
     const down = (e: KeyboardEvent) => {
       if (pausedRef.current || isTypingTarget(e.target) || e.ctrlKey || e.metaKey || e.altKey) return;
       if (e.code === "Space" || e.code === "Enter" || e.code === "KeyF") { if (e.code === "Enter" && (e.target as HTMLElement)?.closest?.("a,button")) return; e.preventDefault(); e.stopPropagation(); if (!e.repeat) use(); return; }
+      if (e.code === "KeyZ") { e.preventDefault(); e.stopPropagation(); if (!e.repeat) toggleLockRef.current(); return; }
       if (e.code === "KeyC") { e.preventDefault(); e.stopPropagation(); if (!e.repeat) callDroneRef.current(); return; }
       if (KEYS[e.code] || e.code === "ShiftLeft" || e.code === "ShiftRight") { e.preventDefault(); e.stopPropagation(); keys.current.add(e.code); wakeRef.current(); }
     };
@@ -117,7 +154,7 @@ export function BranchRoom({ world, color, go, mapHref, backHref, onLocked, onPr
     return () => { window.removeEventListener("keydown", down, true); window.removeEventListener("keyup", up, true); window.removeEventListener("blur", blur); cancelAnimationFrame(raf.current); raf.current = 0; };
   }, [use]);
 
-  useEffect(() => { if (paused) { keys.current.clear(); stick.current = { x: 0, y: 0 }; drag.current = null; } else { stage.current?.focus({ preventScroll: true }); dirty.current = true; wakeRef.current(); } }, [paused]);
+  useEffect(() => { if (paused) { lock.current = null; setLocked(false); keys.current.clear(); stick.current = { x: 0, y: 0 }; drag.current = null; } else { stage.current?.focus({ preventScroll: true }); dirty.current = true; wakeRef.current(); } }, [paused]);
   useEffect(() => {
     if (!visible) { others.current.clear(); setHere(0); dirty.current = true; wakeRef.current(); return; }
     link.current = joinRoom(world.slug, (l) => { applyList(others.current, l); setHere(l.length); dirty.current = true; wakeRef.current(); });
@@ -125,11 +162,19 @@ export function BranchRoom({ world, color, go, mapHref, backHref, onLocked, onPr
     return () => { link.current?.close(); link.current = null; others.current.clear(); };
   }, [world.slug, visible]);
 
+  const toggleLock = useCallback(() => {
+    if (pausedRef.current) return;
+    if (lock.current) { lock.current = null; setLocked(false); showToast("Lock released"); dirty.current = true; wakeRef.current(); return; }
+    const l = pickLock(world, eye.current, others.current.values());
+    if (!l) { showToast("Nothing to lock on to"); return; }
+    lock.current = l; setLocked(true); dirty.current = true; wakeRef.current();
+  }, [world, showToast]);
+  const toggleLockRef = useRef(toggleLock); toggleLockRef.current = toggleLock;
   const callDroneRef = useRef(() => {});
   const callDrone = () => { if (!droneOnRef.current) { setDroneOn(true); setDroneWanted(true); } onDrone(); };
   callDroneRef.current = callDrone;
   const onStick = useCallback((x: number, y: number) => { stick.current = { x, y }; wakeRef.current(); }, []);
-  const pdown = (e: React.PointerEvent) => { if (drag.current || pausedRef.current) return; drag.current = { id: e.pointerId, x: e.clientX, y: e.clientY, moved: 0, type: e.pointerType }; try { e.currentTarget.setPointerCapture(e.pointerId); } catch { /* synthetic */ } stage.current?.focus({ preventScroll: true }); };
+  const pdown = (e: React.PointerEvent) => { if (pausedRef.current) return; if (e.button === 2) { e.preventDefault(); toggleLockRef.current(); return; } if (drag.current) return; drag.current = { id: e.pointerId, x: e.clientX, y: e.clientY, moved: 0, type: e.pointerType }; try { e.currentTarget.setPointerCapture(e.pointerId); } catch { /* synthetic */ } stage.current?.focus({ preventScroll: true }); };
   const pmove = (e: React.PointerEvent) => {
     const d = drag.current; if (!d || d.id !== e.pointerId) return;
     const dx = e.clientX - d.x, dy = e.clientY - d.y; d.x = e.clientX; d.y = e.clientY; d.moved += Math.abs(dx) + Math.abs(dy);
@@ -145,22 +190,24 @@ export function BranchRoom({ world, color, go, mapHref, backHref, onLocked, onPr
   return (
     <div className="rm" data-testid="branch-room" style={{ ["--rm" as string]: color }}>
       <div ref={stage} className="rm-stage" tabIndex={0} aria-label={`${world.name}: walk with W A S D or the arrow keys, Space to use`} data-testid="room-stage" data-room={world.slug}
-        onPointerDown={pdown} onPointerMove={pmove} onPointerUp={pup} onPointerCancel={pup}>
+        onContextMenu={(e) => e.preventDefault()} onPointerDown={pdown} onPointerMove={pmove} onPointerUp={pup} onPointerCancel={pup}>
         <canvas ref={canvas} />
       </div>
       <div className="rm-scan" aria-hidden="true" />
       <div className="rm-title">{world.name}{here > 0 && <span data-testid="room-here" className="rm-here"> · {here} here</span>}</div>
       <div ref={prompt} className="rm-prompt" data-testid="room-prompt" aria-live="polite" />
       <div ref={toast} className="rm-toast" role="status" />
+      {perfOn.current && <div ref={perfEl} className="rm-perf" data-testid="room-perf" />}
       <div className="rm-bar">
         <Link to={backHref} className="rm-btn" data-testid="room-back">Back</Link>
         <Link to={mapHref} className="rm-btn" data-testid="room-map">Map</Link>
         <button type="button" className="rm-btn" data-testid="room-drone" onClick={callDrone}>Drone</button>
+        <button type="button" className="rm-btn" data-testid="room-lock" aria-pressed={locked} onClick={toggleLock}>{locked ? "Unlock" : "Lock on"}</button>
         <button type="button" className="rm-btn" aria-pressed={visible} data-testid="room-visible" title={visible ? "Others in this room can see you. Press to hide (you will not see them either)." : "You are hidden. Press to appear."} onClick={() => { const v = !visible; setVisible(v); setVis(v); }}>{visible ? "Visible" : "Hidden"}</button>
       </div>
       <div className="rm-pad"><RoomStick onChange={onStick} /></div>
       <button type="button" className="rm-use" data-testid="room-use" onClick={() => { use(); }} onPointerDown={(e) => e.stopPropagation()}>Use</button>
-      <p className="rm-hint">W A S D move · arrows look · Q E turn · Space use · C drone · Esc leave</p>
+      <p className="rm-hint">W A S D move · arrows look · Q E turn · Space use · right-click / Z lock on · C drone · Esc leave</p>
       <ul className="sr-only">
         {world.doors.map((d) => (
           <li key={d.id}>
