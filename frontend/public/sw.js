@@ -1,6 +1,6 @@
 // Exomusica service worker. It does nothing until someone pins an album for offline ("exo-armed" exists).
 // - pinned audio / covers (/uploads, /api/audio-proxy) are served from the cache, with Range support so seeking works;
-// - /api/albums/:slug and /api/tracks/:id/provenance are network-first, falling back to the pinned copy;
+// - /api/albums/:slug, /api/playlists/:slug and /api/tracks/:id/provenance are network-first, falling back to the pinned copy;
 // - the app shell (index.html + hashed /assets) is kept so a pinned album opens with no connection.
 const PINNED = "exo-offline-v1";
 const SHELL = "exo-shell-v1";
@@ -75,6 +75,6 @@ self.addEventListener("fetch", (event) => {
   const p = url.pathname;
   if (req.mode === "navigate") { event.respondWith(navigation(req)); return; }
   if (p.startsWith("/uploads/") || p.startsWith("/api/audio-proxy/")) { event.respondWith(pinnedFirst(req)); return; }
-  if (/^\/api\/albums\/[^/]+$/.test(p) || /^\/api\/tracks\/\d+\/provenance$/.test(p)) { event.respondWith(networkThenPinned(req)); return; }
+  if (/^\/api\/(albums|playlists)\/[^/]+$/.test(p) || /^\/api\/tracks\/\d+\/provenance$/.test(p)) { event.respondWith(networkThenPinned(req)); return; }
   if (p.startsWith("/assets/")) { event.respondWith(shellAsset(req)); return; }
 });

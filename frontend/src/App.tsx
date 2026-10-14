@@ -1,3 +1,4 @@
+import { StormPage } from "./pages/StormPage";
 import { Suspense, lazy } from "react";
 import { BrowserRouter, Routes, Route, Navigate, useLocation, useParams } from "react-router-dom";
 import { ChromaticAberrationLayer } from "./components/ChromaticAberrationLayer";
@@ -73,6 +74,7 @@ import { CapsulePage } from "./pages/CapsulePage";
 import { FieldLogPage } from "./pages/FieldLogPage";
 import { ChartPage } from "./pages/ChartPage";
 import { VaultPage } from "./pages/VaultPage";
+import { BranchRoomPage } from "./pages/BranchRoomPage";
 import { ExplorePage } from "./pages/ExplorePage";
 import { AuditLogAdminPage } from "./pages/admin/AuditLogAdminPage";
 import { TrashAdminPage } from "./pages/admin/TrashAdminPage";
@@ -137,6 +139,7 @@ export default function App() {
             <Route path="vault" element={<VaultPage />} />
             <Route path="explore" element={<ExplorePage />} />
             <Route path="radio" element={<RadioPage />} />
+            <Route path="storm" element={<StormPage />} />
             <Route path="jam" element={<JamPage />} />
             <Route path="jam/:code" element={<JamPage />} />
             <Route path="studies" element={<Navigate to="/xenolab?tab=studies" replace />} />
@@ -158,6 +161,7 @@ export default function App() {
             <Route path="discussion" element={<DiscussionIndexPage />} />
             <Route path="discussion/map" element={<ForumMapPage />} />
             <Route path="branch/:slug" element={<BranchPage />} />
+            <Route path="branch/:slug/room" element={<BranchRoomPage />} />
             <Route path="album/:slug" element={<AlbumPage />} />
             <Route path="offline" element={<OfflinePage />} />
             <Route path="community-album/:slug" element={<CommunityAlbumPage />} />

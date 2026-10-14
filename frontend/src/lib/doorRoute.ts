@@ -7,7 +7,7 @@ export function branchSlugOf(path: string): string | null {
 }
 
 export interface ClickInfo { button: number; meta: boolean; ctrl: boolean; shift: boolean; alt: boolean; defaultPrevented: boolean }
-export interface AnchorInfo { href: string | null; target: string | null; download: boolean; origin: string; noDoor: boolean }
+export interface AnchorInfo { href: string | null; target: string | null; download: boolean; origin: string; noDoor: boolean; always?: boolean }
 
 /** The path to walk through a door when this click should play it; null leaves the click alone. */
 export function doorTarget(click: ClickInfo, a: AnchorInfo, currentPath: string): string | null {
@@ -16,7 +16,7 @@ export function doorTarget(click: ClickInfo, a: AnchorInfo, currentPath: string)
   let u: URL;
   try { u = new URL(a.href, a.origin); } catch { return null; }
   if (u.origin !== a.origin) return null;
-  if (sectionOf(u.pathname) === sectionOf(currentPath)) return null;
+  if (!a.always && sectionOf(u.pathname) === sectionOf(currentPath)) return null; // `always`: a door inside a section (room to room)
   return u.pathname + u.search + u.hash;
 }
 

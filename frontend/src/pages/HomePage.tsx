@@ -5,7 +5,7 @@ import { Link, useSearchParams } from "react-router-dom";
 import { ACTIVITY_ICON } from "../components/ActivityIcons";
 import { HomeExplore } from "../components/HomeExplore";
 import { FeaturedArticles } from "../components/FeaturedArticles";
-import { EchoCard } from "../components/Resurface";
+import { EchoCard, StormBanner } from "../components/Resurface";
 import { api } from "../lib/api";
 import { useAuth } from "../lib/auth";
 import { useHome, type HomeActivity } from "../lib/home";
@@ -139,6 +139,7 @@ export function HomePage() {
         {home ? <HappeningNow activity={home.activity} members={home.stats.members} /> : <div className="home-placeholder" aria-busy={!failed}>{failed ? "Couldn't load the latest activity." : "Loading…"}</div>}
       </section>
 
+      {home && <StormBanner />}
       {home && <EchoCard />}
 
       {user ? (

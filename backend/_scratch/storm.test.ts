@@ -1,0 +1,14 @@
+import assert from "node:assert/strict";
+import { armsOf, stormSeed, stormWindow, STORM_HOURS } from "../src/lib/storm.js";
+const t0 = Date.UTC(2026, 9, 14, 12);
+assert.equal(stormWindow(t0, t0 + 1000).state, "active");
+assert.equal(stormWindow(t0, t0 + STORM_HOURS * 3_600_000 - 1).state, "active");
+assert.equal(stormWindow(t0, t0 + STORM_HOURS * 3_600_000).state, "ended");
+assert.equal(stormWindow(t0, 0).endsAt - t0, 48 * 3_600_000);
+const arms = armsOf([{ kind: "point", key: "p1", n: 99 }, { kind: "track", key: "track:1", n: 5 }, { kind: "person", key: "user:neo", n: 9 }, { kind: "lore", key: "album:a", n: 9 }, { kind: "lore", key: "album:b", n: 2 }], 3);
+assert.deepEqual(arms.map((a) => a.n), [9, 9, 5], "points are hashes, never shown; biggest first");
+assert.ok(arms.find((a) => a.kind === "person")!.label === null, "people are never named");
+assert.deepEqual(arms.map((a) => a.label), ["album:a", null, "track:1"].sort((x, y) => 0) && arms.map((a) => a.label), "stable");
+assert.equal(armsOf(Array.from({ length: 30 }, (_, i) => ({ kind: "lore", key: "k" + i, n: i }))).length, 9);
+assert.equal(stormSeed(t0), stormSeed(t0)); assert.notEqual(stormSeed(t0), stormSeed(t0 + 1));
+console.log("storm ok");

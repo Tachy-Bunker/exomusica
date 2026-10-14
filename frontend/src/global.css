@@ -6533,3 +6533,23 @@ body:has(.term-backdrop, .fp-panel, .pocket-pad, .probe-hud, .visor-hud) { touch
 .hx-bar kbd,.hx-hints kbd{font:inherit;font-size:.75rem;border:1px solid #2a5366;border-radius:4px;padding:0 .3rem;margin-right:.2rem;color:#9fdcf0}
 .hx-sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
 @media (max-width:640px){.hx-hints{display:none}.hx-card{bottom:6.2rem}}
+
+/* fix347: the walkable branch room */
+.rm{position:absolute;inset:0;overflow:hidden;color:#cfefff;--rm:#5fd3ee}
+.rm-stage{position:absolute;inset:0;touch-action:none;outline:none;user-select:none;cursor:grab}
+.rm-stage canvas{display:block;width:100%;height:100%}
+.rm-scan{position:absolute;inset:0;pointer-events:none;background:repeating-linear-gradient(0deg,rgba(0,0,0,.18) 0 1px,transparent 1px 3px);mix-blend-mode:multiply;box-shadow:inset 0 0 90px rgba(0,0,0,.7)}
+.rm-title{position:absolute;left:1rem;top:.8rem;pointer-events:none;font-size:1rem;text-shadow:0 0 8px var(--rm),0 0 2px #000;color:var(--rm)}
+.rm-prompt{position:absolute;left:50%;bottom:34%;transform:translateX(-50%);max-width:88%;text-align:center;pointer-events:none;opacity:0;transition:opacity .12s;padding:.35rem .7rem;background:rgba(4,8,12,.78);border:1px solid var(--rm);border-radius:6px;font-size:.9rem}
+.rm-prompt:empty{display:none}
+.rm-toast{position:absolute;left:50%;top:22%;transform:translateX(-50%);pointer-events:none;opacity:0;transition:opacity .25s;padding:.4rem .8rem;background:rgba(20,10,6,.9);border:1px solid #ffb347;color:#ffd9a0;border-radius:6px;font-size:.9rem}
+.rm-bar{position:absolute;left:1rem;top:2.6rem;display:flex;gap:.5rem}
+.rm-btn{padding:.35rem .8rem;background:rgba(4,8,12,.8);border:1px solid var(--rm);color:#cfefff;border-radius:6px;text-decoration:none;font-size:.85rem;min-height:36px;display:inline-flex;align-items:center}
+.rm-pad{position:absolute;left:max(1rem,env(safe-area-inset-left));bottom:max(1rem,env(safe-area-inset-bottom));width:clamp(110px,30vmin,160px);height:clamp(110px,30vmin,160px)}
+.rm-stick{position:relative;width:100%;height:100%;border-radius:50%;border:1.5px solid var(--rm);background:rgba(4,8,12,.45)}
+.rm-knob{position:absolute;left:50%;top:50%;width:42%;height:42%;margin:-21% 0 0 -21%;border-radius:50%;background:var(--rm);opacity:.8;box-shadow:0 0 12px var(--rm)}
+.rm-use{position:absolute;right:max(1rem,env(safe-area-inset-right));bottom:max(1.4rem,env(safe-area-inset-bottom));width:clamp(76px,20vmin,104px);height:clamp(76px,20vmin,104px);border-radius:50%;border:2px solid var(--rm);background:rgba(4,8,12,.6);color:#fff;font-size:1rem;box-shadow:0 0 14px var(--rm);touch-action:none}
+.rm-use:active{background:var(--rm);color:#000}
+.rm-hint{position:absolute;left:50%;bottom:.5rem;transform:translateX(-50%);margin:0;font-size:.75rem;opacity:.6;pointer-events:none;white-space:nowrap}
+@media (pointer:coarse){.rm-hint{display:none}}
+@media (pointer:fine){.rm-pad{opacity:.55}}

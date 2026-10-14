@@ -1,3 +1,5 @@
+import { OfflineButton } from "../components/OfflineButton";
+import { loadMilestones } from "../lib/milestones";
 import { PlayGlow } from "../components/PlayGlow";
 import { useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
@@ -90,6 +92,8 @@ export function PlaylistPage() {
   }
 
   useDocumentTitle(playlist?.title ?? "");
+  const [offlineOn, setOfflineOn] = useState(false);
+  useEffect(() => { let live = true; void loadMilestones().then((l) => { if (live) setOfflineOn(l.find((m) => m.key === "m-offline")?.reached === true); }).catch(() => undefined); return () => { live = false; }; }, []);
 
   if (!playlist) return <p>Loading…</p>;
 
@@ -169,7 +173,8 @@ export function PlaylistPage() {
           )}
           <p style={{ color: "var(--text-dim)", marginTop: 0 }}>{backPath ? <Link to={backPath}>← {playlist.owner}</Link> : <>by {playlist.owner}</>}</p>
         </div>
-        <div style={{ display: "flex", gap: "0.5rem" }}>
+        <div style={{ display: "flex", gap: "0.5rem", alignItems: "center", flexWrap: "wrap" }}>
+          {offlineOn && <OfflineButton slug={playlist.slug} kind="playlist" />}
           <Link className="btn" to={mapPath} title="View as spacemap">
             <svg width="18" height="18" viewBox="0 0 256 256" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
               <path d="M128,116a48,48,0,1,1,48-48A48.05436,48.05436,0,0,1,128,116Zm60,8a48,48,0,1,0,48,48A48.05436,48.05436,0,0,0,188,124ZM68,124a48,48,0,1,0,48,48A48.05436,48.05436,0,0,0,68,124Z" />

@@ -297,7 +297,7 @@ export function BranchExplorer({ hull, states, lastSlug, playingSlug, pulses, on
           <b>{selState === "unseen" ? "???" : selState === "sealed" ? "A sealed room" : sel.name}</b>
           <span className="hx-dim">{STATE_WORD[selState]}{(selState === "visited" || selState === "heard") ? ` · ${sel.albums} album${sel.albums === 1 ? "" : "s"} · ${sel.tracks} track${sel.tracks === 1 ? "" : "s"}` : ""}</span>
           {(selState === "visited" || selState === "heard") ? (
-            <span className="hx-actions"><Link className="btn" to={`/branch/${sel.slug}`} data-testid="explorer-open">Open</Link><Link className="btn" to={`/soundbay?open=${sel.slug}`} data-testid="explorer-soundbay">In Soundbay</Link></span>
+            <span className="hx-actions"><Link className="btn" to={`/branch/${sel.slug}`} data-testid="explorer-open">Open</Link><Link className="btn" to={`/branch/${sel.slug}/room`} data-testid="explorer-room">Walk in</Link><Link className="btn" to={`/soundbay?open=${sel.slug}`} data-testid="explorer-soundbay">In Soundbay</Link></span>
           ) : <span className="hx-dim">{selState === "sealed" ? "Somewhere there is a way in." : "Walk toward it: go to a room next to it first."}</span>}
         </aside>
       )}

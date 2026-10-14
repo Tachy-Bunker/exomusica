@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { doorTarget } from "../src/lib/doorRoute.js";
 import { BLADES, blade, cornerMask, frameOctagon, isPortrait } from "../src/lib/doorShape.js";
 import { asDoorStyle } from "../src/lib/doorStyle.js";
 assert.equal(BLADES, 9);
@@ -14,3 +15,10 @@ assert.ok(cornerMask().includes("Z M"));
 assert.ok(isPortrait(400, 800) && !isPortrait(800, 400) && !isPortrait(500, 500));
 assert.equal(asDoorStyle("hex"), "hex"); assert.equal(asDoorStyle(null), "stronghold"); assert.equal(asDoorStyle("x"), "stronghold");
 console.log("door2 ok");
+{
+  const click = { button: 0, meta: false, ctrl: false, shift: false, alt: false, defaultPrevented: false };
+  const a = { href: "/branch/b/room?from=a", target: null, download: false, origin: "http://x", noDoor: false };
+  assert.equal(doorTarget(click, a, "/branch/a/room"), null, "same section: no door");
+  assert.equal(doorTarget(click, { ...a, always: true }, "/branch/a/room"), "/branch/b/room?from=a", "data-door-always: room to room plays the door");
+  assert.equal(doorTarget(click, { ...a, always: true, noDoor: true }, "/branch/a/room"), null, "no-door still wins");
+}

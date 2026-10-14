@@ -1,11 +1,9 @@
 # Exomusica backlog (kept through chat compaction: update this file with every delivery)
 
-Last updated: fix344. Built milestone rewards are listed in `docs/HOMEPAGE_AND_NAV.md`.
+Last updated: fix347. Built milestone rewards are listed in `docs/HOMEPAGE_AND_NAV.md`.
 
 ## Milestone rewards still labelled "reward being built"
 - **Monthly challenge** (100 members): a monthly challenge with a boss brief. Needs a design write-up first (item 91).
-- **Signal storm** (5000 scans): a 48-hour event where scanning feeds a shared meter; payoff is a surprise Artifact.
-- **Offline cache** (1000 tracks): pick what to download for offline listening.
 - **Twelve Artifacts** (10000 scans): twelve Artifacts revealed, one per twelfth of the way. Needs a design write-up first (item 88).
 - **Hull** (24 milestones reached): the seed of the explorable ship, a corridor with one lit door per milestone. Ties to the 3D game below.
 - **Emoji gate**: needs a moderation decision from the owner before building.
@@ -46,3 +44,14 @@ Last updated: fix344. Built milestone rewards are listed in `docs/HOMEPAGE_AND_N
 
 ## fix344 notes
 - Door: access levels no longer change its colour (site primary or branch colour only); bring back as a thin accent if wanted. Door sound still open.
+
+## fix345 notes
+- Built: Offline cache (playlists). Still open from the reward list: Monthly challenge, Signal storm, Twelve Artifacts, Hull, Emoji gate.
+- Offline: picking single tracks or a whole branch is not built; playlists and albums only.
+
+## fix346 notes
+- Built: Signal storm. Still open from the reward list: Monthly challenge, Twelve Artifacts, Hull, Emoji gate.
+- **Direction change (owner, after fix346):** the Explore map's "3D game" is no longer a full game. Think of it as a **3D room that replaces a branch's page**, offered for now as an **alternate link** next to the normal branch page. Hull and "connect all rooms" are to be solved inside this idea. Design still to be discussed.
+- Signal storm: goal is a constant (1000 new scans in the 48 h after the milestone, `STORM_GOAL`), the Artifact is a spoked figure + nine notes drawn from the most scanned pages; it is the first "Artifact", the Twelve Artifacts design should be consistent with it. Scans have no index on `at` (a once-per-30-seconds count); add `@@index([at])` if the table grows large.
+
+- Built (fix347): walkable 3D branch room as alternate link `/branch/:slug/room`. Solves for now: moving between branches in map layout. Follow-ups: replace branch page with the room (owner decision), connect separate roots (rooms of different roots are not linked on the map, so no doors between them), Hull milestone as a corridor of milestone doors inside the room world, door colour per destination inside the room, sound/footsteps, pedestal album covers as textures, Scan-map Enter should open the room, test on a real phone.

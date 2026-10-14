@@ -70,7 +70,7 @@ export function DoorWipe() {
       if (!a) return;
       const to = doorTarget(
         { button: e.button, meta: e.metaKey, ctrl: e.ctrlKey, shift: e.shiftKey, alt: e.altKey, defaultPrevented: e.defaultPrevented },
-        { href: a.getAttribute("href"), target: a.getAttribute("target"), download: a.hasAttribute("download"), origin: location.origin, noDoor: a.hasAttribute("data-no-door") },
+        { href: a.getAttribute("href"), target: a.getAttribute("target"), download: a.hasAttribute("download"), origin: location.origin, noDoor: a.hasAttribute("data-no-door"), always: a.hasAttribute("data-door-always") },
         path.current,
       );
       if (!to) return;

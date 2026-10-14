@@ -109,6 +109,7 @@ export function BranchPage() {
           <Link to="/soundbay">{isDesktop ? "← Soundbay (R)" : "← Soundbay"}</Link>
         </p>
         <h1>{branch.name}</h1>
+        <p style={{ margin: "0 0 .4rem" }}><Link to={`/branch/${branch.slug}/room`} data-testid="branch-room-link">Walk into this room (3D)</Link></p>
         <FeedLink href={`/api/feed/branch/${branch.slug}`} title={`${branch.name} — new work`} />
         {branch.description && <p style={{ color: "var(--text-dim)", maxWidth: 640 }}>{branch.description}</p>}
       </div>

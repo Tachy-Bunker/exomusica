@@ -1,0 +1,14 @@
+import assert from "node:assert/strict";
+import { left, notes, rng, spokes, stormWorthAsking, STORM_MS } from "../src/lib/storm.js";
+const arms = [{ kind: "track" as const, label: "track:1", n: 10 }, { kind: "lore" as const, label: "album:a", n: 5 }, { kind: "person" as const, label: null, n: 1 }];
+assert.deepEqual(spokes(42, arms), spokes(42, arms), "same storm, same picture");
+assert.notDeepEqual(spokes(42, arms).map((s) => s.angle), spokes(43, arms).map((s) => s.angle));
+const sp = spokes(42, arms); assert.ok(sp[0].length === 1 && sp[0].length > sp[1].length && sp[1].length > sp[2].length && sp[2].length >= 0.3);
+const step = (sp[1].angle - sp[0].angle + Math.PI * 2) % (Math.PI * 2); assert.ok(Math.abs(step - (Math.PI * 2) / 3) < 1e-9, "spokes spread evenly");
+const ns = notes(42, arms); assert.equal(ns.length, 3); assert.ok(ns.every((n) => n.hz >= 110 && n.hz <= 110 * 2.6)); assert.deepEqual(ns, notes(42, arms));
+assert.equal(ns[0].beats, 2); assert.equal(ns[2].beats, 1);
+const r = rng(5); const v = [r(), r(), r()]; assert.ok(v.every((x) => x >= 0 && x < 1)); assert.deepEqual(v, [rng(5)(), (() => { const q = rng(5); q(); return q(); })(), (() => { const q = rng(5); q(); q(); return q(); })()]);
+const t = Date.UTC(2026, 9, 14);
+assert.ok(!stormWorthAsking(null, t) && !stormWorthAsking(t + 1000, t) && stormWorthAsking(t, t) && stormWorthAsking(t, t + STORM_MS + 86_400_000) && !stormWorthAsking(t, t + STORM_MS + 8 * 86_400_000));
+assert.equal(left(30 * 60000), "30 min"); assert.equal(left(90 * 60000), "1 h 30 min"); assert.equal(left(3 * 86_400_000), "3 days"); assert.equal(left(-5), "0 min");
+console.log("storm fe ok");
