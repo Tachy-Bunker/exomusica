@@ -24,6 +24,8 @@ export interface RoomWorld {
   blurb?: string;
   /** Where this room lies on the Scan map (used to place the corridor and the room behind a door). */
   map: { x: number; z: number };
+  /** Slugs of the branches above this one, nearest first (for themes); set by the page. */
+  lineage?: string[];
   /** The branch's colour; set by the page once the theme is known. */
   color?: string;
 }

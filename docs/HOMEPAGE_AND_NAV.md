@@ -973,3 +973,33 @@ No schema change, no server code. Doors between branch rooms no longer play the 
 - **Perf**: one clipped `drawImage` (two when wrapping) per frame, only inside the ceiling polygon. A turning sky repaints ~15 Hz only while the ceiling is actually on screen; looking down or a speed of 0 costs nothing.
 - Assumptions: up/down faces follow the OpenGL cubemap orientation; sides are unmirrored as seen from inside. Horizontal mapping is linear in angle (slight stretch at the edges on wide screens).
 - Tests: `roomdoc.test.ts` (32), `skymake.test.ts` (24), backend `png.test.ts`, `e2e_fix360.py` (15).
+
+## fix361 — Artifacts
+
+- New actor kind **artifact** (Things tab → "+ artifact"): a panel with words (≤ 60 chars) and/or a library picture, size = Width × Height. Placement: **on a wall** (fixed, faces along Turn°, hangs 0.6 m up), **on the floor**, or **billboard** (always faces you). Backfaces of wall panels are skipped (never mirrored text).
+- **Visor-only** flag: invisible unless the echo visor is unlocked; the ping reveals it too.
+- **Scannable**: lock on + X like doors and pedestals. Scan address `room:<slug>/artifact/<id>`; counts in the Logbook completion. Scanning writes the **Logbook entry** (≤ 1500 chars; falls back to the words, then to a stock line) and emits **scanned**, which wires can use (open a door, show/hide things). What you already scanned replays `scanned` when you re-enter, so opened things stay open. Server-side lore (admin `/api/admin/lore`) for the same key still overrides.
+- Doc: Actor gained `text, lore, img, mode, visor` (only kept for artifacts); backend `roomDoc.ts` is the same file. Room size cap (200 kB) still applies.
+- Perf: each panel is drawn once into a cached 256-px canvas, then stamped as 1, 2×2 or 4×4 affine pieces by distance (≤ 16 `drawImage` near, 1 far). No per-frame text layout.
+- Tests: `roomdoc.test.ts` (38), `e2e_fix361.py` (14).
+
+## fix362 — Ambient flock
+
+- Mood tab → "Drifting specks": none / dust / fireflies, 1–12 of them (`RoomDoc.flock = {kind, n, color}`), colour pick.
+- They drift slowly (small sine wander), **ignore walls and objects**, fade in/out over 6–15 s and respawn somewhere else in the room. Fireflies are soft glows swelling at 0.5 Hz (no flashing); dust is tiny dim dots.
+- **Perf**: allocation-free, one `Float64Array`, only the ones inside the screen are drawn (glow stamped from the shared cache). The room repaints at ~15 Hz only while at least one is on screen. **Off** when the adaptive resolution has dropped below 0.75 (weak devices) and with `prefers-reduced-motion`.
+- Tests: `roomdoc.test.ts` (41), `e2e_fix362.py` (9).
+
+## fix363 — Corridors are rooms too
+
+- Every corridor between two rooms has its own document, key `low~high` (the two slugs sorted; `~` can never be in a room slug). Same table and routes as rooms (`GET /api/room-doc/:key`, admin `PUT`); the backend slug check now allows `a~b`.
+- Coordinates are stored in the frame of the **lower-slug room** (a corridor is always built from that end, `lib/roomCorr.ts`: `corrKey`, `corrShift`, `corridorWorld`). The painter draws the corridor layer (`corrLayer` in `roomPaint.ts`) by shifting the eye, so one document looks right from both ends and from inside either room's doorway (clipped to the door opening, like the corridor itself).
+- Admin: stand in a corridor → "Edit corridor" (next to "Edit room"; the button changes to "Close corridor editor"). The editor shows the corridor's outline as the plan, with only **Things** and **Mood** (fog/tint); no floor, walls, ceiling, sky or flock yet.
+- Works in a corridor: all actor kinds (solids block you, triggers, lights, pools, artifacts incl. scanning and the Logbook, visor-only), wires, fog/tint while you are inside. Scan address `room:low~high/artifact/<id>`. State (what wires changed) survives walking between the two rooms through it.
+- Limits: if the map layout moves rooms, the far end of a corridor moves with the far room (things near the lower-slug door stay put). Crossing into the next room while the corridor editor is open closes it without saving. Elevators do not exist as spaces in the room view yet (only as markers on the explorer map), so there is nothing to edit there.
+- Tests: `roomcorr.test.ts` (7), `e2e_fix363.py` (13).
+
+## fix364 — branch themes and copy look
+- Mood tab (admin editor): "Use the theme of the branches above" (on by default), "Make this look the theme of this branch and below", "Remove this branch's theme", "Copy look"/"Paste look" (mood, sky, specks; not materials or floor).
+- Stored as doc `theme~<slug>` (existing `room_docs` table, no schema change; backend slug regex extended). Rooms fetch the themes of their ancestors (up to 8) on entry. Own settings win per field; nearest ancestor wins otherwise.
+- Tests: `_scratch/roomtheme.test.ts`, `_scratch/e2e_fix364.py`.

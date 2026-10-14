@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { EVENTS, KINDS, MAX_ACTORS, MAX_BANDS, MAX_BANDS_PER_WALL, MAX_TEX, MAX_WIRES, MESSAGES, TEX_KINDS, cleanDoc, newId, type Actor, type Band, type Grade, type Kind, type RoomDoc, type Wire } from "../lib/roomDoc";
+import { EVENTS, KINDS, MAX_ACTORS, MAX_LORE, MAX_TEXT, MAX_BANDS, MAX_BANDS_PER_WALL, MAX_TEX, MAX_WIRES, MESSAGES, TEX_KINDS, cleanDoc, newId, type Actor, type Band, type Grade, type Kind, type RoomDoc, type Wire } from "../lib/roomDoc";
 import { cellAt, decode, encode, floodFill, paintDisc, rectsOf } from "../lib/roomFloor";
 import { onTexReady, texSheet } from "../lib/roomTextures";
-import { isUpload, MAX_SKY_SPEED } from "../lib/roomDoc";
+import { isUpload, MAX_FLOCK, MAX_SKY_SPEED } from "../lib/roomDoc";
 import { api } from "../lib/api";
 import { drawSeams, pngOf, squareTexture } from "../lib/textureMake";
 import { composeCube, panoOf, roleOf, skyUrl, type Role } from "../lib/skyMake";
@@ -12,16 +12,18 @@ import type { RoomWorld } from "../lib/roomWorld";
 const SNAP = 0.25, PLAN = 300;
 const PALETTE = ["#7a8cff", "#ff7ab6", "#7affc8", "#ffd27a", "#c07aff", "#7ad7ff"];
 const DEFAULTS: Record<Kind, Partial<Actor>> = {
-  solid: { w: 2, d: 2, h: 1.5 }, ghost: { w: 2, d: 2, h: 1.5 }, trigger: { w: 3, d: 3, h: 2 }, light: { w: 1, d: 1, h: 2.4 }, marker: { w: 0.6, d: 0.6, h: 1.6 }, pool: { w: 4, d: 4, h: 0 },
+  solid: { w: 2, d: 2, h: 1.5 }, ghost: { w: 2, d: 2, h: 1.5 }, trigger: { w: 3, d: 3, h: 2 }, light: { w: 1, d: 1, h: 2.4 }, marker: { w: 0.6, d: 0.6, h: 1.6 }, pool: { w: 4, d: 4, h: 0 }, artifact: { w: 1.6, d: 0.1, h: 1 },
 };
 const KIND_HELP: Record<Kind, string> = {
   solid: "Blocks you. Can be shown or hidden by wires.", ghost: "You walk through it. Cosmetic.", trigger: "A zone that sends “enter” and “exit” when you step in or out.",
   light: "A glow. Can be turned on or off.", pool: "A soft pool of light on the floor. Can swell slowly and be turned on or off.", marker: "A named point other things can listen to or send to.",
+  artifact: "A panel with words and/or a picture, on a wall, on the floor or turning to face you. Can be scanned: it writes a Logbook entry and sends “scanned” (to open a door, say). Can be visible only through the scan visor.",
 };
 const snap = (v: number) => Math.round(v / SNAP) * SNAP;
 
 interface Props {
-  world: RoomWorld; doc: RoomDoc; onDoc: (d: RoomDoc, key?: string) => void; onUndo: () => void; onRedo: () => void; canUndo: boolean; canRedo: boolean;
+  themeNote?: string; hasTheme?: boolean; themeMsg?: string; onTheme?: (k: "save" | "clear") => void;
+  world: RoomWorld; cx?: number; cz?: number; corridor?: boolean; doc: RoomDoc; onDoc: (d: RoomDoc, key?: string) => void; onUndo: () => void; onRedo: () => void; canUndo: boolean; canRedo: boolean;
   sel: string | null; setSel: (id: string | null) => void;
   where: () => { x: number; z: number; yaw: number };
   dirty: boolean; busy: boolean; error: string; playing: boolean; onPlay: (on: boolean) => void;
@@ -29,11 +31,11 @@ interface Props {
 }
 
 /** The room editor: a plan view of the room, a list of what is in it, and wires between things. Pure form UI, no logic of its own: every change is a new document handed up. */
-export function RoomEditor({ world, doc, onDoc, onUndo, onRedo, canUndo, canRedo, sel, setSel, where, dirty, busy, error, playing, onPlay, onSave, onRevert, onClose }: Props) {
+export function RoomEditor({ themeNote = "", hasTheme = false, themeMsg = "", onTheme = () => {}, world, cx = 0, cz = 0, corridor = false, doc, onDoc, onUndo, onRedo, canUndo, canRedo, sel, setSel, where, dirty, busy, error, playing, onPlay, onSave, onRevert, onClose }: Props) {
   const painting = useRef(false), cv = useRef<HTMLCanvasElement>(null), drag = useRef<{ id: string; dx: number; dz: number } | null>(null);
   const scale = (PLAN / 2 - 8) / (world.inr + 1.5);
-  const toPx = (x: number, z: number): [number, number] => [PLAN / 2 + x * scale, PLAN / 2 + z * scale];
-  const fromPx = (px: number, py: number): [number, number] => [(px - PLAN / 2) / scale, (py - PLAN / 2) / scale];
+  const toPx = (x: number, z: number): [number, number] => [PLAN / 2 + (x - cx) * scale, PLAN / 2 + (z - cz) * scale];
+  const fromPx = (px: number, py: number): [number, number] => [(px - PLAN / 2) / scale + cx, (py - PLAN / 2) / scale + cz];
   const a = doc.actors.find((x) => x.id === sel) ?? null;
   const commit = (actors: Actor[], wires: Wire[] = doc.wires) => onDoc(cleanDoc({ ...doc, actors, wires }));
   const patch = (id: string, p: Partial<Actor>) => onDoc(cleanDoc({ ...doc, actors: doc.actors.map((x) => (x.id === id ? { ...x, ...p } : x)) }), "p:" + id + Object.keys(p).join());
@@ -46,7 +48,7 @@ export function RoomEditor({ world, doc, onDoc, onUndo, onRedo, canUndo, canRedo
   const [lib, setLib] = useState<{ id: number; name: string; sky?: boolean }[]>([]), [skyPend, setSkyPend] = useState<HTMLCanvasElement | null>(null), [skyName, setSkyName] = useState(""), [skyMsg, setSkyMsg] = useState(""), skyPrev = useRef<HTMLCanvasElement>(null), [, bump] = useState(0), [pend, setPend] = useState<HTMLCanvasElement | null>(null), [pname, setPname] = useState(""), [libMsg, setLibMsg] = useState(""), seam = useRef<HTMLCanvasElement>(null);
   useEffect(() => onTexReady(() => bump((n) => n + 1)), []);
   const loadLib = () => { api<{ id: number; name: string; sky?: boolean }[]>("/api/admin/room-textures").then((r) => setLib(Array.isArray(r) ? r : [])).catch(() => setLibMsg("Could not load the library")); };
-  useEffect(() => { if (tab === "floor" || tab === "mood") loadLib(); }, [tab]);
+  useEffect(() => { if (tab === "floor" || tab === "mood" || tab === "things") loadLib(); }, [tab]);
   useEffect(() => { if (pend && seam.current) drawSeams(seam.current, pend); }, [pend]);
   const pickFile = async (f: File | undefined) => { if (!f) return; setLibMsg(""); try { setPend(await squareTexture(f)); setPname(f.name.replace(/\.[^.]+$/, "").slice(0, 60)); } catch { setLibMsg("That file is not a picture the browser can open"); } };
   const saveTex = async () => { if (!pend) return; setLibMsg("Saving…"); try { await api("/api/admin/room-textures", { method: "POST", body: JSON.stringify({ name: pname, png: pngOf(pend) }) }); setPend(null); setLibMsg("Saved to the library"); loadLib(); } catch (e) { setLibMsg(e instanceof Error ? e.message : "Could not save"); } };
@@ -82,6 +84,12 @@ export function RoomEditor({ world, doc, onDoc, onUndo, onRedo, canUndo, canRedo
     try { const r = await api<{ id: number }>("/api/admin/room-textures", { method: "POST", body: JSON.stringify({ name: skyName, sky: true, png: skyUrl(skyPend) }) }); setSkyPend(null); setSkyMsg("Saved to the library"); loadLib(); if (r && typeof r.id === "number") onDoc(cleanDoc({ ...doc, sky: { id: r.id, speed: doc.sky?.speed ?? 0 } }), "sky"); } catch (e) { setSkyMsg(e instanceof Error ? e.message : "Could not save"); }
   };
   useEffect(() => { const c = skyPrev.current; if (c && skyPend) { const g = c.getContext("2d"); if (g) g.drawImage(skyPend, 0, 0, c.width, c.height); } }, [skyPend]);
+  // copy / paste the look (mood, sky, specks) between rooms
+  const [lookMsg, setLookMsg] = useState("");
+  const copyLook = () => { try { localStorage.setItem("exomusica_look", JSON.stringify({ grade: doc.grade, sky: doc.sky, flock: doc.flock })); setLookMsg("Look copied (mood, sky and specks)."); } catch { setLookMsg("Could not copy here."); } };
+  const pasteLook = () => {
+    try { const c = JSON.parse(localStorage.getItem("exomusica_look") ?? "null"); if (!c) { setLookMsg("Copy a look in another room first."); return; } onDoc(cleanDoc({ ...doc, grade: c.grade, sky: c.sky, flock: c.flock }), "look"); setLookMsg("Look pasted."); } catch { setLookMsg("Could not paste."); }
+  };
   const delTex = async (id: number) => { try { await api(`/api/admin/room-textures/${id}`, { method: "DELETE" }); loadLib(); } catch { setLibMsg("Could not delete"); } };
   const setFloor = (cells: Uint8Array, tex = doc.tex, key = "paint") => onDoc(cleanDoc({ ...doc, tex, floor: encode(cells) }), key);
   const stroke = (px: number, py: number, first: boolean) => {
@@ -132,7 +140,7 @@ export function RoomEditor({ world, doc, onDoc, onUndo, onRedo, canUndo, canRedo
     for (const p of world.props) { const [px, py] = toPx(p.x, p.z); g.fillStyle = "#ffd27a"; g.beginPath(); g.arc(px, py, 3, 0, 7); g.fill(); }
     for (const o of doc.actors) {
       const [px, py] = toPx(o.x, o.z); g.save(); g.translate(px, py); g.rotate(o.rot);
-      const hw = (o.w * scale) / 2, hd = (o.d * scale) / 2;
+      const hw = (o.w * scale) / 2, hd = Math.max(o.kind === "artifact" ? 2 : 0, (o.d * scale) / 2);
       g.globalAlpha = o.on ? 1 : 0.4; g.fillStyle = o.color + (o.kind === "ghost" || o.kind === "trigger" ? "33" : "99"); g.strokeStyle = o.id === sel ? "#fff" : o.color; g.lineWidth = o.id === sel ? 2.5 : 1.5;
       if (o.kind === "trigger") g.setLineDash([4, 3]);
       if (o.kind === "light" || o.kind === "marker") { g.beginPath(); g.arc(0, 0, o.kind === "light" ? 5 : 4, 0, 7); g.fill(); g.stroke(); }
@@ -147,7 +155,7 @@ export function RoomEditor({ world, doc, onDoc, onUndo, onRedo, canUndo, canRedo
     const [x, z] = fromPx(px, py); let best: Actor | null = null, bd = Infinity;
     for (const o of doc.actors) {
       const c = Math.cos(-o.rot), s = Math.sin(-o.rot), lx = (x - o.x) * c - (z - o.z) * s, lz = (x - o.x) * s + (z - o.z) * c;
-      const inside = o.kind === "light" || o.kind === "marker" ? Math.hypot(x - o.x, z - o.z) < 14 / scale : Math.abs(lx) <= o.w / 2 && Math.abs(lz) <= o.d / 2;
+      const inside = o.kind === "light" || o.kind === "marker" ? Math.hypot(x - o.x, z - o.z) < 14 / scale : o.kind === "artifact" ? Math.hypot(x - o.x, z - o.z) < Math.max(o.w / 2, 10 / scale) : Math.abs(lx) <= o.w / 2 && Math.abs(lz) <= o.d / 2;
       const d = Math.hypot(x - o.x, z - o.z); if (inside && d < bd) { bd = d; best = o; }
     }
     return best;
@@ -166,7 +174,8 @@ export function RoomEditor({ world, doc, onDoc, onUndo, onRedo, canUndo, canRedo
   const add = (kind: Kind) => {
     if (doc.actors.length >= MAX_ACTORS) return;
     const e = where(), id = newId(doc.actors.map((x) => x.id)), n = doc.actors.filter((x) => x.kind === kind).length + 1;
-    const o: Actor = { id, kind, name: `${kind} ${n}`, x: snap(e.x + Math.cos(e.yaw) * 3), z: snap(e.z + Math.sin(e.yaw) * 3), w: 2, d: 2, h: 1.5, rot: 0, sides: 0, color: PALETTE[doc.actors.length % PALETTE.length], on: true, pulse: 0, ...DEFAULTS[kind] };
+    const o: Actor = { id, kind, name: `${kind} ${n}`, x: snap(e.x + Math.cos(e.yaw) * 3), z: snap(e.z + Math.sin(e.yaw) * 3), w: 2, d: 2, h: 1.5, rot: 0, sides: 0, color: PALETTE[doc.actors.length % PALETTE.length], on: true, pulse: 0, text: "", lore: "", img: 0, mode: 0, visor: false, ...DEFAULTS[kind] };
+    if (kind === "artifact") o.rot = e.yaw + Math.PI; // faces you
     commit([...doc.actors, o]); setSel(id);
   };
   const dup = () => { if (!a || doc.actors.length >= MAX_ACTORS) return; const id = newId(doc.actors.map((x) => x.id)); commit([...doc.actors, { ...a, id, name: a.name + " copy", x: a.x + 1, z: a.z + 1 }]); setSel(id); };
@@ -197,8 +206,8 @@ export function RoomEditor({ world, doc, onDoc, onUndo, onRedo, canUndo, canRedo
       <canvas ref={cv} className="re-plan" data-testid="re-plan" style={{ width: PLAN, height: PLAN }} onPointerDown={down} onPointerMove={move} onPointerUp={up} onPointerCancel={up} aria-label="Plan view of the room. Click a thing to select it, drag to move it." />
       <div className="re-tabs" role="tablist">
         <button type="button" role="tab" className="re-b" aria-selected={tab === "things"} data-testid="re-tab-things" onClick={() => setTab("things")}>Things</button>
-        <button type="button" role="tab" className="re-b" aria-selected={tab === "floor"} data-testid="re-tab-floor" onClick={() => setTab("floor")}>Floor</button>
-        <button type="button" role="tab" className="re-b" aria-selected={tab === "walls"} data-testid="re-tab-walls" onClick={() => setTab("walls")}>Walls</button>
+        {!corridor && <button type="button" role="tab" className="re-b" aria-selected={tab === "floor"} data-testid="re-tab-floor" onClick={() => setTab("floor")}>Floor</button>}
+        {!corridor && <button type="button" role="tab" className="re-b" aria-selected={tab === "walls"} data-testid="re-tab-walls" onClick={() => setTab("walls")}>Walls</button>}
         <button type="button" role="tab" className="re-b" aria-selected={tab === "mood"} data-testid="re-tab-mood" onClick={() => setTab("mood")}>Mood</button>
       </div>
       {tab === "floor" && (
@@ -279,6 +288,12 @@ export function RoomEditor({ world, doc, onDoc, onUndo, onRedo, canUndo, canRedo
             <label>Tint colour<input type="color" value={grade.tint} onChange={(e) => setGrade({ tint: e.target.value })} /></label>
             <label>Tint<input type="range" data-testid="re-tinta" min={0} max={0.4} step={0.02} value={grade.tintA} onChange={(e) => setGrade({ tintA: num(e.target.value, 0) })} /></label>
           </div>
+          {!corridor && <>
+          <div className="re-insp" data-testid="re-flockbox">
+            <label>Drifting specks<select data-testid="re-flock" value={doc.flock ? doc.flock.kind : -1} onChange={(e) => { const v = Number(e.target.value); onDoc(cleanDoc({ ...doc, flock: v < 0 ? null : { kind: v, n: doc.flock?.n ?? 8, color: doc.flock?.color ?? (v ? "#c8ff7a" : "#ffe9a8") } }), "flock"); }}><option value={-1}>none</option><option value={0}>dust</option><option value={1}>fireflies</option></select></label>
+            {doc.flock && <div className="re-grid"><label>How many<input type="range" data-testid="re-flockn" min={1} max={MAX_FLOCK} step={1} value={doc.flock.n} onChange={(e) => onDoc(cleanDoc({ ...doc, flock: { ...doc.flock!, n: Number(e.target.value) } }), "flockn")} /></label><label>Colour<input type="color" data-testid="re-flockc" value={doc.flock.color} onChange={(e) => onDoc(cleanDoc({ ...doc, flock: { ...doc.flock!, color: e.target.value } }), "flockc")} /></label></div>}
+            <p className="re-note">At most {MAX_FLOCK}. They drift through walls, fade and come back elsewhere, only drawn when in view, and switch off on slow devices.</p>
+          </div>
           <div className="re-insp" data-testid="re-skybox">
             <label>Sky<select data-testid="re-sky" value={doc.sky?.id ?? 0} onChange={(e) => { const id = Number(e.target.value); onDoc(cleanDoc({ ...doc, sky: id ? { id, speed: doc.sky?.speed ?? 0 } : null }), "sky"); }}><option value={0}>none (use the ceiling)</option>{lib.filter((t) => t.sky).map((t) => <option key={t.id} value={t.id}>{t.name.replace(/^sky:/, "")}</option>)}{doc.sky && !lib.some((t) => t.id === doc.sky!.id) && <option value={doc.sky.id}>sky #{doc.sky.id}</option>}</select></label>
             {doc.sky && <label>Turning<input type="range" data-testid="re-skyspeed" min={-MAX_SKY_SPEED} max={MAX_SKY_SPEED} step={0.5} value={doc.sky.speed} onChange={(e) => onDoc(cleanDoc({ ...doc, sky: { id: doc.sky!.id, speed: Number(e.target.value) } }), "skyspeed")} /> <span className="re-note">{doc.sky.speed}°/s, wraps round</span></label>}
@@ -287,6 +302,16 @@ export function RoomEditor({ world, doc, onDoc, onUndo, onRedo, canUndo, canRedo
             {skyMsg && <p className="re-note" data-testid="re-skymsg">{skyMsg}</p>}
           </div>
           <label>Ceiling<select data-testid="re-ceil" value={doc.ceil} onChange={(e) => onDoc(cleanDoc({ ...doc, ceil: Number(e.target.value) }), "ceil")}><option value={0}>none</option>{doc.tex.map((t, i) => <option key={i} value={i + 1}>{i + 1} · {isUpload(t.kind) ? "picture" : t.kind}</option>)}</select></label>
+          </>}
+          {!corridor && (
+            <div className="re-insp" data-testid="re-theme">
+              <label className="re-chk"><input type="checkbox" data-testid="re-inherit" checked={doc.inherit} onChange={(e) => onDoc(cleanDoc({ ...doc, inherit: e.target.checked }), "inherit")} />Use the theme of the branches above</label>
+              <p className="re-note" data-testid="re-themenote">{doc.inherit ? themeNote : "Ignoring every theme."} What this room sets itself always wins.</p>
+              <div className="re-row"><button type="button" className="re-b" data-testid="re-themesave" onClick={() => onTheme("save")}>Make this look the theme of this branch and below</button><button type="button" className="re-b" data-testid="re-themeclear" disabled={!hasTheme} onClick={() => onTheme("clear")}>Remove this branch's theme</button></div>
+              <div className="re-row"><button type="button" className="re-b" data-testid="re-copylook" onClick={copyLook}>Copy look</button><button type="button" className="re-b" data-testid="re-pastelook" onClick={pasteLook}>Paste look</button></div>
+              {(themeMsg || lookMsg) && <p className="re-note" data-testid="re-thememsg">{lookMsg || themeMsg}</p>}
+            </div>
+          )}
           <button type="button" className="re-b" onClick={() => onDoc(cleanDoc({ ...doc, grade: null }))}>Clear mood</button>
         </div>
       )}
@@ -314,6 +339,16 @@ export function RoomEditor({ world, doc, onDoc, onUndo, onRedo, canUndo, canRedo
             <label>Shape<select data-testid="re-sides" value={a.sides} onChange={(e) => patch(a.id, { sides: Number(e.target.value) })}><option value={0}>Box</option>{[3, 4, 5, 6, 7, 8].map((n) => <option key={n} value={n}>{n} sides</option>)}</select></label>
           )}
           {(a.kind === "light" || a.kind === "pool") && <label>Slow swell (Hz, 0 = steady)<input data-testid="re-pulse" type="number" min={0} max={2} step={0.25} value={a.pulse} onChange={(e) => patch(a.id, { pulse: num(e.target.value, 0) })} /></label>}
+          {a.kind === "artifact" && (
+            <div className="re-insp" data-testid="re-artifact">
+              <label>Words on it<input data-testid="re-atext" value={a.text} maxLength={MAX_TEXT} onChange={(e) => patch(a.id, { text: e.target.value })} /></label>
+              <label>Picture<select data-testid="re-aimg" value={a.img} onChange={(e) => patch(a.id, { img: Number(e.target.value) })}><option value={0}>none</option>{lib.filter((t) => !t.sky).map((t) => <option key={t.id} value={t.id}>{t.name.slice(0, 24)}</option>)}{a.img > 0 && !lib.some((t) => t.id === a.img) && <option value={a.img}>picture #{a.img}</option>}</select></label>
+              <label>Placement<select data-testid="re-amode" value={a.mode} onChange={(e) => patch(a.id, { mode: Number(e.target.value) })}><option value={0}>On a wall (fixed, turn it with Turn°)</option><option value={1}>On the floor</option><option value={2}>Billboard (faces you)</option></select></label>
+              <label className="re-chk"><input type="checkbox" data-testid="re-avisor" checked={a.visor} onChange={(e) => patch(a.id, { visor: e.target.checked })} />Only visible through the scan visor</label>
+              <label>Logbook entry (what scanning it writes)<textarea data-testid="re-alore" rows={5} maxLength={MAX_LORE} value={a.lore} onChange={(e) => patch(a.id, { lore: e.target.value })} /></label>
+              <p className="re-note">{a.lore.length}/{MAX_LORE}. Width and Height size the panel; wall panels hang 0.6 m up.</p>
+            </div>
+          )}
           <label>Colour<input type="color" value={a.color} onChange={(e) => patch(a.id, { color: e.target.value })} /></label>
           <label className="re-chk"><input type="checkbox" data-testid="re-on" checked={a.on} onChange={(e) => patch(a.id, { on: e.target.checked })} />{a.kind === "trigger" ? "Starts enabled" : "Starts visible"}</label>
           <div className="re-row"><button type="button" className="re-b" onClick={dup}>Duplicate</button><button type="button" className="re-b re-del" data-testid="re-delete" onClick={del}>Delete</button></div>

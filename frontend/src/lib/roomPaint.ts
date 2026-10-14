@@ -9,11 +9,12 @@ import type { Lock } from "./roomLock";
 import { EYE_Y, NEAR, focalOf, type Eye, type Target } from "./roomView";
 import type { Actor, RoomDoc, WireRuntime } from "./roomDoc";
 import { frac, type FloorLayer } from "./roomFloor";
+import type { Look } from "./roomTheme";
 import { sheetTile, skyImage, texAvg, texSheet } from "./roomTextures";
 import { inRoom } from "./roomScene";
 
 /** What the owner built in the room you are in. Set by the room component; the painter draws it when `slug` matches. `edit` shows what visitors never see (triggers, markers, hidden things) and highlights `sel`. */
-export const actorLayer: { slug: string; doc: RoomDoc | null; rt: WireRuntime | null; edit: boolean; sel: string | null; floor: FloorLayer | null; budget: number; now: number; anim: boolean; skyAnim: boolean; skySeen: boolean } = { slug: "", doc: null, rt: null, edit: false, sel: null, floor: null, budget: 260, now: 0, anim: false, skyAnim: false, skySeen: false };
+export const actorLayer: { slug: string; doc: RoomDoc | null; rt: WireRuntime | null; edit: boolean; sel: string | null; floor: FloorLayer | null; budget: number; now: number; anim: boolean; skyAnim: boolean; skySeen: boolean; visor: boolean; flockAnim: boolean; flockSeen: boolean; look: Look } = { slug: "", doc: null, rt: null, edit: false, sel: null, floor: null, budget: 260, now: 0, anim: false, skyAnim: false, skySeen: false, visor: false, flockAnim: false, flockSeen: false, look: { grade: null, sky: null, flock: null } };
 interface ActorStyle { a: string; b: string; top: string; edge: string; faint: string; glowCol: string; pool1: string; pool2: string }
 const styles = new WeakMap<Actor, ActorStyle>();
 function styleOf(a: Actor): ActorStyle {
@@ -67,6 +68,10 @@ export interface FxView { echo: EchoField | null; now: number; scan: { x: number
 export interface DroneView { d: Drone; playing: boolean; title: string; t: number; hit: { x: number; y: number; r: number } | null }
 export interface PaintStats { polys: number; ms: number }
 
+/** The corridor you are in or looking into: its own document, in the frame of the lower-slug room, shown shifted by (ox, oz) into the frame of the room you are in. */
+export const corrLayer: { key: string; doc: RoomDoc | null; rt: WireRuntime | null; ox: number; oz: number; edit: boolean; sel: string | null } = { key: "", doc: null, rt: null, ox: 0, oz: 0, edit: false, sel: null };
+interface Layer { doc: RoomDoc | null; rt: WireRuntime | null; edit: boolean; sel: string | null }
+const REDUCED = typeof matchMedia !== "undefined" && matchMedia("(prefers-reduced-motion: reduce)").matches;
 const glows = new Map<string, HTMLCanvasElement>();
 /** A soft round glow, drawn once per colour and stamped from then on (a gradient per frame is garbage). */
 function glow(col: string, a: number): HTMLCanvasElement | null {
@@ -157,8 +162,8 @@ export class RoomPainter {
   paint(ctx: CanvasRenderingContext2D, W: number, H: number, eye: Eye, target: Target | null, others: Shown[], drone: DroneView | null, lock: Lock | null, sp: ScenePaint | null = null, fx: FxView | null = null): PaintStats {
     this.view(ctx, W, H, eye); this.fx = fx;
     ctx.fillStyle = BG; ctx.fillRect(0, 0, W, H);
-    if (sp && sp.link && sp.corridor) this.corridorView(eye, sp);
-    else { this.tilesLeft = actorLayer.budget; this.shell(eye, -1, target, sp && sp.link ? sp : null); this.floorPaint(eye); this.ceilPaint(eye); this.actors(eye); this.things(eye, target, others); this.grade(); }
+    if (sp && sp.link && sp.corridor) { this.corridorView(eye, sp); this.grade(corrLayer.doc?.grade ?? null); }
+    else { this.tilesLeft = actorLayer.budget; this.shell(eye, -1, target, sp && sp.link ? sp : null); this.floorPaint(eye); this.ceilPaint(eye); this.actors(eye); this.things(eye, target, others); this.flock(eye); this.grade(); }
     if (fx?.echo) this.echo(fx.echo, fx.now);
     if (lock) this.bracket(lock);
     if (fx?.scan && fx.scan.p > 0) this.scanRing(fx.scan);
@@ -200,6 +205,34 @@ export class RoomPainter {
     }
   }
 
+  // ---- the flock: up to 12 specks (dust or fireflies) that drift, fade out and come back somewhere else. They ignore walls and objects; off-screen ones are not drawn.
+  private fp = new Float64Array(12 * 8); private fpKey = ""; private fpT = 0;
+  private fpSpawn(i: number, first: boolean): void {
+    const f = this.fp, o = i * 8, w = this.world; let x = 0, z = 0, m = 0;
+    for (const p of this.v) m = Math.max(m, Math.abs(p[0]), Math.abs(p[1]));
+    for (let t = 0; t < 8; t++) { x = (Math.random() * 2 - 1) * m; z = (Math.random() * 2 - 1) * m; if (inRoom(w, x, z)) break; }
+    f[o] = x; f[o + 1] = 0.4 + Math.random() * 2.2; f[o + 2] = z; f[o + 3] = (Math.random() - 0.5) * 0.3; f[o + 4] = (Math.random() - 0.5) * 0.08; f[o + 5] = (Math.random() - 0.5) * 0.3;
+    f[o + 7] = 6 + Math.random() * 9; f[o + 6] = first ? Math.random() * f[o + 7] : 0;
+  }
+  private flock(eye: Eye): void {
+    const L = actorLayer, fk = L.look.flock; L.flockSeen = false;
+    if (!fk || L.slug !== this.world.slug || L.budget === 0 || REDUCED) return;
+    const key = L.slug + "|" + fk.n; if (key !== this.fpKey) { this.fpKey = key; this.fpT = L.now; for (let i = 0; i < fk.n; i++) this.fpSpawn(i, true); }
+    const dt = Math.min(0.1, Math.max(0, L.now - this.fpT)); this.fpT = L.now;
+    const ctx = this.ctx, f = this.fp, W = this.W, H = this.H, hw = W / 2, hh = H / 2, fl = this.f, fire = fk.kind === 1, g = fire ? glow(fk.color, 0.9) : null, t = L.now, base = ctx.globalAlpha;
+    if (!fire) ctx.fillStyle = rgba(fk.color, 0.55);
+    for (let i = 0; i < fk.n; i++) {
+      const o = i * 8; f[o + 6] += dt; if (f[o + 6] >= f[o + 7]) this.fpSpawn(i, false);
+      f[o] += (f[o + 3] + Math.sin(t * 0.5 + i * 1.7) * 0.12) * dt; f[o + 1] += (f[o + 4] + Math.sin(t * 0.4 + i) * 0.05) * dt; f[o + 2] += (f[o + 5] + Math.cos(t * 0.45 + i * 2.1) * 0.12) * dt;
+      const age = f[o + 6], life = f[o + 7], e = Math.min(1, age / 1.5, (life - age) / 1.5); if (e <= 0) continue;
+      this.cam(f[o], f[o + 1], f[o + 2]); if (this.qz < NEAR) continue;
+      const x = hw + (this.qx * fl) / this.qz, y = hh - (this.qy * fl) / this.qz; if (x < -30 || x > W + 30 || y < -30 || y > H + 30) continue;
+      L.flockSeen = true;
+      if (fire) { const s = Math.max(6, Math.min(70, (0.28 * fl) / this.qz)); ctx.globalAlpha = base * e * (0.65 + 0.35 * Math.sin(t * Math.PI + i * 2.4)); if (g) ctx.drawImage(g, x - s / 2, y - s / 2, s, s); }
+      else { const r = Math.max(0.8, Math.min(3, (0.012 * fl) / this.qz)); ctx.globalAlpha = base * e; ctx.fillRect(x - r, y - r, r * 2, r * 2); }
+    }
+    ctx.globalAlpha = base;
+  }
   // ---- the painted floor: flat colour for every painted rectangle, then textured tiles near the eye until the budget is spent
   /** The sky: the ceiling becomes an open view. One wide picture, sampled by direction, turning `speed` degrees a second and wrapping round (two draws at most per frame). */
   private skyPaint(eye: Eye, sky: { id: number; speed: number }): void {
@@ -230,7 +263,7 @@ export class RoomPainter {
   /** The ceiling: one material over the whole of it, flat first and then tiles overhead while half of what is left of the budget lasts. */
   private ceilPaint(eye: Eye): void {
     const L = actorLayer, doc = L.doc; if (!doc || L.slug !== this.world.slug) return;
-    if (doc.sky) { this.skyPaint(eye, doc.sky); return; }
+    if (L.look.sky) { this.skyPaint(eye, L.look.sky); return; }
     if (!doc.ceil) return;
     const t = doc.tex[doc.ceil - 1]; if (!t) return;
     const ctx = this.ctx, n = this.n, v = this.v, Hh = this.H3;
@@ -292,8 +325,8 @@ export class RoomPainter {
   }
   private fogImg: HTMLCanvasElement | null = null; private fogKey = "";
   /** The room's mood: a colour veil, then a fog band across the horizon (one cached gradient stamped once). */
-  private grade(): void {
-    const L = actorLayer, g = L.doc?.grade; if (!g || L.slug !== this.world.slug) return;
+  private grade(over?: RoomDoc["grade"]): void {
+    const L = actorLayer, g = over !== undefined ? over : L.slug === this.world.slug ? L.look.grade : null; if (!g) return;
     const ctx = this.ctx;
     if (g.fogD > 0 && typeof document !== "undefined") {
       const key = g.fog + g.fogD; if (key !== this.fogKey || !this.fogImg) {
@@ -340,11 +373,19 @@ export class RoomPainter {
 
   // ---- what the owner built (solids, ghosts, lights; in edit mode also triggers and markers)
   private fv = new Float64Array(16); private aOrd = new Int16Array(160); private aD = new Float64Array(160);
-  actors(eye: Eye): void {
-    const L = actorLayer; if (!L.doc || !L.rt || L.slug !== this.world.slug) return;
+  actors(eye: Eye): void { if (actorLayer.slug === this.world.slug) this.drawActors(actorLayer, eye); }
+  private corrEye: Eye = { x: 0, z: 0, yaw: 0, pitch: 0 };
+  /** The corridor's things, drawn as if the eye stood in the corridor's own frame. */
+  private corrActors(eye: Eye): void {
+    const C = corrLayer; if (!C.doc || !C.rt || !C.doc.actors.length) return;
+    const sx = this.ex, sz = this.ez, e = this.corrEye; this.ex = sx - C.ox; this.ez = sz - C.oz; e.x = eye.x - C.ox; e.z = eye.z - C.oz; e.yaw = eye.yaw; e.pitch = eye.pitch;
+    this.drawActors(C, e); this.ex = sx; this.ez = sz;
+  }
+  private drawActors(L: Layer, eye: Eye): void {
+    if (!L.doc || !L.rt) return;
     const acts = L.doc.actors, rt = L.rt; let m = 0;
     for (let i = 0; i < acts.length && i < 160; i++) {
-      const a = acts[i]; if (!L.edit && (a.kind === "trigger" || a.kind === "marker" || !rt.isOn(a.id))) continue;
+      const a = acts[i]; if (!L.edit && (a.kind === "trigger" || a.kind === "marker" || !rt.isOn(a.id) || (a.visor && !actorLayer.visor))) continue;
       const d = (a.x - eye.x) * (a.x - eye.x) + (a.z - eye.z) * (a.z - eye.z);
       let j = m; while (j > 0 && this.aD[j - 1] < d) { this.aD[j] = this.aD[j - 1]; this.aOrd[j] = this.aOrd[j - 1]; j--; } this.aD[j] = d; this.aOrd[j] = i; m++;
     }
@@ -355,9 +396,57 @@ export class RoomPainter {
       if (a.kind === "solid" || a.kind === "ghost") this.prism(a, eye, sel);
       else if (a.kind === "light") this.lamp(a, sel);
       else if (a.kind === "pool") this.pool(a, sel);
+      else if (a.kind === "artifact") this.artifact(a, eye, sel);
       else this.marker(a, eye, sel);
       if (L.edit && !on) ctx.globalAlpha = 1;
     }
+  }
+  // ---- artifacts: a panel with writing and/or a picture, on a wall, on the floor or turning to face you
+  private artC = new WeakMap<Actor, { key: string; c: HTMLCanvasElement }>();
+  private artCanvas(a: Actor): HTMLCanvasElement | null {
+    if (typeof document === "undefined") return null;
+    const img = a.img ? skyImage(a.img) : null, ratio = a.mode === 1 ? a.d / a.w : a.h / a.w, ch = clampI(256 * ratio, 64, 512);
+    const key = `${a.text}|${a.color}|${ch}|${img ? 1 : 0}|${a.img}`, e = this.artC.get(a); if (e && e.key === key) return e.c;
+    const c = e ? e.c : document.createElement("canvas"); c.width = 256; c.height = ch; const g = c.getContext("2d"); if (!g) return null;
+    g.clearRect(0, 0, 256, ch); g.fillStyle = rgba(a.color, 0.2); g.fillRect(0, 0, 256, ch); g.lineWidth = 6; g.strokeStyle = rgba(a.color, 0.9); g.strokeRect(3, 3, 250, ch - 6);
+    const hasT = a.text.length > 0; let top = 0;
+    if (img) { const bh = hasT ? ch * 0.64 : ch - 16, k = Math.min(232 / img.naturalWidth, bh / img.naturalHeight), w = img.naturalWidth * k, h = img.naturalHeight * k; g.drawImage(img, (256 - w) / 2, 8 + (bh - h) / 2, w, h); top = bh + 8; }
+    if (hasT) {
+      const area = ch - top - 10; let size = 30, lines: string[] = [];
+      for (; size >= 11; size -= 2) {
+        g.font = `bold ${size}px sans-serif`; lines = []; let cur = "";
+        for (const wd of a.text.split(/\s+/)) { const t = cur ? cur + " " + wd : wd; if (g.measureText(t).width > 226 && cur) { lines.push(cur); cur = wd; } else cur = t; }
+        if (cur) lines.push(cur); if (lines.length * size * 1.2 <= area) break;
+      }
+      g.textAlign = "center"; g.textBaseline = "middle"; g.fillStyle = "#ffffff"; g.shadowColor = rgba(a.color, 0.9); g.shadowBlur = 6;
+      const y0 = top + 5 + (area - lines.length * size * 1.2) / 2 + size * 0.6; lines.forEach((ln, i) => g.fillText(ln, 128, y0 + i * size * 1.2, 232));
+    }
+    this.artC.set(a, { key, c }); return c;
+  }
+  private artifact(a: Actor, eye: Eye, sel: boolean): void {
+    const ctx = this.ctx, floor = a.mode === 1, dxe = eye.x - a.x, dze = eye.z - a.z, dist = Math.hypot(dxe, dze);
+    const r = a.mode === 2 ? Math.atan2(dze, dxe) : a.rot, nx = Math.cos(r), nz = Math.sin(r), ux = Math.sin(r), uz = -Math.cos(r);
+    const back = !floor && dxe * nx + dze * nz <= 0, y1 = floor ? 0.02 : 0.6 + a.h, hh = floor ? a.d : a.h;
+    const px = (s: number, t: number, i: number): number => (i === 0 ? (floor ? a.x + nx * (0.5 - t) * a.d + ux * (s - 0.5) * a.w : a.x + ux * (s - 0.5) * a.w) : i === 1 ? (floor ? y1 : y1 - t * hh) : (floor ? a.z + nz * (0.5 - t) * a.d + uz * (s - 0.5) * a.w : a.z + uz * (s - 0.5) * a.w));
+    const alpha = a.visor ? 0.8 : 1; if (alpha < 1) ctx.globalAlpha *= alpha;
+    const c = back ? null : this.artCanvas(a);
+    if (c) {
+      const N = dist < 5 ? 4 : dist < 12 ? 2 : 1, base = ctx.getTransform().a, hw = this.W / 2, h2 = this.H / 2, f = this.f, cw = c.width, chh = c.height;
+      for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) {
+        const s0 = i / N, s1 = (i + 1) / N, t0 = j / N, t1 = (j + 1) / N;
+        this.cam(px(s0, t0, 0), px(s0, t0, 1), px(s0, t0, 2)); if (this.qz < NEAR) continue; const ax = hw + (this.qx * f) / this.qz, ay = h2 - (this.qy * f) / this.qz;
+        this.cam(px(s1, t0, 0), px(s1, t0, 1), px(s1, t0, 2)); if (this.qz < NEAR) continue; const bx = hw + (this.qx * f) / this.qz, by = h2 - (this.qy * f) / this.qz;
+        this.cam(px(s0, t1, 0), px(s0, t1, 1), px(s0, t1, 2)); if (this.qz < NEAR) continue; const dx = hw + (this.qx * f) / this.qz, dy = h2 - (this.qy * f) / this.qz;
+        ctx.setTransform(base * (bx - ax), base * (by - ay), base * (dx - ax), base * (dy - ay), base * ax, base * ay);
+        ctx.drawImage(c, s0 * cw, t0 * chh, (s1 - s0) * cw + 0.5, (t1 - t0) * chh + 0.5, 0, 0, 1.02, 1.02);
+      }
+      ctx.setTransform(base, 0, 0, base, 0, 0);
+    }
+    if (sel || a.visor || back) {
+      const w = this.wp; for (let k = 0; k < 4; k++) { const s = k === 1 || k === 2 ? 1 : 0, t = k >= 2 ? 1 : 0; w[k * 3] = px(s, t, 0); w[k * 3 + 1] = px(s, t, 1); w[k * 3 + 2] = px(s, t, 2); }
+      if (this.poly(4)) { ctx.lineWidth = sel ? 2.5 : 1.2; ctx.strokeStyle = sel ? "#ffffff" : a.visor ? "rgba(120,255,240,.9)" : "rgba(160,160,160,.5)"; if (back) ctx.setLineDash([4, 4]); ctx.stroke(); ctx.setLineDash([]); }
+    }
+    if (alpha < 1) ctx.globalAlpha /= alpha;
   }
   private footprint(a: Actor): number {
     const v = this.fv;
@@ -455,7 +544,7 @@ export class RoomPainter {
   /** Eye in the corridor: the corridor, then the room behind (through its door) and the room ahead. */
   private corridorView(eye: Eye, sp: ScenePaint): void {
     const L = sp.link!;
-    this.corridorShell(L, eye, true);
+    this.corridorShell(L, eye, true); this.corrActors(eye);
     if (this.clipDoor(L.door, 0, 0)) { this.shell(eye, L.door.edge, null, null); this.things(eye, null, NO_PEOPLE); this.ctx.restore(); }
     this.beyond(sp, eye);
   }
@@ -500,7 +589,7 @@ export class RoomPainter {
     if (!this.quad(ax, 0, az, bx, 0, bz, bx, DOOR_H, bz, ax, DOOR_H, az)) return;
     ctx.fillStyle = open ? (hot ? C.doorOpenHot : C.doorOpen) : "rgba(8,14,20,.9)"; ctx.fill();
     // a door that is opening shows the corridor behind it
-    if (linked && this.clipDoor(d, 0, 0)) { this.corridorShell(sp!.link!, e, false); this.beyond(sp!, e); ctx.restore(); }
+    if (linked && this.clipDoor(d, 0, 0)) { this.corridorShell(sp!.link!, e, false); this.corrActors(e); this.beyond(sp!, e); ctx.restore(); }
     // the iris: shut for a door that leads somewhere or is sealed, pulled back as it opens. Only when all four corners are in front and the door is near.
     let allFront = dist < 16;
     if (allFront) for (let k = 0; k < 4 && allFront; k++) { this.cam(k & 1 ? bx : ax, k > 1 ? DOOR_H : 0, k & 1 ? bz : az); if (this.qz < NEAR) allFront = false; }

@@ -3,7 +3,8 @@ import { prisma } from "../lib/prisma.js";
 import { requireAdmin } from "../lib/auth.js";
 import { cleanDoc, emptyDoc } from "../lib/roomDoc.js";
 
-const SLUG = /^[a-z0-9][a-z0-9-]{0,80}$/;
+// a room slug, "low~high" for the corridor between two rooms, or "theme~slug"
+const SLUG = /^(theme~)?[a-z0-9][a-z0-9-]{0,80}(~[a-z0-9][a-z0-9-]{0,80})?$/; // "theme~slug" is a branch's theme
 
 export async function roomDocRoutes(app: FastifyInstance): Promise<void> {
   // Public: every room fetches its own document once. Empty when nobody built anything there.

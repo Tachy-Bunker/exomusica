@@ -6,6 +6,7 @@ import { useDocumentTitle } from "../lib/useDocumentTitle";
 import { scannedIds } from "../lib/scanLog";
 import { keysOf } from "../lib/fieldLog";
 import { roomStates, type ChartBranch } from "../lib/chart";
+import { lineageOf } from "../lib/roomTheme";
 import { hashStr } from "../lib/probeCore";
 import { recordVisit, visitedSlugs } from "../lib/visits";
 import { loadChartBranches } from "../lib/chartLoad";
@@ -68,7 +69,7 @@ function RoomInner({ slug }: { slug: string }) {
     const states = g.chart.length ? roomStates(g.chart, vis, new Set([...vis].map(hashStr))) : null;
     const color = theme ? neon(theme.color) : "#5fd3ee";
     const world = buildRoom({ hull: g.hull, slug: s, name: branch.name, states, albums: (albums ?? []).map((a) => ({ slug: a.slug, title: a.title })), channelSlug: branch.channel?.slug ?? null, from: via });
-    world.color = color; world.blurb = branch.description ?? undefined;
+    world.color = color; world.blurb = branch.description ?? undefined; world.lineage = lineageOf(g.chart, s);
     if (branch.channel?.slug) { const m = await getJson<unknown>(`/api/channels/${branch.channel.slug}/messages?limit=3`).catch(() => null); const l = previewLines(m); if (l.length) world.chat = l; }
     return { slug: s, branch, albums: albums ?? [], color, world };
   }, []);

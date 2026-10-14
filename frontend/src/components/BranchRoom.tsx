@@ -1,21 +1,23 @@
-import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import type { RoomDoor, RoomProp, RoomWorld } from "../lib/roomWorld";
 import { startDrone, stepDrone, droneWanted, setDroneWanted } from "../lib/roomDrone";
 import { useAudioStore } from "../lib/audioStore";
 import { applyList, glide, isVisible, joinRoom, setVisible, type Shown } from "../lib/roomNet";
 import { clamp, doorWalkedInto, facing, MAX_PITCH, stepEye, wrapYaw, type Eye, type Target } from "../lib/roomView";
-import { actorLayer, painterFor, paintRoom, ScenePaint, type DroneView, type FxView } from "../lib/roomPaint";
+import { actorLayer, corrLayer, painterFor, paintRoom, ScenePaint, type DroneView, type FxView } from "../lib/roomPaint";
 import { cleanDoc, emptyDoc, pushOut, WireRuntime, type RoomDoc } from "../lib/roomDoc";
 import { buildFloor } from "../lib/roomFloor";
 import { getJson, clearShared } from "../lib/sharedGet";
 import { api } from "../lib/api";
+import { effectiveLook, themeKey } from "../lib/roomTheme";
+import { corrKey, corrShift, corridorWorld, type CorrWorld } from "../lib/roomCorr";
 import { onTexReady } from "../lib/roomTextures";
 const RoomEditor = lazy(() => import("./RoomEditor").then((m) => ({ default: m.RoomEditor }))); // the editor is only downloaded when an admin opens it
 import { makePool, parseGhosts, stepGhosts, type Ghost } from "../lib/roomGhosts";
 import { buildLink, crossed, eyeSpace, flipLink, inRoom, resolveMove, type Link as RoomLink } from "../lib/roomScene";
 import { ScaleGovernor } from "../lib/roomPerf";
-import { aimAt, pickLock, refreshLock, type Lock } from "../lib/roomLock";
+import { aimAt, artifactLocks, pickLock, refreshLock, type Lock } from "../lib/roomLock";
 import { isTypingTarget } from "../lib/isTypingTarget";
 import { useAuth } from "../lib/auth";
 import { recordScan, scannedIds, scanId } from "../lib/scanLog";
@@ -70,6 +72,7 @@ export function BranchRoom({ tick, world, color, next, wantNext, onAdvance, go, 
   const solve = useRef((x: number, z: number) => {
     let r = resolveMove(wref.current, linkRef.current, x, z); const rt = rtRef.current;
     if (rt && docSlug.current === wref.current.slug && rt.doc.actors.length && pushOut(rt.doc, rt, r.x, r.z, 0.3, pushed.current)) r = resolveMove(wref.current, linkRef.current, pushed.current.x, pushed.current.z);
+    const C = corrLayer; if (C.rt && C.doc && C.doc.actors.length && linkRef.current && pushOut(C.doc, C.rt, r.x - C.ox, r.z - C.oz, 0.3, pushed.current)) r = resolveMove(wref.current, linkRef.current, pushed.current.x + C.ox, pushed.current.z + C.oz); // the corridor's own solids
     return r;
   }).current;
   const { user } = useAuth(), isAdmin = !!user?.isAdmin, userRef = useRef(!!user); userRef.current = !!user;
@@ -93,21 +96,66 @@ export function BranchRoom({ tick, world, color, next, wantNext, onAdvance, go, 
   const audioRef = useRef({ title: "", playing: false }); audioRef.current = { title: track?.title ?? "", playing };
   // ---- what the owner built in this room (and the editor for the admin)
   const [doc, setDoc] = useState<RoomDoc>(emptyDoc), [editing, setEditing] = useState(false), [playTest, setPlayTest] = useState(false), [sel, setSel] = useState<string | null>(null);
+  const corrEdit = useRef<CorrWorld | null>(null), [corrW, setCorrW] = useState<CorrWorld | null>(null), [inCorr, setInCorr] = useState(false), stash = useRef<{ doc: RoomDoc; saved: RoomDoc } | null>(null), corrScan = useRef<Scannable[]>([]), corrT = useRef(0), lastLink = useRef<RoomLink | null>(null), lastSpace = useRef("cur"), corrAnim = useRef(false);
   const [saved, setSaved] = useState<RoomDoc>(emptyDoc), [busy, setBusy] = useState(false), [err, setErr] = useState(""), editRef = useRef(false), playRef = useRef(false), docT = useRef(0);
   editRef.current = editing; playRef.current = playTest;
+  /** Artifacts you can lock onto and scan right now: showing, and visible to you (visor-only ones need the visor). */
+  const syncArt = useCallback(() => {
+    const rt = rtRef.current, d = actorLayer.doc, W = wref.current; actorLayer.visor = visorRef.current.on;
+    const list: Lock[] = rt && d && actorLayer.slug === W.slug ? d.actors.filter((a) => a.kind === "artifact" && rt.isOn(a.id) && (!a.visor || visorRef.current.on)).map((a) => ({ kind: "artifact" as const, id: a.id, x: a.x, y: a.mode === 1 ? 0.3 : 1.3, z: a.z, label: a.name || "Artifact" })) : [];
+    const C = corrLayer; // the corridor's artifacts too: ids carry "corr:" and the place is shifted into this room's frame
+    if (C.rt && C.doc && linkRef.current) for (const a of C.doc.actors) if (a.kind === "artifact" && C.rt.isOn(a.id) && (!a.visor || visorRef.current.on)) list.push({ kind: "artifact", id: "corr:" + a.id, x: a.x + C.ox, y: a.mode === 1 ? 0.3 : 1.3, z: a.z + C.oz, label: a.name || "Artifact" });
+    artifactLocks.list = list;
+  }, []);
+  /** The corridor's scannable things, in the frame of the room you are in. */
+  const reshift = useCallback(() => {
+    const C = corrLayer, d = C.doc;
+    corrScan.current = d ? scannables({ slug: C.key, props: [], doors: [], plaque: null } as unknown as RoomWorld, d.actors.filter((a) => a.kind === "artifact").map((a) => ({ ...a, id: "corr:" + a.id, x: a.x + C.ox, z: a.z + C.oz }))).map((x) => ({ ...x, key: x.key.replace("/artifact/corr:", "/artifact/") })) : []; // the address has the real id, the lock a "corr:" one
+    syncArt();
+  }, [syncArt]);
+  /** Make `d` the live content of the corridor you are in or looking into (its things, its mood). */
+  const useCorr = useCallback((d: RoomDoc | null, key: string, run: boolean) => {
+    const C = corrLayer; C.key = key; C.doc = d; C.rt = d ? new WireRuntime(d) : null; C.edit = !!corrEdit.current && !playRef.current; C.sel = corrEdit.current ? C.sel : null; corrAnim.current = !!d?.actors.some((x) => x.pulse > 0);
+    if (d && C.rt && run) { const t0 = performance.now() / 1000; C.rt.start(t0); const done = scannedIds(); for (const a of d.actors) if (a.kind === "artifact" && done.has(scanId("lore", `room:${key}/artifact/${a.id}`))) C.rt.emit(a.id, "scanned", t0); }
+    reshift(); dirty.current = true; wakeRef.current();
+  }, [syncArt, reshift]);
+  /** The link changed (a door opened, shut, or you crossed into the next room): load or drop the corridor's document and keep its shift right. */
+  const syncCorr = useCallback(() => {
+    const L = linkRef.current, W = wref.current, C = corrLayer;
+    if (!L) { if (!corrEdit.current && C.doc) useCorr(null, "", false); return; }
+    const key = corrKey(W.slug, L.next.slug), sh = corrShift(W.slug, L); C.ox = sh.ox; C.oz = sh.oz;
+    if (corrEdit.current) { corrEdit.current = { ...corrEdit.current }; return; }
+    if (C.key === key && C.doc) { reshift(); return; } // same corridor from the other side: keep its state, move it
+    C.key = key; C.doc = null; C.rt = null;
+    getJson<{ version: number; doc: unknown }>(`/api/room-doc/${key}`).then((r) => { if (corrLayer.key === key && !corrEdit.current && linkRef.current) useCorr(cleanDoc(r.doc), key, true); }).catch(() => {});
+  }, [useCorr, reshift]);
+  /** The look in effect: this room's own mood/sky/flock, else the nearest theme above. */
+  const themeRef = useRef<{ slugs: string[]; docs: (RoomDoc | null)[] }>({ slugs: [], docs: [] }), [lookFrom, setLookFrom] = useState<{ grade: string | null; sky: string | null; flock: string | null }>({ grade: null, sky: null, flock: null }), [ownTheme, setOwnTheme] = useState(false), [themeMsg, setThemeMsg] = useState("");
+  const applyLook = useCallback((d: RoomDoc) => {
+    const th = themeRef.current, r = effectiveLook(d, th.docs, th.slugs); actorLayer.look = r.look; actorLayer.skyAnim = !!r.look.sky?.speed; actorLayer.flockAnim = !!r.look.flock; setLookFrom(r.from); dirty.current = true; wakeRef.current();
+  }, []);
   const useDoc = useCallback((d: RoomDoc, slug: string, run: boolean) => { // make `d` the live content of the room
     const rt = new WireRuntime(d); rtRef.current = rt; docSlug.current = slug;
-    actorLayer.slug = slug; actorLayer.doc = d; actorLayer.rt = rt; actorLayer.floor = buildFloor(d.floor, d.tex); actorLayer.anim = !!actorLayer.floor?.scrolls || d.tex.some((t) => t.scroll !== 0) || d.actors.some((x) => x.pulse > 0); actorLayer.skyAnim = !!d.sky?.speed; actorLayer.edit = editRef.current && !playRef.current;
-    if (run) rt.start(performance.now() / 1000);
+    actorLayer.slug = slug; actorLayer.doc = d; actorLayer.rt = rt; actorLayer.floor = buildFloor(d.floor, d.tex); actorLayer.anim = !!actorLayer.floor?.scrolls || d.tex.some((t) => t.scroll !== 0) || d.actors.some((x) => x.pulse > 0); actorLayer.edit = editRef.current && !playRef.current;
+    if (run) { const t0 = performance.now() / 1000; rt.start(t0); const done = scannedIds(); for (const a of d.actors) if (a.kind === "artifact" && done.has(scanId("lore", `room:${slug}/artifact/${a.id}`))) rt.emit(a.id, "scanned", t0); } // what you already scanned here stays scanned
+    applyLook(d); fxWorld.current = null; syncArt(); // the scanner rebuilds its list with this room's artifacts
     dirty.current = true; wakeRef.current();
-  }, []);
+  }, [syncArt, applyLook]);
+  /** Whatever is being edited (the room, or the corridor) becomes the live content. */
+  const applyDoc = useCallback((d: RoomDoc, run: boolean) => { if (corrEdit.current) useCorr(d, corrEdit.current.world.slug, run); else useDoc(d, wref.current.slug, run); }, [useCorr, useDoc]);
   useEffect(() => { // load the room's document
-    hist.current = { undo: [], redo: [], key: "", at: 0 }; let dead = false; setEditing(false); setPlayTest(false); setSel(null); setErr("");
+    if (corrEdit.current) { corrEdit.current = null; corrLayer.edit = false; stash.current = null; setCorrW(null); }
+    hist.current = { undo: [], redo: [], key: "", at: 0 }; let dead = false; setEditing(false); setPlayTest(false); setSel(null); setErr(""); setThemeMsg("");
+    const slugs = [world.slug, ...(world.lineage ?? []).slice(0, 8)]; themeRef.current = { slugs, docs: slugs.map(() => null) }; setOwnTheme(false);
+    Promise.all(slugs.map((sl) => getJson<{ version: number; doc: unknown }>(`/api/room-doc/${themeKey(sl)}`).then((r) => (r.version > 0 ? cleanDoc(r.doc) : null)).catch(() => null))).then((docs) => {
+      if (dead) return; themeRef.current = { slugs, docs }; setOwnTheme(!!docs[0]); applyLook(docRef.current);
+    });
     getJson<{ version: number; doc: unknown }>(`/api/room-doc/${world.slug}`).then((r) => {
       if (dead) return; const d = cleanDoc({ ...(r.doc as object), version: r.version }); setDoc(d); setSaved(d); useDoc(d, world.slug, true);
     }).catch(() => { if (!dead) { const d = emptyDoc(); setDoc(d); setSaved(d); useDoc(d, world.slug, false); } });
-    return () => { dead = true; if (actorLayer.slug === world.slug) { actorLayer.doc = null; actorLayer.rt = null; actorLayer.floor = null; actorLayer.slug = ""; } rtRef.current = null; window.clearTimeout(docT.current); };
-  }, [world.slug, useDoc]);
+    return () => { dead = true; if (actorLayer.slug === world.slug) { actorLayer.doc = null; actorLayer.rt = null; actorLayer.floor = null; actorLayer.slug = ""; artifactLocks.list = []; fxWorld.current = null; } rtRef.current = null; window.clearTimeout(docT.current); actorLayer.look = { grade: null, sky: null, flock: null }; };
+  }, [world.slug, world.lineage, useDoc, applyLook]);
+  useEffect(() => { syncArt(); dirty.current = true; wakeRef.current(); }, [visor.on, syncArt]);
   useEffect(() => onTexReady(() => { dirty.current = true; wakeRef.current(); }), []);
   const docRef = useRef(doc); docRef.current = doc;
   const hist = useRef<{ undo: RoomDoc[]; redo: RoomDoc[]; key: string; at: number }>({ undo: [], redo: [], key: "", at: 0 }), [, setHistN] = useState(0);
@@ -115,10 +163,10 @@ export function BranchRoom({ tick, world, color, next, wantNext, onAdvance, go, 
     const h = hist.current, t = performance.now();
     if (!(key && key === h.key && t - h.at < 900)) { h.undo.push(docRef.current); if (h.undo.length > 50) h.undo.shift(); }
     h.redo.length = 0; h.key = key; h.at = t; setHistN((n) => n + 1);
-    setDoc(d); useDoc(d, wref.current.slug, false);
-  }, [useDoc]);
-  const undoDoc = useCallback(() => { const h = hist.current, p = h.undo.pop(); if (!p) return; h.redo.push(docRef.current); h.key = ""; setHistN((n) => n + 1); setDoc(p); useDoc(p, wref.current.slug, false); }, [useDoc]);
-  const redoDoc = useCallback(() => { const h = hist.current, p = h.redo.pop(); if (!p) return; h.undo.push(docRef.current); h.key = ""; setHistN((n) => n + 1); setDoc(p); useDoc(p, wref.current.slug, false); }, [useDoc]);
+    setDoc(d); applyDoc(d, false);
+  }, [applyDoc]);
+  const undoDoc = useCallback(() => { const h = hist.current, p = h.undo.pop(); if (!p) return; h.redo.push(docRef.current); h.key = ""; setHistN((n) => n + 1); setDoc(p); applyDoc(p, false); }, [applyDoc]);
+  const redoDoc = useCallback(() => { const h = hist.current, p = h.redo.pop(); if (!p) return; h.undo.push(docRef.current); h.key = ""; setHistN((n) => n + 1); setDoc(p); applyDoc(p, false); }, [applyDoc]);
   useEffect(() => {
     if (!editing) return;
     const k = (e: KeyboardEvent) => {
@@ -127,14 +175,44 @@ export function BranchRoom({ tick, world, color, next, wantNext, onAdvance, go, 
     };
     window.addEventListener("keydown", k); return () => window.removeEventListener("keydown", k);
   }, [editing, undoDoc, redoDoc]);
-  const setPlay = useCallback((on: boolean) => { setPlayTest(on); playRef.current = on; useDoc(doc, wref.current.slug, on); }, [doc, useDoc]);
-  const closeEditor = useCallback(() => { setEditing(false); setPlayTest(false); editRef.current = false; playRef.current = false; actorLayer.edit = false; useDoc(saved, wref.current.slug, true); setDoc(saved); }, [saved, useDoc]);
+  const setPlay = useCallback((on: boolean) => { setPlayTest(on); playRef.current = on; applyDoc(doc, on); }, [doc, applyDoc]);
+  const closeEditor = useCallback(() => {
+    setEditing(false); setPlayTest(false); editRef.current = false; playRef.current = false; actorLayer.edit = false; corrLayer.edit = false;
+    if (corrEdit.current) { const st = stash.current; corrLayer.sel = null; applyDoc(saved, true); corrLayer.edit = false; corrEdit.current = null; setCorrW(null); stash.current = null; if (st) { setDoc(st.doc); setSaved(st.saved); } return; }
+    useDoc(saved, wref.current.slug, true); setDoc(saved);
+  }, [saved, useDoc, applyDoc]);
+  /** Edit the corridor you are standing in: its own document, its own plan. */
+  const editCorridor = useCallback(async () => {
+    const L = linkRef.current, W = wref.current; if (!L) return;
+    const cw = corridorWorld(L, W.slug), sh = corrShift(W.slug, L); setErr("");
+    let d: RoomDoc; try { const r = await api<{ version: number; doc: unknown }>(`/api/room-doc/${cw.world.slug}`); d = cleanDoc({ ...(r.doc as object), version: r.version }); } catch { d = emptyDoc(); }
+    stash.current = { doc: docRef.current, saved }; corrLayer.ox = sh.ox; corrLayer.oz = sh.oz; corrEdit.current = cw; setCorrW(cw);
+    hist.current = { undo: [], redo: [], key: "", at: 0 }; setSel(null); corrLayer.sel = null; setDoc(d); setSaved(d); editRef.current = true; setEditing(true); useCorr(d, cw.world.slug, false);
+  }, [saved, useCorr]);
   const saveDoc = useCallback(async () => {
     setBusy(true); setErr("");
-    try { const r = await api<{ version: number; doc: RoomDoc }>(`/api/admin/room-doc/${wref.current.slug}`, { method: "PUT", body: JSON.stringify({ doc, baseVersion: saved.version }) }); clearShared(); const d = cleanDoc(r.doc); setSaved(d); setDoc(d); useDoc(d, wref.current.slug, false); }
+    try { const r = await api<{ version: number; doc: RoomDoc }>(`/api/admin/room-doc/${corrEdit.current ? corrEdit.current.world.slug : wref.current.slug}`, { method: "PUT", body: JSON.stringify({ doc, baseVersion: saved.version }) }); clearShared(); const d = cleanDoc(r.doc); setSaved(d); setDoc(d); applyDoc(d, false); }
     catch (e) { setErr(e instanceof Error ? e.message : "Could not save"); } finally { setBusy(false); }
-  }, [doc, saved, useDoc]);
-  const sameDoc = JSON.stringify({ a: doc.actors, w: doc.wires, t: doc.tex, f: doc.floor, b: doc.bands, g: doc.grade, c: doc.ceil, k: doc.sky }) === JSON.stringify({ a: saved.actors, w: saved.wires, t: saved.tex, f: saved.floor, b: saved.bands, g: saved.grade, c: saved.ceil, k: saved.sky });
+  }, [doc, saved, applyDoc]);
+  /** Make this room's own mood, sky and flock the theme of this branch and everything below it. */
+  const saveTheme = useCallback(async () => {
+    const W = wref.current, key = themeKey(W.slug), d = docRef.current; setThemeMsg("");
+    if (!d.grade && !d.sky && !d.flock) { setThemeMsg("Set a mood, a sky or drifting specks first."); return; }
+    setBusy(true);
+    try {
+      const cur = await api<{ version: number }>(`/api/room-doc/${key}`, { cache: "no-store" }).catch(() => ({ version: 0 }));
+      const r = await api<{ version: number; doc: RoomDoc }>(`/api/admin/room-doc/${key}`, { method: "PUT", body: JSON.stringify({ doc: cleanDoc({ grade: d.grade, sky: d.sky, flock: d.flock }), baseVersion: cur.version }) });
+      clearShared(); themeRef.current.docs[0] = cleanDoc(r.doc); setOwnTheme(true); applyLook(d); setThemeMsg("Saved: this branch and everything below now use this look unless a room sets its own.");
+    } catch (e) { setThemeMsg(e instanceof Error ? e.message : "Could not save the theme"); } finally { setBusy(false); }
+  }, [applyLook]);
+  const clearTheme = useCallback(async () => {
+    setThemeMsg(""); try { await api(`/api/admin/room-doc/${themeKey(wref.current.slug)}`, { method: "DELETE" }); clearShared(); themeRef.current.docs[0] = null; setOwnTheme(false); applyLook(docRef.current); setThemeMsg("Theme removed."); } catch (e) { setThemeMsg(e instanceof Error ? e.message : "Could not remove the theme"); }
+  }, [applyLook]);
+  const themeNote = useMemo(() => {
+    const parts = (["grade", "sky", "flock"] as const).filter((k) => lookFrom[k]).map((k) => `${k === "grade" ? "mood" : k === "flock" ? "specks" : "sky"} from ${lookFrom[k]}`);
+    return parts.length ? `Inherited: ${parts.join(", ")}.` : "Nothing inherited.";
+  }, [lookFrom]);
+  const sameDoc = JSON.stringify({ a: doc.actors, w: doc.wires, t: doc.tex, f: doc.floor, b: doc.bands, g: doc.grade, c: doc.ceil, k: doc.sky, fl: doc.flock, i: doc.inherit }) === JSON.stringify({ a: saved.actors, w: saved.wires, t: saved.tex, f: saved.floor, b: saved.bands, g: saved.grade, c: saved.ceil, k: saved.sky, fl: saved.flock, i: saved.inherit });
   useEffect(() => { dirty.current = true; wakeRef.current(); }, [track?.id, playing, droneOn]);
   useEffect(() => { const on = () => setDroneOn(droneWanted()); window.addEventListener("exomusica-drone-pref", on); return () => window.removeEventListener("exomusica-drone-pref", on); }, []);
 
@@ -157,7 +235,7 @@ export function BranchRoom({ tick, world, color, next, wantNext, onAdvance, go, 
   /** What the visor and scanner know about the room you are in: built once per room (and again when you walk into the next). */
   const ensureFx = useCallback((W: RoomWorld) => {
     if (fxWorld.current === W) return;
-    fxWorld.current = W; const list = scannables(W); scanList.current = list;
+    fxWorld.current = W; const dd = actorLayer.doc; const list = scannables(W, dd && actorLayer.slug === W.slug ? dd.actors.filter((a) => a.kind === "artifact") : []); scanList.current = list;
     const f = new EchoField(list, (id) => W.doors.findIndex((d) => d.id === id)); const done = scannedIds(); list.forEach((x, i) => { f.scanned[i] = done.has(scanId("lore", x.key)) ? 1 : 0; }); echo.current = f;
     scanSt.current = null; noteRoom(W, list);
   }, []);
@@ -173,7 +251,7 @@ export function BranchRoom({ tick, world, color, next, wantNext, onAdvance, go, 
     if (pausedRef.current || traveling.current) return;
     const W = wref.current; ensureFx(W); const e = eye.current; let id: string | null = null, kind = "";
     const l = lock.current ?? pickLock(W, e, NO_PEOPLE_ITER); if (l && l.kind !== "person") { id = l.id; kind = l.kind; }
-    const s = id ? scanList.current.find((x) => x.id === id && (x.lockKind === kind)) : undefined;
+    const s = id ? scanList.current.find((x) => x.id === id && (x.lockKind === kind)) ?? corrScan.current.find((x) => x.id === id && (x.lockKind === kind)) : undefined;
     if (!s) { showToast("Nothing to scan here"); return; }
     if (scannedIds().has(scanId("lore", s.key))) { showCard(shownOf(s, loreRef.current)); return; }
     scanSt.current = { s, t0: performance.now() }; dirty.current = true; wakeRef.current();
@@ -224,8 +302,14 @@ export function BranchRoom({ tick, world, color, next, wantNext, onAdvance, go, 
     const rt = rtRef.current;
     if (rt && !still && docSlug.current === W.slug && (!editRef.current || playRef.current)) { // triggers, delayed wires
       const ts = now / 1000; rt.probe(r.eye.x, r.eye.z, ts); rt.tick(ts);
-      if (rt.changed.length) { rt.drain(); docMoved = true; }
+      if (rt.changed.length) { rt.drain(); docMoved = true; syncArt(); }
       if (rt.pending) { window.clearTimeout(docT.current); docT.current = window.setTimeout(() => wakeRef.current(), Math.max(16, Math.min(60000, rt.nextDue() * 1000 - performance.now()))); }
+    }
+    const Cr = corrLayer.rt;
+    if (Cr && !still && linkRef.current && (!corrEdit.current || playRef.current)) { // the corridor's own triggers and wires
+      const ts = now / 1000; Cr.probe(r.eye.x - corrLayer.ox, r.eye.z - corrLayer.oz, ts); Cr.tick(ts);
+      if (Cr.changed.length) { Cr.drain(); docMoved = true; syncArt(); }
+      if (Cr.pending) { window.clearTimeout(corrT.current); corrT.current = window.setTimeout(() => wakeRef.current(), Math.max(16, Math.min(60000, Cr.nextDue() * 1000 - performance.now()))); }
     }
     if (!still) { // the corridor: through the door into the next room, the door that opens as you come near, the one that shuts behind you
       const L0 = linkRef.current;
@@ -251,6 +335,8 @@ export function BranchRoom({ tick, world, color, next, wantNext, onAdvance, go, 
         if (want !== wantedRef.current) { wantedRef.current = want; wantNextRef.current(want); }
       }
     }
+    if (linkRef.current !== lastLink.current) { lastLink.current = linkRef.current; syncCorr(); }
+    if (spaceRef.current !== lastSpace.current) { lastSpace.current = spaceRef.current; setInCorr(spaceRef.current === "corridor"); }
     const wantsDrone = droneOnRef.current, a = audioRef.current;
     const droneMoved = wantsDrone ? stepDrone(drone.current, r.eye, spaceRef.current === "corridor" ? null : W, a.playing ? now / 1000 : 0, dt) : false;
     ensureFx(W); const ef = echo.current!;
@@ -268,10 +354,17 @@ export function BranchRoom({ tick, world, color, next, wantNext, onAdvance, go, 
         const sh = shownOf(sc.s, loreRef.current); addLog({ key: sc.s.key, room: W.slug, title: sh.title, text: sh.text, owner: sh.owner, at: Date.now() });
         const i = scanList.current.indexOf(sc.s); if (i >= 0) ef.scanned[i] = 1;
         showCard(sh);
+        if (sc.s.what === "artifact" && sc.s.id.startsWith("corr:") && corrLayer.rt && (!corrEdit.current || playRef.current)) { // an artifact in the corridor
+          const cr = corrLayer.rt, ts = now / 1000; cr.emit(sc.s.id.slice(5), "scanned", ts); cr.tick(ts); if (cr.changed.length) { cr.drain(); docMoved = true; syncArt(); }
+          if (cr.pending) { window.clearTimeout(corrT.current); corrT.current = window.setTimeout(() => wakeRef.current(), Math.max(16, Math.min(60000, cr.nextDue() * 1000 - performance.now()))); }
+        } else if (sc.s.what === "artifact" && rt && docSlug.current === W.slug && (!editRef.current || playRef.current)) { // scanning it can open doors, show things...
+          const ts = now / 1000; rt.emit(sc.s.id, "scanned", ts); rt.tick(ts); if (rt.changed.length) { rt.drain(); docMoved = true; syncArt(); }
+          if (rt.pending) { window.clearTimeout(docT.current); docT.current = window.setTimeout(() => wakeRef.current(), Math.max(16, Math.min(60000, rt.nextDue() * 1000 - performance.now()))); }
+        }
       } else { const v = scanView.current; v.x = sc.s.x; v.y = sc.s.y; v.z = sc.s.z; v.p = p; scanTick = true; }
     }
     const animating = wantsDrone && a.playing && !document.hidden; // a playing drone breathes: repaint about 11 times a second, not 60
-    const scrolling = (actorLayer.anim || (actorLayer.skyAnim && actorLayer.skySeen)) && actorLayer.slug === W.slug && !document.hidden; // flowing floors: about 15 a second
+    const scrolling = (actorLayer.anim || (actorLayer.skyAnim && actorLayer.skySeen) || (actorLayer.flockAnim && actorLayer.flockSeen) || (corrAnim.current && !!linkRef.current)) && actorLayer.slug === W.slug && !document.hidden; // flowing floors: about 15 a second
     const tick = (animating && now - lastPaint.current >= 90) || (scrolling && now - lastPaint.current >= 66);
     const changed = r.moved || !!la.yaw || !!la.pitch || gliding || droneMoved || tick || aimMoved || linkMoved || echoTick || scanTick || ghostTick || docMoved; eye.current = r.eye;
     if (!traveling.current && !still) {
@@ -402,11 +495,12 @@ export function BranchRoom({ tick, world, color, next, wantNext, onAdvance, go, 
         <button type="button" className="rm-btn" data-testid="room-ping" aria-disabled={!visor.on} onClick={doPing}>Ping</button>
         <button type="button" className="rm-btn" data-testid="room-scan" onClick={startScan}>Scan</button>
         <button type="button" className="rm-btn" data-testid="room-logbook" onClick={onLogbook}>Logbook</button>
-        {isAdmin && <button type="button" className="rm-btn" data-testid="room-edit" aria-pressed={editing} onClick={() => { if (editing) closeEditor(); else { setEditing(true); editRef.current = true; useDoc(doc, wref.current.slug, false); } }}>Edit room</button>}
+        {isAdmin && <button type="button" className="rm-btn" data-testid="room-edit" aria-pressed={editing} onClick={() => { if (editing) closeEditor(); else { setEditing(true); editRef.current = true; useDoc(doc, wref.current.slug, false); } }}>{corrW ? "Close corridor editor" : "Edit room"}</button>}
+        {isAdmin && inCorr && !editing && <button type="button" className="rm-btn" data-testid="room-edit-corr" onClick={() => void editCorridor()}>Edit corridor</button>}
         <button type="button" className="rm-btn" data-testid="room-lock" aria-pressed={locked} onClick={toggleLock}>{locked ? "Unlock" : "Lock on"}</button>
         <button type="button" className="rm-btn" aria-pressed={visible} data-testid="room-visible" title={visible ? "Others in this room can see you. Press to hide (you will not see them either)." : "You are hidden. Press to appear."} onClick={() => { const v = !visible; setVisible(v); setVis(v); }}>{visible ? "Visible" : "Hidden"}</button>
       </div>
-      {isAdmin && editing && <Suspense fallback={null}><RoomEditor world={world} doc={doc} onDoc={changeDoc} onUndo={undoDoc} onRedo={redoDoc} canUndo={hist.current.undo.length > 0} canRedo={hist.current.redo.length > 0} sel={sel} setSel={(id) => { setSel(id); actorLayer.sel = id; dirty.current = true; wakeRef.current(); }} where={() => eye.current} dirty={!sameDoc} busy={busy} error={err} playing={playTest} onPlay={setPlay} onSave={saveDoc} onRevert={() => { setDoc(saved); useDoc(saved, wref.current.slug, false); }} onClose={closeEditor} /></Suspense>}
+      {isAdmin && editing && <Suspense fallback={null}><RoomEditor themeNote={themeNote} hasTheme={ownTheme} themeMsg={themeMsg} onTheme={(k) => void (k === "save" ? saveTheme() : clearTheme())} world={corrW ? corrW.world : world} cx={corrW?.cx ?? 0} cz={corrW?.cz ?? 0} corridor={!!corrW} doc={doc} onDoc={changeDoc} onUndo={undoDoc} onRedo={redoDoc} canUndo={hist.current.undo.length > 0} canRedo={hist.current.redo.length > 0} sel={sel} setSel={(id) => { setSel(id); if (corrEdit.current) corrLayer.sel = id; else actorLayer.sel = id; dirty.current = true; wakeRef.current(); }} where={() => (corrEdit.current ? { x: eye.current.x - corrLayer.ox, z: eye.current.z - corrLayer.oz, yaw: eye.current.yaw } : eye.current)} dirty={!sameDoc} busy={busy} error={err} playing={playTest} onPlay={setPlay} onSave={saveDoc} onRevert={() => { setDoc(saved); useDoc(saved, wref.current.slug, false); }} onClose={closeEditor} /></Suspense>}
       <div className="rm-pad"><RoomStick onChange={onStick} /></div>
       <button type="button" className="rm-use" data-testid="room-use" onClick={() => { use(); }} onPointerDown={(e) => e.stopPropagation()}>Use</button>
       <p className="rm-hint">W A S D move · arrows look · Q E turn · Space use · right-click / Z lock on · X scan · V ping · L logbook · C drone · Esc leave</p>

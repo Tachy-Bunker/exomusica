@@ -3,16 +3,19 @@ import { EYE_Y, MAX_PITCH, clamp, wrapYaw, type Eye } from "./roomView";
 import { wrapPi, type RoomWorld } from "./roomWorld";
 import type { Shown } from "./roomNet";
 
-export type LockKind = "door" | "prop" | "person" | "plaque";
+export type LockKind = "door" | "prop" | "person" | "plaque" | "artifact";
 export interface Lock { kind: LockKind; id: string; x: number; y: number; z: number; label: string }
 export const LOCK_REACH = 14, LOCK_DROP = 22, LOCK_CONE = 0.5;
 
+/** Artifacts the owner placed in the room you are in (set by the room component; only those that are showing and visible to you). */
+export const artifactLocks: { list: Lock[] } = { list: [] };
 /** Everything that can be locked onto, with where its middle is and how to call it. */
 export function lockables(world: RoomWorld, others: Iterable<Shown>): Lock[] {
   const out: Lock[] = [];
   for (const d of world.doors) out.push({ kind: "door", id: d.id, x: d.x, y: 1.25, z: d.z, label: d.state === "open" ? `Door: ${d.name}` : "Sealed door" });
   for (const p of world.props) out.push({ kind: "prop", id: p.id, x: p.x, y: 1.3, z: p.z, label: p.kind === "terminal" ? "Terminal: talk" : p.label });
   if (world.plaque) out.push({ kind: "plaque", id: "plaque", x: world.plaque.x, y: 1.6, z: world.plaque.z, label: "Inscription" });
+  for (const l of artifactLocks.list) out.push(l);
   for (const o of others) out.push({ kind: "person", id: String(o.id), x: o.x, y: 1.2, z: o.z, label: o.name });
   return out;
 }
@@ -33,6 +36,7 @@ export function refreshLock(lock: Lock, world: RoomWorld, eye: Eye, others: Iter
   else if (lock.kind === "door" && !world.doors.some((d) => d.id === lock.id)) l = null;
   else if (lock.kind === "prop" && !world.props.some((p) => p.id === lock.id)) l = null;
   else if (lock.kind === "plaque" && !world.plaque) l = null;
+  else if (lock.kind === "artifact" && !artifactLocks.list.some((a) => a.id === lock.id)) l = null;
   if (!l || Math.hypot(l.x - eye.x, l.z - eye.z) > LOCK_DROP) return null;
   return l;
 }

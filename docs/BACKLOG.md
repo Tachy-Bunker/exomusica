@@ -1,6 +1,6 @@
 # Exomusica backlog (kept through chat compaction: update this file with every delivery)
 
-Last updated: fix355. Built milestone rewards are listed in `docs/HOMEPAGE_AND_NAV.md`.
+Last updated: fix363. **Start with `docs/ROOM_EDITOR_STATE.md`** (architecture, decisions, queue, checklist for the rooms line). Built milestone rewards are listed in `docs/HOMEPAGE_AND_NAV.md`.
 
 ## Milestone rewards still labelled "reward being built"
 - **Monthly challenge** (100 members): a monthly challenge with a boss brief. Needs a design write-up first (item 91).
@@ -124,3 +124,14 @@ Queue next: artifacts + Logbook entries, ambient flock, corridors/elevators edit
 
 ## Done in fix360
 Skies (replace ceiling, wrap-around turning, skybox zip / six faces / one wide picture). Still open: vertical flow, per-room sky tint, sky on corridors, sky seen through windows (rooms have no windows yet).
+
+## Done in fix361
+Artifacts (wall/floor/billboard, visor-only, scannable, Logbook entry, scanned wire). Open: artifact on tall walls auto-aligned to the nearest wall; animated/scrolling text; image panels from branch art; 'rewrite branch description when explored' Logbook.
+
+## Done in fix362
+Ambient flock (dust/fireflies, <=12, wall-clipping, view-culled, weak-device off).
+
+## Done in fix363
+Corridors editable (things, wires, mood). Open: corridor floor/walls/ceiling/sky/flock; elevators as a real space; layout-shift stability of corridor things.
+
+- fix364 done: subtree themes + copy look. Next: conditional swap, prop catalogue.
