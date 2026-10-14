@@ -6580,3 +6580,6 @@ body:has(.term-backdrop, .fp-panel, .pocket-pad, .probe-hud, .visor-hud) { touch
 .rt-chat{height:100%;margin:-.9rem -1rem}
 @keyframes rt-on{from{transform:scaleY(.04);filter:brightness(3)}60%{transform:scaleY(1.02);filter:brightness(1.6)}to{transform:none;filter:none}}
 @media (prefers-reduced-motion:reduce){.rt-bezel{animation:none}}
+.rt-sub{margin:1rem 0 .3rem;font-size:.85rem;color:var(--rm);font-weight:600}
+.rt-seek{display:flex;align-items:center;gap:.6rem;font-size:.8rem;margin:.5rem 0}
+.rt-seek input{flex:1;accent-color:var(--rm);min-height:28px}

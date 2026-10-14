@@ -16,7 +16,7 @@ import { themeOf } from "../lib/headerTheme";
 import { neon } from "../lib/legibleColor";
 import type { Branch, BranchAlbum } from "../lib/types";
 import { BranchRoom } from "../components/BranchRoom";
-import { AlbumTerminal, ChatTerminal, ListTerminal, RoomTerminal } from "../components/RoomTerminal";
+import { AlbumTerminal, ChatTerminal, DroneTerminal, ListTerminal, RoomTerminal } from "../components/RoomTerminal";
 import type { RoomProp } from "../lib/roomWorld";
 import { Loading } from "../components/Loading";
 
@@ -39,7 +39,9 @@ function RoomInner({ slug }: { slug: string }) {
   const link = useRef<HTMLAnchorElement>(null);
   const [term, setTerm] = useState<RoomProp | null>(null);
   const [pick, setPick] = useState<string | null>(null);
-  const openTerm = useCallback((p: RoomProp) => { setPick(null); setTerm(p); }, []);
+  const [droneOpen, setDroneOpen] = useState(false);
+  const openTerm = useCallback((p: RoomProp) => { setPick(null); setDroneOpen(false); setTerm(p); }, []);
+  const openDrone = useCallback(() => { setTerm(null); setPick(null); setDroneOpen(true); }, []);
   useDocumentTitle(branch ? `${branch.name} (room)` : "Room");
 
   const visited = useMemo(() => { const v = visitedSlugs(); for (const k of keysOf(scannedIds())) if (k.startsWith("branch:")) v.add(k.slice(7)); v.add(slug); return v; }, [slug]);
@@ -70,9 +72,9 @@ function RoomInner({ slug }: { slug: string }) {
 
   const back = `/branch/${slug}`;
   useEffect(() => {
-    const on = (e: KeyboardEvent) => { if (e.code === "Escape" && !document.fullscreenElement) { e.stopPropagation(); if (term) { setTerm(null); setPick(null); } else navigate(back); } };
+    const on = (e: KeyboardEvent) => { if (e.code === "Escape" && !document.fullscreenElement) { e.stopPropagation(); if (term || droneOpen) { setTerm(null); setPick(null); setDroneOpen(false); } else navigate(back); } };
     window.addEventListener("keydown", on); return () => window.removeEventListener("keydown", on);
-  }, [navigate, back, term]);
+  }, [navigate, back, term, droneOpen]);
 
   const go = useCallback((to: string, door: boolean) => {
     const el = link.current; if (!el) return;
@@ -85,7 +87,8 @@ function RoomInner({ slug }: { slug: string }) {
     <div className="hx-page rm-page" data-testid="room-page">
       {branch === false ? <p className="home-dim" style={{ padding: "2rem" }}>There is no room by that name. <Link to="/explore">Scan map</Link></p>
         : !world || !branch ? <Loading />
-        : <BranchRoom world={world} color={color} go={go} mapHref="/explore" backHref={back} onLocked={() => undefined} onProp={openTerm} paused={!!term} />}
+        : <BranchRoom world={world} color={color} go={go} mapHref="/explore" backHref={back} onLocked={() => undefined} onProp={openTerm} onDrone={openDrone} paused={!!term || droneOpen} />}
+      {droneOpen && branch && <RoomTerminal title="drone // player" color={color} onClose={() => setDroneOpen(false)}><DroneTerminal onClose={() => setDroneOpen(false)} /></RoomTerminal>}
       {term && branch && (() => {
         const close = () => { setTerm(null); setPick(null); };
         if (term.kind === "terminal") return <RoomTerminal title={`${branch.name} // talk`} color={color} onClose={close}><ChatTerminal slug={branch.channel?.slug ?? ""} name={branch.name} /></RoomTerminal>;

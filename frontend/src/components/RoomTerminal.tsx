@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../lib/api";
 import { useAudioStore } from "../lib/audioStore";
+import { setDroneWanted } from "../lib/roomDrone";
 import { useAuth } from "../lib/auth";
 import type { PlayableTrackDTO } from "../lib/types";
 import { MiniChat } from "./MiniChat";
@@ -65,4 +66,39 @@ export function ChatTerminal({ slug, name }: { slug: string; name: string }) {
   const { user } = useAuth();
   if (!user) return <p className="rt-dim">The terminal wants a name. <Link to="/login">Log in</Link> to talk in {name}.</p>;
   return <div className="rt-chat" data-testid="terminal-chat"><MiniChat slug={slug} channelName={name} /></div>;
+}
+
+/** The drone's screen: what is playing, the controls, and the queue. */
+export function DroneTerminal({ onClose }: { onClose: () => void }) {
+  const st = useAudioStore();
+  const t = st.currentTrack;
+  const away = () => { setDroneWanted(false); window.dispatchEvent(new Event("exomusica-drone-pref")); onClose(); };
+  return (
+    <div className="rt-drone" data-testid="drone-screen">
+      {t ? (
+        <>
+          <h2 className="rt-title" data-testid="drone-title">{t.title}</h2>
+          <p className="rt-dim">{t.composer} · <Link to={`/album/${t.albumSlug}`}>{t.albumTitle}</Link>{st.currentPlaylist ? ` · from ${st.currentPlaylist.title}` : ""}</p>
+          <div className="rt-seek"><span>{mmss(st.currentTime)}</span><input type="range" aria-label="Seek" min={0} max={Math.max(1, Math.floor(st.duration || 0))} value={Math.floor(st.currentTime)} onChange={(e) => st.seek(Number(e.target.value))} data-testid="drone-seek" /><span>{mmss(st.duration || null)}</span></div>
+        </>
+      ) : <p className="rt-dim" data-testid="drone-idle">Nothing is playing. Pick a disc at a pedestal and the drone will carry it.</p>}
+      <div className="rt-actions">
+        <button type="button" className="rt-btn" onClick={st.playPrevious} data-testid="drone-prev" disabled={!t}>⏮ Prev</button>
+        <button type="button" className="rt-btn" onClick={st.toggle} data-testid="drone-toggle" disabled={!t}>{st.isPlaying ? "⏸ Pause" : "▶ Play"}</button>
+        <button type="button" className="rt-btn" onClick={st.playNext} data-testid="drone-next" disabled={!t && !st.queue.length}>⏭ Next</button>
+        <button type="button" className="rt-btn" aria-pressed={st.shuffle} onClick={st.toggleShuffle} data-testid="drone-shuffle">Shuffle {st.shuffle ? "on" : "off"}</button>
+        <button type="button" className="rt-btn" onClick={st.cycleRepeat} data-testid="drone-repeat">Repeat: {st.repeatMode}</button>
+      </div>
+      <h3 className="rt-sub">Queue ({st.queue.length})</h3>
+      {st.queue.length === 0 ? <p className="rt-dim">The queue is empty.</p> : (
+        <ol className="rt-tracks" data-testid="drone-queue">
+          {st.queue.slice(0, 60).map((q, i) => <li key={`${q.id}-${i}`}><button type="button" className="rt-track" onClick={() => st.playQueueIndex(i)}><span>{String(i + 1).padStart(2, "0")}</span><span className="rt-t">{q.title}</span><span>{mmss(q.durationSeconds)}</span></button></li>)}
+        </ol>
+      )}
+      <div className="rt-actions">
+        <button type="button" className="rt-btn" onClick={st.clearQueue} disabled={!st.queue.length} data-testid="drone-clear">Clear queue</button>
+        <button type="button" className="rt-btn" onClick={away} data-testid="drone-away">Send the drone away</button>
+      </div>
+    </div>
+  );
 }

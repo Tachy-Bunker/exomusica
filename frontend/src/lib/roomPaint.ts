@@ -1,6 +1,7 @@
 // Draws the room from the eye: 2D canvas, painter's order, no 3D library. Everything is lines and flat fills, so it stays light on weak devices.
 import { DOOR_H, type RoomDoor, type RoomProp, type RoomWorld } from "./roomWorld";
 import type { Shown } from "./roomNet";
+import type { Drone } from "./roomDrone";
 import { EYE_Y, NEAR, clipNear, focalOf, toCam, type Eye, type P3, type Target } from "./roomView";
 
 export const rgba = (hex: string, a: number): string => {
@@ -82,7 +83,8 @@ function prism(ctx: CanvasRenderingContext2D, e: Eye, p: RoomProp, h: number, fi
   if (poly(ctx, e, c.map((a) => [a[0], h, a[1]] as P3), W, H, f)) { ctx.fill(); ctx.stroke(); }
 }
 
-export function paintRoom(ctx: CanvasRenderingContext2D, W: number, H: number, world: RoomWorld, eye: Eye, color: string, target: Target | null, others: Shown[] = []): void {
+export interface DroneView { d: Drone; playing: boolean; title: string; t: number; hit: { x: number; y: number; r: number } | null }
+export function paintRoom(ctx: CanvasRenderingContext2D, W: number, H: number, world: RoomWorld, eye: Eye, color: string, target: Target | null, others: Shown[] = [], drone: DroneView | null = null): void {
   const f = focalOf(W, H), n = world.sides, v = world.verts;
   ctx.fillStyle = "#04080c"; ctx.fillRect(0, 0, W, H);
   const P = (i: number, y: number, k = 1): P3 => [v[i % n][0] * k, y, v[i % n][1] * k];
@@ -128,6 +130,7 @@ export function paintRoom(ctx: CanvasRenderingContext2D, W: number, H: number, w
     const c = camP(eye, p.x, h + sh + 0.22, p.z);
     if (c[2] > NEAR && (it.d < 7 || hot)) { const s = scr(c, W, H, f); text(ctx, chat ? "TALK" : p.label.length > 22 ? p.label.slice(0, 21) + "…" : p.label, s[0], s[1], Math.max(10, Math.min(16, (0.26 * f) / c[2])), hot ? "#fff" : col); }
   }
+  if (drone) paintDrone(ctx, eye, drone, color, W, H, f);
   paintMap(ctx, W, H, world, eye, color);
   // a small cross to aim with
   ctx.strokeStyle = rgba(color, 0.7); ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(W / 2 - 7, H / 2); ctx.lineTo(W / 2 + 7, H / 2); ctx.moveTo(W / 2, H / 2 - 7); ctx.lineTo(W / 2, H / 2 + 7); ctx.stroke();
@@ -162,4 +165,21 @@ function paintPerson(ctx: CanvasRenderingContext2D, e: Eye, o: Shown, W: number,
   const side = fx * rx + fz * rz, toward = -(fx * vx + fz * vz);
   if (toward > -0.2) { ctx.fillStyle = col; ctx.fillRect(cx + side * hr * 0.6 - hr * 0.55, hy - hr * 0.18, hr * 1.1, hr * 0.36); }
   if (base[2] < 14) text(ctx, o.name, cx, yt - 6, Math.max(10, Math.min(15, (0.26 * f) / base[2])), col);
+}
+
+/** The drone: a lit hexagon with a ring round it (the ring turns and breathes while music plays), its track under it. Records where it is on screen so a tap can find it. */
+function paintDrone(ctx: CanvasRenderingContext2D, e: Eye, v: DroneView, color: string, W: number, H: number, f: number): void {
+  const c = camP(e, v.d.x, v.d.y, v.d.z); if (c[2] < NEAR) { v.hit = null; return; }
+  const s = scr(c, W, H, f), r = Math.max(9, Math.min(46, (0.15 * f) / c[2])), col = v.playing ? color : "#d9a441";
+  v.hit = { x: s[0], y: s[1], r };
+  const pulse = v.playing ? 1 + Math.sin(v.t * 6) * 0.08 : 1, spin = v.playing ? v.t * 2.2 : 0.6;
+  ctx.save(); ctx.translate(s[0], s[1]);
+  const g = ctx.createRadialGradient(0, 0, r * 0.3, 0, 0, r * 2.4); g.addColorStop(0, rgba(col, v.playing ? 0.45 : 0.18)); g.addColorStop(1, rgba(col, 0));
+  ctx.fillStyle = g; ctx.beginPath(); ctx.arc(0, 0, r * 2.4, 0, Math.PI * 2); ctx.fill();
+  ctx.lineWidth = Math.max(1.2, r / 10); ctx.strokeStyle = col; ctx.fillStyle = "rgba(6,12,18,.92)";
+  ctx.beginPath(); for (let i = 0; i < 6; i++) { const a = (i / 6) * Math.PI * 2 + Math.PI / 6; ctx.lineTo(Math.cos(a) * r * 0.62, Math.sin(a) * r * 0.62); } ctx.closePath(); ctx.fill(); ctx.stroke();
+  ctx.beginPath(); ctx.ellipse(0, r * 0.05, r * 1.25 * pulse, r * 0.36 * pulse, spin * 0.15, spin, spin + Math.PI * 1.5); ctx.stroke();
+  ctx.fillStyle = v.playing ? "#fff" : col; ctx.beginPath(); ctx.arc(0, 0, r * 0.14, 0, Math.PI * 2); ctx.fill();
+  ctx.restore();
+  if (c[2] < 5) text(ctx, v.title ? (v.playing ? v.title.slice(0, 26) : `paused · ${v.title.slice(0, 18)}`) : "tap me", s[0], s[1] + r * 1.7 + 8, 11, rgba(col, 0.9));
 }
