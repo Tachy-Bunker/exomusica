@@ -171,7 +171,6 @@ export class RoomPainter {
     if (lock) this.bracket(lock);
     if (fx?.scan && fx.scan.p > 0) this.scanRing(fx.scan);
     if (drone) this.drone(drone, eye);
-    this.map(eye, sp && sp.link ? sp.link : null);
     ctx.strokeStyle = this.C.cross; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(W / 2 - 7, H / 2); ctx.lineTo(W / 2 + 7, H / 2); ctx.moveTo(W / 2, H / 2 - 7); ctx.lineTo(W / 2, H / 2 + 7); ctx.stroke();
     this.drop();
     return this.stats;
@@ -908,24 +907,6 @@ export class RoomPainter {
     void e;
   }
 
-  /** Little plan of the room in the corner: doors, pedestals and which way you face. North is the map's "up", as on the Scan map. */
-  private map(eye: Eye, link: Link | null): void {
-    const ctx = this.ctx, W = this.W, H = this.H, world = this.world, S = Math.max(64, Math.min(96, Math.min(W, H) * 0.22)), cx = W - 10 - S / 2, cy = 10 + S / 2 + 26, k = (S / 2 - 3) / world.R;
-    ctx.save(); ctx.fillStyle = "rgba(4,8,12,.7)"; ctx.fillRect(cx - S / 2, cy - S / 2, S, S);
-    ctx.beginPath(); for (let i = 0; i < this.n; i++) { const x = cx + this.v[i][0] * k, y = cy + this.v[i][1] * k; if (i) ctx.lineTo(x, y); else ctx.moveTo(x, y); } ctx.closePath();
-    ctx.lineWidth = 1.5; ctx.strokeStyle = this.C.mapLine; ctx.stroke();
-    if (link) { // the corridor, cut off at the edge of the little plan
-      ctx.save(); ctx.beginPath(); ctx.rect(cx - S / 2, cy - S / 2, S, S); ctx.clip(); ctx.beginPath();
-      for (let i = 0; i < link.c.n; i++) { const x = cx + link.c.pts[i * 2] * k, y = cy + link.c.pts[i * 2 + 1] * k; if (i) ctx.lineTo(x, y); else ctx.moveTo(x, y); }
-      ctx.lineWidth = 3; ctx.strokeStyle = this.C.mapLine; ctx.globalAlpha = 0.45; ctx.stroke(); ctx.restore();
-    }
-    ctx.lineWidth = 4;
-    for (let i = 0; i < world.doors.length; i++) { const d = world.doors[i]; ctx.beginPath(); ctx.moveTo(cx + (d.x - d.tx * d.hw) * k, cy + (d.z - d.tz * d.hw) * k); ctx.lineTo(cx + (d.x + d.tx * d.hw) * k, cy + (d.z + d.tz * d.hw) * k); ctx.strokeStyle = d.state === "open" ? "#ffb347" : "#4c6577"; ctx.stroke(); }
-    ctx.fillStyle = "#9fe9ff"; for (let i = 0; i < world.props.length; i++) ctx.fillRect(cx + world.props[i].x * k - 1.5, cy + world.props[i].z * k - 1.5, 3, 3);
-    const ex = cx + eye.x * k, ez = cy + eye.z * k, fx = Math.cos(eye.yaw), fz = Math.sin(eye.yaw);
-    ctx.beginPath(); ctx.moveTo(ex + fx * 5, ez + fz * 5); ctx.lineTo(ex - fx * 3 - fz * 3, ez - fz * 3 + fx * 3); ctx.lineTo(ex - fx * 3 + fz * 3, ez - fz * 3 - fx * 3); ctx.closePath(); ctx.fillStyle = "#fff"; ctx.fill();
-    ctx.restore();
-  }
 }
 
 const painters = new WeakMap<RoomWorld, Map<string, RoomPainter>>();

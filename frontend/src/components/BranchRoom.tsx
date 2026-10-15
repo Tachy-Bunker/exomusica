@@ -5,7 +5,7 @@ import { startDrone, stepDrone, droneWanted, setDroneWanted } from "../lib/roomD
 import { useAudioStore } from "../lib/audioStore";
 import { applyList, glide, isVisible, joinRoom, setVisible, type Shown } from "../lib/roomNet";
 import { playSfx } from "../lib/roomSfx";
-import { clamp, doorWalkedInto, facing, MAX_PITCH, stepEye, wrapYaw, type Eye, type Target } from "../lib/roomView";
+import { clamp, doorWalkedInto, facing, focalOf, MAX_PITCH, NEAR, stepEye, toCam, wrapYaw, type Eye, type P3, type Target } from "../lib/roomView";
 import { actorLayer, corrLayer, painterFor, paintRoom, ScenePaint, type DroneView, type FxView } from "../lib/roomPaint";
 import { loadMilestones } from "../lib/milestones";
 import { BossPanel } from "./BossPanel";
@@ -25,11 +25,12 @@ import { aimAt, artifactLocks, pickLock, refreshLock, type Lock } from "../lib/r
 import { isTypingTarget } from "../lib/isTypingTarget";
 import { useAuth } from "../lib/auth";
 import { recordScan, scannedIds, scanId } from "../lib/scanLog";
-import { drawHud, hudOn, setHudOn, type HudIn } from "../lib/visorHud";
+import { drawHud, hudOn, setHudOn, type HudIn, type ScanMark } from "../lib/visorHud";
 import { EchoField } from "../lib/roomEcho";
 import { playEcho, playScan } from "../lib/roomEchoAudio";
 import { addLog, loadLog, noteRoom, surveyDraft, surveyKey, scannables, shownOf, type Lore, type Scannable, type ShownLore } from "../lib/roomLore";
 import { RoomStick } from "./RoomStick";
+import { ScanScreen, type ScanRes } from "./ScanScreen";
 
 const KEYS: Record<string, [number, number, number, number]> = { // forward, strafe, turn, look
   KeyW: [1, 0, 0, 0], KeyS: [-1, 0, 0, 0], ArrowUp: [0, 0, 0, 1], ArrowDown: [0, 0, 0, -1],
@@ -38,8 +39,11 @@ const KEYS: Record<string, [number, number, number, number]> = { // forward, str
 };
 const NO_ONE: Shown[] = [];
 const NO_PEOPLE_ITER: Shown[] = [];
+/** The visor overlay draws at full device pixel ratio only where the device has cores to spare: it holds a second large canvas. */
+const hudDpr = (base: number): number => (base > 1 && (navigator.hardwareConcurrency ?? 8) > 4 ? base : 1);
 
-const SCAN_MS = 900, SCAN_REACH = 10, CARD_MS = 9000, WANT_R = 6.5, OPEN_R = 4.4, KEEP_R = 5.4, OPEN_RATE = 2.4;
+const SCAN_MS = 1600, SCAN_REACH = 10, WANT_R = 6.5, OPEN_R = 4.4, KEEP_R = 5.4, OPEN_RATE = 2.4;
+const scanProbe: P3 = [0, 0, 0], scanCam: P3 = [0, 0, 0]; // scratch for the scan visor's projection: no allocation per frame
 
 interface Props {
   world: RoomWorld; color: string;
@@ -97,14 +101,16 @@ export function BranchRoom({ tick, world, color, next, wantNext, onAdvance, go, 
   const visorRef = useRef(visor), loreRef = useRef(lore), logbookRef = useRef(onLogbook); visorRef.current = visor; loreRef.current = lore; logbookRef.current = onLogbook;
   const fxWorld = useRef<RoomWorld | null>(null), scanList = useRef<Scannable[]>([]), echo = useRef<EchoField | null>(null);
   const fxv = useRef<FxView>({ echo: null, now: 0, scan: null }), scanSt = useRef<{ s: Scannable; t0: number } | null>(null), scanView = useRef({ x: 0, y: 0, z: 0, p: 0 });
-  const [card, setCard] = useState<ShownLore | null>(null), cardT = useRef(0), [boss, setBoss] = useState<Actor | null>(null);
+  const [boss, setBoss] = useState<Actor | null>(null);
+  // the scan visor is a mode you stay in; its result (and the logbook entry one level deeper) opens over the room, which stands still meanwhile
+  const [scanMode, setScanMode] = useState(false), scanModeRef = useRef(false), [scanRes, setScanRes] = useState<ScanRes | null>(null), scanResRef = useRef<ScanRes | null>(null);
   const eye = useRef<Eye>({ ...world.spawn, pitch: 0 });
   const keys = useRef(new Set<string>()), stick = useRef({ x: 0, y: 0 }), drag = useRef<{ id: number; x: number; y: number; moved: number; type: string } | null>(null);
   const dirty = useRef(true), raf = useRef(0), last = useRef(0), traveling = useRef(false), size = useRef({ w: 0, h: 0 }), tgt = useRef<Target | null>(null), shown = useRef(""), bumped = useRef(false);
   const lookAcc = useRef({ yaw: 0, pitch: 0 }), drawn = useRef(0);
   const ghosts = useRef<Ghost[]>([]), gpool = useRef(makePool()), drawList = useRef<Shown[]>([]), ghostT = useRef(0);
   const others = useRef(new Map<number, Shown>()), link = useRef<ReturnType<typeof joinRoom>>(null), pausedRef = useRef(paused), [visible, setVis] = useState(isVisible), [here, setHere] = useState(0);
-  pausedRef.current = paused || !!boss;
+  pausedRef.current = paused || !!boss || !!scanRes;
   const gov = useRef(new ScaleGovernor()), dprBase = useRef(1), lock = useRef<Lock | null>(null), [locked, setLocked] = useState(false), pendingPaint = useRef(false), prefetchAt = useRef(0), perfEl = useRef<HTMLDivElement>(null), perfAt = useRef(0), dsAt = useRef(0), dsAt2 = useRef(0);
   const perfMul = useRef(typeof location !== "undefined" ? Number(/[?&]perfmul=(\d+)/.exec(location.search)?.[1] ?? 1) : 1); // test hook: pretend the device is N times slower
   const perfOn = useRef(typeof location !== "undefined" && /[?&]perf\b/.test(location.search));
@@ -134,10 +140,10 @@ export function BranchRoom({ tick, world, color, next, wantNext, onAdvance, go, 
   /** Milestone keys the community has reached (null until known): things with a gate appear or vanish by it. */
   const reachedRef = useRef<ReadonlySet<string> | null>(null);
   /** Hazards: integrity (1 = whole), whether the room / corridor has any, the effect under you right now. */
-  const [hud, setHud] = useState(hudOn), hudRef = useRef(hud), hudC = useRef<HTMLCanvasElement>(null), hudAt = useRef(0), hudIn = useRef<HudIn | null>(null), hudOnAt = useRef(0), hudN = useRef({ at: 0, list: null as readonly { x: number; z: number }[] | null, flags: new Uint8Array(0), done: 0 });
+  const [hud, setHud] = useState(hudOn), hudRef = useRef(hud), hudC = useRef<HTMLCanvasElement>(null), hudAt = useRef(0), hudIn = useRef<HudIn | null>(null), hudOnAt = useRef(0), hudN = useRef({ at: 0, list: null as readonly { x: number; z: number }[] | null, flags: new Uint8Array(0), done: 0, marks: [] as ScanMark[], pool: [] as ScanMark[] });
   hudRef.current = hud;
   const hudMount = useCallback((el: HTMLCanvasElement | null) => { // size the visor canvas as it appears (it is created when the visor is switched on or the editor closes)
-    hudC.current = el; const st = stage.current; if (!el || !st) return; const d = dprBase.current, w = st.clientWidth, h = st.clientHeight;
+    hudC.current = el; const st = stage.current; if (!el || !st) return; const d = hudDpr(dprBase.current), w = st.clientWidth, h = st.clientHeight;
     el.width = Math.max(1, Math.round(w * d)); el.height = Math.max(1, Math.round(h * d)); el.getContext("2d")?.setTransform(d, 0, 0, d, 0, 0); hudAt.current = 0; hudOnAt.current = performance.now() / 1000; dirty.current = true; wakeRef.current();
   }, []);
   const integ = useRef(1), hazRoom = useRef(false), hazCorr = useRef(false), hz = useRef<HazardFx>({ slow: 1, px: 0, pz: 0, drain: 0 }), hz2 = useRef<HazardFx>({ slow: 1, px: 0, pz: 0, drain: 0 }), integEl = useRef<HTMLDivElement>(null), hurtEl = useRef<HTMLDivElement>(null), integShown = useRef(-1), softT = useRef(0);
@@ -281,7 +287,6 @@ export function BranchRoom({ tick, world, color, next, wantNext, onAdvance, go, 
     const f = new EchoField(list, (id) => W.doors.findIndex((d) => d.id === id)); const done = scannedIds(); list.forEach((x, i) => { f.scanned[i] = done.has(scanId("lore", x.key)) ? 1 : 0; }); echo.current = f;
     scanSt.current = null; noteRoom(W, list);
   }, []);
-  const showCard = useCallback((c: ShownLore) => { setCard(c); window.clearTimeout(cardT.current); cardT.current = window.setTimeout(() => setCard(null), CARD_MS); }, []);
   const doPing = useCallback(() => {
     if (pausedRef.current) return;
     const v = visorRef.current; if (!v.on) { showToast(v.hint); return; }
@@ -289,15 +294,37 @@ export function BranchRoom({ tick, world, color, next, wantNext, onAdvance, go, 
     if (!f.ping(performance.now(), e.x, e.z)) { showToast("The visor is still ringing"); return; }
     playEcho(W, f, e.x, e.z, e.yaw); dirty.current = true; wakeRef.current();
   }, [ensureFx, showToast]);
+  /** The scan screen (the result, or the logbook entry one level deeper). The room stands still while it is open. */
+  const setScreen = useCallback((r: ScanRes | null) => {
+    scanResRef.current = r; if (r) { pausedRef.current = true; keys.current.clear(); stick.current = { x: 0, y: 0 }; }
+    setScanRes(r); dirty.current = true; wakeRef.current();
+  }, []);
+  const openScan = useCallback((s: Scannable, view: "result" | "entry") => setScreen({ s, sh: shownOf(s, loreRef.current), view }), [setScreen]);
+  /** The scan visor: on or off. You stay in it until you switch it off (a scan running then is lost). */
+  const setMode = useCallback((on: boolean) => {
+    if (!on) { scanSt.current = null; scanView.current.p = 0; }
+    scanModeRef.current = on; setScanMode(on); hudAt.current = 0; dirty.current = true; wakeRef.current(); showToast(on ? "Scan visor" : "Combat visor");
+  }, [showToast]);
+  const toggleScan = useCallback(() => { if (pausedRef.current) return; setMode(!scanModeRef.current); }, [setMode]);
+  /** The scan screen's keys and buttons: read the entry, go back one level, or leave the scan visor. */
+  const scanAct = useCallback((act: "read" | "back" | "exit") => {
+    const r = scanResRef.current; if (!r) return;
+    if (act === "exit") { setScreen(null); setMode(false); }
+    else if (act === "read" && r.view === "result") setScreen({ ...r, view: "entry" });
+    else if (r.view === "entry") setScreen({ ...r, view: "result" });
+    else setScreen(null);
+    stage.current?.focus({ preventScroll: true });
+  }, [setScreen, setMode]);
+
   const startScan = useCallback(() => {
     if (pausedRef.current || traveling.current) return;
     const W = wref.current; ensureFx(W); const e = eye.current; let id: string | null = null, kind = "";
     const l = lock.current ?? pickLock(W, e, NO_PEOPLE_ITER); if (l && l.kind !== "person") { id = l.id; kind = l.kind; }
     const s = id ? scanList.current.find((x) => x.id === id && (x.lockKind === kind)) ?? corrScan.current.find((x) => x.id === id && (x.lockKind === kind)) : undefined;
     if (!s) { showToast("Nothing to scan here"); return; }
-    if (scannedIds().has(scanId("lore", s.key))) { showCard(shownOf(s, loreRef.current)); return; }
+    if (scannedIds().has(scanId("lore", s.key))) { openScan(s, "entry"); return; }
     scanSt.current = { s, t0: performance.now() }; dirty.current = true; wakeRef.current();
-  }, [ensureFx, showToast, showCard]);
+  }, [ensureFx, showToast, openScan]);
 
   /** Open the door to the room that was loaded for it: the corridor appears and the door starts to open. */
   const openLink = useCallback((d: RoomDoor): boolean => {
@@ -444,7 +471,7 @@ export function BranchRoom({ tick, world, color, next, wantNext, onAdvance, go, 
         recordScan("lore", sc.s.key, userRef.current); playScan();
         const sh = shownOf(sc.s, loreRef.current); addLog({ key: sc.s.key, room: W.slug, title: sh.title, text: sh.text, owner: sh.owner, at: Date.now() });
         const i = scanList.current.indexOf(sc.s); if (i >= 0) ef.scanned[i] = 1;
-        showCard(sh);
+        openScan(sc.s, "result");
         if (sc.s.what === "artifact" && sc.s.id.startsWith("corr:") && corrLayer.rt && (!corrEdit.current || playRef.current)) { // an artifact in the corridor
           const cr = corrLayer.rt, ts = now / 1000; cr.emit(sc.s.id.slice(5), "scanned", ts); cr.tick(ts); if (cr.changed.length) { cr.drain(); docMoved = true; syncArt(); }
           if (cr.pending) { window.clearTimeout(corrT.current); corrT.current = window.setTimeout(() => wakeRef.current(), Math.max(16, Math.min(60000, cr.nextDue() * 1000 - performance.now()))); }
@@ -499,21 +526,37 @@ export function BranchRoom({ tick, world, color, next, wantNext, onAdvance, go, 
       }
     }
     const more = !!(shotRef.current || movers || changed || animating || scrolling || actorLayer.fade || echoBusy || pendingPaint.current || dirty.current || (integ.current < 1 && !still) || (r.eye.y ?? 0) > 0 || (r.eye.vy ?? 0) !== 0 || (!still && hzOn && (hz.current.px || hz.current.pz)) || (!still && (k.size || stick.current.x || stick.current.y || drag.current)));
-    if (hudRef.current && !editRef.current) { // visor: its own small canvas, ~20 Hz while anything moves, once more when things settle
+    if ((hudRef.current || scanModeRef.current) && !editRef.current) { // visor: its own small canvas, ~20 Hz while anything moves, once more when things settle
       const hc = hudC.current, sz = size.current;
       if (hc && sz.w && (now - hudAt.current > 48 || !more)) {
         hudAt.current = now; const hx = hc.getContext("2d");
         if (hx) {
           const cor = spaceRef.current === "corridor", list = cor ? corrScan.current : scanList.current, hn = hudN.current;
           if (hn.list !== list || now - hn.at > 1000) { hn.at = now; hn.list = list; if (hn.flags.length !== list.length) hn.flags = new Uint8Array(list.length); const dn = scannedIds(); let c2 = 0; for (let i = 0; i < list.length; i++) { const v = dn.has(scanId("lore", list[i].key)) ? 1 : 0; hn.flags[i] = v; c2 += v; } hn.done = c2; }
-          let hi = hudIn.current; if (!hi) hi = hudIn.current = { x: 0, z: 0, yaw: 0, verts: W.verts, doors: W.doors, scan: list, scanned: hn.flags, others: others.current.values(), integ: 1, done: 0, total: 0, name: "", color: "", t: 0, locked: false, low: false, target: "", tdist: 0, on: 0 };
-          hi.x = r.eye.x; hi.z = r.eye.z; hi.yaw = r.eye.yaw; hi.verts = W.verts; hi.doors = W.doors; hi.scan = list; hi.scanned = hn.flags; hi.others = others.current.values(); hi.integ = integ.current; hi.done = hn.done; hi.total = list.length; hi.name = W.name; hi.color = W.color ?? color; hi.t = now / 1000; hi.locked = !!lock.current; hi.target = lock.current ? lock.current.label : ""; hi.on = hudOnAt.current; hi.tdist = lock.current ? Math.hypot(lock.current.x - r.eye.x, lock.current.z - r.eye.z) : 0; hi.low = gov.current.scale < 1;
+          let hi = hudIn.current; if (!hi) hi = hudIn.current = { x: 0, z: 0, yaw: 0, verts: W.verts, doors: W.doors, scan: list, scanned: hn.flags, others: others.current.values(), integ: 1, done: 0, total: 0, name: "", color: "", t: 0, locked: false, low: false, target: "", tdist: 0, on: 0, mode: "combat", targetScanned: false, scanP: 0, marks: hn.marks };
+          const scanOn = scanModeRef.current, pe = r.eye;
+          hi.x = pe.x; hi.z = pe.z; hi.yaw = pe.yaw; hi.verts = W.verts; hi.doors = W.doors; hi.scan = list; hi.scanned = hn.flags; hi.others = others.current.values(); hi.integ = integ.current; hi.done = hn.done; hi.total = list.length; hi.name = W.name; hi.color = W.color ?? color; hi.t = now / 1000; hi.on = hudOnAt.current; hi.low = gov.current.scale < 1;
+          hi.mode = scanOn ? "scan" : "combat"; hi.locked = !scanOn && !!lock.current; hi.tdist = lock.current && !scanOn ? Math.hypot(lock.current.x - pe.x, lock.current.z - pe.z) : 0; hi.marks = hn.marks;
+          if (scanOn) { // the scan visor: what is in view, outlined; the target is the one a scan runs on, else what the lock or the reticle is on
+            const mk = hn.marks, f = focalOf(sz.w, sz.h), pb = scanProbe, cb = scanCam; mk.length = 0;
+            for (let i = 0; i < list.length; i++) {
+              const q = list[i]; pb[0] = q.x; pb[1] = q.y; pb[2] = q.z; toCam(pe, pb, cb);
+              const dz = cb[2]; if (dz <= NEAR || dz > 40) continue;
+              const px = sz.w / 2 + (cb[0] * f) / dz, py = sz.h / 2 - (cb[1] * f) / dz;
+              if (px < -40 || py < -40 || px > sz.w + 40 || py > sz.h + 40) continue;
+              const j = mk.length; let m = hn.pool[j]; if (!m) hn.pool[j] = m = { sx: 0, sy: 0, sz: 0, scanned: false };
+              m.sx = px; m.sy = py; m.sz = Math.max(9, Math.min(110, (0.5 * f) / dz)); m.scanned = hn.flags[i] === 1; mk.push(m);
+            }
+            const sc = scanSt.current, tl = sc ? null : lock.current ?? pickLock(W, pe, NO_PEOPLE_ITER); let ti = -1;
+            if (sc) ti = list.indexOf(sc.s); else if (tl && tl.kind !== "person") ti = list.findIndex((x) => x.id === tl.id && x.lockKind === tl.kind);
+            hi.target = ti >= 0 ? list[ti].label : ""; hi.targetScanned = ti >= 0 && hn.flags[ti] === 1; hi.scanP = sc ? clamp((now - sc.t0) / SCAN_MS, 0, 1) : 0;
+          } else { hi.target = lock.current ? lock.current.label : ""; hi.targetScanned = false; hi.scanP = 0; }
           drawHud(hx, sz.w, sz.h, hi);
         }
       }
     }
     if (more || gpool.current.active) raf.current = requestAnimationFrame(frame); else { last.current = 0; flushDs(); if (ghosts.current.length) { window.clearTimeout(ghostT.current); ghostT.current = window.setTimeout(() => wakeRef.current(), Math.min(30000, Math.max(250, gpool.current.nextStartMs)) + 40); } }
-  }, [color, go, onLocked, showToast, flushDs, solve, openLink, ensureFx, showCard]);
+  }, [color, go, onLocked, showToast, flushDs, solve, openLink, ensureFx, openScan]);
 
   function wake() { if (!raf.current && alive.current) raf.current = requestAnimationFrame(frame); }
   const wakeRef = useRef(wake); wakeRef.current = wake;
@@ -525,7 +568,7 @@ export function BranchRoom({ tick, world, color, next, wantNext, onAdvance, go, 
       const w = st.clientWidth, h = st.clientHeight; dprBase.current = Math.min(window.devicePixelRatio || 1, (navigator.hardwareConcurrency ?? 8) <= 4 ? 1 : 1.5);
       const dpr = dprBase.current * gov.current.scale;
       c.width = Math.max(1, Math.round(w * dpr)); c.height = Math.max(1, Math.round(h * dpr)); size.current = { w, h };
-      c.getContext("2d")?.setTransform(dpr, 0, 0, dpr, 0, 0); { const hc = hudC.current; if (hc) { const hd = dprBase.current; hc.width = Math.max(1, Math.round(w * hd)); hc.height = Math.max(1, Math.round(h * hd)); hc.getContext("2d")?.setTransform(hd, 0, 0, hd, 0, 0); hudAt.current = 0; } } dirty.current = true; wakeRef.current();
+      c.getContext("2d")?.setTransform(dpr, 0, 0, dpr, 0, 0); { const hc = hudC.current; if (hc) { const hd = hudDpr(dprBase.current); hc.width = Math.max(1, Math.round(w * hd)); hc.height = Math.max(1, Math.round(h * hd)); hc.getContext("2d")?.setTransform(hd, 0, 0, hd, 0, 0); hudAt.current = 0; } } dirty.current = true; wakeRef.current();
     };
     fitRef.current = fit;
     fit(); const ro = new ResizeObserver(fit); ro.observe(st); return () => ro.disconnect();
@@ -533,11 +576,17 @@ export function BranchRoom({ tick, world, color, next, wantNext, onAdvance, go, 
 
   useEffect(() => {
     const down = (e: KeyboardEvent) => {
-      if (pausedRef.current || isTypingTarget(e.target) || e.ctrlKey || e.metaKey || e.altKey) return;
-      if (e.code === "Space" || e.code === "Enter" || e.code === "KeyF") { if (e.code === "Enter" && (e.target as HTMLElement)?.closest?.("a,button")) return; e.preventDefault(); e.stopPropagation(); if (!e.repeat) use(); return; }
+      if (isTypingTarget(e.target) || e.ctrlKey || e.metaKey || e.altKey) return;
+      if (scanResRef.current) { // the scan screen is open: the room stands still and these keys answer it
+        if (e.code === "Space" || e.code === "Enter" || e.code === "KeyB" || e.code === "KeyX") { e.preventDefault(); e.stopPropagation(); if (!e.repeat) scanActRef.current(e.code === "KeyX" ? "exit" : e.code === "KeyB" || scanResRef.current?.view === "entry" ? "back" : "read"); }
+        return;
+      }
+      if (e.code === "KeyB") { e.stopPropagation(); return; } // B is the scan screen's back key; here it must not jump to the Soundbay letter shortcut (Layout)
+      if (pausedRef.current) return;
+      if (e.code === "Space" || e.code === "Enter" || e.code === "KeyF") { if (e.code === "Enter" && (e.target as HTMLElement)?.closest?.("a,button")) return; e.preventDefault(); e.stopPropagation(); if (!e.repeat) { if (e.code !== "KeyF" && scanModeRef.current) startScanRef.current(); else use(); } return; }
       if (e.code === "KeyZ") { e.preventDefault(); e.stopPropagation(); if (!e.repeat) toggleLockRef.current(); return; }
       if (e.code === "KeyV") { e.preventDefault(); e.stopPropagation(); if (!e.repeat) doPingRef.current(); return; }
-      if (e.code === "KeyX") { e.preventDefault(); e.stopPropagation(); if (!e.repeat) startScanRef.current(); return; }
+      if (e.code === "KeyX") { e.preventDefault(); e.stopPropagation(); if (!e.repeat) toggleScanRef.current(); return; }
       if (e.code === "KeyL") { e.preventDefault(); e.stopPropagation(); if (!e.repeat) logbookRef.current(); return; }
       if (e.code === "KeyC") { e.preventDefault(); e.stopPropagation(); if (!e.repeat) callDroneRef.current(); return; }
       if (e.code === "KeyH") { e.preventDefault(); e.stopPropagation(); if (!e.repeat) { const v = !hudRef.current; setHudOn(v); setHud(v); } return; }
@@ -550,7 +599,7 @@ export function BranchRoom({ tick, world, color, next, wantNext, onAdvance, go, 
     return () => { window.removeEventListener("keydown", down, true); window.removeEventListener("keyup", up, true); window.removeEventListener("blur", blur); };
   }, [use]);
   // Unmount only (not when a handler is swapped): stop the frame and cancel every pending timer, so a late timer cannot restart the loop or keep this room alive.
-  useEffect(() => { alive.current = true; return () => { alive.current = false; cancelAnimationFrame(raf.current); raf.current = 0; for (const t of [docT, corrT, ghostT, cardT, toastT]) window.clearTimeout(t.current); }; }, []);
+  useEffect(() => { alive.current = true; return () => { alive.current = false; cancelAnimationFrame(raf.current); raf.current = 0; for (const t of [docT, corrT, ghostT, toastT]) window.clearTimeout(t.current); }; }, []);
 
   useEffect(() => { if (paused) { lock.current = null; setLocked(false); keys.current.clear(); stick.current = { x: 0, y: 0 }; drag.current = null; } else { stage.current?.focus({ preventScroll: true }); dirty.current = true; wakeRef.current(); } }, [paused]);
   useEffect(() => {
@@ -568,7 +617,7 @@ export function BranchRoom({ tick, world, color, next, wantNext, onAdvance, go, 
     lock.current = l; setLocked(true); dirty.current = true; wakeRef.current();
   }, [showToast]);
   const toggleLockRef = useRef(toggleLock); toggleLockRef.current = toggleLock;
-  const doPingRef = useRef(doPing); doPingRef.current = doPing; const startScanRef = useRef(startScan); startScanRef.current = startScan;
+  const doPingRef = useRef(doPing); doPingRef.current = doPing; const startScanRef = useRef(startScan); startScanRef.current = startScan; const scanActRef = useRef(scanAct); scanActRef.current = scanAct; const toggleScanRef = useRef(toggleScan); toggleScanRef.current = toggleScan;
   const callDroneRef = useRef(() => {});
   const callDrone = () => { if (!droneOnRef.current) { setDroneOn(true); setDroneWanted(true); } onDrone(); };
   callDroneRef.current = callDrone;
@@ -582,18 +631,19 @@ export function BranchRoom({ tick, world, color, next, wantNext, onAdvance, go, 
   const pup = (e: React.PointerEvent) => { const d = drag.current; if (!d || d.id !== e.pointerId) return; drag.current = null; if (d.moved < 6 && e.type === "pointerup") {
       const h = dview.current.hit, rc = stage.current?.getBoundingClientRect();
       if (h && rc && droneOnRef.current && Math.hypot(e.clientX - rc.left - h.x, e.clientY - rc.top - h.y) <= Math.max(30, h.r * 1.9)) { onDrone(); return; }
-      if (d.type === "mouse") use();
+      if (d.type === "mouse") { if (scanModeRef.current) startScanRef.current(); else use(); }
     }
   };
 
+  const showVisor = (hud || scanMode) && !editing; // the scan visor always shows its overlay
   return (
-    <div className={hud && !editing ? "rm hud-on" : "rm"} data-testid="branch-room" style={{ ["--rm" as string]: color }}>
+    <div className={showVisor ? "rm hud-on" : "rm"} data-testid="branch-room" style={{ ["--rm" as string]: color }}>
       <div ref={stage} className="rm-stage" tabIndex={0} aria-label={`${world.name}: walk with W A S D or the arrow keys, Space to use`} data-testid="room-stage" data-room={world.slug}
         onContextMenu={(e) => e.preventDefault()} onPointerDown={pdown} onPointerMove={pmove} onPointerUp={pup} onPointerCancel={pup}>
         <canvas ref={canvas} />
       </div>
       <div className="rm-scan" aria-hidden="true" />
-      {hud && !editing && <canvas ref={hudMount} className="rm-hud" data-testid="room-hud" aria-hidden="true" />}
+      {showVisor && <canvas ref={hudMount} className="rm-hud" data-testid="room-hud" aria-hidden="true" />}
       <div className="rm-title">{world.name}{here > 0 && <span data-testid="room-here" className="rm-here"> · {here} here</span>}</div>
       <div ref={prompt} className="rm-prompt" data-testid="room-prompt" aria-live="polite" />
       <div ref={toast} className="rm-toast" role="status" />
@@ -605,14 +655,14 @@ export function BranchRoom({ tick, world, color, next, wantNext, onAdvance, go, 
           if (rt.pending) { window.clearTimeout(docT.current); docT.current = window.setTimeout(() => wakeRef.current(), Math.max(16, Math.min(60000, rt.nextDue() * 1000 - performance.now()))); } dirty.current = true; wakeRef.current(); }} />}
       <div ref={hurtEl} className="rm-hurt" aria-hidden="true" />
       <div ref={integEl} className="rm-integ" data-testid="room-integrity" aria-hidden="true" style={{ opacity: 0 }}><i /></div>
-      {card && <div className="rm-card" data-testid="room-scan-card" role="status"><b>{card.title}</b><p>{card.text}</p>{card.owner && <i>✦ lore</i>}</div>}
+      {scanRes && <ScanScreen res={scanRes} onRead={() => scanAct("read")} onBack={() => scanAct("back")} onExit={() => scanAct("exit")} />}
       {perfOn.current && <div ref={perfEl} className="rm-perf" data-testid="room-perf" />}
       <div className="rm-bar">
         <Link to={backHref} className="rm-btn" data-testid="room-back" title="The ordinary page of this branch">Classic view</Link>
         <Link to={mapHref} className="rm-btn" data-testid="room-map">Map</Link>
         <button type="button" className="rm-btn" data-testid="room-drone" onClick={callDrone}>Drone</button>
         <button type="button" className="rm-btn" data-testid="room-ping" aria-disabled={!visor.on} onClick={doPing}>Ping</button>
-        <button type="button" className="rm-btn" data-testid="room-scan" onClick={startScan}>Scan</button>
+        <button type="button" className="rm-btn" data-testid="room-scan" aria-pressed={scanMode} title="Scan visor (X)" onClick={toggleScan}>{scanMode ? "Combat visor" : "Scan visor"}</button>
         <button type="button" className="rm-btn" data-testid="room-hud-toggle" aria-pressed={hud} title="Visor display (H)" onClick={() => { const v = !hud; setHudOn(v); setHud(v); }}>Visor</button>
         <button type="button" className="rm-btn" data-testid="room-logbook" onClick={onLogbook}>Logbook</button>
         {isAdmin && <button type="button" className="rm-btn" data-testid="room-edit" aria-pressed={editing} onClick={() => { if (editing) closeEditor(); else { setEditing(true); editRef.current = true; useDoc(doc, wref.current.slug, false); } }}>{corrW ? "Close corridor editor" : "Edit room"}</button>}
@@ -623,8 +673,8 @@ export function BranchRoom({ tick, world, color, next, wantNext, onAdvance, go, 
       {isAdmin && editing && <Suspense fallback={null}><RoomEditor themeNote={themeNote} hasTheme={ownTheme} themeMsg={themeMsg} onTheme={(k) => void (k === "save" ? saveTheme() : clearTheme())} world={corrW ? corrW.world : world} cx={corrW?.cx ?? 0} cz={corrW?.cz ?? 0} corridor={!!corrW} doc={doc} onDoc={changeDoc} onUndo={undoDoc} onRedo={redoDoc} canUndo={hist.current.undo.length > 0} canRedo={hist.current.redo.length > 0} sel={sel} setSel={(id) => { setSel(id); if (corrEdit.current) corrLayer.sel = id; else actorLayer.sel = id; dirty.current = true; wakeRef.current(); }} where={() => (corrEdit.current ? { x: eye.current.x - corrLayer.ox, z: eye.current.z - corrLayer.oz, yaw: eye.current.yaw } : eye.current)} dirty={!sameDoc} busy={busy} error={err} playing={playTest} onPlay={setPlay} onSave={saveDoc} onRevert={() => { setDoc(saved); useDoc(saved, wref.current.slug, false); }} onClose={closeEditor} /></Suspense>}
       <div className="rm-pad"><RoomStick onChange={onStick} /></div>
       {hasHeight && <button type="button" className="rm-jump" data-testid="room-jump" aria-label="Jump" onClick={() => { jumpReq.current = true; wakeRef.current(); }} onPointerDown={(e) => e.stopPropagation()}>Jump</button>}
-      <button type="button" className="rm-use" data-testid="room-use" onClick={() => { use(); }} onPointerDown={(e) => e.stopPropagation()}>Use</button>
-      <p className="rm-hint">W A S D move · arrows look · Q E turn · Space use · J jump · right-click / Z lock on · X scan · V ping · L logbook · C drone · Esc leave</p>
+      <button type="button" className="rm-use" data-testid="room-use" onClick={() => { if (scanMode) startScan(); else use(); }} onPointerDown={(e) => e.stopPropagation()}>{scanMode ? "Scan" : "Use"}</button>
+      <p className="rm-hint">{scanMode ? "Scan visor · W A S D move · arrows look · Space scan · F use · X combat visor · V ping · L logbook · Esc leave" : "W A S D move · arrows look · Q E turn · Space use · J jump · right-click / Z lock on · X scan visor · V ping · L logbook · C drone · Esc leave"}</p>
       <ul className="sr-only">
         {world.doors.map((d) => (
           <li key={d.id}>

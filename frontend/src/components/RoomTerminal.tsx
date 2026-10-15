@@ -67,7 +67,7 @@ export function ListTerminal({ albums, onPick }: { albums: { slug: string; title
 export function ChatTerminal({ slug, name }: { slug: string; name: string }) {
   const { user } = useAuth();
   if (!user) return <p className="rt-dim">The terminal wants a name. <Link to="/login">Log in</Link> to talk in {name}.</p>;
-  return <div className="rt-chat" data-testid="terminal-chat"><MiniChat slug={slug} channelName={name} /></div>;
+  return <div className="rt-chat" data-testid="terminal-chat"><MiniChat slug={slug} /></div>;
 }
 
 /** The drone's screen: what is playing, the controls, and the queue. */

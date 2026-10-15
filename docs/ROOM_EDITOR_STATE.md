@@ -111,3 +111,14 @@ Older list: see `docs/BACKLOG.md` (Monthly challenge, Twelve Artifacts, Hull, Em
 - Measured in headless Chromium, 24 hops in-page: stages kept alive after GC went 5 → 2 (WeakRef count; counts are noisy until GC has run). A full CDP GC leaves one old stage (the first room; most likely held by the test harness, not the app). Open sockets stay at 2 across hops (no socket leak). JS heap stays flat across hops.
 - **Not solved**: the lag that grows with time spent walking between rooms was not reproduced in this environment. Frame cost and per-hop timing on a real weak device are the next thing to measure (`?perf` shows the frame stats).
 - Test: `_scratch/e2e_fix373.py` (7 checks).
+
+## fix374 additions
+- **One map**: the canvas minimap (top-right) and the hull map are gone. The radar (top-left) is the only map, and its name and scan count sit under it (`visorHud.ts`, `combatVisor`).
+- **Room editor**: the panel sits below the button row (`.re{top:92px}`), and its plan preview is sized to the panel (`.re-plan`), so the Things controls no longer run off the canvas.
+- **Chat**: the channel name shows once. `MiniChat` takes `channelName`; the terminal does not pass it (the page title already names the channel).
+- **Scan visor is a mode you stay in.** X turns it on and off. In it, Space (or Enter, a tap on the stage, or the Scan button on touch) scans what the reticle is on; F still uses things. A scan takes 1.6 s (`SCAN_MS`), and the reticle closes in while it runs. A finished scan opens a result screen over the room (`components/ScanScreen.tsx`): the artifact's picture, its title and first sentence. Space reads the logbook entry one level deeper (the full text); B goes back a level; X leaves the visor. The room stands still while the screen is open. Scanning something already in the logbook opens its entry straight away.
+- **Outlines**: in the scan visor, every thing in view (in front, within 40 m, on screen) is outlined: purple until it is in the logbook, green after (`ScanMark`, colours `SCAN_PURPLE` and `SCAN_GREEN`). The reticle's target shows its name and "SPACE TO SCAN", or "IN LOGBOOK · SPACE TO READ".
+- **Sprite and text are admin-editable.** The result screen's picture is the artifact's own picture (`Actor.img`, the Picture field in the artifact inspector). Its text is the artifact's lore, as before.
+- **Memory**: the visor canvas draws at device pixel ratio 1 on devices with 4 or fewer cores (`hudDpr`). The scan visor reuses its mark objects (`hudN.pool`), so it allocates nothing per frame. Not measured yet.
+- Known limit: outlines are not hidden by walls (the radar and the echo do not hide either).
+- Tests: `_scratch/e2e_fix374.py` (16 checks: visor on/off, idle colours, result, entry, room still while open, B/X, green after a scan, buttons). `e2e_fix352`, `e2e_fix361` and `e2e_fix363` now scan with X then Space; the old one-press X scan is gone.

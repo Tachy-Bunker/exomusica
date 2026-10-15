@@ -157,3 +157,7 @@ Corridors editable (things, wires, mood). Open: corridor floor/walls/ceiling/sky
 - Done: player bar expands on top of the room (was hidden under the room page); painter drops its canvas context per frame; room timers cancelled on unmount.
 - Open: the lag that grows with time spent walking between rooms (not reproduced here; measure frame cost per hop on a weak device with `?perf`). Also confirm whether "the player that disappears" meant the in-room drone player (it did not disappear in the repro).
 - Regression (fix373): 105/107 files pass. `e2e_fix297c` flaked once in the full run (passes alone). `e2e_fix362` fails the reduced-motion repaint check ("0 px, 4-6 frames", limit < 3) both with and without the fix373 room changes, so it predates fix373 and stays open. The room still repaints under reduced motion while the hazard/movement state is active.
+
+## fix374
+- Done: one map (the radar); room editor below the button row; channel name once in chat; scan visor as a mode (X), result screen and logbook entry one level deeper (Space, B, X), purple/green outlines of what is in view; visor canvas at DPR 1 on devices with 4 or fewer cores.
+- Open: the lag with hops still needs `?perf` numbers from a weak device. Memory is not measured since the change (heap and canvas pixel totals before and after). Outlines are not hidden by walls. Scan screen has no sprite for walls, terminals or doors (text only).

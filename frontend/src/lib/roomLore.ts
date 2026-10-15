@@ -10,16 +10,18 @@ export interface Scannable {
   label: string; text: string; x: number; y: number; z: number;
   /** The first wall: the admin lore entry `opening:wall` stands in for it when nothing is written for its own key. */
   opening?: boolean;
+  /** The sprite on the scan screen: a room texture id (an artifact's own picture), when it has one. */
+  img?: number;
 }
 
 /** The part of an owner-placed artifact the scanner needs. */
-export interface ArtifactLike { id: string; name: string; text: string; lore: string; mode: number; x: number; z: number }
+export interface ArtifactLike { id: string; name: string; text: string; lore: string; mode: number; x: number; z: number; img?: number }
 /** What the first wall says until the owner writes something there (admin lore or the branch description replace it). */
 export const OPENING_LORE = "Thanaton. You are inside it. The hull was never built to keep the dark out; it was built to hold a sound in. Every room is a place where that sound was heard once and kept. Walk. Scan. Listen. Somewhere in these walls an unnamed voice is still repeating the first thing it was ever told, and it is waiting for someone to answer.";
 /** Everything in the room that can be scanned, with the text shown when it is (the owner's lore replaces this text when there is some). */
 export function scannables(w: RoomWorld, arts: readonly ArtifactLike[] = []): Scannable[] {
   const out: Scannable[] = [];
-  for (const a of arts) out.push({ key: `room:${w.slug}/artifact/${a.id}`, what: "artifact", id: a.id, lockKind: "artifact", label: a.name || "Artifact", text: a.lore.trim() || a.text.trim() || "Something left here. It has no words.", x: a.x, y: a.mode === 1 ? 0.3 : 1.3, z: a.z });
+  for (const a of arts) out.push({ key: `room:${w.slug}/artifact/${a.id}`, what: "artifact", id: a.id, lockKind: "artifact", label: a.name || "Artifact", text: a.lore.trim() || a.text.trim() || "Something left here. It has no words.", x: a.x, y: a.mode === 1 ? 0.3 : 1.3, z: a.z, img: a.img || undefined });
   if (w.plaque) out.push({ key: `branch:${w.slug}`, what: "wall", id: "plaque", lockKind: "plaque", label: "Inscription", text: w.blurb?.trim() || (w.lineage?.length === 0 ? OPENING_LORE : `${w.name}. Nobody has written anything on this wall yet.`), opening: w.lineage?.length === 0, x: w.plaque.x, y: 1.6, z: w.plaque.z });
   for (const p of w.props) {
     if (p.kind === "terminal") out.push({ key: `room:${w.slug}/terminal`, what: "terminal", id: p.id, lockKind: "prop", label: "Terminal", text: `A terminal wired to ${w.name}'s room chat. Whatever is said here is kept, day by day.`, x: p.x, y: 1.3, z: p.z });

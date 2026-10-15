@@ -18,7 +18,7 @@ function upsertMessage(list: MessageDTO[], msg: MessageDTO): MessageDTO[] {
 
 const MAX_ATTACHMENTS_PER_MESSAGE = 10;
 
-export function MiniChat({ slug, channelName }: { slug: string; channelName: string }) {
+export function MiniChat({ slug, channelName }: { slug: string; channelName?: string }) {
   const navigate = useNavigate();
   const [messages, setMessages] = useState<MessageDTO[]>([]);
   const [draft, setDraft] = useState("");
@@ -110,9 +110,9 @@ export function MiniChat({ slug, channelName }: { slug: string; channelName: str
 
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%", fontFamily: "var(--font-body)", color: "var(--text)", background: "var(--bg)" }}>
-      <div style={{ padding: "0.5rem 0.7rem", borderBottom: "1px solid var(--border)", fontFamily: "var(--font-display)", fontSize: "0.95rem" }}>
+      {channelName && <div style={{ padding: "0.5rem 0.7rem", borderBottom: "1px solid var(--border)", fontFamily: "var(--font-display)", fontSize: "0.95rem" }}>
         {channelName}
-      </div>
+      </div>}
       <div ref={listRef} style={{ flex: 1, overflowY: "auto", padding: "0.5rem 0.7rem" }}>
         {messages.map((m) => (
           <div key={m.id} style={{ marginBottom: "0.5rem", fontSize: "0.85rem" }}>
