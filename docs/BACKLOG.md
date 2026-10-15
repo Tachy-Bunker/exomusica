@@ -140,3 +140,11 @@ Corridors editable (things, wires, mood). Open: corridor floor/walls/ceiling/sky
 ## fix369 (hazards, messages, height, paths, prefabs, Logbook notes, map overrides, corridor surfaces, first boss)
 - Built: see ROOM_EDITOR_STATE.md "fix369 additions". Schema change: `MapOverride` (migrate!).
 - Still open: elevators as a real editable space; corridor sky/flock; carry-you-sideways platforms; boss mic input, server contours, peer verification, monthly cycle, other four boss mechanisms (resonance cancellation next); optional older list (Monthly challenge, Twelve Artifacts, Hull, Emoji gate, ABX, instrument maker, processor module, offline app, forum↔Discord bridge, contributor points); vertical sky flow, per-room sky tint, PS1 wobble (owner never answered), scan-on-ping for flock, co-op.
+
+## fix370
+- Done: opening lore in Admin, visor HUD, wall dressing.
+- Next for the Prime look: per-room dressing density/style in the editor (Surfaces tab), light shafts, bloom on emissive strips, HUD lock reticle/target readout, damage-flash vignette tied to hazards.
+
+## fix371
+- Done: per-room dressing density, light shafts, strip bloom, HUD lock readout, damage vignette, Warm industrial preset.
+- Open for the look: emissive wall decals (screens/glyph panels from room text), steam/vent particles on vent greebles, per-wall dressing override, HUD scan-in animation when the visor starts.

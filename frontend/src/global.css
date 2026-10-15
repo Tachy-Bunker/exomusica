@@ -6662,3 +6662,11 @@ label.re-b{display:inline-block;cursor:pointer}
 .bp-pad button.lit,.bp-pad button:active{background:var(--bp,#ff7ab6);color:#000}
 .bp-row{display:flex;gap:.5rem}.bp-b{flex:1;padding:.5rem;border-radius:6px;border:1px solid rgba(255,255,255,.35);background:transparent;color:#fff}
 .bp-hint{margin:0;font-size:.75rem;opacity:.6}
+
+/* fix370: the visor */
+.rm-hud{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:2}
+.rm.hud-on .rm-title{position:absolute;left:50%;top:auto;bottom:auto;transform:translateX(-50%);top:3.4rem;font-size:.7rem;letter-spacing:.14em;opacity:.7;text-align:center}
+.rm.hud-on .rm-integ{display:none}
+.rm.hud-on .rm-bar{top:8.6rem;right:8.5rem;left:1rem}
+@media (prefers-reduced-motion:reduce){.rm-hud{opacity:.9}}
+.rm-hurt{position:absolute;inset:0;pointer-events:none;z-index:3;opacity:0;transition:opacity .5s ease;background:radial-gradient(ellipse at center,transparent 45%,rgba(255,70,20,.38) 100%)}

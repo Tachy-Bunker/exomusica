@@ -165,7 +165,7 @@ export class RoomPainter {
     this.view(ctx, W, H, eye); this.fx = fx;
     ctx.fillStyle = BG; ctx.fillRect(0, 0, W, H);
     if (sp && sp.link && sp.corridor) { this.corridorView(eye, sp); this.grade(corrLayer.doc?.grade ?? null); }
-    else { this.tilesLeft = actorLayer.budget; this.shell(eye, -1, target, sp && sp.link ? sp : null); this.floorPaint(eye); this.ceilPaint(eye); this.actors(eye); this.things(eye, target, others); this.flock(eye); this.grade(); }
+    else { this.tilesLeft = actorLayer.budget; this.shell(eye, -1, target, sp && sp.link ? sp : null); this.floorPaint(eye); this.ceilPaint(eye); this.shafts(eye); this.actors(eye); this.things(eye, target, others); this.flock(eye); this.grade(); }
     if (fx?.echo) this.echo(fx.echo, fx.now);
     if (lock) this.bracket(lock);
     if (fx?.scan && fx.scan.p > 0) this.scanRing(fx.scan);
@@ -202,11 +202,78 @@ export class RoomPainter {
       this.seg(a[0], 0.35, a[1], b[0], 0.35, b[1]); this.seg(a[0], Hh - 0.4, a[1], b[0], Hh - 0.4, b[1]);
       if (near) { const cols = Math.max(2, Math.round(this.wallLen[i] / 1.8)); for (let c = 1; c < cols; c++) { const t = c / cols, x = a[0] + (b[0] - a[0]) * t, z = a[1] + (b[1] - a[1]) * t; this.seg(x, 0.35, z, x, Hh - 0.4, z); } }
       ctx.lineWidth = 1; ctx.strokeStyle = C.line; ctx.stroke();
+      if (near && actorLayer.budget > 0 && this.dist[i] < 169 && (actorLayer.doc?.dress ?? 2) > 0) this.greeble(i);
       ctx.beginPath(); this.seg(a[0], 0, a[1], a[0], Hh, a[1]); ctx.lineWidth = 2; ctx.strokeStyle = C.edge; ctx.stroke();
       for (let di = 0; di < world.doors.length; di++) if (world.doors[di].edge === i) this.door(di, eye, target?.kind === "door" && target.door.id === world.doors[di].id, sp);
     }
   }
 
+  // ---- wall dressing: panel seams, vents, cable runs, hazard strips and light strips, laid out once per wall from the room's name (same every visit), drawn only on near walls
+  private gr: (Float32Array | null)[] | null = null; private grD = 2;
+  private greebleBuild(i: number): Float32Array {
+    const w = this.world, len = this.wallLen[i], Hh = w.H, a = this.v[i];
+    let h = 2166136261; const key = w.slug + "#" + i; for (let k = 0; k < key.length; k++) { h ^= key.charCodeAt(k); h = Math.imul(h, 16777619); }
+    const rnd = (): number => { h = Math.imul(h ^ (h >>> 15), 2246822507) >>> 0; h ^= h >>> 13; return (h >>> 0) / 4294967296; };
+    const free: number[] = []; for (const d of w.doors) if (d.edge === i) free.push(Math.hypot(d.x - a[0], d.z - a[1]));
+    const out: number[] = []; // kind, u, y, w, h
+    const clear = (u: number, ww: number): boolean => { for (const f of free) if (Math.abs(f - u) < ww / 2 + 1.3) return false; return u - ww / 2 > 0.3 && u + ww / 2 < len - 0.3; };
+    const dr = actorLayer.doc && actorLayer.slug === w.slug ? actorLayer.doc.dress : 2, n = Math.round((len < 3 ? 2 : len < 6 ? 4 : 6) * (dr === 1 ? 0.5 : dr === 3 ? 1.7 : 1));
+    for (let k = 0; k < n; k++) {
+      const kind = Math.floor(rnd() * 5), ww = kind === 1 ? 1.4 + rnd() * 1.6 : kind === 4 ? 1.2 : 0.5 + rnd() * 0.9, u = ww / 2 + 0.4 + rnd() * Math.max(0, len - ww - 0.8);
+      if (!clear(u, ww)) continue;
+      const y = kind === 1 ? Hh - 0.55 : kind === 2 ? 0.08 : kind === 4 ? Hh - 0.8 : 0.7 + rnd() * (Hh - 2.2);
+      out.push(kind, u, y, ww, kind === 2 ? 0.28 : 0.3 + rnd() * 0.45);
+    }
+    return Float32Array.from(out);
+  }
+  private greeble(i: number): void {
+    const dk = actorLayer.doc && actorLayer.slug === this.world.slug ? actorLayer.doc.dress : 2; if (dk !== this.grD) { this.grD = dk; this.gr = null; }
+    if (!this.gr) this.gr = new Array(this.n).fill(null);
+    const g = this.gr[i] ?? (this.gr[i] = this.greebleBuild(i)); if (!g.length) return;
+    const a = this.v[i], b = this.v[(i + 1) % this.n], len = this.wallLen[i], ux = (b[0] - a[0]) / len, uz = (b[1] - a[1]) / len, ctx = this.ctx;
+    ctx.beginPath(); // structure: vents, panels, hazard stripes, cable runs
+    for (let k = 0; k < g.length; k += 5) {
+      const kind = g[k], u = g[k + 1], y = g[k + 2], ww = g[k + 3], hh = g[k + 4], x0 = a[0] + ux * (u - ww / 2), z0 = a[1] + uz * (u - ww / 2), x1 = a[0] + ux * (u + ww / 2), z1 = a[1] + uz * (u + ww / 2);
+      if (kind === 4) continue;
+      if (kind === 1) { // a cable run: sags between two clips
+        let px = x0, py = y, pz = z0;
+        for (let q = 1; q <= 6; q++) { const t = q / 6, nx = x0 + (x1 - x0) * t, nz = z0 + (z1 - z0) * t, ny = y - Math.sin(t * Math.PI) * 0.35; this.seg(px, py, pz, nx, ny, nz); px = nx; py = ny; pz = nz; }
+      } else if (kind === 2) { // hazard stripes along the foot of the wall
+        this.seg(x0, y, z0, x1, y, z1); this.seg(x0, y + hh, z0, x1, y + hh, z1);
+        const m = Math.max(2, Math.round(ww / 0.25)); for (let q = 0; q < m; q++) { const t0 = q / m, t1 = (q + 0.6) / m; this.seg(x0 + (x1 - x0) * t0, y, z0 + (z1 - z0) * t0, x0 + (x1 - x0) * t1, y + hh, z0 + (z1 - z0) * t1); }
+      } else { // 0 vent (slats) / 3 plain panel
+        this.seg(x0, y, z0, x1, y, z1); this.seg(x1, y, z1, x1, y + hh, z1); this.seg(x1, y + hh, z1, x0, y + hh, z0); this.seg(x0, y + hh, z0, x0, y, z0);
+        if (kind === 0) for (let q = 1; q < 4; q++) { const yy = y + (hh * q) / 4; this.seg(x0, yy, z0, x1, yy, z1); }
+      }
+    }
+    ctx.lineWidth = 1; ctx.strokeStyle = this.C.line; ctx.stroke();
+    ctx.beginPath(); let any = false; // light strips: the one warm thing on the wall
+    for (let k = 0; k < g.length; k += 5) if (g[k] === 4) { const u = g[k + 1], ww = g[k + 3], y = g[k + 2]; this.seg(a[0] + ux * (u - ww / 2), y, a[1] + uz * (u - ww / 2), a[0] + ux * (u + ww / 2), y, a[1] + uz * (u + ww / 2)); any = true; }
+    if (any) { const ga = ctx.globalAlpha, gc = ctx.globalCompositeOperation; const lg = actorLayer.look.grade, wc = lg && lg.tintA > 0 ? lg.tint : this.C.edge; ctx.globalCompositeOperation = "lighter"; ctx.globalAlpha = ga * 0.16; ctx.lineWidth = 9; ctx.strokeStyle = wc; ctx.stroke(); ctx.globalAlpha = ga * 0.3; ctx.lineWidth = 4.5; ctx.stroke(); ctx.globalCompositeOperation = gc; ctx.globalAlpha = ga; ctx.globalAlpha = ga * 0.8; ctx.lineWidth = 2; ctx.strokeStyle = "#fff"; ctx.stroke(); ctx.globalAlpha = ga; }
+  }
+  // ---- light shafts: slanted additive wedges from the ceiling to the floor, seeded per room; they breathe slowly (≈0.15 Hz, never a flash)
+  private shaftPos: Float32Array | null = null; private shaftKey = "";
+  private shafts(eye: Eye): void {
+    const L = actorLayer, doc = L.doc; if (!doc || L.slug !== this.world.slug || !doc.shafts || L.budget === 0) return;
+    const w = this.world, key = w.slug + "|" + this.n; const K = 4;
+    if (this.shaftKey !== key || !this.shaftPos) {
+      this.shaftKey = key; const p = new Float32Array(K * 4); let h = 2166136261; for (let k = 0; k < w.slug.length; k++) { h ^= w.slug.charCodeAt(k); h = Math.imul(h, 16777619); }
+      const rnd = (): number => { h = Math.imul(h ^ (h >>> 15), 2246822507) >>> 0; h ^= h >>> 13; return (h >>> 0) / 4294967296; };
+      let m = 0; for (const q of this.v) m = Math.max(m, Math.abs(q[0]), Math.abs(q[1]));
+      for (let i = 0; i < K; i++) { let x = 0, z = 0; for (let t = 0; t < 10; t++) { x = (rnd() * 2 - 1) * m * 0.8; z = (rnd() * 2 - 1) * m * 0.8; if (inRoom(w, x, z)) break; } p[i * 4] = x; p[i * 4 + 1] = z; p[i * 4 + 2] = (rnd() - 0.5) * 2.2; p[i * 4 + 3] = rnd() * 6.28; }
+      this.shaftPos = p;
+    }
+    const p = this.shaftPos, ctx = this.ctx, Hh = w.H, g = L.look.grade, col = g && g.tintA > 0 ? g.tint : "#ffc27a", ga = ctx.globalAlpha, gc = ctx.globalCompositeOperation;
+    ctx.globalCompositeOperation = "lighter"; ctx.fillStyle = col;
+    for (let i = 0; i < K; i++) {
+      const x = p[i * 4], z = p[i * 4 + 1], dx = p[i * 4 + 2], br = REDUCED ? 0.9 : 0.75 + 0.25 * Math.sin(L.now * 0.95 + p[i * 4 + 3]);
+      for (let layer = 0; layer < 2; layer++) {
+        const wt = layer ? 0.45 : 0.9, wb = layer ? 1.0 : 1.9;
+        if (this.quad(x - wt, Hh, z, x + wt, Hh, z, x + dx + wb, 0, z + 0.3, x + dx - wb, 0, z + 0.3)) { ctx.globalAlpha = ga * doc.shafts * (layer ? 0.1 : 0.06) * br; ctx.fill(); }
+      }
+    }
+    ctx.globalCompositeOperation = gc; ctx.globalAlpha = ga;
+  }
   // ---- the flock: up to 12 specks (dust or fireflies) that drift, fade out and come back somewhere else. They ignore walls and objects; off-screen ones are not drawn.
   private fp = new Float64Array(12 * 8); private fpKey = ""; private fpT = 0;
   private fpSpawn(i: number, first: boolean): void {

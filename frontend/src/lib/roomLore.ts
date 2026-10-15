@@ -8,6 +8,8 @@ export interface Scannable {
   /** Same id the lock-on uses for this thing: a door id, a prop id or "plaque". */
   id: string; lockKind: "door" | "prop" | "plaque" | "artifact";
   label: string; text: string; x: number; y: number; z: number;
+  /** The first wall: the admin lore entry `opening:wall` stands in for it when nothing is written for its own key. */
+  opening?: boolean;
 }
 
 /** The part of an owner-placed artifact the scanner needs. */
@@ -18,7 +20,7 @@ export const OPENING_LORE = "Thanaton. You are inside it. The hull was never bui
 export function scannables(w: RoomWorld, arts: readonly ArtifactLike[] = []): Scannable[] {
   const out: Scannable[] = [];
   for (const a of arts) out.push({ key: `room:${w.slug}/artifact/${a.id}`, what: "artifact", id: a.id, lockKind: "artifact", label: a.name || "Artifact", text: a.lore.trim() || a.text.trim() || "Something left here. It has no words.", x: a.x, y: a.mode === 1 ? 0.3 : 1.3, z: a.z });
-  if (w.plaque) out.push({ key: `branch:${w.slug}`, what: "wall", id: "plaque", lockKind: "plaque", label: "Inscription", text: w.blurb?.trim() || (w.lineage?.length === 0 ? OPENING_LORE : `${w.name}. Nobody has written anything on this wall yet.`), x: w.plaque.x, y: 1.6, z: w.plaque.z });
+  if (w.plaque) out.push({ key: `branch:${w.slug}`, what: "wall", id: "plaque", lockKind: "plaque", label: "Inscription", text: w.blurb?.trim() || (w.lineage?.length === 0 ? OPENING_LORE : `${w.name}. Nobody has written anything on this wall yet.`), opening: w.lineage?.length === 0, x: w.plaque.x, y: 1.6, z: w.plaque.z });
   for (const p of w.props) {
     if (p.kind === "terminal") out.push({ key: `room:${w.slug}/terminal`, what: "terminal", id: p.id, lockKind: "prop", label: "Terminal", text: `A terminal wired to ${w.name}'s room chat. Whatever is said here is kept, day by day.`, x: p.x, y: 1.3, z: p.z });
     else if (p.kind === "album") out.push({ key: `album:${p.id.slice(2)}`, what: "album", id: p.id, lockKind: "prop", label: p.label, text: `Pedestal: the album "${p.label}". Its disc can be read from the screen.`, x: p.x, y: 1.3, z: p.z });
@@ -43,8 +45,9 @@ export function signature(key: string): Signature {
 export interface Lore { title: string; body: string }
 export interface ShownLore { title: string; text: string; owner: boolean }
 /** What the logbook says about a scanned thing: the owner's lore when there is some, else the plain description. */
-export function shownOf(s: Pick<Scannable, "key" | "label" | "text">, lore: ReadonlyMap<string, Lore> | null): ShownLore {
-  const l = lore?.get(s.key);
+export const OPENING_KEY = "opening:wall";
+export function shownOf(s: Pick<Scannable, "key" | "label" | "text" | "opening">, lore: ReadonlyMap<string, Lore> | null): ShownLore {
+  const l = lore?.get(s.key) ?? (s.opening ? lore?.get(OPENING_KEY) : undefined);
   return l ? { title: l.title, text: l.body, owner: true } : { title: s.label, text: s.text, owner: false };
 }
 

@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { api, ApiError } from "../../lib/api";
 import { Loading } from "../../components/Loading";
+import { OPENING_LORE } from "../../lib/roomLore";
 
 interface LoreRow { id: number; key: string; title: string; body: string }
 
@@ -22,8 +23,10 @@ export function LoreAdminPage() {
         <li><code>room:slug/door/other-slug</code> the door in <i>slug</i> that leads to <i>other-slug</i></li>
         <li><code>room:slug/seal/&lt;hash&gt;</code> a sealed door (the hash is the hidden branch's address hash, as the Chart shows it)</li>
       </ul>
-      <p><button type="button" className="btn" onClick={() => setEdit("new")} data-testid="lore-new">+ New entry</button></p>
-      {edit && <LoreForm item={edit === "new" ? null : edit} onDone={(c) => { setEdit(null); if (c) load(); }} />}
+      <p><button type="button" className="btn" onClick={() => setEdit("new")} data-testid="lore-new">+ New entry</button>{" "}
+        <button type="button" className="btn" data-testid="lore-opening" onClick={() => setEdit(rows.find((r) => r.key === "opening:wall") ?? { id: 0, key: "opening:wall", title: "Thanaton", body: OPENING_LORE })}>Edit the opening lore</button></p>
+      <p className="home-dim">The opening lore is what the first wall says (the first room, when it has no lore of its own and no description). Key: <code>opening:wall</code>.</p>
+      {edit && <LoreForm item={edit === "new" || edit.id === 0 ? (edit === "new" ? null : edit) : edit} onDone={(c) => { setEdit(null); if (c) load(); }} />}
       <ul style={{ listStyle: "none", padding: 0, display: "grid", gap: "0.4rem" }}>
         {rows.map((r) => (
           <li key={r.id} data-testid="lore-row" style={{ display: "flex", gap: "0.6rem", alignItems: "baseline", flexWrap: "wrap" }}>
@@ -44,7 +47,7 @@ function LoreForm({ item, onDone }: { item: LoreRow | null; onDone: (changed: bo
   const [error, setError] = useState<string | null>(null);
   async function save() {
     setError(null);
-    try { await api(item ? `/api/admin/lore/${item.id}` : "/api/admin/lore", { method: item ? "PATCH" : "POST", body: JSON.stringify({ key, title, body }) }); onDone(true); }
+    try { await api(item && item.id ? `/api/admin/lore/${item.id}` : "/api/admin/lore", { method: item && item.id ? "PATCH" : "POST", body: JSON.stringify({ key, title, body }) }); onDone(true); }
     catch (e) { setError(e instanceof ApiError ? e.message : "Couldn't save"); }
   }
   async function remove() {
@@ -61,7 +64,7 @@ function LoreForm({ item, onDone }: { item: LoreRow | null; onDone: (changed: bo
       <div style={{ display: "flex", gap: "0.5rem" }}>
         <button type="submit" className="btn btn-primary" disabled={!key.trim() || !title.trim() || !body.trim()} data-testid="lore-save">Save</button>
         <button type="button" className="btn" onClick={() => onDone(false)}>Cancel</button>
-        {item && <button type="button" className="btn" onClick={() => void remove()}>Delete</button>}
+        {item && item.id > 0 && <button type="button" className="btn" onClick={() => void remove()}>Delete</button>}
       </div>
     </form>
   );

@@ -1,6 +1,6 @@
 # Rooms, editor and Thanaton — state of the build (read this first after a chat compaction)
 
-Owner: Tachy (designer; no programming knowledge). Last updated: fix369. Update this file with every delivery, together with `docs/BACKLOG.md` (queue) and `docs/HOMEPAGE_AND_NAV.md` (per-fix notes).
+Owner: Tachy (designer; no programming knowledge). Last updated: fix371. Update this file with every delivery, together with `docs/BACKLOG.md` (queue) and `docs/HOMEPAGE_AND_NAV.md` (per-fix notes).
 
 ## Owner preferences (standing)
 - Direct tone, no flattery, rare/on-point ideas. Maximum convenience for the designer (everything via editor UI, no code). Optimised code that runs on weak devices (allocation-free painters, budgets, adaptive resolution).
@@ -84,3 +84,18 @@ Older list: see `docs/BACKLOG.md` (Monthly challenge, Twelve Artifacts, Hull, Em
 4. Full regression in the background: `ls _scratch/e2e_fix*.py | sed 's/.*fix//;s/\.py//' | grep -v '^NNN$' | sort -n` → run each with `timeout 280`, log to `/tmp/regNNN.txt`; do not rebuild dist while it runs. Known flakes (pass on rerun): 291, 312, 347, 356, 353's `ERR_TUNNEL_CONNECTION_FAILED` console noise.
 5. Append a section to `docs/HOMEPAGE_AND_NAV.md`, update this file and `docs/BACKLOG.md`.
 6. Zip from `/home/claude` and send with SendUserFile; final report: what it does, limits, schema commands if any, next in queue.
+
+## fix370 additions
+- **Opening lore in Admin**: Admin → Room lore → "Edit the opening lore" writes LoreEntry key `opening:wall`. The first wall scan shows it (fallback: `OPENING_LORE` in `lib/roomLore.ts`). No schema change.
+- **Visor HUD** (`lib/visorHud.ts`, overlay `<canvas class="rm-hud">` in BranchRoom): rotating radar with sweep (doors green, unscanned scannables amber diamonds, people pink), hull map top-right, integrity numeral + 20-segment bar, `SCANNED 000/008`, chamfered corner brackets, visor icon. Redrawn ≤ ~20 Hz while the frame loop runs and once when it settles; scan flags refreshed 1 Hz; allocation-free draw. Toggle: key H or "Visor" button, stored in localStorage `exomusica_hud`. CSS `.rm.hud-on` hides the old title/integrity bar and moves `.rm-bar` below the radar. Hidden while the editor is open.
+- **Wall dressing** (`RoomPainter.greeble`): per wall, seeded from slug+edge: vents, panels, hazard stripes, sagging cable runs, light strips (colour = `C.edge`). Skips door zones, drawn only on walls < 13 m away and only when the tile budget > 0 (so the governor's weakest step turns it off). Layout cached per wall.
+- Embers already exist: Flock kind 1 (fire). Warm look = set grade/fog amber + flock fire in the editor.
+- Test: `_scratch/e2e_fix370.py`.
+
+## fix371 additions (the "Prime" look)
+- RoomDoc `dress` (0 none, 1 light, 2 normal = old default, 3 heavy) and `shafts` (0..1, default 0): per room, not inherited. Both copies of roomDoc.ts updated. Editor → Mood tab: **Warm industrial** button (amber veil `#ff9a4a` .12, brown fog `#2a1408` .45, Flock fire ×8, dress 3, shafts .6), a Wall dressing select and a Light shafts slider.
+- Painter: `shafts()` = 4 seeded additive wedges ceiling→floor, two layers, breathing ≈0.15 Hz (no flash), tinted by the room's grade tint (else warm white); off when budget = 0. Light strips of the dressing now bloom (two wide additive strokes + thin core), warm when the room has a tint.
+- HUD: lock-on readout (name + range in a cut-corner tag, bottom-right) while locked.
+- `.rm-hurt`: edge vignette, opacity = 1 − integrity (≤ .85), eased by CSS (.5 s), set when the integrity step changes. Always on, independent of the visor.
+- Test: `_scratch/e2e_fix371.py`; roomdoc unit tests (both copies). Backend `_scratch/roomdoc.test.ts` was rewritten small (the original was overwritten by accident; scratch only).
+- Fixed in fix371: `addWire` used `wf.ev` left over from the previously selected thing when a pick came right after a selection change (the select showed the first event but the state held another kind's), so the wire was silently dropped by cleanDoc. It now validates the event against the selected thing's kind. Visor sweep and shaft breathing stand still under `prefers-reduced-motion`.

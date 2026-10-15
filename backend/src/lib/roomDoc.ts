@@ -111,9 +111,9 @@ export const MAX_SKY_SPEED = 30;
 /** A few drifting specks: `kind` 0 dust, 1 fireflies; `n` at most MAX_FLOCK. They ignore walls and objects, fade out and reappear elsewhere. */
 export interface Flock { kind: 0 | 1; n: number; color: string }
 export const MAX_FLOCK = 12;
-export interface RoomDoc { v: 1; version: number; actors: Actor[]; wires: Wire[]; tex: Tex[]; floor: number[]; bands: Band[]; grade: Grade | null; ceil: number; sky: Sky | null; flock: Flock | null; inherit: boolean; /** corridors: material (1-based, 0 = none) on the floor and on both walls; the ceiling is `ceil` */ cfloor: number; cwall: number; /** the Logbook entry written once this room has been explored ("" = made from the branch description) */ log: string }
+export interface RoomDoc { v: 1; version: number; actors: Actor[]; wires: Wire[]; tex: Tex[]; floor: number[]; bands: Band[]; grade: Grade | null; ceil: number; sky: Sky | null; flock: Flock | null; inherit: boolean; /** corridors: material (1-based, 0 = none) on the floor and on both walls; the ceiling is `ceil` */ cfloor: number; cwall: number; /** wall dressing: 0 none, 1 light, 2 normal, 3 heavy */ dress: number; /** light shafts from the ceiling, 0 = none .. 1 */ shafts: number; /** the Logbook entry written once this room has been explored ("" = made from the branch description) */ log: string }
 
-export const emptyDoc = (): RoomDoc => ({ v: 1, version: 0, actors: [], wires: [], tex: [], floor: [], bands: [], grade: null, ceil: 0, sky: null, flock: null, inherit: true, cfloor: 0, cwall: 0, log: "" });
+export const emptyDoc = (): RoomDoc => ({ v: 1, version: 0, actors: [], wires: [], tex: [], floor: [], bands: [], grade: null, ceil: 0, sky: null, flock: null, inherit: true, cfloor: 0, cwall: 0, dress: 2, shafts: 0, log: "" });
 
 const num = (x: unknown, lo: number, hi: number, d: number) => { const n = typeof x === "number" && Number.isFinite(x) ? x : d; return Math.min(hi, Math.max(lo, n)); };
 const str = (x: unknown, max: number, d = "") => (typeof x === "string" ? x.replace(/[\u0000-\u001f]/g, "").slice(0, max) : d);
@@ -188,6 +188,7 @@ export function cleanDoc(raw: unknown): RoomDoc {
   out.ceil = Math.round(num(r.ceil, 0, out.tex.length, 0));
   out.cfloor = Math.round(num(r.cfloor, 0, out.tex.length, 0)); out.cwall = Math.round(num(r.cwall, 0, out.tex.length, 0));
   if (r.sky && typeof r.sky === "object") { const k = r.sky as Record<string, unknown>, id = Number(k.id); if (Number.isInteger(id) && id >= 1 && id <= 1e9) out.sky = { id, speed: Math.round(num(k.speed, -MAX_SKY_SPEED, MAX_SKY_SPEED, 0) * 2) / 2 }; }
+  out.dress = Math.round(num(r.dress, 0, 3, 2)); out.shafts = Math.round(num(r.shafts, 0, 1, 0) * 10) / 10;
   out.log = str(r.log, MAX_LORE);
   out.inherit = r.inherit !== false; // true: mood, sky and flock this room does not set come from the theme of the branch above it
   if (r.flock && typeof r.flock === "object") { const k = r.flock as Record<string, unknown>, n = Math.round(num(k.n, 0, MAX_FLOCK, 0)); if (n >= 1) out.flock = { kind: k.kind === 1 ? 1 : 0, n, color: typeof k.color === "string" && COLOR.test(k.color) ? k.color.toLowerCase() : "#ffe9a8" }; }

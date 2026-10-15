@@ -264,8 +264,9 @@ export function RoomEditor({ themeNote = "", hasTheme = false, themeMsg = "", on
   useEffect(() => { setWf({ ev: a ? EVENTS[a.kind][0] : "", to: "", msg: "", delay: 0, once: false, arg: "" }); }, [sel]); // eslint-disable-line react-hooks/exhaustive-deps
   const target = doc.actors.find((x) => x.id === wf.to) ?? null;
   const addWire = () => {
-    if (!a || !target || !wf.ev || !wf.msg || doc.wires.length >= MAX_WIRES) return;
-    commit(doc.actors, [...doc.wires, { from: a.id, ev: wf.ev, to: target.id, msg: wf.msg, delay: wf.delay, once: wf.once, ...(ARG_KIND[wf.msg] ? { arg: wf.arg } : {}) }]);
+    const ev = a && EVENTS[a.kind].includes(wf.ev) ? wf.ev : a ? EVENTS[a.kind][0] : ""; // the select shows its first event when the state is empty or left over from another thing (a fast pick after a selection change)
+    if (!a || !target || !ev || !wf.msg || doc.wires.length >= MAX_WIRES) return;
+    commit(doc.actors, [...doc.wires, { from: a.id, ev, to: target.id, msg: wf.msg, delay: wf.delay, once: wf.once, ...(ARG_KIND[wf.msg] ? { arg: wf.arg } : {}) }]);
   };
   const nameOf = (id: string) => doc.actors.find((x) => x.id === id)?.name ?? id;
   const mine = a ? doc.wires.filter((w) => w.from === a.id || w.to === a.id) : [];
@@ -365,6 +366,13 @@ export function RoomEditor({ themeNote = "", hasTheme = false, themeMsg = "", on
       {tab === "mood" && (
         <div className="re-floor re-insp" data-testid="re-mood">
           <p className="re-note">One veil of colour, one band of fog, a sky (replaces the ceiling) or one material over the whole ceiling.</p>
+          {!corridor && <div className="re-insp" data-testid="re-look">
+            <div className="re-row"><button type="button" className="re-b" data-testid="re-prime" title="Amber veil, dark brown fog, drifting embers, heavy wall dressing, light shafts" onClick={() => onDoc(cleanDoc({ ...doc, grade: { tint: "#ff9a4a", tintA: 0.12, fog: "#2a1408", fogD: 0.45 }, flock: { kind: 1, n: 8, color: "#ff8a3c" }, dress: 3, shafts: 0.6 }), "prime")}>Warm industrial</button></div>
+            <div className="re-grid">
+              <label>Wall dressing<select data-testid="re-dress" value={doc.dress} onChange={(e) => onDoc(cleanDoc({ ...doc, dress: Number(e.target.value) }), "dress")}><option value={0}>None</option><option value={1}>Light</option><option value={2}>Normal</option><option value={3}>Heavy</option></select></label>
+              <label>Light shafts<input type="range" data-testid="re-shafts" min={0} max={1} step={0.1} value={doc.shafts} onChange={(e) => onDoc(cleanDoc({ ...doc, shafts: num(e.target.value, 0) }), "shafts")} /></label>
+            </div>
+          </div>}
           <div className="re-grid">
             <label>Fog colour<input type="color" data-testid="re-fogc" value={grade.fog} onChange={(e) => setGrade({ fog: e.target.value })} /></label>
             <label>Fog<input type="range" data-testid="re-fogd" min={0} max={1} step={0.05} value={grade.fogD} onChange={(e) => setGrade({ fogD: num(e.target.value, 0) })} /></label>

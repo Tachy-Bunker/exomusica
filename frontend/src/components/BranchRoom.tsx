@@ -25,6 +25,7 @@ import { aimAt, artifactLocks, pickLock, refreshLock, type Lock } from "../lib/r
 import { isTypingTarget } from "../lib/isTypingTarget";
 import { useAuth } from "../lib/auth";
 import { recordScan, scannedIds, scanId } from "../lib/scanLog";
+import { drawHud, hudOn, setHudOn, type HudIn } from "../lib/visorHud";
 import { EchoField } from "../lib/roomEcho";
 import { playEcho, playScan } from "../lib/roomEchoAudio";
 import { addLog, loadLog, noteRoom, surveyDraft, surveyKey, scannables, shownOf, type Lore, type Scannable, type ShownLore } from "../lib/roomLore";
@@ -132,7 +133,13 @@ export function BranchRoom({ tick, world, color, next, wantNext, onAdvance, go, 
   /** Milestone keys the community has reached (null until known): things with a gate appear or vanish by it. */
   const reachedRef = useRef<ReadonlySet<string> | null>(null);
   /** Hazards: integrity (1 = whole), whether the room / corridor has any, the effect under you right now. */
-  const integ = useRef(1), hazRoom = useRef(false), hazCorr = useRef(false), hz = useRef<HazardFx>({ slow: 1, px: 0, pz: 0, drain: 0 }), hz2 = useRef<HazardFx>({ slow: 1, px: 0, pz: 0, drain: 0 }), integEl = useRef<HTMLDivElement>(null), integShown = useRef(-1), softT = useRef(0);
+  const [hud, setHud] = useState(hudOn), hudRef = useRef(hud), hudC = useRef<HTMLCanvasElement>(null), hudAt = useRef(0), hudIn = useRef<HudIn | null>(null), hudN = useRef({ at: 0, list: null as readonly { x: number; z: number }[] | null, flags: new Uint8Array(0), done: 0 });
+  hudRef.current = hud;
+  const hudMount = useCallback((el: HTMLCanvasElement | null) => { // size the visor canvas as it appears (it is created when the visor is switched on or the editor closes)
+    hudC.current = el; const st = stage.current; if (!el || !st) return; const d = dprBase.current, w = st.clientWidth, h = st.clientHeight;
+    el.width = Math.max(1, Math.round(w * d)); el.height = Math.max(1, Math.round(h * d)); el.getContext("2d")?.setTransform(d, 0, 0, d, 0, 0); hudAt.current = 0; dirty.current = true; wakeRef.current();
+  }, []);
+  const integ = useRef(1), hazRoom = useRef(false), hazCorr = useRef(false), hz = useRef<HazardFx>({ slow: 1, px: 0, pz: 0, drain: 0 }), hz2 = useRef<HazardFx>({ slow: 1, px: 0, pz: 0, drain: 0 }), integEl = useRef<HTMLDivElement>(null), hurtEl = useRef<HTMLDivElement>(null), integShown = useRef(-1), softT = useRef(0);
   /** Wire messages for the player (teleport to a marker, say a line, play a sound); `ox`,`oz` shift a corridor's frame into the room's. */
   const actFn = useRef<(ox: number, oz: number, d: RoomDoc, id: string, msg: string, arg: string) => void>(() => {});
   /** Make `d` the live content of the corridor you are in or looking into (its things, its mood). */
@@ -358,7 +365,7 @@ export function BranchRoom({ tick, world, color, next, wantNext, onAdvance, go, 
       }
       if (softT.current && now - softT.current > 1500) softT.current = 0;
     } else if (integ.current < 1 && !still) integ.current = Math.min(1, integ.current + 0.2 * dt);
-    { const iv = Math.round(integ.current * 50), el = integEl.current; if (el && iv !== integShown.current) { integShown.current = iv; el.style.opacity = iv >= 50 ? "0" : "1"; (el.firstChild as HTMLElement).style.width = iv * 2 + "%"; } }
+    { const iv = Math.round(integ.current * 50), el = integEl.current; if (el && iv !== integShown.current) { integShown.current = iv; if (hurtEl.current) hurtEl.current.style.opacity = String(Math.round((1 - iv / 50) * 85) / 100); el.style.opacity = iv >= 50 ? "0" : "1"; (el.firstChild as HTMLElement).style.width = iv * 2 + "%"; } }
     { // height: stand on platforms and stairs, fall off edges, jump (J), bump your head
       const live = !still && (!editRef.current || playRef.current), rt1 = rtRef.current, d1 = rt1 && docSlug.current === W.slug ? rt1 : null;
       let fy = r.eye.y ?? 0, vy = r.eye.vy ?? 0;
@@ -491,6 +498,19 @@ export function BranchRoom({ tick, world, color, next, wantNext, onAdvance, go, 
       }
     }
     const more = !!(shotRef.current || movers || changed || animating || scrolling || actorLayer.fade || echoBusy || pendingPaint.current || dirty.current || (integ.current < 1 && !still) || (r.eye.y ?? 0) > 0 || (r.eye.vy ?? 0) !== 0 || (!still && hzOn && (hz.current.px || hz.current.pz)) || (!still && (k.size || stick.current.x || stick.current.y || drag.current)));
+    if (hudRef.current && !editRef.current) { // visor: its own small canvas, ~20 Hz while anything moves, once more when things settle
+      const hc = hudC.current, sz = size.current;
+      if (hc && sz.w && (now - hudAt.current > 48 || !more)) {
+        hudAt.current = now; const hx = hc.getContext("2d");
+        if (hx) {
+          const cor = spaceRef.current === "corridor", list = cor ? corrScan.current : scanList.current, hn = hudN.current;
+          if (hn.list !== list || now - hn.at > 1000) { hn.at = now; hn.list = list; if (hn.flags.length !== list.length) hn.flags = new Uint8Array(list.length); const dn = scannedIds(); let c2 = 0; for (let i = 0; i < list.length; i++) { const v = dn.has(scanId("lore", list[i].key)) ? 1 : 0; hn.flags[i] = v; c2 += v; } hn.done = c2; }
+          let hi = hudIn.current; if (!hi) hi = hudIn.current = { x: 0, z: 0, yaw: 0, verts: W.verts, doors: W.doors, scan: list, scanned: hn.flags, others: others.current.values(), integ: 1, done: 0, total: 0, name: "", color: "", t: 0, locked: false, low: false, target: "", tdist: 0 };
+          hi.x = r.eye.x; hi.z = r.eye.z; hi.yaw = r.eye.yaw; hi.verts = W.verts; hi.doors = W.doors; hi.scan = list; hi.scanned = hn.flags; hi.others = others.current.values(); hi.integ = integ.current; hi.done = hn.done; hi.total = list.length; hi.name = W.name; hi.color = W.color ?? color; hi.t = now / 1000; hi.locked = !!lock.current; hi.target = lock.current ? lock.current.label : ""; hi.tdist = lock.current ? Math.hypot(lock.current.x - r.eye.x, lock.current.z - r.eye.z) : 0; hi.low = gov.current.scale < 1;
+          drawHud(hx, sz.w, sz.h, hi);
+        }
+      }
+    }
     if (more || gpool.current.active) raf.current = requestAnimationFrame(frame); else { last.current = 0; flushDs(); if (ghosts.current.length) { window.clearTimeout(ghostT.current); ghostT.current = window.setTimeout(() => wakeRef.current(), Math.min(30000, Math.max(250, gpool.current.nextStartMs)) + 40); } }
   }, [color, go, onLocked, showToast, flushDs, solve, openLink, ensureFx, showCard]);
 
@@ -504,7 +524,7 @@ export function BranchRoom({ tick, world, color, next, wantNext, onAdvance, go, 
       const w = st.clientWidth, h = st.clientHeight; dprBase.current = Math.min(window.devicePixelRatio || 1, (navigator.hardwareConcurrency ?? 8) <= 4 ? 1 : 1.5);
       const dpr = dprBase.current * gov.current.scale;
       c.width = Math.max(1, Math.round(w * dpr)); c.height = Math.max(1, Math.round(h * dpr)); size.current = { w, h };
-      c.getContext("2d")?.setTransform(dpr, 0, 0, dpr, 0, 0); dirty.current = true; wakeRef.current();
+      c.getContext("2d")?.setTransform(dpr, 0, 0, dpr, 0, 0); { const hc = hudC.current; if (hc) { const hd = dprBase.current; hc.width = Math.max(1, Math.round(w * hd)); hc.height = Math.max(1, Math.round(h * hd)); hc.getContext("2d")?.setTransform(hd, 0, 0, hd, 0, 0); hudAt.current = 0; } } dirty.current = true; wakeRef.current();
     };
     fitRef.current = fit;
     fit(); const ro = new ResizeObserver(fit); ro.observe(st); return () => ro.disconnect();
@@ -519,6 +539,7 @@ export function BranchRoom({ tick, world, color, next, wantNext, onAdvance, go, 
       if (e.code === "KeyX") { e.preventDefault(); e.stopPropagation(); if (!e.repeat) startScanRef.current(); return; }
       if (e.code === "KeyL") { e.preventDefault(); e.stopPropagation(); if (!e.repeat) logbookRef.current(); return; }
       if (e.code === "KeyC") { e.preventDefault(); e.stopPropagation(); if (!e.repeat) callDroneRef.current(); return; }
+      if (e.code === "KeyH") { e.preventDefault(); e.stopPropagation(); if (!e.repeat) { const v = !hudRef.current; setHudOn(v); setHud(v); } return; }
       if (e.code === "KeyJ") { e.preventDefault(); e.stopPropagation(); if (!e.repeat) { jumpReq.current = true; wakeRef.current(); } return; }
       if (KEYS[e.code] || e.code === "ShiftLeft" || e.code === "ShiftRight") { e.preventDefault(); e.stopPropagation(); keys.current.add(e.code); wakeRef.current(); }
     };
@@ -564,12 +585,13 @@ export function BranchRoom({ tick, world, color, next, wantNext, onAdvance, go, 
   };
 
   return (
-    <div className="rm" data-testid="branch-room" style={{ ["--rm" as string]: color }}>
+    <div className={hud && !editing ? "rm hud-on" : "rm"} data-testid="branch-room" style={{ ["--rm" as string]: color }}>
       <div ref={stage} className="rm-stage" tabIndex={0} aria-label={`${world.name}: walk with W A S D or the arrow keys, Space to use`} data-testid="room-stage" data-room={world.slug}
         onContextMenu={(e) => e.preventDefault()} onPointerDown={pdown} onPointerMove={pmove} onPointerUp={pup} onPointerCancel={pup}>
         <canvas ref={canvas} />
       </div>
       <div className="rm-scan" aria-hidden="true" />
+      {hud && !editing && <canvas ref={hudMount} className="rm-hud" data-testid="room-hud" aria-hidden="true" />}
       <div className="rm-title">{world.name}{here > 0 && <span data-testid="room-here" className="rm-here"> · {here} here</span>}</div>
       <div ref={prompt} className="rm-prompt" data-testid="room-prompt" aria-live="polite" />
       <div ref={toast} className="rm-toast" role="status" />
@@ -579,6 +601,7 @@ export function BranchRoom({ tick, world, color, next, wantNext, onAdvance, go, 
         onWin={() => { const rt = rtRef.current, W = wref.current; if (!rt) return; markBeaten(bossKey(W.slug, boss.id)); rt.done.add(boss.id); const ts = performance.now() / 1000; rt.emit(boss.id, "defeated", ts); rt.tick(ts); if (rt.changed.length) { rt.drain(); syncArt(); }
           const name = boss.text || "The Unnamed Sound"; addLog({ key: `room:${W.slug}/boss/${boss.id}`, room: W.slug, title: name, text: boss.lore || `${name} resolved. It answered, and its voice is yours.`, owner: !!boss.lore, at: Date.now() }); showToast("Logbook: " + name);
           if (rt.pending) { window.clearTimeout(docT.current); docT.current = window.setTimeout(() => wakeRef.current(), Math.max(16, Math.min(60000, rt.nextDue() * 1000 - performance.now()))); } dirty.current = true; wakeRef.current(); }} />}
+      <div ref={hurtEl} className="rm-hurt" aria-hidden="true" />
       <div ref={integEl} className="rm-integ" data-testid="room-integrity" aria-hidden="true" style={{ opacity: 0 }}><i /></div>
       {card && <div className="rm-card" data-testid="room-scan-card" role="status"><b>{card.title}</b><p>{card.text}</p>{card.owner && <i>✦ lore</i>}</div>}
       {perfOn.current && <div ref={perfEl} className="rm-perf" data-testid="room-perf" />}
@@ -588,6 +611,7 @@ export function BranchRoom({ tick, world, color, next, wantNext, onAdvance, go, 
         <button type="button" className="rm-btn" data-testid="room-drone" onClick={callDrone}>Drone</button>
         <button type="button" className="rm-btn" data-testid="room-ping" aria-disabled={!visor.on} onClick={doPing}>Ping</button>
         <button type="button" className="rm-btn" data-testid="room-scan" onClick={startScan}>Scan</button>
+        <button type="button" className="rm-btn" data-testid="room-hud-toggle" aria-pressed={hud} title="Visor display (H)" onClick={() => { const v = !hud; setHudOn(v); setHud(v); }}>Visor</button>
         <button type="button" className="rm-btn" data-testid="room-logbook" onClick={onLogbook}>Logbook</button>
         {isAdmin && <button type="button" className="rm-btn" data-testid="room-edit" aria-pressed={editing} onClick={() => { if (editing) closeEditor(); else { setEditing(true); editRef.current = true; useDoc(doc, wref.current.slug, false); } }}>{corrW ? "Close corridor editor" : "Edit room"}</button>}
         {isAdmin && inCorr && !editing && <button type="button" className="rm-btn" data-testid="room-edit-corr" onClick={() => void editCorridor()}>Edit corridor</button>}
