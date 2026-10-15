@@ -39,8 +39,6 @@ const KEYS: Record<string, [number, number, number, number]> = { // forward, str
 };
 const NO_ONE: Shown[] = [];
 const NO_PEOPLE_ITER: Shown[] = [];
-/** The visor overlay draws at full device pixel ratio only where the device has cores to spare: it holds a second large canvas. */
-const hudDpr = (base: number): number => (base > 1 && (navigator.hardwareConcurrency ?? 8) > 4 ? base : 1);
 
 const SCAN_MS = 1600, SCAN_REACH = 10, WANT_R = 6.5, OPEN_R = 4.4, KEEP_R = 5.4, OPEN_RATE = 2.4;
 const scanProbe: P3 = [0, 0, 0], scanCam: P3 = [0, 0, 0]; // scratch for the scan visor's projection: no allocation per frame
@@ -143,7 +141,7 @@ export function BranchRoom({ tick, world, color, next, wantNext, onAdvance, go, 
   const [hud, setHud] = useState(hudOn), hudRef = useRef(hud), hudC = useRef<HTMLCanvasElement>(null), hudAt = useRef(0), hudIn = useRef<HudIn | null>(null), hudOnAt = useRef(0), hudN = useRef({ at: 0, list: null as readonly { x: number; z: number }[] | null, flags: new Uint8Array(0), done: 0, marks: [] as ScanMark[], pool: [] as ScanMark[] });
   hudRef.current = hud;
   const hudMount = useCallback((el: HTMLCanvasElement | null) => { // size the visor canvas as it appears (it is created when the visor is switched on or the editor closes)
-    hudC.current = el; const st = stage.current; if (!el || !st) return; const d = hudDpr(dprBase.current), w = st.clientWidth, h = st.clientHeight;
+    hudC.current = el; const st = stage.current; if (!el || !st) return; const d = dprBase.current, w = st.clientWidth, h = st.clientHeight;
     el.width = Math.max(1, Math.round(w * d)); el.height = Math.max(1, Math.round(h * d)); el.getContext("2d")?.setTransform(d, 0, 0, d, 0, 0); hudAt.current = 0; hudOnAt.current = performance.now() / 1000; dirty.current = true; wakeRef.current();
   }, []);
   const integ = useRef(1), hazRoom = useRef(false), hazCorr = useRef(false), hz = useRef<HazardFx>({ slow: 1, px: 0, pz: 0, drain: 0 }), hz2 = useRef<HazardFx>({ slow: 1, px: 0, pz: 0, drain: 0 }), integEl = useRef<HTMLDivElement>(null), hurtEl = useRef<HTMLDivElement>(null), integShown = useRef(-1), softT = useRef(0);
@@ -568,7 +566,7 @@ export function BranchRoom({ tick, world, color, next, wantNext, onAdvance, go, 
       const w = st.clientWidth, h = st.clientHeight; dprBase.current = Math.min(window.devicePixelRatio || 1, (navigator.hardwareConcurrency ?? 8) <= 4 ? 1 : 1.5);
       const dpr = dprBase.current * gov.current.scale;
       c.width = Math.max(1, Math.round(w * dpr)); c.height = Math.max(1, Math.round(h * dpr)); size.current = { w, h };
-      c.getContext("2d")?.setTransform(dpr, 0, 0, dpr, 0, 0); { const hc = hudC.current; if (hc) { const hd = hudDpr(dprBase.current); hc.width = Math.max(1, Math.round(w * hd)); hc.height = Math.max(1, Math.round(h * hd)); hc.getContext("2d")?.setTransform(hd, 0, 0, hd, 0, 0); hudAt.current = 0; } } dirty.current = true; wakeRef.current();
+      c.getContext("2d")?.setTransform(dpr, 0, 0, dpr, 0, 0); { const hc = hudC.current; if (hc) { const hd = dprBase.current; hc.width = Math.max(1, Math.round(w * hd)); hc.height = Math.max(1, Math.round(h * hd)); hc.getContext("2d")?.setTransform(hd, 0, 0, hd, 0, 0); hudAt.current = 0; } } dirty.current = true; wakeRef.current();
     };
     fitRef.current = fit;
     fit(); const ro = new ResizeObserver(fit); ro.observe(st); return () => ro.disconnect();
