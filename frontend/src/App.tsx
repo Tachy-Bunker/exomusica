@@ -51,6 +51,7 @@ import { ResourcesAdminPage } from "./pages/admin/ResourcesAdminPage";
 import { LedgerPage } from "./pages/LedgerPage";
 import { GlossaryAdminPage } from "./pages/admin/GlossaryAdminPage";
 import { LoreAdminPage } from "./pages/admin/LoreAdminPage";
+import { MapLayoutAdminPage } from "./pages/admin/MapLayoutAdminPage";
 import { MilestonesAdminPage } from "./pages/admin/MilestonesAdminPage";
 import { FeaturedAdminPage } from "./pages/admin/FeaturedAdminPage";
 import { RewardsAdminPage } from "./pages/admin/RewardsAdminPage";
@@ -205,6 +206,7 @@ export default function App() {
                 <Route path="resources" element={<ResourcesAdminPage />} />
                 <Route path="glossary" element={<GlossaryAdminPage />} />
                 <Route path="lore" element={<LoreAdminPage />} />
+                <Route path="map-layout" element={<MapLayoutAdminPage />} />
                 <Route path="milestones" element={<MilestonesAdminPage />} />
                 <Route path="featured" element={<FeaturedAdminPage />} />
                 <Route path="rewards" element={<RewardsAdminPage />} />

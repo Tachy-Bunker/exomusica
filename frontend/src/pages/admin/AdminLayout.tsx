@@ -37,6 +37,7 @@ export function AdminLayout() {
         <AdminNavLink to="resources" label="Resources" att={att} />
         <AdminNavLink to="glossary" label="Glossary" att={att} />
         <AdminNavLink to="lore" label="Room lore" att={att} />
+        <AdminNavLink to="map-layout" label="Map layout" att={att} />
         <AdminNavLink to="milestones" label="Milestones" att={att} />
         <AdminNavLink to="featured" label="Featured" att={att} />
         <AdminNavLink to="rewards" label="Rewards" att={att} />

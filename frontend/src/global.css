@@ -6543,6 +6543,7 @@ body:has(.term-backdrop, .fp-panel, .pocket-pad, .probe-hud, .visor-hud) { touch
 .rm-title{position:absolute;left:1rem;top:.8rem;pointer-events:none;font-size:1rem;text-shadow:0 0 8px var(--rm),0 0 2px #000;color:var(--rm)}
 .rm-prompt{position:absolute;left:50%;bottom:34%;transform:translateX(-50%);max-width:88%;text-align:center;pointer-events:none;opacity:0;transition:opacity .12s;padding:.35rem .7rem;background:rgba(4,8,12,.78);border:1px solid var(--rm);border-radius:6px;font-size:.9rem}
 .rm-prompt:empty{display:none}
+.rm-integ{position:absolute;left:50%;bottom:5.2rem;transform:translateX(-50%);width:min(40%,220px);height:5px;background:rgba(255,255,255,.12);border-radius:3px;pointer-events:none;transition:opacity .6s}.rm-integ i{display:block;height:100%;width:100%;background:#ffb347;border-radius:3px;transition:width .25s}
 .rm-toast{position:absolute;left:50%;top:22%;transform:translateX(-50%);pointer-events:none;opacity:0;transition:opacity .25s;padding:.4rem .8rem;background:rgba(20,10,6,.9);border:1px solid #ffb347;color:#ffd9a0;border-radius:6px;font-size:.9rem}
 .rm-bar{position:absolute;left:1rem;right:1rem;top:2.6rem;display:flex;flex-wrap:wrap;gap:.4rem .5rem}
 @media (max-width:640px){.rm-bar{left:.5rem;right:5.8rem;gap:.3rem .4rem}.rm-btn{padding:.3rem .6rem;font-size:.8rem;min-height:34px}}
@@ -6551,10 +6552,11 @@ body:has(.term-backdrop, .fp-panel, .pocket-pad, .probe-hud, .visor-hud) { touch
 .rm-stick{position:relative;width:100%;height:100%;border-radius:50%;border:1.5px solid var(--rm);background:rgba(4,8,12,.45)}
 .rm-knob{position:absolute;left:50%;top:50%;width:42%;height:42%;margin:-21% 0 0 -21%;border-radius:50%;background:var(--rm);opacity:.8;box-shadow:0 0 12px var(--rm)}
 .rm-use{position:absolute;right:max(1rem,env(safe-area-inset-right));bottom:max(1.4rem,env(safe-area-inset-bottom));width:clamp(76px,20vmin,104px);height:clamp(76px,20vmin,104px);border-radius:50%;border:2px solid var(--rm);background:rgba(4,8,12,.6);color:#fff;font-size:1rem;box-shadow:0 0 14px var(--rm);touch-action:none}
+.rm-jump{position:absolute;right:max(1.6rem,env(safe-area-inset-right));bottom:calc(max(1.4rem,env(safe-area-inset-bottom)) + clamp(76px,20vmin,104px) + .6rem);width:clamp(54px,14vmin,72px);height:clamp(54px,14vmin,72px);border-radius:50%;border:2px solid var(--rm);background:rgba(4,8,12,.6);color:#fff;font-size:.8rem;touch-action:manipulation}.rm-jump:active{background:var(--rm);color:#000}
 .rm-use:active{background:var(--rm);color:#000}
 .rm-hint{position:absolute;left:50%;bottom:.5rem;transform:translateX(-50%);margin:0;font-size:.75rem;opacity:.6;pointer-events:none;white-space:nowrap}
 @media (pointer:coarse){.rm-hint{display:none}}
-@media (hover:hover) and (pointer:fine){.rm-pad,.rm-use{display:none}}
+@media (hover:hover) and (pointer:fine){.rm-pad,.rm-use,.rm-jump{display:none}}
 
 /* fix348: terminal screens and people in the room */
 .rm-here{opacity:.8;font-size:.85rem}
@@ -6648,3 +6650,15 @@ body:has(.term-backdrop, .fp-panel, .pocket-pad, .probe-hud, .visor-hud) { touch
 .re-mats li{position:relative}
 .re-x{position:absolute;top:0;right:0;background:rgba(0,0,0,.6);border:0;color:#fff;font-size:10px;width:16px;height:16px;border-radius:50%;cursor:pointer;padding:0;line-height:1}
 label.re-b{display:inline-block;cursor:pointer}
+
+/* boss panel: call and response */
+.bp{position:absolute;inset:0;display:flex;align-items:flex-end;justify-content:center;padding:0 1rem calc(1.2rem + env(safe-area-inset-bottom));background:radial-gradient(ellipse at 50% 100%,rgba(0,0,0,.7),transparent 70%);z-index:6}
+.bp-card{width:min(440px,100%);background:rgba(8,6,12,.92);border:1px solid var(--bp,#ff7ab6);border-radius:10px;padding:.8rem 1rem 1rem;color:#fff;display:grid;gap:.5rem}
+.bp-name{font-family:var(--font-display);font-size:1.1rem;color:var(--bp,#ff7ab6)}
+.bp-state{margin:0;font-size:.9rem;min-height:2.6em}
+.bp-dots{display:flex;gap:.4rem}.bp-dots i{width:10px;height:10px;border-radius:50%;border:1px solid var(--bp,#ff7ab6)}.bp-dots i.on{background:var(--bp,#ff7ab6)}
+.bp-pad{display:flex;gap:.35rem;align-items:flex-end}
+.bp-pad button{flex:1;border:1px solid var(--bp,#ff7ab6);background:rgba(255,255,255,.05);color:#fff;border-radius:6px;font-size:1rem;touch-action:manipulation;transition:background .12s}
+.bp-pad button.lit,.bp-pad button:active{background:var(--bp,#ff7ab6);color:#000}
+.bp-row{display:flex;gap:.5rem}.bp-b{flex:1;padding:.5rem;border-radius:6px;border:1px solid rgba(255,255,255,.35);background:transparent;color:#fff}
+.bp-hint{margin:0;font-size:.75rem;opacity:.6}

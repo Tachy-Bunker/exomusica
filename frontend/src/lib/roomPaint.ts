@@ -7,7 +7,8 @@ import type { Shown } from "./roomNet";
 import type { Drone } from "./roomDrone";
 import type { Lock } from "./roomLock";
 import { EYE_Y, NEAR, focalOf, type Eye, type Target } from "./roomView";
-import type { Actor, RoomDoc, WireRuntime } from "./roomDoc";
+import { figureOf } from "./roomBoss";
+import { atNow, type Actor, type RoomDoc, type WireRuntime } from "./roomDoc";
 import { frac, type FloorLayer } from "./roomFloor";
 import type { Look } from "./roomTheme";
 import { sheetTile, skyImage, texAvg, texSheet } from "./roomTextures";
@@ -87,7 +88,7 @@ export class RoomPainter {
   readonly stats: PaintStats = { polys: 0, ms: 0 };
   private ctx!: CanvasRenderingContext2D; private W = 0; private H = 0; private f = 1;
   // camera, set once per frame
-  private ex = 0; private ez = 0; private sy = 0; private cy = 1; private sp = 0; private cp = 1;
+  private ex = 0; private ez = 0; private ey = EYE_Y; private sy = 0; private cy = 1; private sp = 0; private cp = 1;
   private qx = 0; private qy = 0; private qz = 0;      // result of cam()
   private wp = new Float64Array(3 * 40); private cc = new Float64Array(3 * 80); private cl = new Float64Array(3 * 80);
   private order: Int16Array; private dist: Float64Array; private itemD = new Float64Array(64); private itemI = new Int16Array(64);
@@ -116,7 +117,7 @@ export class RoomPainter {
 
   // ---- projection primitives (no allocation)
   private cam(x: number, y: number, z: number): void {
-    const dx = x - this.ex, dy = y - EYE_Y, dz = z - this.ez;
+    const dx = x - this.ex, dy = y - this.ey, dz = z - this.ez;
     const cx = -dx * this.sy + dz * this.cy, cz = dx * this.cy + dz * this.sy;
     this.qx = cx; this.qy = dy * this.cp - cz * this.sp; this.qz = cz * this.cp + dy * this.sp;
   }
@@ -157,7 +158,7 @@ export class RoomPainter {
   /** Camera for this frame. */
   view(ctx: CanvasRenderingContext2D, W: number, H: number, eye: Eye): void {
     this.ctx = ctx; this.W = W; this.H = H; this.f = focalOf(W, H); this.stats.polys = 0;
-    this.ex = eye.x; this.ez = eye.z; this.sy = Math.sin(eye.yaw); this.cy = Math.cos(eye.yaw); this.sp = Math.sin(eye.pitch); this.cp = Math.cos(eye.pitch);
+    this.ex = eye.x; this.ez = eye.z; this.ey = EYE_Y + (eye.y ?? 0); this.sy = Math.sin(eye.yaw); this.cy = Math.cos(eye.yaw); this.sp = Math.sin(eye.pitch); this.cp = Math.cos(eye.pitch);
   }
 
   paint(ctx: CanvasRenderingContext2D, W: number, H: number, eye: Eye, target: Target | null, others: Shown[], drone: DroneView | null, lock: Lock | null, sp: ScenePaint | null = null, fx: FxView | null = null): PaintStats {
@@ -405,7 +406,7 @@ export class RoomPainter {
   /** The corridor's things, drawn as if the eye stood in the corridor's own frame. */
   private corrActors(eye: Eye): void {
     const C = corrLayer; if (!C.doc || !C.rt || !C.doc.actors.length) return;
-    const sx = this.ex, sz = this.ez, e = this.corrEye; this.ex = sx - C.ox; this.ez = sz - C.oz; e.x = eye.x - C.ox; e.z = eye.z - C.oz; e.yaw = eye.yaw; e.pitch = eye.pitch;
+    const sx = this.ex, sz = this.ez, e = this.corrEye; this.ex = sx - C.ox; this.ez = sz - C.oz; e.x = eye.x - C.ox; e.z = eye.z - C.oz; e.y = eye.y; e.yaw = eye.yaw; e.pitch = eye.pitch;
     this.drawActors(C, e); this.ex = sx; this.ez = sz;
   }
   private drawActors(L: Layer, eye: Eye): void {
@@ -418,12 +419,14 @@ export class RoomPainter {
     }
     const ctx = this.ctx;
     for (let q = 0; q < m; q++) {
-      const a = acts[this.aOrd[q]], on = rt.isOn(a.id), sel = L.edit && L.sel === a.id;
+      let a = acts[this.aOrd[q]]; const on = rt.isOn(a.id), sel = L.edit && L.sel === a.id;
+      if (rt.col.size) { const c = rt.col.get(a.id); if (c && c !== a.color) a = this.recolored(a, c); }
       if (L.edit && !on) ctx.globalAlpha = 0.35;
-      if (a.prop && (a.kind === "solid" || a.kind === "ghost")) this.propDraw(a, eye, sel);
-      else if (a.kind === "solid" || a.kind === "ghost") this.prism(a, eye, sel);
+      if (a.kind === "solid" || a.kind === "ghost") { const m = a.ptime ? atNow(a, rt) : a; if (a.prop) this.propDraw(m, eye, sel, styleOf(a)); else this.prism(m, eye, sel, styleOf(a), m.lift); }
       else if (a.kind === "light") this.lamp(a, sel);
       else if (a.kind === "pool") this.pool(a, sel);
+      else if (a.kind === "hazard") this.hazard(a, sel);
+      else if (a.kind === "boss") this.boss(a, sel, rt.done.has(a.id));
       else if (a.kind === "artifact") this.artifact(a, eye, sel);
       else this.marker(a, eye, sel);
       if (L.edit && !on) ctx.globalAlpha = 1;
@@ -490,14 +493,15 @@ export class RoomPainter {
       if ((mx - a.x) * (eye.x - mx) + (mz - a.z) * (eye.z - mz) <= 0) continue; // faces away
       if (this.quad(v[i * 2], y0, v[i * 2 + 1], v[j * 2], y0, v[j * 2 + 1], v[j * 2], h, v[j * 2 + 1], v[i * 2], h, v[i * 2 + 1])) { ctx.fillStyle = i % 2 ? st.b : st.a; ctx.fill(); ctx.lineWidth = sel ? 2.5 : 1.2; ctx.strokeStyle = sel ? "#ffffff" : st.edge; ctx.stroke(); }
     }
-    if (h < EYE_Y) { for (let i = 0; i < n; i++) { this.wp[i * 3] = v[i * 2]; this.wp[i * 3 + 1] = h; this.wp[i * 3 + 2] = v[i * 2 + 1]; } if (this.poly(n)) { ctx.fillStyle = st.top; ctx.fill(); ctx.lineWidth = sel ? 2.5 : 1.2; ctx.strokeStyle = sel ? "#ffffff" : st.edge; ctx.stroke(); } }
+    if (y0 > this.ey) { for (let i = 0; i < n; i++) { this.wp[i * 3] = v[i * 2]; this.wp[i * 3 + 1] = y0; this.wp[i * 3 + 2] = v[i * 2 + 1]; } if (this.poly(n)) { ctx.fillStyle = st.b; ctx.fill(); ctx.lineWidth = sel ? 2.5 : 1.2; ctx.strokeStyle = sel ? "#ffffff" : st.edge; ctx.stroke(); } } // the underside of something above you
+    if (h < this.ey) { for (let i = 0; i < n; i++) { this.wp[i * 3] = v[i * 2]; this.wp[i * 3 + 1] = h; this.wp[i * 3 + 2] = v[i * 2 + 1]; } if (this.poly(n)) { ctx.fillStyle = st.top; ctx.fill(); ctx.lineWidth = sel ? 2.5 : 1.2; ctx.strokeStyle = sel ? "#ffffff" : st.edge; ctx.stroke(); } }
   }
   // ---- catalogue props: a few prisms in the actor's frame, farthest first
-  private ps = { id: "", kind: "solid", name: "", x: 0, z: 0, w: 1, d: 1, h: 1, rot: 0, sides: 0, color: "#fff", on: true, pulse: 0, text: "", lore: "", img: 0, mode: 0, visor: false, prop: "", gate: "", gateOff: false } as Actor;
+  private ps = { id: "", kind: "solid", name: "", x: 0, z: 0, w: 1, d: 1, h: 1, rot: 0, sides: 0, color: "#fff", on: true, pulse: 0, text: "", lore: "", img: 0, mode: 0, visor: false, prop: "", gate: "", gateOff: false, lift: 0, pdx: 0, pdz: 0, pdy: 0, ptime: 0, pmode: 0 } as Actor;
   private pOrd = new Int8Array(8); private pD = new Float32Array(8);
-  private propDraw(a: Actor, eye: Eye, sel: boolean): void {
-    const def = PROP_BY_ID.get(a.prop); if (!def) { this.prism(a, eye, sel); return; }
-    const st = styleOf(a), ps = this.ps, c = Math.cos(a.rot), s = Math.sin(a.rot), parts = def.parts, np = Math.min(parts.length, 8);
+  private propDraw(a: Actor, eye: Eye, sel: boolean, st: ActorStyle): void {
+    const def = PROP_BY_ID.get(a.prop); if (!def) { this.prism(a, eye, sel, st, a.lift); return; }
+    const ps = this.ps, c = Math.cos(a.rot), s = Math.sin(a.rot), parts = def.parts, np = Math.min(parts.length, 8);
     const bob = def.bob && !REDUCED ? Math.sin(actorLayer.now * 1.3 + a.x * 0.7 + a.z * 0.5) * 0.12 * Math.min(1, a.h / 1.8) : 0;
     let m = 0;
     for (let k = 0; k < np; k++) { const p = parts[k], lx = p[0] * a.w, lz = p[1] * a.d, dx = a.x + lx * c - lz * s - eye.x, dz = a.z + lx * s + lz * c - eye.z, d = dx * dx + dz * dz; let j = m; while (j > 0 && this.pD[j - 1] < d) { this.pD[j] = this.pD[j - 1]; this.pOrd[j] = this.pOrd[j - 1]; j--; } this.pD[j] = d; this.pOrd[j] = k; m++; }
@@ -505,7 +509,7 @@ export class RoomPainter {
     for (let q = 0; q < m; q++) {
       const p = parts[this.pOrd[q]], lx = p[0] * a.w, lz = p[1] * a.d;
       ps.x = a.x + lx * c - lz * s; ps.z = a.z + lx * s + lz * c; ps.w = Math.max(0.05, p[2] * a.w); ps.d = Math.max(0.05, p[3] * a.d); ps.rot = a.rot + p[7]; ps.sides = p[6]; ps.h = Math.max(0.02, p[5] * a.h);
-      this.prism(ps, eye, sel, st, p[4] * a.h + bob + (def.bob ? 0.3 * Math.min(1, a.h / 1.8) : 0));
+      this.prism(ps, eye, sel, st, a.lift + p[4] * a.h + bob + (def.bob ? 0.3 * Math.min(1, a.h / 1.8) : 0));
     }
   }
   private lamp(a: Actor, sel: boolean): void {
@@ -515,6 +519,43 @@ export class RoomPainter {
     if (g && size > 2) this.ctx.drawImage(g, x - size / 2, y - size / 2, size, size);
     this.ctx.globalAlpha = keep;
     if (this.ctx.globalAlpha < 1 || sel) { this.ctx.strokeStyle = sel ? "#ffffff" : styleOf(a).edge; this.ctx.lineWidth = 1.5; this.ctx.strokeRect(x - 5, y - 5, 10, 10); }
+  }
+  /** A boss: stacked polygons from its seed, slowly turning and breathing (still, when motion is reduced). A beaten one is a faint echo. */
+  private boss(a: Actor, sel: boolean, beaten: boolean): void {
+    const st = styleOf(a), ctx = this.ctx, keep = ctx.globalAlpha, rings = figureOf(a.img), t = REDUCED || beaten ? 0 : actorLayer.now;
+    if (beaten) ctx.globalAlpha = keep * 0.35;
+    for (let k = 0; k < rings.length; k++) {
+      const g = rings[k], r = (Math.max(a.w, a.d) / 2) * g.r * (1 + (beaten ? 0 : 0.05 * Math.sin(t * 1.3 + k))), y = 0.2 + g.y * Math.max(0.6, a.h), n = g.sides, rot = a.rot + g.spin * t;
+      for (let i = 0; i < n; i++) { const q = rot + (i * Math.PI * 2) / n; this.wp[i * 3] = a.x + Math.cos(q) * r; this.wp[i * 3 + 1] = y; this.wp[i * 3 + 2] = a.z + Math.sin(q) * r; }
+      if (this.poly(n)) { ctx.fillStyle = k % 2 ? st.pool1 : st.pool2; ctx.fill(); ctx.lineWidth = sel ? 2.5 : 1.3; ctx.strokeStyle = sel ? "#fff" : st.edge; ctx.stroke(); }
+    }
+    ctx.beginPath(); this.seg(a.x, 0, a.z, a.x, 0.4 + a.h, a.z); ctx.lineWidth = 1; ctx.strokeStyle = st.faint; ctx.stroke();
+    ctx.globalAlpha = keep;
+  }
+  private colA = new Map<string, { src: Actor; a: Actor }>();
+  /** The actor as a wire has recoloured it (cached, so a recoloured thing costs one object, not one per frame). */
+  private recolored(a: Actor, c: string): Actor {
+    const k = a.id + c, h = this.colA.get(k); if (h && h.src === a) return h.a;
+    if (this.colA.size > 48) this.colA.clear();
+    const n = { ...a, color: c }; this.colA.set(k, { src: a, a: n }); return n;
+  }
+  /** A hazard zone: a tinted patch on the floor. Slow = plain, drift = chevrons along the direction, drain = a slowly breathing inner patch. Nothing flashes. */
+  private hazard(a: Actor, sel: boolean): void {
+    const st = styleOf(a), ctx = this.ctx, keep = ctx.globalAlpha, n = this.footprint(a), v = this.fv;
+    if (a.pulse > 0) ctx.globalAlpha = Math.min(1, keep * (0.8 + 0.2 * Math.sin(actorLayer.now * Math.PI * 2 * a.pulse)));
+    for (let i = 0; i < n; i++) { this.wp[i * 3] = v[i * 2]; this.wp[i * 3 + 1] = 0.02; this.wp[i * 3 + 2] = v[i * 2 + 1]; }
+    if (this.poly(n)) { ctx.fillStyle = st.pool1; ctx.fill(); ctx.setLineDash([6, 5]); ctx.lineWidth = sel ? 2.5 : 1.2; ctx.strokeStyle = sel ? "#fff" : st.edge; ctx.stroke(); ctx.setLineDash([]); }
+    if (a.mode === 1) { // chevrons pointing along the drift
+      const c = Math.cos(a.rot), s = Math.sin(a.rot), len = Math.max(a.w, a.d) * 0.3, k = Math.max(2, Math.min(4, Math.round(Math.max(a.w, a.d) / 1.6)));
+      ctx.strokeStyle = st.edge; ctx.lineWidth = 1.4; ctx.beginPath();
+      for (let i = 0; i < k; i++) { const o = (i - (k - 1) / 2) * len * 1.1, cx = a.x + c * o, cz = a.z + s * o; this.seg(cx - c * len * 0.35 - s * len * 0.5, 0.03, cz - s * len * 0.35 + c * len * 0.5, cx + c * len * 0.35, 0.03, cz + s * len * 0.35); this.seg(cx + c * len * 0.35, 0.03, cz + s * len * 0.35, cx - c * len * 0.35 + s * len * 0.5, 0.03, cz - s * len * 0.35 - c * len * 0.5); }
+      ctx.stroke();
+    } else if (a.mode === 2) { // breathing core, 0.3 Hz
+      const sc = 0.45 + 0.1 * Math.sin(actorLayer.now * Math.PI * 0.6);
+      for (let i = 0; i < n; i++) { this.wp[i * 3] = a.x + (v[i * 2] - a.x) * sc; this.wp[i * 3 + 1] = 0.03; this.wp[i * 3 + 2] = a.z + (v[i * 2 + 1] - a.z) * sc; }
+      if (this.poly(n)) { ctx.fillStyle = st.pool2; ctx.fill(); }
+    }
+    ctx.globalAlpha = keep;
   }
   /** A pool of light on the floor: two soft discs, optionally swelling slowly (never flashing). */
   private pool(a: Actor, sel: boolean): void {
@@ -592,16 +633,41 @@ export class RoomPainter {
     if (this.clipDoor(L.door, 0, 0)) { this.shell(eye, L.door.edge, null, null); this.things(eye, null, NO_PEOPLE); this.ctx.restore(); }
     this.beyond(sp, eye);
   }
+  /** Tiles of a material over the quad P00 P10 / P01 P11 (u along `uLen` metres, v across `vLen`), clipped to its outline. Only near the eye, only while half the tile budget lasts, and never more than 70 cells. */
+  private surf(t: { kind: string; tint: string; scale: number; scroll: number }, x00: number, y00: number, z00: number, x10: number, y10: number, z10: number, x01: number, y01: number, z01: number, x11: number, y11: number, z11: number, uLen: number, vLen: number, u0: number, v0: number, d2: number): void {
+    const L = actorLayer; if (this.tilesLeft <= L.budget / 2 || d2 > 144) return;
+    const sheet = texSheet(t.kind, t.tint); if (!sheet) return;
+    const s = Math.min(1, t.scale), nu = Math.ceil(uLen / s), nv = Math.ceil(vLen / s); if (nu * nv > 70) return;
+    const ctx = this.ctx, base = ctx.getTransform().a, T = sheetTile(sheet), P = this.sq;
+    P[0] = x00; P[1] = y00; P[2] = z00; P[3] = x10; P[4] = y10; P[5] = z10; P[6] = x01; P[7] = y01; P[8] = z01; P[9] = x11; P[10] = y11; P[11] = z11;
+    ctx.save(); for (let k = 0; k < 4; k++) { const j = k === 2 ? 3 : k === 3 ? 2 : k; this.wp[k * 3] = P[j * 3]; this.wp[k * 3 + 1] = P[j * 3 + 1]; this.wp[k * 3 + 2] = P[j * 3 + 2]; }
+    if (!this.poly(4)) { ctx.restore(); return; } ctx.clip();
+    for (let a = 0; a < nu; a++) {
+      const ua = a * s, du = Math.min(s, uLen - ua), ta = ua / uLen, tb = (ua + du) / uLen;
+      for (let b = 0; b < nv; b++) {
+        if (this.tilesLeft <= 0) break;
+        const va = b * s, dv = Math.min(s, vLen - va), tc = va / vLen, td = (va + dv) / vLen;
+        const ox = this.bil(0, ta, tc), oy = this.bil(1, ta, tc), oz = this.bil(2, ta, tc);
+        this.tq(sheet, frac((u0 + ua + t.scroll * L.now) / t.scale) * T, frac((v0 + va) / t.scale) * T, (T * du) / t.scale, (T * dv) / t.scale, ox, oy, oz, this.bil(0, tb, tc) - ox, this.bil(1, tb, tc) - oy, this.bil(2, tb, tc) - oz, this.bil(0, ta, td) - ox, this.bil(1, ta, td) - oy, this.bil(2, ta, td) - oz, 0, base);
+      }
+    }
+    ctx.setTransform(base, 0, 0, base, 0, 0); ctx.restore();
+  }
+  private sq = new Float64Array(12);
+  /** Bilinear point of the quad in `sq`: coordinate `k` (0 x, 1 y, 2 z) at (tu along, tv across). */
+  private bil(k: number, tu: number, tv: number): number { const P = this.sq; return (1 - tv) * ((1 - tu) * P[k] + tu * P[3 + k]) + tv * ((1 - tu) * P[6 + k] + tu * P[9 + k]); }
   /** The corridor: floor, ceiling and two walls for each stretch (far to near), and the end walls with the doors cut out. */
   private corridorShell(L: Link, eye: Eye, capNear: boolean): void {
     const c = L.c, ns = Math.min(c.n - 1, 30), ctx = this.ctx, C = this.C, P = c.pts, A = c.left, B = c.right, CH = CORR_H;
     for (let i = 0; i < ns; i++) { const dx = (P[i * 2] + P[i * 2 + 2]) / 2 - eye.x, dz = (P[i * 2 + 1] + P[i * 2 + 3]) / 2 - eye.z; this.segD[i] = dx * dx + dz * dz; let j = i; while (j > 0 && this.segD[this.segOrd[j - 1]] < this.segD[i]) { this.segOrd[j] = this.segOrd[j - 1]; j--; } this.segOrd[j] = i; }
     for (let oi = 0; oi < ns; oi++) {
       const i = this.segOrd[oi], near = this.segD[i] < 200, a0x = A[i * 2], a0z = A[i * 2 + 1], a1x = A[i * 2 + 2], a1z = A[i * 2 + 3], b0x = B[i * 2], b0z = B[i * 2 + 1], b1x = B[i * 2 + 2], b1z = B[i * 2 + 3];
-      if (this.quad(a0x, 0, a0z, b0x, 0, b0z, b1x, 0, b1z, a1x, 0, a1z)) { ctx.fillStyle = C.floor; ctx.fill(); }
-      if (this.quad(a0x, CH, a0z, b0x, CH, b0z, b1x, CH, b1z, a1x, CH, a1z)) { ctx.fillStyle = C.ceil; ctx.fill(); }
-      if (this.quad(a0x, 0, a0z, a1x, 0, a1z, a1x, CH, a1z, a0x, CH, a0z)) { ctx.fillStyle = C.wallA; ctx.fill(); }
-      if (this.quad(b0x, 0, b0z, b1x, 0, b1z, b1x, CH, b1z, b0x, CH, b0z)) { ctx.fillStyle = C.wallB; ctx.fill(); }
+      const cd = corrLayer.doc, len = c.cum[i + 1] - c.cum[i], u0 = c.cum[i], wid = Math.hypot(a0x - b0x, a0z - b0z);
+      const mF = cd && cd.cfloor ? cd.tex[cd.cfloor - 1] : undefined, mC = cd && cd.ceil ? cd.tex[cd.ceil - 1] : undefined, mW = cd && cd.cwall ? cd.tex[cd.cwall - 1] : undefined; // the owner's materials, if any
+      if (this.quad(a0x, 0, a0z, b0x, 0, b0z, b1x, 0, b1z, a1x, 0, a1z)) { ctx.fillStyle = mF ? this.flatOf(mF.kind, mF.tint) : C.floor; ctx.fill(); if (mF && near) this.surf(mF, a0x, 0, a0z, a1x, 0, a1z, b0x, 0, b0z, b1x, 0, b1z, len, wid, u0, 0, this.segD[i]); }
+      if (this.quad(a0x, CH, a0z, b0x, CH, b0z, b1x, CH, b1z, a1x, CH, a1z)) { ctx.fillStyle = mC ? this.flatOf(mC.kind, mC.tint) : C.ceil; ctx.fill(); if (mC && near) this.surf(mC, a0x, CH, a0z, a1x, CH, a1z, b0x, CH, b0z, b1x, CH, b1z, len, wid, u0, 0, this.segD[i]); }
+      if (this.quad(a0x, 0, a0z, a1x, 0, a1z, a1x, CH, a1z, a0x, CH, a0z)) { ctx.fillStyle = mW ? this.flatOf(mW.kind, mW.tint) : C.wallA; ctx.fill(); if (mW && near) this.surf(mW, a0x, 0, a0z, a1x, 0, a1z, a0x, CH, a0z, a1x, CH, a1z, len, CH, u0, 0, this.segD[i]); }
+      if (this.quad(b0x, 0, b0z, b1x, 0, b1z, b1x, CH, b1z, b0x, CH, b0z)) { ctx.fillStyle = mW ? this.flatOf(mW.kind, mW.tint) : C.wallB; ctx.fill(); if (mW && near) this.surf(mW, b0x, 0, b0z, b1x, 0, b1z, b0x, CH, b0z, b1x, CH, b1z, len, CH, u0, 0, this.segD[i]); }
       ctx.beginPath();
       this.seg(a0x, 0.35, a0z, a1x, 0.35, a1z); this.seg(a0x, CH - 0.4, a0z, a1x, CH - 0.4, a1z); this.seg(b0x, 0.35, b0z, b1x, 0.35, b1z); this.seg(b0x, CH - 0.4, b0z, b1x, CH - 0.4, b1z);
       this.seg(P[i * 2], CH, P[i * 2 + 1], P[i * 2 + 2], CH, P[i * 2 + 3]);   // the ceiling light

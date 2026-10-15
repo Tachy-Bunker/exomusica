@@ -8,29 +8,37 @@ export const MAX_PER_ACTOR_TICK = 8;       // per target, so a loop cannot run a
 export const MAX_DELAY = 600;              // seconds
 export const RANGE = 200;                  // metres, positions are clamped to +-RANGE
 
-export type Kind = "solid" | "ghost" | "trigger" | "light" | "marker" | "pool" | "artifact";
-export const KINDS: Kind[] = ["solid", "ghost", "trigger", "light", "marker", "pool", "artifact"];
+export type Kind = "solid" | "ghost" | "trigger" | "light" | "marker" | "pool" | "artifact" | "hazard" | "boss";
+export const KINDS: Kind[] = ["solid", "ghost", "trigger", "light", "marker", "pool", "artifact", "hazard", "boss"];
 
 /** Events an actor can emit, per kind. "start" fires once when the room loads. */
 export const EVENTS: Record<Kind, string[]> = {
-  solid: ["shown", "hidden", "start"],
-  ghost: ["shown", "hidden", "start"],
+  solid: ["shown", "hidden", "arrived", "start"],
+  ghost: ["shown", "hidden", "arrived", "start"],
   trigger: ["enter", "exit", "start"],
   light: ["shown", "hidden", "start"],
   marker: ["scanned", "start"],
   pool: ["shown", "hidden", "start"],
   artifact: ["scanned", "shown", "hidden", "start"],
+  hazard: ["enter", "exit", "shown", "hidden", "start"],
+  boss: ["engaged", "defeated", "shown", "hidden", "start"],
 };
 /** Messages an actor accepts. */
 export const MESSAGES: Record<Kind, string[]> = {
-  solid: ["show", "hide", "toggle"],
-  ghost: ["show", "hide", "toggle"],
+  solid: ["show", "hide", "toggle", "setcolor", "move"],
+  ghost: ["show", "hide", "toggle", "setcolor", "move"],
   trigger: ["enable", "disable", "fire"],
-  light: ["show", "hide", "toggle"],
-  marker: ["fire"],
-  pool: ["show", "hide", "toggle"],
-  artifact: ["show", "hide", "toggle"],
+  light: ["show", "hide", "toggle", "setcolor"],
+  marker: ["fire", "teleport", "say", "play", "shot"],
+  pool: ["show", "hide", "toggle", "setcolor"],
+  artifact: ["show", "hide", "toggle", "setcolor"],
+  hazard: ["show", "hide", "toggle", "setcolor"],
+  boss: ["show", "hide", "toggle", "setcolor"],
 };
+/** Messages that need a value (`Wire.arg`): a colour, a line of text, a sound name. */
+export const ARG_KIND: Record<string, "color" | "text" | "sound" | "secs"> = { setcolor: "color", say: "text", play: "sound", shot: "secs" };
+export const SOUNDS = ["chime", "hum", "pulse", "drop", "swell"] as const;
+export const MAX_ARG = 80;
 
 export interface Actor {
   id: string;
@@ -52,14 +60,39 @@ export interface Actor {
   prop: string;                        // solid/ghost only: a catalogue prop ("" = plain box or prism)
   gate: string;                        // community milestone key; the thing exists only once it is reached ("" = always)
   gateOff: boolean;                    // with a gate: the opposite, it exists only until the milestone is reached
+  pdx: number; pdz: number; pdy: number; // solid/ghost: it travels this far (metres) and back, smoothly
+  pmode: number;                       // 0 = travels back and forth for ever, 1 = only when called (message "move": goes to the far end, the next call brings it back)
+  ptime: number;                       // seconds for one way (1..120); 0 = stands still
+  lift: number;                        // solid/ghost: height of its underside above the floor (a platform, a low ceiling), 0..12 m
 }
 export const MAX_LORE = 1500, MAX_TEXT = 60;
 /** Catalogue props (shapes in `roomProps.ts`): id -> blocks you? Frames, arches and the like are walk-through. */
-export const PROP_BLOCKS: Record<string, boolean> = { spire: true, monolith: true, pylon: true, totem: true, rubble: true, crates: true, hullplate: true, frame: false, arch: false, ribs: false, scaffold: false, drifter: false };
+export const PROP_BLOCKS: Record<string, boolean> = { spire: true, monolith: true, pylon: true, totem: true, rubble: true, crates: true, hullplate: true, stairs: false, ramp: false, frame: false, arch: false, ribs: false, scaffold: false, drifter: false };
+const q4 = (v: number) => Math.round(v * 4) / 4;
+/** Travel of a solid or ghost: offset (x, z, up) and seconds one way. Without time or with no offset it stands still. */
+function pathOf(kind: Kind, o: Record<string, unknown>): { pdx: number; pdz: number; pdy: number; ptime: number; pmode: number } {
+  const z = { pdx: 0, pdz: 0, pdy: 0, ptime: 0, pmode: 0 };
+  if (kind !== "solid" && kind !== "ghost") return z;
+  const dx = q4(num(o.pdx, -40, 40, 0)), dz = q4(num(o.pdz, -40, 40, 0)), dy = q4(num(o.pdy, -10, 10, 0)), t = Math.round(num(o.ptime, 0, 120, 0));
+  return dx || dz || dy ? { pdx: dx, pdz: dz, pdy: dy, ptime: t >= 1 ? t : 0, pmode: o.pmode === 1 && t >= 1 ? 1 : 0 } : z;
+}
+/** Seconds on the shared clock that moving things follow (set once a frame by the room). */
+export let pathT = 0;
+export const setPathT = (t: number): void => { pathT = t; };
+const MV = {} as Actor;
+/** A moving actor as it stands right now (a shared scratch copy: use it, do not keep it). Static actors come back as they are. */
+export function atNow(a: Actor, rt?: WireRuntime | null): Actor {
+  if (!a.ptime) return a;
+  const s = a.pmode === 1 ? (rt ? rt.fracOf(a) : 0) : 0.5 - 0.5 * Math.cos((Math.PI * pathT) / a.ptime);
+  Object.assign(MV, a); MV.x = a.x + a.pdx * s; MV.z = a.z + a.pdz * s; MV.lift = Math.max(0, a.lift + a.pdy * s); return MV;
+}
+/** Slope props: stairs (N steps) and a ramp (smooth). You walk up them; the value is the number of steps, 0 = smooth. */
+export const PROP_SLOPE: Record<string, number> = { stairs: 5, ramp: 0 };
+export const STEP = 0.5, BODY = 1.7;       // you step up this much for free; you need this much headroom
 export const GATE = /^[a-z0-9][a-z0-9-]{0,31}$/;
 /** True when the actor is shut away by its milestone gate: `reached` holds the milestone keys the community has reached. */
 export const gatedOut = (a: Pick<Actor, "gate" | "gateOff">, reached: ReadonlySet<string> | null): boolean => !!a.gate && (reached?.has(a.gate) === true) === a.gateOff;
-export interface Wire { from: string; ev: string; to: string; msg: string; delay: number; once: boolean }
+export interface Wire { from: string; ev: string; to: string; msg: string; delay: number; once: boolean; arg?: string }
 /** Looping floor textures. `kind` picks a procedural pattern; a room has up to MAX_TEX materials, and each floor cell is 0 (none) or a material number (1-based). */
 export const TEX_KINDS = ["noise", "scan", "grid", "diamond", "circuit", "water", "brick", "static"] as const;
 export const MAX_TEX = 16, GRID = 80;      // the floor grid is GRID x GRID cells of 0.5 m, centred on the room's middle
@@ -78,9 +111,9 @@ export const MAX_SKY_SPEED = 30;
 /** A few drifting specks: `kind` 0 dust, 1 fireflies; `n` at most MAX_FLOCK. They ignore walls and objects, fade out and reappear elsewhere. */
 export interface Flock { kind: 0 | 1; n: number; color: string }
 export const MAX_FLOCK = 12;
-export interface RoomDoc { v: 1; version: number; actors: Actor[]; wires: Wire[]; tex: Tex[]; floor: number[]; bands: Band[]; grade: Grade | null; ceil: number; sky: Sky | null; flock: Flock | null; inherit: boolean }
+export interface RoomDoc { v: 1; version: number; actors: Actor[]; wires: Wire[]; tex: Tex[]; floor: number[]; bands: Band[]; grade: Grade | null; ceil: number; sky: Sky | null; flock: Flock | null; inherit: boolean; /** corridors: material (1-based, 0 = none) on the floor and on both walls; the ceiling is `ceil` */ cfloor: number; cwall: number; /** the Logbook entry written once this room has been explored ("" = made from the branch description) */ log: string }
 
-export const emptyDoc = (): RoomDoc => ({ v: 1, version: 0, actors: [], wires: [], tex: [], floor: [], bands: [], grade: null, ceil: 0, sky: null, flock: null, inherit: true });
+export const emptyDoc = (): RoomDoc => ({ v: 1, version: 0, actors: [], wires: [], tex: [], floor: [], bands: [], grade: null, ceil: 0, sky: null, flock: null, inherit: true, cfloor: 0, cwall: 0, log: "" });
 
 const num = (x: unknown, lo: number, hi: number, d: number) => { const n = typeof x === "number" && Number.isFinite(x) ? x : d; return Math.min(hi, Math.max(lo, n)); };
 const str = (x: unknown, max: number, d = "") => (typeof x === "string" ? x.replace(/[\u0000-\u001f]/g, "").slice(0, max) : d);
@@ -105,11 +138,13 @@ export function cleanDoc(raw: unknown): RoomDoc {
       w: num(o.w, 0.1, 60, 2), d: num(o.d, 0.1, 60, 2), h: num(o.h, 0, 30, kind === "solid" || kind === "ghost" ? 1.5 : kind === "artifact" ? 1 : 2),
       rot: num(o.rot, -7, 7, 0), sides: sides === 1 || sides === 2 ? 0 : sides,
       color: typeof o.color === "string" && COLOR.test(o.color) ? o.color.toLowerCase() : "#7a8cff",
-      on: o.on === false ? false : true, pulse: kind === "light" || kind === "pool" ? Math.round(num(o.pulse, 0, 2, 0) * 4) / 4 : 0,
-      text: kind === "artifact" ? str(o.text, MAX_TEXT, "") : "", lore: kind === "artifact" ? str(o.lore, MAX_LORE, "") : "",
-      img: kind === "artifact" ? Math.round(num(o.img, 0, 1e9, 0)) : 0, mode: kind === "artifact" ? Math.round(num(o.mode, 0, 2, 0)) : 0, visor: kind === "artifact" && o.visor === true,
+      on: o.on === false ? false : true, pulse: kind === "light" || kind === "pool" || kind === "hazard" ? Math.round(num(o.pulse, 0, 2, 0) * 4) / 4 : 0,
+      text: kind === "artifact" || kind === "boss" ? str(o.text, MAX_TEXT, "") : "", lore: kind === "artifact" || kind === "boss" ? str(o.lore, MAX_LORE, "") : "",
+      img: kind === "artifact" || kind === "boss" ? Math.round(num(o.img, 0, 1e9, 0)) : 0, mode: kind === "artifact" || kind === "boss" ? Math.round(num(o.mode, 0, 2, 0)) : kind === "hazard" ? Math.round(num(o.mode, 0, 2, 0)) : 0, visor: kind === "artifact" && o.visor === true,
       prop: (kind === "solid" || kind === "ghost") && typeof o.prop === "string" && Object.hasOwn(PROP_BLOCKS, o.prop) ? o.prop : "",
       gate: typeof o.gate === "string" && GATE.test(o.gate) ? o.gate : "", gateOff: typeof o.gate === "string" && GATE.test(o.gate) && o.gateOff === true,
+      lift: kind === "solid" || kind === "ghost" ? Math.round(num(o.lift, 0, 12, 0) * 4) / 4 : 0,
+      ...pathOf(kind, o),
     });
   }
   const seen = new Set<string>();
@@ -121,7 +156,9 @@ export function cleanDoc(raw: unknown): RoomDoc {
     const ev = EVENTS[from.kind].find((e) => e === o.ev), msg = MESSAGES[to.kind].find((m) => m === o.msg);
     if (!ev || !msg) continue;
     const wire: Wire = { from: from.id, ev, to: to.id, msg, delay: Math.round(num(o.delay, 0, MAX_DELAY, 0) * 100) / 100, once: o.once === true };
-    const key = `${wire.from}|${wire.ev}|${wire.to}|${wire.msg}|${wire.delay}`;
+    const ak = ARG_KIND[msg];
+    if (ak) { const raw = typeof o.arg === "string" ? o.arg : ""; const v = ak === "secs" ? (Number.isFinite(parseFloat(raw)) ? String(Math.min(20, Math.max(1, Math.round(parseFloat(raw))))) : "") : ak === "color" ? (COLOR.test(raw) ? raw.toLowerCase() : "") : ak === "sound" ? (SOUNDS.find((x) => x === raw) ?? "") : raw.trim().slice(0, MAX_ARG); if (!v) continue; wire.arg = v; }
+    const key = `${wire.from}|${wire.ev}|${wire.to}|${wire.msg}|${wire.delay}|${wire.arg ?? ""}`;
     if (seen.has(key)) continue;
     seen.add(key); out.wires.push(wire);
   }
@@ -149,7 +186,9 @@ export function cleanDoc(raw: unknown): RoomDoc {
     out.bands.push({ e, u0: Math.round(u0 * 1000) / 1000, u1: Math.round(u1 * 1000) / 1000, y0: Math.round(y0 * 100) / 100, y1: Math.round(y1 * 100) / 100, m });
   }
   out.ceil = Math.round(num(r.ceil, 0, out.tex.length, 0));
+  out.cfloor = Math.round(num(r.cfloor, 0, out.tex.length, 0)); out.cwall = Math.round(num(r.cwall, 0, out.tex.length, 0));
   if (r.sky && typeof r.sky === "object") { const k = r.sky as Record<string, unknown>, id = Number(k.id); if (Number.isInteger(id) && id >= 1 && id <= 1e9) out.sky = { id, speed: Math.round(num(k.speed, -MAX_SKY_SPEED, MAX_SKY_SPEED, 0) * 2) / 2 }; }
+  out.log = str(r.log, MAX_LORE);
   out.inherit = r.inherit !== false; // true: mood, sky and flock this room does not set come from the theme of the branch above it
   if (r.flock && typeof r.flock === "object") { const k = r.flock as Record<string, unknown>, n = Math.round(num(k.n, 0, MAX_FLOCK, 0)); if (n >= 1) out.flock = { kind: k.kind === 1 ? 1 : 0, n, color: typeof k.color === "string" && COLOR.test(k.color) ? k.color.toLowerCase() : "#ffe9a8" }; }
   if (r.grade && typeof r.grade === "object") {
@@ -174,6 +213,24 @@ export class WireRuntime {
   changed: string[] = [];
   /** Called whenever a message reaches a marker/trigger "fire". */
   onFire: ((id: string) => void) | null = null;
+  /** Player-facing messages sent to a marker: teleport here, say a line, play a sound. */
+  onAct: ((id: string, msg: string, arg: string) => void) | null = null;
+  /** Things that travel only when called: where they are heading from and to (0 = home, 1 = far end), and since when. */
+  mv = new Map<string, { t0: number; from: number; to: number }>();
+  /** The ones still on their way (the room keeps repainting while there are any). */
+  moving = new Set<string>();
+  /** The runtime's clock: the time of the last tick, seconds. */
+  now = 0;
+  /** How far along its path a called thing is right now: 0 home .. 1 far end, eased. */
+  fracOf(a: Actor): number {
+    const m = this.mv.get(a.id); if (!m) return 0;
+    const dur = a.ptime * Math.abs(m.to - m.from), p = dur > 0 ? Math.min(1, Math.max(0, (this.now - m.t0) / dur)) : 1;
+    return m.from + (m.to - m.from) * (0.5 - 0.5 * Math.cos(Math.PI * p));
+  }
+  /** Bosses already answered on this device (the painter shows them as a quiet echo). */
+  done = new Set<string>();
+  /** Colours set by wires (id -> #rrggbb), read by the painter. */
+  col = new Map<string, string>();
   /** Actors shut away by a milestone gate: always off, whatever wires say. */
   shut = new Set<string>();
   constructor(readonly doc: RoomDoc, reached: ReadonlySet<string> | null = null) {
@@ -194,6 +251,8 @@ export class WireRuntime {
   start(t: number) { for (const a of this.doc.actors) this.emit(a.id, "start", t); }
   /** Handles everything that is due. Messages that cause events are processed in the same tick, within the caps. */
   tick(t: number) {
+    this.now = t;
+    if (this.moving.size) for (const id of this.moving) { const m = this.mv.get(id), a = this.doc.actors.find((x) => x.id === id); if (!m || !a || t >= m.t0 + a.ptime * Math.abs(m.to - m.from)) { this.moving.delete(id); this.emit(id, "arrived", t); } }
     if (!this.q.length) return;
     let total = 0; const per = new Map<string, number>();
     for (let guard = 0; guard < MAX_FIRES_PER_TICK + 1; guard++) {
@@ -204,16 +263,21 @@ export class WireRuntime {
       if (++total > MAX_FIRES_PER_TICK) { this.q.length = 0; return; }
       const n = (per.get(w.to) ?? 0) + 1; per.set(w.to, n);
       if (n > MAX_PER_ACTOR_TICK) continue;
-      this.deliver(w.to, w.msg, t);
+      this.deliver(w.to, w.msg, t, w.arg);
     }
   }
-  private deliver(id: string, msg: string, t: number) {
+  private deliver(id: string, msg: string, t: number, arg = "") {
     const a = this.doc.actors.find((x) => x.id === id); if (!a || this.shut.has(id)) return;
     if (a.kind === "trigger") {
       if (msg === "fire") { this.onFire?.(id); this.emit(id, "enter", t); return; }
       const v = msg === "enable"; if (this.enabled.get(id) !== v) { this.enabled.set(id, v); this.changed.push(id); } return;
     }
-    if (a.kind === "marker") { if (msg === "fire") { this.onFire?.(id); this.emit(id, "scanned", t); } return; }
+    if (a.kind === "marker") { if (msg === "fire") { this.onFire?.(id); this.emit(id, "scanned", t); } else this.onAct?.(id, msg, arg); return; }
+    if (msg === "setcolor") { if (arg && this.col.get(id) !== arg) { this.col.set(id, arg); this.changed.push(id); } return; }
+    if (msg === "move") { // a called platform goes to the far end; the next call brings it back
+      if (a.ptime && a.pmode === 1) { const cur = this.fracOf(a), m = this.mv.get(id), to = m && m.to === 1 ? 0 : 1; this.mv.set(id, { t0: t, from: cur, to }); this.moving.add(id); this.changed.push(id); }
+      return;
+    }
     const was = this.isOn(id);
     const now = msg === "show" ? true : msg === "hide" ? false : !was;
     if (now !== was) { this.on.set(id, now); this.changed.push(id); this.emit(id, now ? "shown" : "hidden", t); }
@@ -222,8 +286,8 @@ export class WireRuntime {
   private inside = new Set<string>();
   probe(px: number, pz: number, t: number) {
     for (const a of this.doc.actors) {
-      if (a.kind !== "trigger") continue;
-      const hit = this.enabled.get(a.id) === true && insideBox(a, px, pz);
+      if (a.kind !== "trigger" && a.kind !== "hazard") continue;
+      const hit = (a.kind === "hazard" ? this.on.get(a.id) === true : this.enabled.get(a.id) === true) && insideBox(a, px, pz);
       const was = this.inside.has(a.id);
       if (hit && !was) { this.inside.add(a.id); this.emit(a.id, "enter", t); }
       else if (!hit && was) { this.inside.delete(a.id); this.emit(a.id, "exit", t); }
@@ -243,11 +307,24 @@ export function insideBox(a: Actor, px: number, pz: number): boolean {
   return Math.abs(lx) <= a.w / 2 && Math.abs(lz) <= a.d / 2;
 }
 
-/** Push a moving circle (radius r) out of every visible solid. Returns true if it moved. Writes the result into `out`. */
-export function pushOut(doc: RoomDoc, rt: WireRuntime, x: number, z: number, r: number, out: { x: number; z: number }): boolean {
+/** Local coordinates of (x, z) in an actor's frame (box actors): `lx` along its width, `lz` along its depth. */
+const local = (a: Actor, x: number, z: number, out: { lx: number; lz: number }): void => {
+  const dx = x - a.x, dz = z - a.z, c = Math.cos(-a.rot), s = Math.sin(-a.rot); out.lx = dx * c - dz * s; out.lz = dx * s + dz * c;
+};
+const LC = { lx: 0, lz: 0 };
+/** Height of a slope prop's surface at (x, z), clamped onto its footprint. Stairs are quantised to their steps. */
+function slopeTop(a: Actor, x: number, z: number): number {
+  local(a, x, z, LC); const u = Math.max(0, Math.min(1, LC.lx / a.w + 0.5)), n = PROP_SLOPE[a.prop];
+  return a.lift + a.h * (n ? Math.min(n, Math.floor(u * n) + 1) / n : u);
+}
+/** Push a moving circle (radius r) out of every visible solid it would hit at foot height `fy`. Returns true if it moved. Writes the result into `out`. */
+export function pushOut(doc: RoomDoc, rt: WireRuntime, x: number, z: number, r: number, out: { x: number; z: number }, fy = 0): boolean {
   out.x = x; out.z = z; let moved = false;
-  for (const a of doc.actors) {
-    if (a.kind !== "solid" || !rt.isOn(a.id) || (a.prop && !PROP_BLOCKS[a.prop])) continue;
+  for (const a0 of doc.actors) {
+    if (a0.kind !== "solid" || !rt.isOn(a0.id)) continue;
+    const a = atNow(a0, rt), slope = a.prop ? PROP_SLOPE[a.prop] !== undefined : false;
+    if (a.prop && !PROP_BLOCKS[a.prop] && !slope) continue;
+    if (!slope && (a.lift >= fy + BODY || a.lift + a.h <= fy + STEP)) continue; // you pass under it, or step onto it
     const dx0 = out.x - a.x, dz0 = out.z - a.z;
     if (a.sides >= 3) {
       const rr = Math.min(a.w, a.d) / 2 + r, dist = Math.hypot(dx0, dz0);
@@ -258,6 +335,7 @@ export function pushOut(doc: RoomDoc, rt: WireRuntime, x: number, z: number, r: 
     const lx = dx0 * c - dz0 * s, lz = dx0 * s + dz0 * c;
     const hx = a.w / 2 + r, hz = a.d / 2 + r;
     if (Math.abs(lx) >= hx || Math.abs(lz) >= hz) continue;
+    if (slope && (a.lift >= fy + BODY || slopeTop(a, out.x, out.z) <= fy + STEP)) continue; // a slope you can walk up is not a wall
     const px = hx - Math.abs(lx), pz = hz - Math.abs(lz);
     let nx = lx, nz = lz;
     if (px < pz) nx = lx < 0 ? -hx : hx; else nz = lz < 0 ? -hz : hz;
@@ -265,4 +343,41 @@ export function pushOut(doc: RoomDoc, rt: WireRuntime, x: number, z: number, r: 
     out.x = a.x + nx * c2 - nz * s2; out.z = a.z + nx * s2 + nz * c2; moved = true;
   }
   return moved;
+}
+/** The floor under (x, z) for someone whose feet are at `fy`: 0, or the top of a solid / slope they can step onto. */
+export function groundAt(doc: RoomDoc, rt: WireRuntime, x: number, z: number, fy: number): number {
+  let g = 0;
+  for (const a0 of doc.actors) {
+    if (a0.kind !== "solid" || !rt.isOn(a0.id)) continue;
+    const a = atNow(a0, rt); if (!insideBox(a, x, z)) continue;
+    const slope = a.prop ? PROP_SLOPE[a.prop] !== undefined : false;
+    if (a.prop && !PROP_BLOCKS[a.prop] && !slope) continue;
+    const top = slope ? slopeTop(a, x, z) : a.lift + a.h;
+    if (top <= fy + STEP + 1e-6 && top > g) g = top;
+  }
+  return g;
+}
+/** The underside of the lowest solid over (x, z) that is above a person standing with feet at `fy` (Infinity = open sky). */
+export function ceilAt(doc: RoomDoc, rt: WireRuntime, x: number, z: number, fy: number): number {
+  let c = Infinity;
+  for (const a0 of doc.actors) {
+    if (a0.kind !== "solid" || !rt.isOn(a0.id)) continue;
+    const a = atNow(a0, rt); if (a.lift < fy + BODY - 0.05 || a.lift >= c || !insideBox(a, x, z)) continue;
+    c = a.lift;
+  }
+  return c;
+}
+/** What the hazards under the player do right now. `slow` multiplies walking speed (1 = none), (`px`,`pz`) is a drift in m/s, `drain` is integrity lost per second. */
+export interface HazardFx { slow: number; px: number; pz: number; drain: number }
+export const HAZ_SLOW = 0.45, HAZ_PUSH = 2.0, HAZ_DRAIN = 0.16;
+export function hazardAt(doc: RoomDoc, rt: WireRuntime, x: number, z: number, out: HazardFx): boolean {
+  out.slow = 1; out.px = 0; out.pz = 0; out.drain = 0; let hit = false;
+  for (const a of doc.actors) {
+    if (a.kind !== "hazard" || !rt.isOn(a.id) || !insideBox(a, x, z)) continue;
+    hit = true;
+    if (a.mode === 0) out.slow = Math.min(out.slow, HAZ_SLOW);
+    else if (a.mode === 1) { out.px += Math.cos(a.rot) * HAZ_PUSH; out.pz += Math.sin(a.rot) * HAZ_PUSH; }
+    else out.drain += HAZ_DRAIN;
+  }
+  return hit;
 }

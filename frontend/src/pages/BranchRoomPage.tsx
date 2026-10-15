@@ -13,6 +13,7 @@ import { loadChartBranches } from "../lib/chartLoad";
 import { loadHome, type HomeData } from "../lib/home";
 import { loadMilestones } from "../lib/milestones";
 import { layoutHull, type Hull, type HullNode } from "../lib/hullLayout";
+import { loadMapOverrides } from "../lib/mapOverrides";
 import { buildRoom, type RoomWorld } from "../lib/roomWorld";
 import { themeOf } from "../lib/headerTheme";
 import { neon } from "../lib/legibleColor";
@@ -83,11 +84,11 @@ function RoomInner({ slug }: { slug: string }) {
 
   useEffect(() => {
     recordVisit(slug);
-    Promise.all([loadChartBranches(visited.current).catch(() => null), loadHome().catch(() => null), loadMilestones().then((l) => !!l.find((m) => m.key === "m-ring")?.reached).catch(() => false)]).then(async ([chart, home, outer]) => {
+    Promise.all([loadChartBranches(visited.current).catch(() => null), loadHome().catch(() => null), loadMilestones().then((l) => !!l.find((m) => m.key === "m-ring")?.reached).catch(() => false), loadMapOverrides()]).then(async ([chart, home, outer, overrides]) => {
       if (!alive.current) return;
       const by = new Map((home ? home.branches : []).map((b) => [b.slug, b]));
       const nodes: HullNode[] = (chart || []).map((b) => ({ id: b.id, parentId: b.parentId, slug: b.slug, name: b.name, secret: b.secret, key: b.key, tracks: by.get(b.slug)?.tracks ?? 0, albums: by.get(b.slug)?.albums ?? 0 }));
-      const g: Graph = { chart: chart || [], hull: nodes.length ? layoutHull(nodes, { outer }) : null, outer };
+      const g: Graph = { chart: chart || [], hull: nodes.length ? layoutHull(nodes, { outer, overrides }) : null, outer };
       graphRef.current = g; setGraph(g);
       const d = await loadRoom(slug, from);
       if (alive.current) setCur(d);

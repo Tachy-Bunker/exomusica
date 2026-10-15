@@ -1028,3 +1028,15 @@ No schema change, no server code. Doors between branch rooms no longer play the 
 - Editor: a side view shows the room height and every thing's height to scale; the wall strip "High" box stops at the ceiling.
 - Explore: W and S slide along the ground (forward/back), never up or down.
 - Tests: hull.test.ts (walkBy), `e2e_fix368.py`.
+
+
+## fix369 — hazards, wire messages, height, paths, prefabs, Logbook notes, map layout, corridor surfaces, first boss
+- **Hazards**: add `+ hazard`, pick Effect (slows / drifts along Turn° / drains integrity). A thin amber bar shows integrity only when it is below full; at zero you are drawn gently back to the room's start. Nothing flashes.
+- **Wires with a value**: `setcolor` (colour picker), marker `say` (line of text), `play` (sound), `teleport` (to the marker), `shot` (the view turns to the marker for 1–20 s).
+- **Height**: "Raised by (m)" on solids/ghosts makes platforms and low ceilings; props Stairs and Ramp; J jumps (touch: Jump button). Side view in the editor shows the lift.
+- **Travels**: per solid/ghost, sideways/forward/up metres and seconds one way; "all the time" or "only when called" (wire message `move`, event `arrived`): lifts, drawbridges, sliding walls.
+- **Prefabs** (Things tab): save the picked thing plus everything wired to it (or the whole room), place it in front of you anywhere.
+- **Logbook**: "Logbook entry for this room" (Things tab, nothing picked). Empty = made from the branch description. Written when a player has walked >6 m into the room.
+- **Map layout** (Admin → Map layout): drag rooms; orange = moved; floor number; back to automatic. Needs the `map_overrides` migration.
+- **Corridor Surfaces** tab: floor, walls, ceiling materials.
+- **Boss**: `+ boss`, Name/Seed/Length/Logbook entry; wire its `defeated` to open doors etc.

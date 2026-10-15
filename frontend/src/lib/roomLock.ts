@@ -43,6 +43,6 @@ export function refreshLock(lock: Lock, world: RoomWorld, eye: Eye, others: Iter
 /** Turn the view toward the lock, smoothly (about 9 per second), looking up or down at its height. */
 export function aimAt(eye: Eye, l: Lock, dt: number): Eye {
   const k = 1 - Math.exp(-dt * 9), want = Math.atan2(l.z - eye.z, l.x - eye.x), dist = Math.max(0.5, Math.hypot(l.x - eye.x, l.z - eye.z));
-  const wantPitch = clamp(Math.atan2(l.y - EYE_Y, dist), -MAX_PITCH, MAX_PITCH);
+  const wantPitch = clamp(Math.atan2(l.y - EYE_Y - (eye.y ?? 0), dist), -MAX_PITCH, MAX_PITCH);
   return { ...eye, yaw: wrapYaw(eye.yaw + wrapPi(want - eye.yaw) * k), pitch: eye.pitch + (wantPitch - eye.pitch) * k };
 }

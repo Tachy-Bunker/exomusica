@@ -137,3 +137,6 @@ Corridors editable (things, wires, mood). Open: corridor floor/walls/ceiling/sky
 - fix364 done: subtree themes + copy look. Next: conditional swap, prop catalogue.
 - fix365 done: milestone gates on things. Next: prop catalogue + black-hole debris; hazards.
 - fix367 done: 12-prop catalogue. Next: hazards (damage/push/slow zones), more props.\n
+## fix369 (hazards, messages, height, paths, prefabs, Logbook notes, map overrides, corridor surfaces, first boss)
+- Built: see ROOM_EDITOR_STATE.md "fix369 additions". Schema change: `MapOverride` (migrate!).
+- Still open: elevators as a real editable space; corridor sky/flock; carry-you-sideways platforms; boss mic input, server contours, peer verification, monthly cycle, other four boss mechanisms (resonance cancellation next); optional older list (Monthly challenge, Twelve Artifacts, Hull, Emoji gate, ABX, instrument maker, processor module, offline app, forum↔Discord bridge, contributor points); vertical sky flow, per-room sky tint, PS1 wobble (owner never answered), scan-on-ping for flock, co-op.

@@ -1,7 +1,7 @@
 // First-person view of a room: camera, near-plane clipping, projection, walking with collision, and what you are facing. Pure (no DOM).
 import { DOOR_H, type RoomDoor, type RoomProp, type RoomWorld } from "./roomWorld";
 
-export interface Eye { x: number; z: number; yaw: number; pitch: number }
+export interface Eye { x: number; z: number; yaw: number; pitch: number; /** height of the feet above the floor (platforms, jumps); 0 when omitted */ y?: number; /** vertical speed, m/s */ vy?: number }
 export const EYE_Y = 1.6, NEAR = 0.12, MAX_PITCH = 0.75, WALL_MARGIN = 0.45, WALK = 3.0, RUN = 5.2, TURN = 2.2;
 export const clamp = (n: number, a: number, b: number): number => Math.max(a, Math.min(b, n));
 
@@ -11,7 +11,7 @@ export const focalOf = (w: number, h: number): number => (h > w ? w * 0.72 : w *
 export type P3 = [number, number, number];
 /** World point into camera space: x right, y up, z forward. */
 export function toCam(e: Eye, p: P3, out: P3 = [0, 0, 0]): P3 {
-  const dx = p[0] - e.x, dy = p[1] - EYE_Y, dz = p[2] - e.z;
+  const dx = p[0] - e.x, dy = p[1] - EYE_Y - (e.y ?? 0), dz = p[2] - e.z;
   const sy = Math.sin(e.yaw), cy = Math.cos(e.yaw);
   const cx = -dx * sy + dz * cy, cz = dx * cy + dz * sy;      // right and forward on the floor
   const sp = Math.sin(e.pitch), cp = Math.cos(e.pitch);
@@ -61,7 +61,7 @@ export function stepEye(world: RoomWorld, e: Eye, m: Move, dt: number, solve?: (
   const pushed = Math.hypot(wantX - r.x, wantZ - r.z) > 1e-4;
   let into: { nx: number; nz: number; edge: number } | null = null;
   if (pushed && r.touched != null) { const a = world.rot + (r.touched + 0.5) * ((Math.PI * 2) / world.sides); const nx = Math.cos(a), nz = Math.sin(a); if (vx * nx + vz * nz > 0.15) into = { nx, nz, edge: r.touched }; }
-  return { eye: { x: r.x, z: r.z, yaw: wrapYaw(yaw), pitch }, into, moved: Math.hypot(r.x - e.x, r.z - e.z) > 1e-5 || m.turn !== 0 || m.look !== 0 };
+  return { eye: { x: r.x, z: r.z, yaw: wrapYaw(yaw), pitch, y: e.y, vy: e.vy }, into, moved: Math.hypot(r.x - e.x, r.z - e.z) > 1e-5 || m.turn !== 0 || m.look !== 0 };
 }
 export const wrapYaw = (a: number): number => { const t = Math.PI * 2, m = ((a % t) + t) % t; return m > Math.PI ? m - t : m; };
 

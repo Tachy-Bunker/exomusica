@@ -4,10 +4,13 @@ import type { RoomDoor, RoomProp, RoomWorld } from "../lib/roomWorld";
 import { startDrone, stepDrone, droneWanted, setDroneWanted } from "../lib/roomDrone";
 import { useAudioStore } from "../lib/audioStore";
 import { applyList, glide, isVisible, joinRoom, setVisible, type Shown } from "../lib/roomNet";
+import { playSfx } from "../lib/roomSfx";
 import { clamp, doorWalkedInto, facing, MAX_PITCH, stepEye, wrapYaw, type Eye, type Target } from "../lib/roomView";
 import { actorLayer, corrLayer, painterFor, paintRoom, ScenePaint, type DroneView, type FxView } from "../lib/roomPaint";
 import { loadMilestones } from "../lib/milestones";
-import { cleanDoc, emptyDoc, pushOut, WireRuntime, type RoomDoc } from "../lib/roomDoc";
+import { BossPanel } from "./BossPanel";
+import { bossKey, isBeaten, markBeaten } from "../lib/roomBoss";
+import { type Actor, setPathT, hazardAt, groundAt, ceilAt, BODY, PROP_SLOPE, type HazardFx, cleanDoc, emptyDoc, pushOut, WireRuntime, type RoomDoc } from "../lib/roomDoc";
 import { buildFloor } from "../lib/roomFloor";
 import { getJson, clearShared } from "../lib/sharedGet";
 import { api } from "../lib/api";
@@ -24,7 +27,7 @@ import { useAuth } from "../lib/auth";
 import { recordScan, scannedIds, scanId } from "../lib/scanLog";
 import { EchoField } from "../lib/roomEcho";
 import { playEcho, playScan } from "../lib/roomEchoAudio";
-import { addLog, noteRoom, scannables, shownOf, type Lore, type Scannable, type ShownLore } from "../lib/roomLore";
+import { addLog, loadLog, noteRoom, surveyDraft, surveyKey, scannables, shownOf, type Lore, type Scannable, type ShownLore } from "../lib/roomLore";
 import { RoomStick } from "./RoomStick";
 
 const KEYS: Record<string, [number, number, number, number]> = { // forward, strafe, turn, look
@@ -64,30 +67,42 @@ interface Props {
   onLogbook: () => void;
 }
 
+/** The boss in reach: shown, within 4.5 m and in front of you. Nothing in the editor (unless playtesting). */
+function bossNear(rt: WireRuntime | null, ready: boolean, e: Eye, editing: boolean): Actor | null {
+  if (!rt || !ready || editing) return null; let best: Actor | null = null, bd = Infinity;
+  for (const a of rt.doc.actors) {
+    if (a.kind !== "boss" || !rt.isOn(a.id)) continue;
+    const dx = a.x - e.x, dz = a.z - e.z, d = Math.hypot(dx, dz); if (d > 4.5) continue;
+    const cos = d < 1e-6 ? 1 : (dx * Math.cos(e.yaw) + dz * Math.sin(e.yaw)) / d; if (cos < 0.6) continue;
+    if (d < bd) { bd = d; best = a; }
+  }
+  return best;
+}
 /** The first-person room. Input is read into refs and the canvas is only drawn while something moves or changes, so a parked room costs nothing. */
 export function BranchRoom({ tick, world, color, next, wantNext, onAdvance, go, mapHref, backHref, onLocked, onProp, paused, onDrone, visor, lore, onLogbook }: Props) {
   const stage = useRef<HTMLDivElement>(null), canvas = useRef<HTMLCanvasElement>(null), prompt = useRef<HTMLDivElement>(null), toast = useRef<HTMLDivElement>(null);
   const wref = useRef(world), linkRef = useRef<RoomLink | null>(null), nextRef = useRef(next), wantedRef = useRef<string | null>(null), waitRef = useRef(0), spaceRef = useRef("cur");
   const sp = useRef(new ScenePaint()), wantNextRef = useRef(wantNext), advanceRef = useRef(onAdvance); nextRef.current = next; wantNextRef.current = wantNext; advanceRef.current = onAdvance;
+  const shotRef = useRef<{ l: Lock; until: number } | null>(null), tpRef = useRef<{ x: number; z: number } | null>(null), moveAnim = useRef(false), surveyed = useRef(""), fyRef = useRef(0), jumpReq = useRef(false), [hasHeight, setHasHeight] = useState(false); // feet height (for the collision), a queued jump, whether this room has anything to climb
   const rtRef = useRef<WireRuntime | null>(null), docSlug = useRef(""), pushed = useRef({ x: 0, z: 0 });
   const solve = useRef((x: number, z: number) => {
     let r = resolveMove(wref.current, linkRef.current, x, z); const rt = rtRef.current;
-    if (rt && docSlug.current === wref.current.slug && rt.doc.actors.length && pushOut(rt.doc, rt, r.x, r.z, 0.3, pushed.current)) r = resolveMove(wref.current, linkRef.current, pushed.current.x, pushed.current.z);
-    const C = corrLayer; if (C.rt && C.doc && C.doc.actors.length && linkRef.current && pushOut(C.doc, C.rt, r.x - C.ox, r.z - C.oz, 0.3, pushed.current)) r = resolveMove(wref.current, linkRef.current, pushed.current.x + C.ox, pushed.current.z + C.oz); // the corridor's own solids
+    if (rt && docSlug.current === wref.current.slug && rt.doc.actors.length && pushOut(rt.doc, rt, r.x, r.z, 0.3, pushed.current, fyRef.current)) r = resolveMove(wref.current, linkRef.current, pushed.current.x, pushed.current.z);
+    const C = corrLayer; if (C.rt && C.doc && C.doc.actors.length && linkRef.current && pushOut(C.doc, C.rt, r.x - C.ox, r.z - C.oz, 0.3, pushed.current, fyRef.current)) r = resolveMove(wref.current, linkRef.current, pushed.current.x + C.ox, pushed.current.z + C.oz); // the corridor's own solids
     return r;
   }).current;
   const { user } = useAuth(), isAdmin = !!user?.isAdmin, userRef = useRef(!!user); userRef.current = !!user;
   const visorRef = useRef(visor), loreRef = useRef(lore), logbookRef = useRef(onLogbook); visorRef.current = visor; loreRef.current = lore; logbookRef.current = onLogbook;
   const fxWorld = useRef<RoomWorld | null>(null), scanList = useRef<Scannable[]>([]), echo = useRef<EchoField | null>(null);
   const fxv = useRef<FxView>({ echo: null, now: 0, scan: null }), scanSt = useRef<{ s: Scannable; t0: number } | null>(null), scanView = useRef({ x: 0, y: 0, z: 0, p: 0 });
-  const [card, setCard] = useState<ShownLore | null>(null), cardT = useRef(0);
+  const [card, setCard] = useState<ShownLore | null>(null), cardT = useRef(0), [boss, setBoss] = useState<Actor | null>(null);
   const eye = useRef<Eye>({ ...world.spawn, pitch: 0 });
   const keys = useRef(new Set<string>()), stick = useRef({ x: 0, y: 0 }), drag = useRef<{ id: number; x: number; y: number; moved: number; type: string } | null>(null);
   const dirty = useRef(true), raf = useRef(0), last = useRef(0), traveling = useRef(false), size = useRef({ w: 0, h: 0 }), tgt = useRef<Target | null>(null), shown = useRef(""), bumped = useRef(false);
   const lookAcc = useRef({ yaw: 0, pitch: 0 }), drawn = useRef(0);
   const ghosts = useRef<Ghost[]>([]), gpool = useRef(makePool()), drawList = useRef<Shown[]>([]), ghostT = useRef(0);
   const others = useRef(new Map<number, Shown>()), link = useRef<ReturnType<typeof joinRoom>>(null), pausedRef = useRef(paused), [visible, setVis] = useState(isVisible), [here, setHere] = useState(0);
-  pausedRef.current = paused;
+  pausedRef.current = paused || !!boss;
   const gov = useRef(new ScaleGovernor()), dprBase = useRef(1), lock = useRef<Lock | null>(null), [locked, setLocked] = useState(false), pendingPaint = useRef(false), prefetchAt = useRef(0), perfEl = useRef<HTMLDivElement>(null), perfAt = useRef(0), dsAt = useRef(0), dsAt2 = useRef(0);
   const perfMul = useRef(typeof location !== "undefined" ? Number(/[?&]perfmul=(\d+)/.exec(location.search)?.[1] ?? 1) : 1); // test hook: pretend the device is N times slower
   const perfOn = useRef(typeof location !== "undefined" && /[?&]perf\b/.test(location.search));
@@ -116,9 +131,13 @@ export function BranchRoom({ tick, world, color, next, wantNext, onAdvance, go, 
   }, [syncArt]);
   /** Milestone keys the community has reached (null until known): things with a gate appear or vanish by it. */
   const reachedRef = useRef<ReadonlySet<string> | null>(null);
+  /** Hazards: integrity (1 = whole), whether the room / corridor has any, the effect under you right now. */
+  const integ = useRef(1), hazRoom = useRef(false), hazCorr = useRef(false), hz = useRef<HazardFx>({ slow: 1, px: 0, pz: 0, drain: 0 }), hz2 = useRef<HazardFx>({ slow: 1, px: 0, pz: 0, drain: 0 }), integEl = useRef<HTMLDivElement>(null), integShown = useRef(-1), softT = useRef(0);
+  /** Wire messages for the player (teleport to a marker, say a line, play a sound); `ox`,`oz` shift a corridor's frame into the room's. */
+  const actFn = useRef<(ox: number, oz: number, d: RoomDoc, id: string, msg: string, arg: string) => void>(() => {});
   /** Make `d` the live content of the corridor you are in or looking into (its things, its mood). */
   const useCorr = useCallback((d: RoomDoc | null, key: string, run: boolean) => {
-    const C = corrLayer; C.key = key; C.doc = d; C.rt = d ? new WireRuntime(d, reachedRef.current) : null; C.edit = !!corrEdit.current && !playRef.current; C.sel = corrEdit.current ? C.sel : null; corrAnim.current = !!d?.actors.some((x) => x.pulse > 0 || x.prop === "drifter");
+    const C = corrLayer; C.key = key; C.doc = d; C.rt = d ? new WireRuntime(d, reachedRef.current) : null; hazCorr.current = !!d?.actors.some((x) => x.kind === "hazard"); if (C.rt && d) C.rt.onAct = (id, msg, arg) => actFn.current(C.ox, C.oz, d, id, msg, arg); C.edit = !!corrEdit.current && !playRef.current; C.sel = corrEdit.current ? C.sel : null; corrAnim.current = !!d?.actors.some((x) => x.pulse > 0 || x.prop === "drifter" || x.ptime > 0) || !!d?.tex.some((t) => t.scroll !== 0);
     if (d && C.rt && run) { const t0 = performance.now() / 1000; C.rt.start(t0); const done = scannedIds(); for (const a of d.actors) if (a.kind === "artifact" && done.has(scanId("lore", `room:${key}/artifact/${a.id}`))) C.rt.emit(a.id, "scanned", t0); }
     reshift(); dirty.current = true; wakeRef.current();
   }, [syncArt, reshift]);
@@ -138,9 +157,9 @@ export function BranchRoom({ tick, world, color, next, wantNext, onAdvance, go, 
     const th = themeRef.current, r = effectiveLook(d, th.docs, th.slugs); actorLayer.look = r.look; actorLayer.skyAnim = !!r.look.sky?.speed; actorLayer.flockAnim = !!r.look.flock; setLookFrom(r.from); dirty.current = true; wakeRef.current();
   }, []);
   const useDoc = useCallback((d: RoomDoc, slug: string, run: boolean) => { // make `d` the live content of the room
-    const rt = new WireRuntime(d, reachedRef.current); rtRef.current = rt; docSlug.current = slug;
-    actorLayer.slug = slug; actorLayer.doc = d; actorLayer.rt = rt; actorLayer.floor = buildFloor(d.floor, d.tex); actorLayer.anim = !!actorLayer.floor?.scrolls || d.tex.some((t) => t.scroll !== 0) || d.actors.some((x) => x.pulse > 0 || x.prop === "drifter"); actorLayer.edit = editRef.current && !playRef.current;
-    if (run) { const t0 = performance.now() / 1000; rt.start(t0); const done = scannedIds(); for (const a of d.actors) if (a.kind === "artifact" && done.has(scanId("lore", `room:${slug}/artifact/${a.id}`))) rt.emit(a.id, "scanned", t0); } // what you already scanned here stays scanned
+    const rt = new WireRuntime(d, reachedRef.current); rtRef.current = rt; docSlug.current = slug; for (const a of d.actors) if (a.kind === "boss" && isBeaten(bossKey(slug, a.id))) rt.done.add(a.id); hazRoom.current = d.actors.some((x) => x.kind === "hazard"); moveAnim.current = d.actors.some((x) => x.ptime > 0 && x.pmode !== 1); setHasHeight(d.actors.some((x) => x.kind === "solid" && (x.lift > 0 || (!!x.prop && PROP_SLOPE[x.prop] !== undefined)))); rt.onAct = (id, msg, arg) => actFn.current(0, 0, d, id, msg, arg);
+    actorLayer.slug = slug; actorLayer.doc = d; actorLayer.rt = rt; actorLayer.floor = buildFloor(d.floor, d.tex); actorLayer.anim = !!actorLayer.floor?.scrolls || d.tex.some((t) => t.scroll !== 0) || d.actors.some((x) => x.pulse > 0 || x.prop === "drifter" || x.ptime > 0); actorLayer.edit = editRef.current && !playRef.current;
+    if (run) { const t0 = performance.now() / 1000; rt.start(t0); const done = scannedIds(); for (const a of d.actors) { if (a.kind === "artifact" && done.has(scanId("lore", `room:${slug}/artifact/${a.id}`))) rt.emit(a.id, "scanned", t0); if (a.kind === "boss" && rt.done.has(a.id)) rt.emit(a.id, "defeated", t0); } } // what you already scanned or answered here stays so
     applyLook(d); fxWorld.current = null; syncArt(); // the scanner rebuilds its list with this room's artifacts
     dirty.current = true; wakeRef.current();
   }, [syncArt, applyLook]);
@@ -239,6 +258,13 @@ export function BranchRoom({ tick, world, color, next, wantNext, onAdvance, go, 
     st.dataset.echo = echo.current?.busy(performance.now()) ? "1" : ""; st.dataset.scan = scanSt.current ? scanView.current.p.toFixed(2) : "";
   }, []);
   const showToast = useCallback((s: string) => { const t = toast.current; if (!t) return; t.textContent = s; t.style.opacity = "1"; window.clearTimeout((t as unknown as { _t?: number })._t); (t as unknown as { _t?: number })._t = window.setTimeout(() => { t.style.opacity = "0"; }, 1800); }, []);
+  actFn.current = (ox, oz, d, id, msg, arg) => { // a wire told a marker to teleport you there, say something, or play a sound
+    if (msg === "play") { playSfx(arg); return; }
+    if (msg === "say") { showToast(arg); return; }
+    if (msg === "shot") { const m = d.actors.find((x) => x.id === id); if (m) { shotRef.current = { l: { kind: "prop", id: "shot", x: m.x + ox, y: m.h || 1.6, z: m.z + oz, label: "" }, until: performance.now() + Number(arg) * 1000 }; lock.current = null; setLocked(false); dirty.current = true; wakeRef.current(); } return; }
+    const m = d.actors.find((x) => x.id === id);
+    if (msg === "teleport" && m) { tpRef.current = { x: m.x + ox, z: m.z + oz }; lock.current = null; setLocked(false); dirty.current = true; wakeRef.current(); }
+  };
 
   /** What the visor and scanner know about the room you are in: built once per room (and again when you walk into the next). */
   const ensureFx = useCallback((W: RoomWorld) => {
@@ -274,7 +300,9 @@ export function BranchRoom({ tick, world, color, next, wantNext, onAdvance, go, 
 
   const use = useCallback(() => {
     if (traveling.current || pausedRef.current) return;
-    const W = wref.current, t = facing(W, eye.current); if (!t) return;
+    const W = wref.current, bn = bossNear(rtRef.current, docSlug.current === wref.current.slug, eye.current, editRef.current && !playRef.current);
+    if (bn) { setBoss(bn); keys.current.clear(); return; }
+    const t = facing(W, eye.current); if (!t) return;
     if (t.kind === "door") {
       const d = t.door;
       if (d.state === "open" && d.toSlug) {
@@ -291,7 +319,7 @@ export function BranchRoom({ tick, world, color, next, wantNext, onAdvance, go, 
   const frame = useCallback((now: number) => {
     raf.current = 0;
     const c = canvas.current, st = stage.current; if (!c || !st) return;
-    const dt = Math.min(0.05, last.current ? (now - last.current) / 1000 : 0.016); last.current = now;
+    const dt = Math.min(0.05, last.current ? (now - last.current) / 1000 : 0.016); last.current = now; setPathT(Date.now() / 1000);
     const k = keys.current, still = pausedRef.current; let f = 0, s = 0, tr = 0, lk = 0;
     const gliding = glide(others.current, dt); let aimMoved = false;
     if (!still) for (const code of k) { const v = KEYS[code]; if (v) { f += v[0]; s += v[1]; tr += v[2]; lk += v[3]; } }
@@ -304,9 +332,56 @@ export function BranchRoom({ tick, world, color, next, wantNext, onAdvance, go, 
       const nl = refreshLock(lock.current, W, e, others.current.values());
       if (!nl) { lock.current = null; setLocked(false); showToast("Lock lost"); } else { lock.current = nl; const a2 = aimAt(e, nl, dt); if (Math.abs(a2.yaw - e.yaw) + Math.abs(a2.pitch - e.pitch) > 1e-4) aimMoved = true; e = a2; tr = 0; lk = 0; la.yaw = 0; la.pitch = 0; }
     }
+    const shot = shotRef.current;
+    if (shot && !still) { // a camera shot: the view turns to look at the marker, hands off the controls
+      if (now >= shot.until) shotRef.current = null;
+      else { const a2 = aimAt(e, shot.l, dt); if (Math.abs(a2.yaw - e.yaw) + Math.abs(a2.pitch - e.pitch) > 1e-4) aimMoved = true; e = a2; f = 0; s = 0; tr = 0; lk = 0; la.yaw = 0; la.pitch = 0; }
+    }
     if (la.yaw || la.pitch) e = { ...e, yaw: wrapYaw(e.yaw + la.yaw), pitch: clamp(e.pitch + la.pitch, -MAX_PITCH, MAX_PITCH) };
-    const r = still ? { eye: e, into: null as { nx: number; nz: number; edge: number } | null, moved: false } : stepEye(W, e, { forward: clamp(f, -1, 1), strafe: clamp(s, -1, 1), turn: clamp(tr, -1, 1), look: clamp(lk, -1, 1), run }, dt, solve);
+    fyRef.current = e.y ?? 0;
+    const hzOn = !still && (hazRoom.current || hazCorr.current) && (!editRef.current || playRef.current); let slow = 1;
+    if (hzOn) { // hazards under you: slower, drifting, or draining integrity
+      const h = hz.current; h.slow = 1; h.px = 0; h.pz = 0; h.drain = 0; const rt0 = rtRef.current, C0 = corrLayer;
+      if (hazRoom.current && rt0 && docSlug.current === W.slug) hazardAt(rt0.doc, rt0, e.x, e.z, h);
+      if (hazCorr.current && C0.rt && C0.doc) { const q = hz2.current; hazardAt(C0.doc, C0.rt, e.x - C0.ox, e.z - C0.oz, q); h.slow = Math.min(h.slow, q.slow); h.px += q.px; h.pz += q.pz; h.drain += q.drain; }
+      slow = h.slow;
+    }
+    const r = still ? { eye: e, into: null as { nx: number; nz: number; edge: number } | null, moved: false } : stepEye(W, e, { forward: clamp(f, -1, 1) * slow, strafe: clamp(s, -1, 1) * slow, turn: clamp(tr, -1, 1), look: clamp(lk, -1, 1), run }, dt, solve);
     let linkMoved = false, docMoved = false;
+    if (hzOn) {
+      const h = hz.current;
+      if (h.px || h.pz) { const q = solve(r.eye.x + h.px * dt, r.eye.z + h.pz * dt); r.eye = { ...r.eye, x: q.x, z: q.z }; r.moved = true; }
+      const before = integ.current;
+      if (h.drain > 0) integ.current = Math.max(0, before - h.drain * dt); else if (before < 1) integ.current = Math.min(1, before + 0.2 * dt);
+      if (integ.current <= 0 && !softT.current) { // never a fail screen: you are drawn gently back to the start, whole again
+        softT.current = now; const sp0 = W.spawn; r.eye = { ...r.eye, x: sp0.x, z: sp0.z }; r.moved = true; integ.current = 0.6; showToast("Integrity low. You were drawn back."); lock.current = null; setLocked(false);
+      }
+      if (softT.current && now - softT.current > 1500) softT.current = 0;
+    } else if (integ.current < 1 && !still) integ.current = Math.min(1, integ.current + 0.2 * dt);
+    { const iv = Math.round(integ.current * 50), el = integEl.current; if (el && iv !== integShown.current) { integShown.current = iv; el.style.opacity = iv >= 50 ? "0" : "1"; (el.firstChild as HTMLElement).style.width = iv * 2 + "%"; } }
+    { // height: stand on platforms and stairs, fall off edges, jump (J), bump your head
+      const live = !still && (!editRef.current || playRef.current), rt1 = rtRef.current, d1 = rt1 && docSlug.current === W.slug ? rt1 : null;
+      let fy = r.eye.y ?? 0, vy = r.eye.vy ?? 0;
+      if (live) {
+        const g = d1 ? groundAt(d1.doc, d1, r.eye.x, r.eye.z, fy) : 0;
+        if (jumpReq.current && fy <= g + 0.02 && vy <= 0) vy = 4.2;
+        if (vy <= 0 && g > 0 && fy > g && fy - g < 0.12) { fy = g; vy = 0; r.moved = true; } // riding a platform that sinks: stay on it
+        else if (vy > 0 || fy > g + 0.02) {
+          const was = fy; vy -= 11 * dt; fy += vy * dt;
+          if (vy > 0 && d1) { const cl = ceilAt(d1.doc, d1, r.eye.x, r.eye.z, was); if (fy + BODY > cl) { fy = Math.max(was, cl - BODY); vy = 0; } }
+          if (fy <= g) { fy = g; vy = 0; }
+          r.moved = true;
+        } else if (fy < g - 0.002) { fy += (g - fy) * Math.min(1, dt * 16); if (g - fy < 0.01) fy = g; r.moved = true; }
+        else { fy = g; vy = 0; }
+        fy = Math.min(fy, Math.max(0, W.H - BODY - 0.15));
+      } else if (fy || vy) { fy = 0; vy = 0; r.moved = true; }
+      jumpReq.current = false;
+      if (fy !== (r.eye.y ?? 0) || vy !== (r.eye.vy ?? 0)) r.eye = { ...r.eye, y: fy, vy };
+    }
+    if (!still && surveyed.current !== W.slug && (!editRef.current || playRef.current) && docSlug.current === W.slug && Math.hypot(r.eye.x - W.spawn.x, r.eye.z - W.spawn.z) > 6 && spaceRef.current !== "corridor") { // explored: the room writes its Logbook entry (yours to edit; else made from the branch description)
+      surveyed.current = W.slug; const key = surveyKey(W.slug);
+      if (!loadLog()[key]) { const own = rtRef.current?.doc.log ?? ""; addLog({ key, room: W.slug, title: W.name, text: own || surveyDraft(W.name, W.blurb), owner: !!own, at: Date.now() }); showToast("Logbook: " + W.name); }
+    }
     const rt = rtRef.current;
     if (rt && !still && docSlug.current === W.slug && (!editRef.current || playRef.current)) { // triggers, delayed wires
       const ts = now / 1000; rt.probe(r.eye.x, r.eye.z, ts); rt.tick(ts);
@@ -373,7 +448,9 @@ export function BranchRoom({ tick, world, color, next, wantNext, onAdvance, go, 
     }
     const animating = wantsDrone && a.playing && !document.hidden; // a playing drone breathes: repaint about 11 times a second, not 60
     const scrolling = (actorLayer.anim || (actorLayer.skyAnim && actorLayer.skySeen) || (actorLayer.flockAnim && actorLayer.flockSeen) || (corrAnim.current && !!linkRef.current)) && actorLayer.slug === W.slug || actorLayer.fade && !document.hidden; // flowing floors: about 15 a second
-    const tick = (animating && now - lastPaint.current >= 90) || (scrolling && now - lastPaint.current >= 66);
+    const movers = (rtRef.current?.moving.size ?? 0) + (corrLayer.rt?.moving.size ?? 0) > 0 || moveAnim.current; // things that travel: repaint about 30 a second
+    const tick = (animating && now - lastPaint.current >= 90) || (scrolling && now - lastPaint.current >= 66) || (movers && !document.hidden && now - lastPaint.current >= 33);
+    if (tpRef.current) { r.eye = { ...r.eye, x: tpRef.current.x, z: tpRef.current.z, y: 0, vy: 0 }; r.moved = true; tpRef.current = null; }
     const changed = r.moved || !!la.yaw || !!la.pitch || gliding || droneMoved || tick || aimMoved || linkMoved || echoTick || scanTick || ghostTick || docMoved; eye.current = r.eye;
     if (!traveling.current && !still) {
       const d = doorWalkedInto(W, r.eye, r.into);
@@ -387,11 +464,11 @@ export function BranchRoom({ tick, world, color, next, wantNext, onAdvance, go, 
       else if (!r.into) { bumped.current = false; waitRef.current = 0; }
     }
     if (changed || dirty.current || pendingPaint.current) {
-      const t = facing(W, r.eye); tgt.current = t;
-      const label = t ? t.label : lock.current ? `Locked: ${lock.current.label}` : "";
+      const bn = bossNear(rtRef.current, docSlug.current === W.slug, r.eye, editRef.current && !playRef.current), t = bn ? null : facing(W, r.eye); tgt.current = t;
+      const label = bn ? (rtRef.current?.done.has(bn.id) ? `${bn.text || "The Unnamed Sound"} (echo): play its voice` : `Answer: ${bn.text || "The Unnamed Sound"}`) : t ? t.label : lock.current ? `Locked: ${lock.current.label}` : "";
       if (label !== shown.current) { shown.current = label; if (prompt.current) { prompt.current.textContent = label; prompt.current.style.opacity = label ? "1" : "0"; } }
       link.current?.sendPose(r.eye.x, r.eye.z, r.eye.yaw);
-      if (now - dsAt.current > 100) { dsAt.current = now; st.dataset.x = r.eye.x.toFixed(2); st.dataset.z = r.eye.z.toFixed(2); st.dataset.yaw = r.eye.yaw.toFixed(3); st.dataset.pitch = r.eye.pitch.toFixed(3); st.dataset.target = label; st.dataset.lock = lock.current ? lock.current.id : ""; st.dataset.space = spaceRef.current; st.dataset.link = linkRef.current ? `${linkRef.current.next.slug}:${linkRef.current.open.toFixed(2)}` : ""; st.dataset.room = W.slug; st.dataset.ghosts = String(gpool.current.count); st.dataset.chat = String(W.chat?.length ?? 0); st.dataset.echo = echoBusy ? "1" : ""; st.dataset.scan = scanSt.current ? scanView.current.p.toFixed(2) : ""; }
+      if (now - dsAt.current > 100) { dsAt.current = now; st.dataset.x = r.eye.x.toFixed(2); st.dataset.z = r.eye.z.toFixed(2); st.dataset.yaw = r.eye.yaw.toFixed(3); st.dataset.pitch = r.eye.pitch.toFixed(3); st.dataset.y = (r.eye.y ?? 0).toFixed(2); st.dataset.target = label; st.dataset.lock = lock.current ? lock.current.id : ""; st.dataset.space = spaceRef.current; st.dataset.link = linkRef.current ? `${linkRef.current.next.slug}:${linkRef.current.open.toFixed(2)}` : ""; st.dataset.room = W.slug; st.dataset.ghosts = String(gpool.current.count); st.dataset.chat = String(W.chat?.length ?? 0); st.dataset.echo = echoBusy ? "1" : ""; st.dataset.scan = scanSt.current ? scanView.current.p.toFixed(2) : ""; }
       if (gov.current.minGap && now - lastPaint.current < gov.current.minGap) pendingPaint.current = true; // slow device: paint at ~30 fps
       else {
         pendingPaint.current = false; dirty.current = false;
@@ -413,7 +490,7 @@ export function BranchRoom({ tick, world, color, next, wantNext, onAdvance, go, 
         ++drawn.current; if (now - dsAt2.current > 100) { dsAt2.current = now; st.dataset.scale = String(gov.current.scale); const hh = dview.current.hit; st.dataset.drone = wantsDrone && hh ? `${Math.round(hh.x)},${Math.round(hh.y)}` : ""; st.dataset.drawn = String(drawn.current); }
       }
     }
-    const more = !!(changed || animating || scrolling || actorLayer.fade || echoBusy || pendingPaint.current || dirty.current || (!still && (k.size || stick.current.x || stick.current.y || drag.current)));
+    const more = !!(shotRef.current || movers || changed || animating || scrolling || actorLayer.fade || echoBusy || pendingPaint.current || dirty.current || (integ.current < 1 && !still) || (r.eye.y ?? 0) > 0 || (r.eye.vy ?? 0) !== 0 || (!still && hzOn && (hz.current.px || hz.current.pz)) || (!still && (k.size || stick.current.x || stick.current.y || drag.current)));
     if (more || gpool.current.active) raf.current = requestAnimationFrame(frame); else { last.current = 0; flushDs(); if (ghosts.current.length) { window.clearTimeout(ghostT.current); ghostT.current = window.setTimeout(() => wakeRef.current(), Math.min(30000, Math.max(250, gpool.current.nextStartMs)) + 40); } }
   }, [color, go, onLocked, showToast, flushDs, solve, openLink, ensureFx, showCard]);
 
@@ -442,6 +519,7 @@ export function BranchRoom({ tick, world, color, next, wantNext, onAdvance, go, 
       if (e.code === "KeyX") { e.preventDefault(); e.stopPropagation(); if (!e.repeat) startScanRef.current(); return; }
       if (e.code === "KeyL") { e.preventDefault(); e.stopPropagation(); if (!e.repeat) logbookRef.current(); return; }
       if (e.code === "KeyC") { e.preventDefault(); e.stopPropagation(); if (!e.repeat) callDroneRef.current(); return; }
+      if (e.code === "KeyJ") { e.preventDefault(); e.stopPropagation(); if (!e.repeat) { jumpReq.current = true; wakeRef.current(); } return; }
       if (KEYS[e.code] || e.code === "ShiftLeft" || e.code === "ShiftRight") { e.preventDefault(); e.stopPropagation(); keys.current.add(e.code); wakeRef.current(); }
     };
     const up = (e: KeyboardEvent) => { keys.current.delete(e.code); };
@@ -495,6 +573,13 @@ export function BranchRoom({ tick, world, color, next, wantNext, onAdvance, go, 
       <div className="rm-title">{world.name}{here > 0 && <span data-testid="room-here" className="rm-here"> · {here} here</span>}</div>
       <div ref={prompt} className="rm-prompt" data-testid="room-prompt" aria-live="polite" />
       <div ref={toast} className="rm-toast" role="status" />
+      {boss && <BossPanel key={boss.id} name={boss.text} seed={boss.img} diff={boss.mode} beaten={!!rtRef.current?.done.has(boss.id)} color={boss.color}
+        onClose={() => { setBoss(null); stage.current?.focus({ preventScroll: true }); dirty.current = true; wakeRef.current(); }}
+        onEngage={() => { const rt = rtRef.current; if (rt) { const ts = performance.now() / 1000; rt.emit(boss.id, "engaged", ts); rt.tick(ts); if (rt.changed.length) { rt.drain(); syncArt(); } dirty.current = true; wakeRef.current(); } }}
+        onWin={() => { const rt = rtRef.current, W = wref.current; if (!rt) return; markBeaten(bossKey(W.slug, boss.id)); rt.done.add(boss.id); const ts = performance.now() / 1000; rt.emit(boss.id, "defeated", ts); rt.tick(ts); if (rt.changed.length) { rt.drain(); syncArt(); }
+          const name = boss.text || "The Unnamed Sound"; addLog({ key: `room:${W.slug}/boss/${boss.id}`, room: W.slug, title: name, text: boss.lore || `${name} resolved. It answered, and its voice is yours.`, owner: !!boss.lore, at: Date.now() }); showToast("Logbook: " + name);
+          if (rt.pending) { window.clearTimeout(docT.current); docT.current = window.setTimeout(() => wakeRef.current(), Math.max(16, Math.min(60000, rt.nextDue() * 1000 - performance.now()))); } dirty.current = true; wakeRef.current(); }} />}
+      <div ref={integEl} className="rm-integ" data-testid="room-integrity" aria-hidden="true" style={{ opacity: 0 }}><i /></div>
       {card && <div className="rm-card" data-testid="room-scan-card" role="status"><b>{card.title}</b><p>{card.text}</p>{card.owner && <i>✦ lore</i>}</div>}
       {perfOn.current && <div ref={perfEl} className="rm-perf" data-testid="room-perf" />}
       <div className="rm-bar">
@@ -511,8 +596,9 @@ export function BranchRoom({ tick, world, color, next, wantNext, onAdvance, go, 
       </div>
       {isAdmin && editing && <Suspense fallback={null}><RoomEditor themeNote={themeNote} hasTheme={ownTheme} themeMsg={themeMsg} onTheme={(k) => void (k === "save" ? saveTheme() : clearTheme())} world={corrW ? corrW.world : world} cx={corrW?.cx ?? 0} cz={corrW?.cz ?? 0} corridor={!!corrW} doc={doc} onDoc={changeDoc} onUndo={undoDoc} onRedo={redoDoc} canUndo={hist.current.undo.length > 0} canRedo={hist.current.redo.length > 0} sel={sel} setSel={(id) => { setSel(id); if (corrEdit.current) corrLayer.sel = id; else actorLayer.sel = id; dirty.current = true; wakeRef.current(); }} where={() => (corrEdit.current ? { x: eye.current.x - corrLayer.ox, z: eye.current.z - corrLayer.oz, yaw: eye.current.yaw } : eye.current)} dirty={!sameDoc} busy={busy} error={err} playing={playTest} onPlay={setPlay} onSave={saveDoc} onRevert={() => { setDoc(saved); useDoc(saved, wref.current.slug, false); }} onClose={closeEditor} /></Suspense>}
       <div className="rm-pad"><RoomStick onChange={onStick} /></div>
+      {hasHeight && <button type="button" className="rm-jump" data-testid="room-jump" aria-label="Jump" onClick={() => { jumpReq.current = true; wakeRef.current(); }} onPointerDown={(e) => e.stopPropagation()}>Jump</button>}
       <button type="button" className="rm-use" data-testid="room-use" onClick={() => { use(); }} onPointerDown={(e) => e.stopPropagation()}>Use</button>
-      <p className="rm-hint">W A S D move · arrows look · Q E turn · Space use · right-click / Z lock on · X scan · V ping · L logbook · C drone · Esc leave</p>
+      <p className="rm-hint">W A S D move · arrows look · Q E turn · Space use · J jump · right-click / Z lock on · X scan · V ping · L logbook · C drone · Esc leave</p>
       <ul className="sr-only">
         {world.doors.map((d) => (
           <li key={d.id}>

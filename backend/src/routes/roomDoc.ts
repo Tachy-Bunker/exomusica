@@ -3,8 +3,8 @@ import { prisma } from "../lib/prisma.js";
 import { requireAdmin } from "../lib/auth.js";
 import { cleanDoc, emptyDoc } from "../lib/roomDoc.js";
 
-// a room slug, "low~high" for the corridor between two rooms, or "theme~slug"
-const SLUG = /^(theme~)?[a-z0-9][a-z0-9-]{0,80}(~[a-z0-9][a-z0-9-]{0,80})?$/; // "theme~slug" is a branch's theme
+// a room slug, "low~high" for the corridor between two rooms, "theme~slug" (a branch theme) or "prefab~name" (a saved group of things)
+const SLUG = /^((theme|prefab)~)?[a-z0-9][a-z0-9-]{0,80}(~[a-z0-9][a-z0-9-]{0,80})?$/; // "theme~slug" is a branch's theme
 
 export async function roomDocRoutes(app: FastifyInstance): Promise<void> {
   // Public: every room fetches its own document once. Empty when nobody built anything there.
@@ -14,6 +14,12 @@ export async function roomDocRoutes(app: FastifyInstance): Promise<void> {
     const row = await prisma.roomDoc.findUnique({ where: { slug: req.params.slug } });
     if (!row) return { version: 0, doc: emptyDoc() };
     return { version: row.version, doc: cleanDoc(JSON.parse(row.doc)) };
+  });
+
+  // Admin: the saved prefabs (groups of things the editor can place again), newest first.
+  app.get("/api/admin/room-prefabs", { preHandler: requireAdmin }, async () => {
+    const rows = await prisma.roomDoc.findMany({ where: { slug: { startsWith: "prefab~" } }, select: { slug: true, updatedAt: true }, orderBy: { updatedAt: "desc" }, take: 200 });
+    return rows.map((r: { slug: string; updatedAt: Date }) => ({ slug: r.slug.slice(7), at: r.updatedAt }));
   });
 
   // Admin: save the whole document. `baseVersion` must be what the editor loaded, else someone else saved in between.

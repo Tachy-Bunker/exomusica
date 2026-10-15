@@ -10,7 +10,8 @@ import { readLastPlay, visitedSlugs } from "../lib/visits";
 import { loadChartBranches } from "../lib/chartLoad";
 import { loadHome, type HomeData } from "../lib/home";
 import { loadMilestones } from "../lib/milestones";
-import { layoutHull, type HullNode } from "../lib/hullLayout";
+import { layoutHull, type HullNode, type MapOverride } from "../lib/hullLayout";
+import { loadMapOverrides } from "../lib/mapOverrides";
 import { useAudioStore } from "../lib/audioStore";
 import { BranchExplorer } from "../components/BranchExplorer";
 import { Loading } from "../components/Loading";
@@ -53,12 +54,14 @@ export function ExplorePage() {
     window.addEventListener("keydown", on); return () => window.removeEventListener("keydown", on);
   }); // eslint-disable-line react-hooks/exhaustive-deps
 
+  const [ovr, setOvr] = useState<MapOverride[]>([]);
+  useEffect(() => { let on = true; loadMapOverrides().then((r) => { if (on) setOvr(r); }); return () => { on = false; }; }, []);
   const hull = useMemo(() => {
     if (!list) return null;
     const by = new Map((home?.branches ?? []).map((b) => [b.slug, b]));
     const nodes: HullNode[] = list.map((b) => ({ id: b.id, parentId: b.parentId, slug: b.slug, name: b.name, secret: b.secret, key: b.key, tracks: by.get(b.slug)?.tracks ?? 0, albums: by.get(b.slug)?.albums ?? 0 }));
-    return layoutHull(nodes, { outer });
-  }, [list, home, outer]);
+    return layoutHull(nodes, { outer, overrides: ovr });
+  }, [list, home, outer, ovr]);
   const states = useMemo(() => (list ? roomStates(list, visited, found) : null), [list, visited, found]);
 
   return (

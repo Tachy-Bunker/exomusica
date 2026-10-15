@@ -1,6 +1,6 @@
 # Rooms, editor and Thanaton — state of the build (read this first after a chat compaction)
 
-Owner: Tachy (designer; no programming knowledge). Last updated: fix368. Update this file with every delivery, together with `docs/BACKLOG.md` (queue) and `docs/HOMEPAGE_AND_NAV.md` (per-fix notes).
+Owner: Tachy (designer; no programming knowledge). Last updated: fix369. Update this file with every delivery, together with `docs/BACKLOG.md` (queue) and `docs/HOMEPAGE_AND_NAV.md` (per-fix notes).
 
 ## Owner preferences (standing)
 - Direct tone, no flattery, rare/on-point ideas. Maximum convenience for the designer (everything via editor UI, no code). Optimised code that runs on weak devices (allocation-free painters, budgets, adaptive resolution).
@@ -45,10 +45,8 @@ fix347 rooms · 348 people/terminals · 349 drone/player · 352 scan/visor/Logbo
 4. (first catalogue DONE fix367: 12 props) More props, e.g. tribe repairs, signage, cables, props that react to wires.
 5. Hazards: damage, push, slow zones (never-hard-fail health model).
 6. Logbook entries rewritten from branch descriptions when a room is explored.
-7. Paths and camera shots, prefabs, more wire messages (play sound, set colour, teleport, show text).
-8. Height: `Eye.y`, ramps, platforms, ceilings, jump, look up/down.
-9. Admin map overrides (needs a new table).
-10. Opening scan lore + first boss ("bosses made of sound", call and response).
+7. DONE in fix369: hazards, wire messages, paths, camera shots, prefabs, height, Logbook survey notes, map overrides, corridor surfaces, opening lore, first boss (see "fix369" notes below).
+8. NOT built: elevators as a real space (a lift is now just a called moving platform: path "only when called" + Up travel); corridor sky/flock; riding a platform sideways (it does not carry you horizontally); boss server-side contours / peer verification / monthly cycle (the first boss is solo, client-side, remembered on the device).
 11. Optional: vertical sky flow, per-room sky tint, sky in corridors, PS1 wobble (if the owner wants it), scan-on-ping for flock, pulsing light pools beyond pools (done), co-op.
 Older list: see `docs/BACKLOG.md` (Monthly challenge, Twelve Artifacts, Hull, Emoji gate, ABX, instrument maker, processor module, offline app, forum↔Discord bridge, contributor points).
 
@@ -62,6 +60,17 @@ Older list: see `docs/BACKLOG.md` (Monthly challenge, Twelve Artifacts, Hull, Em
 - **Mood easing**: `grade()` keeps a shown mood (`gs`) that eases to the wanted one (~0.28 s time constant), so entering/leaving styled rooms or corridors never pops; `actorLayer.fade` keeps the frame loop running until settled. Governor now also counts frame spacing (not just JS paint time).
 - **Editor**: side view (`re-side`) draws heights to scale (ceiling, eye line, every thing, red when taller than the ceiling); brush strokes are handled once per frame and interpolated.
 - **Door prefetch**: BranchRoom fetches the next room's document, themes and milestones as soon as `next` is known.
+
+- **fix369 additions**:
+  - *Hazards*: kind `hazard` (floor patch; `mode` 0 slow x0.45, 1 drift 2 m/s along its turn, 2 drain 0.16/s). `hazardAt`. Integrity meter (`rm-integ`, hidden when whole, refills 0.2/s); at 0 you are drawn back to the room spawn at 60%, never a fail screen. Events enter/exit/shown/hidden.
+  - *Wire messages*: `Wire.arg` (colour / ≤80 chars / sound name / seconds). `setcolor` (every visual kind; `rt.col`, painter `recolored`), marker messages `teleport`, `say`, `play` (`lib/roomSfx.ts`: chime hum pulse drop swell), `shot` (camera shot: view turns to the marker for N s, controls held, `shotRef`). Wires without a needed arg are dropped by `cleanDoc`.
+  - *Height*: Actor `lift` (underside, 0..12). `pushOut(..., fy)`, `groundAt`, `ceilAt`, `STEP` 0.5, `BODY` 1.7. Eye has `y`, `vy` (feet height / speed); camera = `EYE_Y + y`. Jump = J (and a Jump button on touch when the room has anything to climb), apex ~0.8 m, gravity 11. Props `stairs` (5 steps) and `ramp` (smooth) are slopes: you walk up along their length (turn = direction); from the side they are walls. A solid lower than 0.5 m is stepped onto, no longer a wall. Underside of lifted things is drawn when you are below them.
+  - *Paths*: solid/ghost `pdx pdz pdy ptime pmode`. `pmode` 0 = back and forth for ever on the shared clock (`pathT`, Date.now), 1 = only when called (message `move`; `rt.mv/moving/fracOf`, event `arrived`). `atNow(a, rt)` is the moved copy used by collision and painter. Moving things repaint ~30 Hz. They do not carry you sideways; vertical rides work (you stay on top).
+  - *Prefabs*: `lib/roomPrefab.ts` (`groupOf` follows wires, `makePrefab`, `placePrefab`); stored as room docs `prefab~<name>` (SLUG regex allows it); `GET /api/admin/room-prefabs` lists them. Editor Things tab: Save picked + wired / whole room, Place in front of you, Delete.
+  - *Logbook*: `RoomDoc.log` (≤1500) is the room's own entry; empty = `surveyDraft(name, blurb)` (cleaned branch description). Written once (never overwritten) when you are >6 m from the spawn, key `room:<slug>/survey`. Editor "Logbook entry for this room" + "Draft from the branch description". The first wall (lineage empty) says `OPENING_LORE` when nobody wrote anything.
+  - *Map overrides*: Prisma `MapOverride {slug, x, z, level}`; `GET /api/map-overrides`, admin PUT/DELETE `/api/admin/map-overrides/:slug`; `layoutHull(nodes, {outer, overrides})`; used by ExplorePage and BranchRoomPage (doors follow). Admin page "Map layout" (drag dots, type x/z/floor, back to automatic).
+  - *Corridor surfaces*: RoomDoc `cfloor`, `cwall` (+ `ceil`) = material numbers; corridor editor has a Surfaces tab (materials + library + three selects). Painter `surf()`: flat colour, then tiles within 12 m (max 70 cells per quad, half the tile budget). Deleting a material renumbers ceil/cfloor/cwall/bands.
+  - *Boss* (first, solo): kind `boss` (`img` = seed, `mode` = motif length 3/4/5, `text` = name, `lore` = Logbook text). `lib/roomBoss.ts` (seeded scale/voice/figure; rounds: motif, reversed, inverted; pad answers; wrong = plays again, no loss). `components/BossPanel.tsx` (pad, keys 1–7, Esc). Use within 4.5 m facing it. Events engaged/defeated; defeat remembered in localStorage `exomusica_bosses`, drawn as a faint echo, replays `defeated` on entry, then lets you play its voice. No microphone (pad only).
 
 ## Design docs (Claude Docs artifacts)
 - Room editor — design: https://claude.ai/code/artifact/b6e0382b-19d7-404e-8d6e-c6a7dc668097 (owner-edited; has Wiring section)

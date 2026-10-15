@@ -12,11 +12,13 @@ export interface Scannable {
 
 /** The part of an owner-placed artifact the scanner needs. */
 export interface ArtifactLike { id: string; name: string; text: string; lore: string; mode: number; x: number; z: number }
+/** What the first wall says until the owner writes something there (admin lore or the branch description replace it). */
+export const OPENING_LORE = "Thanaton. You are inside it. The hull was never built to keep the dark out; it was built to hold a sound in. Every room is a place where that sound was heard once and kept. Walk. Scan. Listen. Somewhere in these walls an unnamed voice is still repeating the first thing it was ever told, and it is waiting for someone to answer.";
 /** Everything in the room that can be scanned, with the text shown when it is (the owner's lore replaces this text when there is some). */
 export function scannables(w: RoomWorld, arts: readonly ArtifactLike[] = []): Scannable[] {
   const out: Scannable[] = [];
   for (const a of arts) out.push({ key: `room:${w.slug}/artifact/${a.id}`, what: "artifact", id: a.id, lockKind: "artifact", label: a.name || "Artifact", text: a.lore.trim() || a.text.trim() || "Something left here. It has no words.", x: a.x, y: a.mode === 1 ? 0.3 : 1.3, z: a.z });
-  if (w.plaque) out.push({ key: `branch:${w.slug}`, what: "wall", id: "plaque", lockKind: "plaque", label: "Inscription", text: w.blurb?.trim() || `${w.name}. Nobody has written anything on this wall yet.`, x: w.plaque.x, y: 1.6, z: w.plaque.z });
+  if (w.plaque) out.push({ key: `branch:${w.slug}`, what: "wall", id: "plaque", lockKind: "plaque", label: "Inscription", text: w.blurb?.trim() || (w.lineage?.length === 0 ? OPENING_LORE : `${w.name}. Nobody has written anything on this wall yet.`), x: w.plaque.x, y: 1.6, z: w.plaque.z });
   for (const p of w.props) {
     if (p.kind === "terminal") out.push({ key: `room:${w.slug}/terminal`, what: "terminal", id: p.id, lockKind: "prop", label: "Terminal", text: `A terminal wired to ${w.name}'s room chat. Whatever is said here is kept, day by day.`, x: p.x, y: 1.3, z: p.z });
     else if (p.kind === "album") out.push({ key: `album:${p.id.slice(2)}`, what: "album", id: p.id, lockKind: "prop", label: p.label, text: `Pedestal: the album "${p.label}". Its disc can be read from the screen.`, x: p.x, y: 1.3, z: p.z });
@@ -60,6 +62,14 @@ export function noteRoom(w: RoomWorld, list: Scannable[]): void {
   const keys = Object.keys(all); if (keys.length > 200) for (const k of keys.slice(0, keys.length - 200)) delete all[k];
   write(ROOMS_KEY, all);
 }
+/** A branch description turned into a Logbook note: markdown and links stripped, whitespace collapsed, cut at a sentence, under the room's name. */
+export function surveyDraft(name: string, blurb: string | undefined): string {
+  const plain = (blurb ?? "").replace(/!?\[([^\]]*)\]\([^)]*\)/g, "$1").replace(/[`*_>#~]+/g, "").replace(/https?:\/\/\S+/g, "").replace(/\s+/g, " ").trim();
+  if (!plain) return `${name}. Passed through; nothing recorded yet.`;
+  let cut = plain.slice(0, 500); if (plain.length > 500) { const k = Math.max(cut.lastIndexOf(". "), cut.lastIndexOf("! "), cut.lastIndexOf("? ")); cut = k > 120 ? cut.slice(0, k + 1) : cut.replace(/\s+\S*$/, "") + "…"; }
+  return `Surveyed: ${name}. ${cut}`;
+}
+export const surveyKey = (slug: string): string => `room:${slug}/survey`;
 export const loadLog = (): Record<string, LogEntry> => read(LOG_KEY, {} as Record<string, LogEntry>);
 export function addLog(e: LogEntry): void {
   const all = loadLog(); all[e.key] = e;

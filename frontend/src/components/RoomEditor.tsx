@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { EVENTS, KINDS, MAX_ACTORS, MAX_LORE, MAX_TEXT, MAX_BANDS, MAX_BANDS_PER_WALL, MAX_TEX, MAX_WIRES, MESSAGES, TEX_KINDS, cleanDoc, newId, type Actor, type Band, type Grade, type Kind, type RoomDoc, type Wire } from "../lib/roomDoc";
+import { ARG_KIND, EVENTS, KINDS, SOUNDS, MAX_ACTORS, MAX_LORE, MAX_TEXT, MAX_BANDS, MAX_BANDS_PER_WALL, MAX_TEX, MAX_WIRES, MESSAGES, TEX_KINDS, cleanDoc, newId, type Actor, type Band, type Grade, type Kind, type RoomDoc, type Wire } from "../lib/roomDoc";
 import { cellAt, decode, encode, floodFill, paintDisc, rectsOf } from "../lib/roomFloor";
 import { onTexReady, texSheet } from "../lib/roomTextures";
 import { isUpload, MAX_FLOCK, MAX_SKY_SPEED } from "../lib/roomDoc";
@@ -10,15 +10,21 @@ import { drawSeams, pngOf, squareTexture } from "../lib/textureMake";
 import { composeCube, panoOf, roleOf, skyUrl, type Role } from "../lib/skyMake";
 import { isImageName, listZip } from "../lib/zipRead";
 import type { RoomWorld } from "../lib/roomWorld";
+import { surveyDraft } from "../lib/roomLore";
+import { freqOf, motifOf, voiceOf } from "../lib/roomBoss";
+import { tone } from "../lib/roomSfx";
+import { groupOf, makePrefab, placePrefab, prefabKey, prefabSlug } from "../lib/roomPrefab";
 
 const SNAP = 0.25, PLAN = 300;
 const PALETTE = ["#7a8cff", "#ff7ab6", "#7affc8", "#ffd27a", "#c07aff", "#7ad7ff"];
 const DEFAULTS: Record<Kind, Partial<Actor>> = {
-  solid: { w: 2, d: 2, h: 1.5 }, ghost: { w: 2, d: 2, h: 1.5 }, trigger: { w: 3, d: 3, h: 2 }, light: { w: 1, d: 1, h: 2.4 }, marker: { w: 0.6, d: 0.6, h: 1.6 }, pool: { w: 4, d: 4, h: 0 }, artifact: { w: 1.6, d: 0.1, h: 1 },
+  solid: { w: 2, d: 2, h: 1.5 }, ghost: { w: 2, d: 2, h: 1.5 }, trigger: { w: 3, d: 3, h: 2 }, light: { w: 1, d: 1, h: 2.4 }, marker: { w: 0.6, d: 0.6, h: 1.6 }, pool: { w: 4, d: 4, h: 0 }, artifact: { w: 1.6, d: 0.1, h: 1 }, hazard: { w: 4, d: 4, h: 0, mode: 0, color: "#ff9a5c" }, boss: { w: 2.6, d: 2.6, h: 2.4, mode: 0, color: "#ff7ab6", text: "The Unnamed Sound" },
 };
 const KIND_HELP: Record<Kind, string> = {
   solid: "Blocks you. Can be shown or hidden by wires.", ghost: "You walk through it. Cosmetic.", trigger: "A zone that sends “enter” and “exit” when you step in or out.",
   light: "A glow. Can be turned on or off.", pool: "A soft pool of light on the floor. Can swell slowly and be turned on or off.", marker: "A named point other things can listen to or send to.",
+  boss: "A sound you have to answer: it plays a short motif, you play it back on the pad, it changes the motif, three rounds. No health, no losing: a wrong answer just plays again. Beating it sends “defeated” (open a door, show a thing) and makes its voice yours. The seed fixes its scale, voice and body.",
+  hazard: "A zone on the floor that slows you, drifts you along, or drains your integrity. Integrity refills by itself; at zero you are drawn gently back to the start of the room. Never a game-over.",
   artifact: "A panel with words and/or a picture, on a wall, on the floor or turning to face you. Can be scanned: it writes a Logbook entry and sends “scanned” (to open a door, say). Can be visible only through the scan visor.",
 };
 const snap = (v: number) => Math.round(v / SNAP) * SNAP;
@@ -46,14 +52,14 @@ export function RoomEditor({ themeNote = "", hasTheme = false, themeMsg = "", on
   const patch = (id: string, p: Partial<Actor>) => onDoc(cleanDoc({ ...doc, actors: doc.actors.map((x) => (x.id === id ? { ...x, ...p } : x)) }), "p:" + id + Object.keys(p).join());
 
   // ---- floor painting
-  const [tab, setTab] = useState<"things" | "floor" | "walls" | "mood">("things"), [edge, setEdge] = useState(0), [bf, setBf] = useState({ m: 1, u0: 0, u1: 100, y0: 0, y1: Math.round(world.H * 10) / 10 }), [mat, setMat] = useState(1), [tool, setTool] = useState<"brush" | "fill" | "erase" | "pick">("brush"), [size, setSize] = useState(2), [newKind, setNewKind] = useState<string>("grid");
+  const [tab, setTab] = useState<"things" | "floor" | "walls" | "mood" | "surf">("things"), [edge, setEdge] = useState(0), [bf, setBf] = useState({ m: 1, u0: 0, u1: 100, y0: 0, y1: Math.round(world.H * 10) / 10 }), [mat, setMat] = useState(1), [tool, setTool] = useState<"brush" | "fill" | "erase" | "pick">("brush"), [size, setSize] = useState(2), [newKind, setNewKind] = useState<string>("grid");
   const floorRects = useMemo(() => rectsOf(decode(doc.floor)), [doc.floor]);
   const activeMat = doc.tex[mat - 1] ?? null;
   // ---- the picture library (admin): upload one picture or a zip of pictures
   const [lib, setLib] = useState<{ id: number; name: string; sky?: boolean }[]>([]), [skyPend, setSkyPend] = useState<HTMLCanvasElement | null>(null), [skyName, setSkyName] = useState(""), [skyMsg, setSkyMsg] = useState(""), skyPrev = useRef<HTMLCanvasElement>(null), [, bump] = useState(0), [pend, setPend] = useState<HTMLCanvasElement | null>(null), [pname, setPname] = useState(""), [libMsg, setLibMsg] = useState(""), seam = useRef<HTMLCanvasElement>(null);
   useEffect(() => onTexReady(() => bump((n) => n + 1)), []);
   const loadLib = () => { api<{ id: number; name: string; sky?: boolean }[]>("/api/admin/room-textures").then((r) => setLib(Array.isArray(r) ? r : [])).catch(() => setLibMsg("Could not load the library")); };
-  useEffect(() => { if (tab === "floor" || tab === "mood" || tab === "things") loadLib(); }, [tab]);
+  useEffect(() => { if (tab === "floor" || tab === "mood" || tab === "things" || tab === "surf") loadLib(); }, [tab]);
   useEffect(() => { if (pend && seam.current) drawSeams(seam.current, pend); }, [pend]);
   const pickFile = async (f: File | undefined) => { if (!f) return; setLibMsg(""); try { setPend(await squareTexture(f)); setPname(f.name.replace(/\.[^.]+$/, "").slice(0, 60)); } catch { setLibMsg("That file is not a picture the browser can open"); } };
   const saveTex = async () => { if (!pend) return; setLibMsg("Saving…"); try { await api("/api/admin/room-textures", { method: "POST", body: JSON.stringify({ name: pname, png: pngOf(pend) }) }); setPend(null); setLibMsg("Saved to the library"); loadLib(); } catch (e) { setLibMsg(e instanceof Error ? e.message : "Could not save"); } };
@@ -130,7 +136,8 @@ export function RoomEditor({ themeNote = "", hasTheme = false, themeMsg = "", on
   const setTex = (p: Partial<RoomDoc["tex"][number]>) => onDoc(cleanDoc({ ...doc, tex: doc.tex.map((t, i) => (i === mat - 1 ? { ...t, ...p } : t)) }), "tex" + mat + Object.keys(p).join());
   const delMat = () => {
     if (!activeMat) return; const cells = decode(doc.floor); for (let i = 0; i < cells.length; i++) { if (cells[i] === mat) cells[i] = 0; else if (cells[i] > mat) cells[i]--; }
-    setFloor(cells, doc.tex.filter((_, i) => i !== mat - 1), "delmat"); setMat(Math.max(1, mat - 1));
+    const sh = (v: number) => (v === mat ? 0 : v > mat ? v - 1 : v); // every surface that used a later material follows it down; the removed one goes plain
+    onDoc(cleanDoc({ ...doc, tex: doc.tex.filter((_, i) => i !== mat - 1), floor: encode(cells), ceil: sh(doc.ceil), cfloor: sh(doc.cfloor), cwall: sh(doc.cwall), bands: doc.bands.filter((b) => b.m !== mat).map((b) => (b.m > mat ? { ...b, m: b.m - 1 } : b)) }), "delmat"); setMat(Math.max(1, mat - 1));
   };
 
   useEffect(() => { // the plan view
@@ -167,8 +174,8 @@ export function RoomEditor({ themeNote = "", hasTheme = false, themeMsg = "", on
       sg.fillStyle = "rgba(255,255,255,.7)"; sg.font = "10px sans-serif"; sg.fillText(`ceiling ${world.H} m`, 4, Y(world.H) - 3); sg.fillText("eye 1.6 m", 4, Y(1.6) - 3);
       for (const o of doc.actors) {
         const cs = Math.cos(o.rot), sn = Math.sin(o.rot), half = (Math.abs(o.w * cs) + Math.abs(o.d * sn)) / 2, [px] = toPx(o.x, o.z);
-        let lo = 0, hi = o.h;
-        if (o.kind === "pool") { lo = 0; hi = 0.05; } else if (o.kind === "light") { lo = Math.max(0, o.h - 0.1); hi = o.h + 0.1; } else if (o.kind === "marker") hi = 1.6;
+        let lo = o.lift, hi = o.lift + o.h;
+        if (o.kind === "pool" || o.kind === "hazard") { lo = 0; hi = 0.05; } else if (o.kind === "light") { lo = Math.max(0, o.h - 0.1); hi = o.h + 0.1; } else if (o.kind === "marker") hi = 1.6;
         else if (o.kind === "artifact") { lo = o.mode === 1 ? 0 : 0.6; hi = o.mode === 1 ? 0.05 : 0.6 + o.h; } else if (o.prop === "drifter") { const k = Math.min(1, o.h / 1.8); lo = 0.3 * k + o.h * 0.2; hi = lo + o.h * 0.75; }
         const x0 = px - Math.max(half, 0.1) * scale, w = Math.max(3, Math.max(half, 0.1) * 2 * scale), over = hi > world.H + 0.01;
         sg.globalAlpha = o.on ? 1 : 0.4; sg.fillStyle = over ? "#ff6a6a99" : o.color + (o.kind === "ghost" || o.kind === "trigger" ? "33" : "99"); sg.strokeStyle = o.id === sel ? "#fff" : over ? "#ff6a6a" : o.color; sg.lineWidth = o.id === sel ? 2.5 : 1.2;
@@ -212,27 +219,53 @@ export function RoomEditor({ themeNote = "", hasTheme = false, themeMsg = "", on
   const add = (kind: Kind) => {
     if (doc.actors.length >= MAX_ACTORS) return;
     const e = where(), id = newId(doc.actors.map((x) => x.id)), n = doc.actors.filter((x) => x.kind === kind).length + 1;
-    const o: Actor = { id, kind, name: `${kind} ${n}`, x: snap(e.x + Math.cos(e.yaw) * 3), z: snap(e.z + Math.sin(e.yaw) * 3), w: 2, d: 2, h: 1.5, rot: 0, sides: 0, color: PALETTE[doc.actors.length % PALETTE.length], on: true, pulse: 0, text: "", lore: "", img: 0, mode: 0, visor: false, prop: "", gate: "", gateOff: false, ...DEFAULTS[kind] };
+    const o: Actor = { id, kind, name: `${kind} ${n}`, x: snap(e.x + Math.cos(e.yaw) * 3), z: snap(e.z + Math.sin(e.yaw) * 3), w: 2, d: 2, h: 1.5, rot: 0, sides: 0, color: PALETTE[doc.actors.length % PALETTE.length], on: true, pulse: 0, text: "", lore: "", img: 0, mode: 0, visor: false, prop: "", gate: "", gateOff: false, lift: 0, pdx: 0, pdz: 0, pdy: 0, ptime: 0, pmode: 0, ...DEFAULTS[kind] };
     if (kind === "artifact") o.rot = e.yaw + Math.PI; // faces you
+    if (kind === "boss") o.img = 1 + Math.floor(Math.random() * 999999);
     commit([...doc.actors, o]); setSel(id);
   };
   /** Add a catalogue prop (a solid, or a ghost for walk-through ones is not needed: frames and the like never block). */
   const addProp = (pid: string) => {
     const def = PROP_BY_ID.get(pid); if (!def || doc.actors.length >= MAX_ACTORS) return;
     const e = where(), id = newId(doc.actors.map((x) => x.id)), n = doc.actors.filter((x) => x.prop === pid).length + 1;
-    const o: Actor = { id, kind: "solid", name: `${def.name} ${n}`, x: snap(e.x + Math.cos(e.yaw) * 3.5), z: snap(e.z + Math.sin(e.yaw) * 3.5), w: def.w, d: def.d, h: def.h, rot: e.yaw + Math.PI / 2, sides: def.sides, color: PALETTE[doc.actors.length % PALETTE.length], on: true, pulse: 0, text: "", lore: "", img: 0, mode: 0, visor: false, prop: pid, gate: "", gateOff: false };
+    const o: Actor = { id, kind: "solid", name: `${def.name} ${n}`, x: snap(e.x + Math.cos(e.yaw) * 3.5), z: snap(e.z + Math.sin(e.yaw) * 3.5), w: def.w, d: def.d, h: def.h, rot: e.yaw + Math.PI / 2, sides: def.sides, color: PALETTE[doc.actors.length % PALETTE.length], on: true, pulse: 0, text: "", lore: "", img: 0, mode: 0, visor: false, prop: pid, gate: "", gateOff: false, lift: 0, pdx: 0, pdz: 0, pdy: 0, ptime: 0, pmode: 0 };
     commit([...doc.actors, o]); setSel(id);
   };
   const dup = () => { if (!a || doc.actors.length >= MAX_ACTORS) return; const id = newId(doc.actors.map((x) => x.id)); commit([...doc.actors, { ...a, id, name: a.name + " copy", x: a.x + 1, z: a.z + 1 }]); setSel(id); };
   const del = () => { if (!a) return; commit(doc.actors.filter((x) => x.id !== a.id), doc.wires.filter((w) => w.from !== a.id && w.to !== a.id)); setSel(null); };
 
+  // prefabs: groups of things saved on the server, placeable anywhere
+  const [pfs, setPfs] = useState<string[]>([]), [pfName, setPfName] = useState(""), [pfPick, setPfPick] = useState(""), [pfMsg, setPfMsg] = useState("");
+  const loadPfs = () => { api<{ slug: string }[]>("/api/admin/room-prefabs").then((r) => setPfs(Array.isArray(r) ? r.map((x) => x.slug) : [])).catch(() => setPfMsg("Could not load the prefabs")); };
+  useEffect(() => { if (tab === "things") loadPfs(); }, [tab]); // eslint-disable-line react-hooks/exhaustive-deps
+  const savePf = async (whole: boolean) => {
+    const slug = prefabSlug(pfName || (a?.name ?? "")); if (!slug) { setPfMsg("Give it a name first."); return; }
+    const ids = whole ? new Set(doc.actors.map((x) => x.id)) : a ? groupOf(doc, a.id) : new Set<string>();
+    if (!ids.size) { setPfMsg(whole ? "The room is empty." : "Pick a thing first."); return; }
+    setPfMsg("Saving…");
+    try {
+      const cur = await api<{ version: number }>(`/api/room-doc/${prefabKey(slug)}`, { cache: "no-store" }).catch(() => ({ version: 0 }));
+      await api(`/api/admin/room-doc/${prefabKey(slug)}`, { method: "PUT", body: JSON.stringify({ doc: makePrefab(doc, ids), baseVersion: cur.version }) });
+      setPfMsg(`Saved “${slug}” (${ids.size} thing${ids.size === 1 ? "" : "s"}).`); setPfPick(slug); loadPfs();
+    } catch (e) { setPfMsg(e instanceof Error ? e.message : "Could not save"); }
+  };
+  const putPf = async () => {
+    if (!pfPick) return; setPfMsg("Placing…");
+    try {
+      const r = await api<{ doc: RoomDoc }>(`/api/room-doc/${prefabKey(pfPick)}`, { cache: "no-store" }), e = where();
+      const out = placePrefab(doc, cleanDoc(r.doc), snap(e.x + Math.cos(e.yaw) * 4), snap(e.z + Math.sin(e.yaw) * 4));
+      if (!out.added.length) { setPfMsg("No room for it: the room is full."); return; }
+      commit(out.actors, out.wires); setSel(out.added[0]); setPfMsg(`Placed ${out.added.length} thing${out.added.length === 1 ? "" : "s"} in front of you.`);
+    } catch (er) { setPfMsg(er instanceof Error ? er.message : "Could not place"); }
+  };
+  const delPf = async () => { if (!pfPick) return; try { await api(`/api/admin/room-doc/${prefabKey(pfPick)}`, { method: "DELETE" }); setPfMsg(`Deleted “${pfPick}”.`); setPfPick(""); loadPfs(); } catch (er) { setPfMsg(er instanceof Error ? er.message : "Could not delete"); } };
   // wires
-  const [wf, setWf] = useState({ ev: "", to: "", msg: "", delay: 0, once: false });
-  useEffect(() => { setWf({ ev: a ? EVENTS[a.kind][0] : "", to: "", msg: "", delay: 0, once: false }); }, [sel]); // eslint-disable-line react-hooks/exhaustive-deps
+  const [wf, setWf] = useState({ ev: "", to: "", msg: "", delay: 0, once: false, arg: "" });
+  useEffect(() => { setWf({ ev: a ? EVENTS[a.kind][0] : "", to: "", msg: "", delay: 0, once: false, arg: "" }); }, [sel]); // eslint-disable-line react-hooks/exhaustive-deps
   const target = doc.actors.find((x) => x.id === wf.to) ?? null;
   const addWire = () => {
     if (!a || !target || !wf.ev || !wf.msg || doc.wires.length >= MAX_WIRES) return;
-    commit(doc.actors, [...doc.wires, { from: a.id, ev: wf.ev, to: target.id, msg: wf.msg, delay: wf.delay, once: wf.once }]);
+    commit(doc.actors, [...doc.wires, { from: a.id, ev: wf.ev, to: target.id, msg: wf.msg, delay: wf.delay, once: wf.once, ...(ARG_KIND[wf.msg] ? { arg: wf.arg } : {}) }]);
   };
   const nameOf = (id: string) => doc.actors.find((x) => x.id === id)?.name ?? id;
   const mine = a ? doc.wires.filter((w) => w.from === a.id || w.to === a.id) : [];
@@ -254,15 +287,20 @@ export function RoomEditor({ themeNote = "", hasTheme = false, themeMsg = "", on
         <button type="button" role="tab" className="re-b" aria-selected={tab === "things"} data-testid="re-tab-things" onClick={() => setTab("things")}>Things</button>
         {!corridor && <button type="button" role="tab" className="re-b" aria-selected={tab === "floor"} data-testid="re-tab-floor" onClick={() => setTab("floor")}>Floor</button>}
         {!corridor && <button type="button" role="tab" className="re-b" aria-selected={tab === "walls"} data-testid="re-tab-walls" onClick={() => setTab("walls")}>Walls</button>}
+        {corridor && <button type="button" role="tab" className="re-b" aria-selected={tab === "surf"} data-testid="re-tab-surf" onClick={() => setTab("surf")}>Surfaces</button>}
         <button type="button" role="tab" className="re-b" aria-selected={tab === "mood"} data-testid="re-tab-mood" onClick={() => setTab("mood")}>Mood</button>
       </div>
-      {tab === "floor" && (
+      {(tab === "floor" || tab === "surf") && (
         <div className="re-floor" data-testid="re-floor">
-          <p className="re-note">Pick a material, then paint on the plan. The floor repeats the pattern.</p>
-          <div className="re-row" role="group" aria-label="Tool">
+          {tab === "surf" && <div className="re-insp" data-testid="re-surf">
+            <p className="re-note">Make materials below (pick a pattern or a picture), then choose which one covers each surface of this corridor.</p>
+            {([["cfloor", "Floor"], ["cwall", "Walls"], ["ceil", "Ceiling"]] as const).map(([k, label]) => <label key={k}>{label}<select data-testid={`re-surf-${k}`} value={doc[k]} onChange={(e) => onDoc(cleanDoc({ ...doc, [k]: Number(e.target.value) }), k)}><option value={0}>plain</option>{doc.tex.map((t, i) => <option key={i} value={i + 1}>{i + 1} · {isUpload(t.kind) ? `picture #${t.kind.slice(1)}` : t.kind}</option>)}</select></label>)}
+          </div>}
+          {tab === "floor" && <p className="re-note">Pick a material, then paint on the plan. The floor repeats the pattern.</p>}
+          {tab === "floor" && <div className="re-row" role="group" aria-label="Tool">
             {(["brush", "fill", "erase", "pick"] as const).map((t) => <button key={t} type="button" className="re-b" data-testid={`re-tool-${t}`} aria-pressed={tool === t} onClick={() => setTool(t)}>{t === "pick" ? "pick up" : t}</button>)}
             <label className="re-inline">size<select data-testid="re-size" value={size} onChange={(e) => setSize(Number(e.target.value))}>{[1, 2, 3, 4, 5].map((n) => <option key={n} value={n}>{n}</option>)}</select></label>
-          </div>
+          </div>}
           <ul className="re-mats" aria-label="Materials">
             {doc.tex.map((t, i) => <li key={i}><button type="button" data-testid={`re-mat-${i + 1}`} aria-pressed={mat === i + 1} onClick={() => { setMat(i + 1); if (tool === "erase" || tool === "pick") setTool("brush"); }}>
               <canvas width={32} height={32} ref={(c) => { const sh = texSheet(t.kind, t.tint), g = c?.getContext("2d"); if (c && g && sh) { g.clearRect(0, 0, 32, 32); g.drawImage(sh, 0, 0, sh.width / 2, sh.width / 2, 0, 0, 32, 32); } }} />{isUpload(t.kind) ? "picture" : t.kind}</button></li>)}
@@ -281,7 +319,7 @@ export function RoomEditor({ themeNote = "", hasTheme = false, themeMsg = "", on
           )}
         </div>
       )}
-      {tab === "floor" && (
+      {(tab === "floor" || tab === "surf") && (
         <div className="re-floor" data-testid="re-library">
           <h4>Picture library</h4>
           <div className="re-row">
@@ -362,6 +400,20 @@ export function RoomEditor({ themeNote = "", hasTheme = false, themeMsg = "", on
         </div>
       )}
       {tab === "things" && <p className="re-note">White dot: you. Drag things to move. New things appear 3 m in front of you.</p>}
+      {tab === "things" && (
+        <div className="re-insp" data-testid="re-prefabs">
+          <b>Prefabs</b>
+          <div className="re-row"><input data-testid="re-pfname" placeholder="name" maxLength={40} value={pfName} onChange={(e) => setPfName(e.target.value)} /><button type="button" className="re-b" data-testid="re-pfsave" disabled={!a} title="Saves the picked thing and everything wired to it" onClick={() => savePf(false)}>Save picked + wired</button><button type="button" className="re-b" data-testid="re-pfsaveall" onClick={() => savePf(true)}>Save whole room</button></div>
+          <div className="re-row"><select data-testid="re-pfpick" value={pfPick} onChange={(e) => setPfPick(e.target.value)}><option value="">pick a prefab…</option>{pfs.map((n) => <option key={n}>{n}</option>)}</select><button type="button" className="re-b" data-testid="re-pfput" disabled={!pfPick} onClick={putPf}>Place</button><button type="button" className="re-b re-del" data-testid="re-pfdel" disabled={!pfPick} onClick={delPf}>Delete</button></div>
+          {pfMsg && <p className="re-note" data-testid="re-pfmsg">{pfMsg}</p>}
+        </div>
+      )}
+      {tab === "things" && !corridor && !a && (
+        <div className="re-insp" data-testid="re-log">
+          <label>Logbook entry for this room<textarea data-testid="re-logtext" rows={4} maxLength={MAX_LORE} placeholder="Written into the player's Logbook once they have explored the room. Empty: made from the branch description." value={doc.log} onChange={(e) => onDoc(cleanDoc({ ...doc, log: e.target.value }), "log")} /></label>
+          <div className="re-row"><button type="button" className="re-b" data-testid="re-logdraft" onClick={() => onDoc(cleanDoc({ ...doc, log: surveyDraft(world.name, world.blurb) }), "log")}>Draft from the branch description</button></div>
+        </div>
+      )}
       <div className="re-add" hidden={tab !== "things"} role="group" aria-label="Add">
         {KINDS.map((k) => <button key={k} type="button" className="re-b" data-testid={`re-add-${k}`} title={KIND_HELP[k]} onClick={() => add(k)}>+ {k}</button>)}
         <select className="re-b" data-testid="re-add-prop" value="" aria-label="Add a prop" title="Black-hole debris and ruins" onChange={(e) => { if (e.target.value) addProp(e.target.value); }}><option value="">+ prop…</option>{PROP_DEFS.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</select>
@@ -380,6 +432,20 @@ export function RoomEditor({ themeNote = "", hasTheme = false, themeMsg = "", on
             <label>Width<input data-testid="re-w" type="number" step={SNAP} min={0.1} value={a.w} onChange={(e) => patch(a.id, { w: num(e.target.value, a.w) })} /></label>
             <label>Depth<input type="number" step={SNAP} min={0.1} value={a.d} onChange={(e) => patch(a.id, { d: num(e.target.value, a.d) })} /></label>
             <label>Height<input data-testid="re-h" type="number" step={SNAP} min={0} value={a.h} onChange={(e) => patch(a.id, { h: num(e.target.value, a.h) })} /></label>
+            {(a.kind === "solid" || a.kind === "ghost") && <label>Raised by (m)<input data-testid="re-lift" type="number" step={SNAP} min={0} max={12} value={a.lift} title="Height of its underside above the floor. 0 = on the floor. Over 1.7 you can walk under it; a flat top up to 0.5 m you step onto, higher you jump (J) or take stairs and ramps." onChange={(e) => patch(a.id, { lift: Math.max(0, Math.min(12, num(e.target.value, a.lift))) })} /></label>}
+            {(a.kind === "solid" || a.kind === "ghost") && (
+              <div className="re-insp" data-testid="re-path">
+                <b>Travels (back and forth, smoothly)</b>
+                <div className="re-row">
+                  <label>Sideways (m)<input data-testid="re-pdx" type="number" step={SNAP} min={-40} max={40} value={a.pdx} onChange={(e) => patch(a.id, { pdx: num(e.target.value, a.pdx), ptime: a.ptime || 6 })} /></label>
+                  <label>Forward (m)<input data-testid="re-pdz" type="number" step={SNAP} min={-40} max={40} value={a.pdz} onChange={(e) => patch(a.id, { pdz: num(e.target.value, a.pdz), ptime: a.ptime || 6 })} /></label>
+                  <label>Up (m)<input data-testid="re-pdy" type="number" step={SNAP} min={-10} max={10} value={a.pdy} onChange={(e) => patch(a.id, { pdy: num(e.target.value, a.pdy), ptime: a.ptime || 6 })} /></label>
+                  <label>Seconds one way<input data-testid="re-ptime" type="number" step={1} min={1} max={120} value={a.ptime || ""} placeholder="still" onChange={(e) => patch(a.id, { ptime: Math.max(0, Math.min(120, num(e.target.value, 0))) })} /></label>
+                </div>
+                <label>It moves<select data-testid="re-pmode" value={a.pmode} onChange={(e) => patch(a.id, { pmode: Number(e.target.value) })}><option value={0}>all the time</option><option value={1}>only when called (a wire sends “move”: it goes, the next call brings it back)</option></select></label>
+                <p className="re-note">Directions are relative to the room, not to the turn of the thing. Everyone sees it in the same place at the same time. It does not carry you along.</p>
+              </div>
+            )}
             <label>Turn°<input type="number" step={5} value={Math.round((a.rot * 180) / Math.PI)} onChange={(e) => patch(a.id, { rot: (num(e.target.value, 0) * Math.PI) / 180 })} /></label>
           </div>
           {(a.kind === "solid" || a.kind === "ghost") && (
@@ -389,7 +455,17 @@ export function RoomEditor({ themeNote = "", hasTheme = false, themeMsg = "", on
           {(a.kind === "trigger" || ((a.kind === "solid" || a.kind === "ghost") && !a.prop)) && (
             <label>Shape<select data-testid="re-sides" value={a.sides} onChange={(e) => patch(a.id, { sides: Number(e.target.value) })}><option value={0}>Box</option>{[3, 4, 5, 6, 7, 8].map((n) => <option key={n} value={n}>{n} sides</option>)}</select></label>
           )}
-          {(a.kind === "light" || a.kind === "pool") && <label>Slow swell (Hz, 0 = steady)<input data-testid="re-pulse" type="number" min={0} max={2} step={0.25} value={a.pulse} onChange={(e) => patch(a.id, { pulse: num(e.target.value, 0) })} /></label>}
+          {a.kind === "hazard" && <label>Effect<select data-testid="re-hmode" value={a.mode} onChange={(e) => patch(a.id, { mode: Number(e.target.value) })}><option value={0}>Slows you</option><option value={1}>Drifts you along (Turn° sets the direction)</option><option value={2}>Drains integrity</option></select></label>}
+          {(a.kind === "light" || a.kind === "pool" || a.kind === "hazard") && <label>Slow swell (Hz, 0 = steady)<input data-testid="re-pulse" type="number" min={0} max={2} step={0.25} value={a.pulse} onChange={(e) => patch(a.id, { pulse: num(e.target.value, 0) })} /></label>}
+          {a.kind === "boss" && (
+            <div className="re-insp" data-testid="re-boss">
+              <label>Name<input data-testid="re-bossname" maxLength={MAX_TEXT} value={a.text} onChange={(e) => patch(a.id, { text: e.target.value })} /></label>
+              <div className="re-row"><label>Seed<input data-testid="re-bossseed" type="number" min={0} max={999999999} step={1} value={a.img} onChange={(e) => patch(a.id, { img: Math.max(0, Math.round(num(e.target.value, a.img))) })} /></label><button type="button" className="re-b" data-testid="re-bossroll" onClick={() => patch(a.id, { img: 1 + Math.floor(Math.random() * 999999) })}>New seed</button><button type="button" className="re-b" data-testid="re-bosslisten" onClick={() => { const v = voiceOf(a.img, a.mode); motifOf(a.img, a.mode, 0).forEach((d, i) => tone(freqOf(v, d), 0.7, v.partials, i * 0.55, 0.1)); }}>Hear round 1</button></div>
+              <label>Length of the motif<select data-testid="re-bossdiff" value={a.mode} onChange={(e) => patch(a.id, { mode: Number(e.target.value) })}><option value={0}>3 notes</option><option value={1}>4 notes</option><option value={2}>5 notes</option></select></label>
+              <label>Logbook entry when answered<textarea data-testid="re-bosslore" rows={3} maxLength={MAX_LORE} value={a.lore} onChange={(e) => patch(a.id, { lore: e.target.value })} /></label>
+              <p className="re-note">The seed fixes its scale, voice, body and motifs: the same for everyone. Walk up to it in play and press Use.</p>
+            </div>
+          )}
           {a.kind === "artifact" && (
             <div className="re-insp" data-testid="re-artifact">
               <label>Words on it<input data-testid="re-atext" value={a.text} maxLength={MAX_TEXT} onChange={(e) => patch(a.id, { text: e.target.value })} /></label>
@@ -413,7 +489,7 @@ export function RoomEditor({ themeNote = "", hasTheme = false, themeMsg = "", on
           <ul className="re-wires">
             {mine.map((w, i) => (
               <li key={i} data-testid="re-wire">
-                <span>{nameOf(w.from)} · {w.ev} → {nameOf(w.to)} · {w.msg}{w.delay ? ` after ${w.delay}s` : ""}{w.once ? " (once)" : ""}</span>
+                <span>{nameOf(w.from)} · {w.ev} → {nameOf(w.to)} · {w.msg}{w.arg ? ` “${w.arg}”` : ""}{w.delay ? ` after ${w.delay}s` : ""}{w.once ? " (once)" : ""}</span>
                 <button type="button" className="re-b" aria-label="Remove wire" onClick={() => commit(doc.actors, doc.wires.filter((x) => x !== w))}>✕</button>
               </li>
             ))}
@@ -421,11 +497,15 @@ export function RoomEditor({ themeNote = "", hasTheme = false, themeMsg = "", on
           </ul>
           <div className="re-wf">
             <label>When {a.name}<select data-testid="re-wev" value={wf.ev} onChange={(e) => setWf({ ...wf, ev: e.target.value })}>{EVENTS[a.kind].map((v) => <option key={v}>{v}</option>)}</select></label>
-            <label>then tell<select data-testid="re-wto" value={wf.to} onChange={(e) => { const t = doc.actors.find((x) => x.id === e.target.value); setWf({ ...wf, to: e.target.value, msg: t ? MESSAGES[t.kind][0] : "" }); }}><option value="">pick a thing…</option>{doc.actors.map((o) => <option key={o.id} value={o.id}>{o.name}</option>)}</select></label>
-            <label>to<select data-testid="re-wmsg" value={wf.msg} disabled={!target} onChange={(e) => setWf({ ...wf, msg: e.target.value })}>{(target ? MESSAGES[target.kind] : []).map((v) => <option key={v}>{v}</option>)}</select></label>
+            <label>then tell<select data-testid="re-wto" value={wf.to} onChange={(e) => { const t = doc.actors.find((x) => x.id === e.target.value); setWf({ ...wf, to: e.target.value, msg: t ? MESSAGES[t.kind][0] : "", arg: "" }); }}><option value="">pick a thing…</option>{doc.actors.map((o) => <option key={o.id} value={o.id}>{o.name}</option>)}</select></label>
+            <label>to<select data-testid="re-wmsg" value={wf.msg} disabled={!target} onChange={(e) => setWf({ ...wf, msg: e.target.value, arg: e.target.value === "setcolor" ? "#ff7ab6" : e.target.value === "play" ? SOUNDS[0] : e.target.value === "shot" ? "4" : "" })}>{(target ? MESSAGES[target.kind] : []).map((v) => <option key={v}>{v}</option>)}</select></label>
+            {ARG_KIND[wf.msg] === "color" && <label>colour<input data-testid="re-warg" type="color" value={wf.arg || "#ff7ab6"} onChange={(e) => setWf({ ...wf, arg: e.target.value })} /></label>}
+            {ARG_KIND[wf.msg] === "sound" && <label>sound<select data-testid="re-warg" value={wf.arg} onChange={(e) => setWf({ ...wf, arg: e.target.value })}>{SOUNDS.map((v) => <option key={v}>{v}</option>)}</select></label>}
+            {ARG_KIND[wf.msg] === "secs" && <label>seconds<input data-testid="re-warg" type="number" min={1} max={20} step={1} value={wf.arg} onChange={(e) => setWf({ ...wf, arg: e.target.value })} /></label>}
+            {ARG_KIND[wf.msg] === "text" && <label>line<input data-testid="re-warg" maxLength={80} value={wf.arg} onChange={(e) => setWf({ ...wf, arg: e.target.value })} /></label>}
             <label>after (s)<input type="number" min={0} max={600} step={0.5} value={wf.delay} onChange={(e) => setWf({ ...wf, delay: Math.max(0, num(e.target.value, 0)) })} /></label>
             <label className="re-chk"><input type="checkbox" checked={wf.once} onChange={(e) => setWf({ ...wf, once: e.target.checked })} />only once</label>
-            <button type="button" className="re-b" data-testid="re-wadd" disabled={!target || !wf.msg} onClick={addWire}>Add wire</button>
+            <button type="button" className="re-b" data-testid="re-wadd" disabled={!target || !wf.msg || (!!ARG_KIND[wf.msg] && !wf.arg.trim())} onClick={addWire}>Add wire</button>
           </div>
         </div>
       )}

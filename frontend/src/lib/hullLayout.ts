@@ -21,7 +21,9 @@ export function shapeOf(seed: string): Shape { return (["box", "oct", "tower", "
 
 /** Rooms and links for the nodes. Sealed (secret) rooms are left out unless `outer`, in which case they sit on a ring of their own outside everything else.
  *  A node whose parent is missing (or sealed and left out) hangs from the nearest ancestor that is there; cycles and orphans cannot hang it. */
-export function layoutHull(nodes: HullNode[], opts: { outer: boolean }): Hull {
+export interface MapOverride { slug: string; x: number | null; z: number | null; level: number | null }
+export const FLOOR_H = FLOOR;
+export function layoutHull(nodes: HullNode[], opts: { outer: boolean; overrides?: readonly MapOverride[] | null }): Hull {
   const byId = new Map(nodes.map((n) => [n.id, n]));
   const shown = (n: HullNode): boolean => !n.secret;
   const real = nodes.filter(shown), realIds = new Set(real.map((n) => n.id));
@@ -102,6 +104,10 @@ export function layoutHull(nodes: HullNode[], opts: { outer: boolean }): Hull {
     list.forEach((s, i) => { const ang = base + (i - (list.length - 1) / 2) * (SLOT / Math.max(outerR, 1)); outerAngles.push(ang); rooms.push(make(s, maxDepth + 1, ang, outerR, true)); });
   }
 
+  if (opts.overrides?.length) { // the owner's moves win over the automatic layout (only for rooms that are shown)
+    const ov = new Map(opts.overrides.map((o) => [o.slug, o]));
+    for (const r of rooms) { const o = ov.get(r.slug); if (!o) continue; if (o.x != null) r.x = o.x; if (o.z != null) r.z = o.z; if (o.level != null && !r.outer) r.y = o.level * FLOOR; }
+  }
   const links: HullLink[] = [];
   const door = (r: HullRoom, tx: number, tz: number): V3 => { const dx = tx - r.x, dz = tz - r.z, L = Math.hypot(dx, dz) || 1, rad = Math.max(r.w, r.d) / 2; return [r.x + (dx / L) * rad, r.y + Math.min(r.h * 0.4, 0.8), r.z + (dz / L) * rad]; };
   const link = (a: HullRoom, b: HullRoom, dashed: boolean): HullLink => {
