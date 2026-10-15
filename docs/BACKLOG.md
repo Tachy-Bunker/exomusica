@@ -148,3 +148,7 @@ Corridors editable (things, wires, mood). Open: corridor floor/walls/ceiling/sky
 ## fix371
 - Done: per-room dressing density, light shafts, strip bloom, HUD lock readout, damage vignette, Warm industrial preset.
 - Open for the look: emissive wall decals (screens/glyph panels from room text), steam/vent particles on vent greebles, per-wall dressing override, HUD scan-in animation when the visor starts.
+
+## fix372
+- Done: visor scan-in, screens on heavy dressing (animated, reduced-motion aware).
+- Open: vent steam (particles from vent greebles), per-wall dressing override in the Walls tab, dressing preview in the editor (the editor shows the room without greeble today).

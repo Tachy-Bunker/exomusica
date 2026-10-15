@@ -9,7 +9,7 @@ export interface HudIn {
   /** things to scan: positions, and which are already in the logbook */
   scan: readonly { x: number; z: number }[]; scanned: ArrayLike<number>;
   others: Iterable<{ x: number; z: number }>;
-  integ: number; done: number; total: number; name: string; color: string; t: number; locked: boolean; low: boolean; target: string; tdist: number;
+  integ: number; done: number; total: number; name: string; color: string; t: number; locked: boolean; low: boolean; target: string; tdist: number; /** when the visor was switched on (seconds, same clock as t) */ on: number;
 }
 
 const CY = "#7fe9ff", CY2 = "rgba(127,233,255,.35)", AMB = "#ffb347";
@@ -31,9 +31,11 @@ export function drawHud(c: CanvasRenderingContext2D, w: number, h: number, s: Hu
   const m = 14 * u, fx = Math.cos(s.yaw), fz = Math.sin(s.yaw);
   c.lineWidth = 1.5 * u; c.lineJoin = "miter"; c.lineCap = "butt";
 
+  // scan-in: the brackets unfold and the frame fades up over ~0.6 s after the visor comes on (instant for reduced motion)
+  const sk = REDUCED ? 1 : Math.min(1, Math.max(0, (s.t - s.on) / 0.6)), ke = 1 - (1 - sk) * (1 - sk);
   // frame: four brackets and a faint inner edge so the view reads as seen through a visor
-  c.strokeStyle = CY; c.globalAlpha = 0.75; c.shadowColor = CY; c.shadowBlur = s.low ? 0 : 6;
-  const L = 46 * u, K = 14 * u;
+  c.strokeStyle = CY; c.globalAlpha = 0.75 * ke; c.shadowColor = CY; c.shadowBlur = s.low ? 0 : 6;
+  const L = 46 * u * (0.3 + 0.7 * ke), K = 14 * u;
   bracket(c, m, m, 1, 1, L, K); bracket(c, w - m, m, -1, 1, L, K); bracket(c, m, h - m, 1, -1, L, K); bracket(c, w - m, h - m, -1, -1, L, K);
   c.shadowBlur = 0; c.globalAlpha = 0.18; c.strokeRect(m + 2, m + 2, w - 2 * m - 4, h - 2 * m - 4);
 

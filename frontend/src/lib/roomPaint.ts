@@ -16,7 +16,7 @@ import { inRoom } from "./roomScene";
 import { PROP_BY_ID } from "./roomProps";
 
 /** What the owner built in the room you are in. Set by the room component; the painter draws it when `slug` matches. `edit` shows what visitors never see (triggers, markers, hidden things) and highlights `sel`. */
-export const actorLayer: { slug: string; doc: RoomDoc | null; rt: WireRuntime | null; edit: boolean; sel: string | null; floor: FloorLayer | null; budget: number; now: number; anim: boolean; skyAnim: boolean; skySeen: boolean; visor: boolean; flockAnim: boolean; flockSeen: boolean; fade: boolean; look: Look } = { slug: "", doc: null, rt: null, edit: false, sel: null, floor: null, budget: 260, now: 0, anim: false, skyAnim: false, skySeen: false, visor: false, flockAnim: false, flockSeen: false, fade: false, look: { grade: null, sky: null, flock: null } };
+export const actorLayer: { screenSeen: boolean; slug: string; doc: RoomDoc | null; rt: WireRuntime | null; edit: boolean; sel: string | null; floor: FloorLayer | null; budget: number; now: number; anim: boolean; skyAnim: boolean; skySeen: boolean; visor: boolean; flockAnim: boolean; flockSeen: boolean; fade: boolean; look: Look } = { screenSeen: false, slug: "", doc: null, rt: null, edit: false, sel: null, floor: null, budget: 260, now: 0, anim: false, skyAnim: false, skySeen: false, visor: false, flockAnim: false, flockSeen: false, fade: false, look: { grade: null, sky: null, flock: null } };
 interface ActorStyle { a: string; b: string; top: string; edge: string; faint: string; glowCol: string; pool1: string; pool2: string }
 const styles = new WeakMap<Actor, ActorStyle>();
 function styleOf(a: Actor): ActorStyle {
@@ -191,6 +191,7 @@ export class RoomPainter {
     }
     ctx.lineWidth = 1; ctx.strokeStyle = C.grid; ctx.stroke();
 
+    actorLayer.screenSeen = false;
     // walls, far to near (insertion sort of a handful of indices)
     for (let i = 0; i < n; i++) { const dx = this.wallMid[i * 2] - eye.x, dz = this.wallMid[i * 2 + 1] - eye.z; this.dist[i] = dx * dx + dz * dz; let j = i; while (j > 0 && this.dist[this.order[j - 1]] < this.dist[i]) { this.order[j] = this.order[j - 1]; j--; } this.order[j] = i; }
     for (let oi = 0; oi < n; oi++) {
@@ -219,10 +220,10 @@ export class RoomPainter {
     const clear = (u: number, ww: number): boolean => { for (const f of free) if (Math.abs(f - u) < ww / 2 + 1.3) return false; return u - ww / 2 > 0.3 && u + ww / 2 < len - 0.3; };
     const dr = actorLayer.doc && actorLayer.slug === w.slug ? actorLayer.doc.dress : 2, n = Math.round((len < 3 ? 2 : len < 6 ? 4 : 6) * (dr === 1 ? 0.5 : dr === 3 ? 1.7 : 1));
     for (let k = 0; k < n; k++) {
-      const kind = Math.floor(rnd() * 5), ww = kind === 1 ? 1.4 + rnd() * 1.6 : kind === 4 ? 1.2 : 0.5 + rnd() * 0.9, u = ww / 2 + 0.4 + rnd() * Math.max(0, len - ww - 0.8);
+      const kind = Math.floor(rnd() * (dr === 3 ? 6 : 5)), ww = kind === 1 ? 1.4 + rnd() * 1.6 : kind === 4 ? 1.2 : kind === 5 ? 1.6 + rnd() * 0.8 : 0.5 + rnd() * 0.9, u = ww / 2 + 0.4 + rnd() * Math.max(0, len - ww - 0.8);
       if (!clear(u, ww)) continue;
-      const y = kind === 1 ? Hh - 0.55 : kind === 2 ? 0.08 : kind === 4 ? Hh - 0.8 : 0.7 + rnd() * (Hh - 2.2);
-      out.push(kind, u, y, ww, kind === 2 ? 0.28 : 0.3 + rnd() * 0.45);
+      const y = kind === 1 ? Hh - 0.55 : kind === 2 ? 0.08 : kind === 4 ? Hh - 0.8 : kind === 5 ? 0.9 + rnd() * Math.max(0, Hh - 2.4) : 0.7 + rnd() * (Hh - 2.2);
+      out.push(kind, u, y, ww, kind === 2 ? 0.28 : kind === 5 ? 0.85 : 0.3 + rnd() * 0.45);
     }
     return Float32Array.from(out);
   }
@@ -234,7 +235,7 @@ export class RoomPainter {
     ctx.beginPath(); // structure: vents, panels, hazard stripes, cable runs
     for (let k = 0; k < g.length; k += 5) {
       const kind = g[k], u = g[k + 1], y = g[k + 2], ww = g[k + 3], hh = g[k + 4], x0 = a[0] + ux * (u - ww / 2), z0 = a[1] + uz * (u - ww / 2), x1 = a[0] + ux * (u + ww / 2), z1 = a[1] + uz * (u + ww / 2);
-      if (kind === 4) continue;
+      if (kind === 4 || kind === 5) continue;
       if (kind === 1) { // a cable run: sags between two clips
         let px = x0, py = y, pz = z0;
         for (let q = 1; q <= 6; q++) { const t = q / 6, nx = x0 + (x1 - x0) * t, nz = z0 + (z1 - z0) * t, ny = y - Math.sin(t * Math.PI) * 0.35; this.seg(px, py, pz, nx, ny, nz); px = nx; py = ny; pz = nz; }
@@ -249,6 +250,19 @@ export class RoomPainter {
     ctx.lineWidth = 1; ctx.strokeStyle = this.C.line; ctx.stroke();
     ctx.beginPath(); let any = false; // light strips: the one warm thing on the wall
     for (let k = 0; k < g.length; k += 5) if (g[k] === 4) { const u = g[k + 1], ww = g[k + 3], y = g[k + 2]; this.seg(a[0] + ux * (u - ww / 2), y, a[1] + uz * (u - ww / 2), a[0] + ux * (u + ww / 2), y, a[1] + uz * (u + ww / 2)); any = true; }
+    // screens (heavy dressing only): a dark panel with three amber readout bars that slide slowly (≈0.1 Hz); reduced motion draws them still
+    for (let k = 0; k < g.length; k += 5) if (g[k] === 5) {
+      const u = g[k + 1], y = g[k + 2], ww = g[k + 3], hh = g[k + 4], x0 = a[0] + ux * (u - ww / 2), z0 = a[1] + uz * (u - ww / 2), x1 = a[0] + ux * (u + ww / 2), z1 = a[1] + uz * (u + ww / 2);
+      if (this.quad(x0, y, z0, x1, y, z1, x1, y + hh, z1, x0, y + hh, z0)) { ctx.fillStyle = "#0d0a06"; ctx.fill(); }
+      ctx.beginPath(); ctx.lineWidth = 2; ctx.strokeStyle = this.C.edge; this.seg(x0, y, z0, x1, y, z1); this.seg(x1, y, z1, x1, y + hh, z1); this.seg(x1, y + hh, z1, x0, y + hh, z0); this.seg(x0, y + hh, z0, x0, y, z0); ctx.stroke();
+      ctx.beginPath(); ctx.lineWidth = 3; ctx.strokeStyle = "#ffb347"; const ph = u * 3.1, t = REDUCED ? 0 : actorLayer.now;
+      for (let r = 0; r < 3; r++) {
+        const by = y + hh * (0.25 + 0.25 * r), fr = REDUCED ? 0.7 : 0.55 + 0.4 * Math.sin(t * 0.6 + ph + r * 1.3), e = 0.12, bx0 = u - ww / 2 + ww * e, bx1 = u - ww / 2 + ww * (e + (1 - 2 * e) * fr);
+        this.seg(a[0] + ux * bx0, by, a[1] + uz * bx0, a[0] + ux * bx1, by, a[1] + uz * bx1);
+      }
+      ctx.stroke();
+      if (!REDUCED) actorLayer.screenSeen = true;
+    }
     if (any) { const ga = ctx.globalAlpha, gc = ctx.globalCompositeOperation; const lg = actorLayer.look.grade, wc = lg && lg.tintA > 0 ? lg.tint : this.C.edge; ctx.globalCompositeOperation = "lighter"; ctx.globalAlpha = ga * 0.16; ctx.lineWidth = 9; ctx.strokeStyle = wc; ctx.stroke(); ctx.globalAlpha = ga * 0.3; ctx.lineWidth = 4.5; ctx.stroke(); ctx.globalCompositeOperation = gc; ctx.globalAlpha = ga; ctx.globalAlpha = ga * 0.8; ctx.lineWidth = 2; ctx.strokeStyle = "#fff"; ctx.stroke(); ctx.globalAlpha = ga; }
   }
   // ---- light shafts: slanted additive wedges from the ceiling to the floor, seeded per room; they breathe slowly (≈0.15 Hz, never a flash)

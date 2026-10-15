@@ -133,11 +133,11 @@ export function BranchRoom({ tick, world, color, next, wantNext, onAdvance, go, 
   /** Milestone keys the community has reached (null until known): things with a gate appear or vanish by it. */
   const reachedRef = useRef<ReadonlySet<string> | null>(null);
   /** Hazards: integrity (1 = whole), whether the room / corridor has any, the effect under you right now. */
-  const [hud, setHud] = useState(hudOn), hudRef = useRef(hud), hudC = useRef<HTMLCanvasElement>(null), hudAt = useRef(0), hudIn = useRef<HudIn | null>(null), hudN = useRef({ at: 0, list: null as readonly { x: number; z: number }[] | null, flags: new Uint8Array(0), done: 0 });
+  const [hud, setHud] = useState(hudOn), hudRef = useRef(hud), hudC = useRef<HTMLCanvasElement>(null), hudAt = useRef(0), hudIn = useRef<HudIn | null>(null), hudOnAt = useRef(0), hudN = useRef({ at: 0, list: null as readonly { x: number; z: number }[] | null, flags: new Uint8Array(0), done: 0 });
   hudRef.current = hud;
   const hudMount = useCallback((el: HTMLCanvasElement | null) => { // size the visor canvas as it appears (it is created when the visor is switched on or the editor closes)
     hudC.current = el; const st = stage.current; if (!el || !st) return; const d = dprBase.current, w = st.clientWidth, h = st.clientHeight;
-    el.width = Math.max(1, Math.round(w * d)); el.height = Math.max(1, Math.round(h * d)); el.getContext("2d")?.setTransform(d, 0, 0, d, 0, 0); hudAt.current = 0; dirty.current = true; wakeRef.current();
+    el.width = Math.max(1, Math.round(w * d)); el.height = Math.max(1, Math.round(h * d)); el.getContext("2d")?.setTransform(d, 0, 0, d, 0, 0); hudAt.current = 0; hudOnAt.current = performance.now() / 1000; dirty.current = true; wakeRef.current();
   }, []);
   const integ = useRef(1), hazRoom = useRef(false), hazCorr = useRef(false), hz = useRef<HazardFx>({ slow: 1, px: 0, pz: 0, drain: 0 }), hz2 = useRef<HazardFx>({ slow: 1, px: 0, pz: 0, drain: 0 }), integEl = useRef<HTMLDivElement>(null), hurtEl = useRef<HTMLDivElement>(null), integShown = useRef(-1), softT = useRef(0);
   /** Wire messages for the player (teleport to a marker, say a line, play a sound); `ox`,`oz` shift a corridor's frame into the room's. */
@@ -454,7 +454,7 @@ export function BranchRoom({ tick, world, color, next, wantNext, onAdvance, go, 
       } else { const v = scanView.current; v.x = sc.s.x; v.y = sc.s.y; v.z = sc.s.z; v.p = p; scanTick = true; }
     }
     const animating = wantsDrone && a.playing && !document.hidden; // a playing drone breathes: repaint about 11 times a second, not 60
-    const scrolling = (actorLayer.anim || (actorLayer.skyAnim && actorLayer.skySeen) || (actorLayer.flockAnim && actorLayer.flockSeen) || (corrAnim.current && !!linkRef.current)) && actorLayer.slug === W.slug || actorLayer.fade && !document.hidden; // flowing floors: about 15 a second
+    const scrolling = (actorLayer.anim || actorLayer.screenSeen || (actorLayer.skyAnim && actorLayer.skySeen) || (actorLayer.flockAnim && actorLayer.flockSeen) || (corrAnim.current && !!linkRef.current)) && actorLayer.slug === W.slug || actorLayer.fade && !document.hidden; // flowing floors: about 15 a second
     const movers = (rtRef.current?.moving.size ?? 0) + (corrLayer.rt?.moving.size ?? 0) > 0 || moveAnim.current; // things that travel: repaint about 30 a second
     const tick = (animating && now - lastPaint.current >= 90) || (scrolling && now - lastPaint.current >= 66) || (movers && !document.hidden && now - lastPaint.current >= 33);
     if (tpRef.current) { r.eye = { ...r.eye, x: tpRef.current.x, z: tpRef.current.z, y: 0, vy: 0 }; r.moved = true; tpRef.current = null; }
@@ -505,8 +505,8 @@ export function BranchRoom({ tick, world, color, next, wantNext, onAdvance, go, 
         if (hx) {
           const cor = spaceRef.current === "corridor", list = cor ? corrScan.current : scanList.current, hn = hudN.current;
           if (hn.list !== list || now - hn.at > 1000) { hn.at = now; hn.list = list; if (hn.flags.length !== list.length) hn.flags = new Uint8Array(list.length); const dn = scannedIds(); let c2 = 0; for (let i = 0; i < list.length; i++) { const v = dn.has(scanId("lore", list[i].key)) ? 1 : 0; hn.flags[i] = v; c2 += v; } hn.done = c2; }
-          let hi = hudIn.current; if (!hi) hi = hudIn.current = { x: 0, z: 0, yaw: 0, verts: W.verts, doors: W.doors, scan: list, scanned: hn.flags, others: others.current.values(), integ: 1, done: 0, total: 0, name: "", color: "", t: 0, locked: false, low: false, target: "", tdist: 0 };
-          hi.x = r.eye.x; hi.z = r.eye.z; hi.yaw = r.eye.yaw; hi.verts = W.verts; hi.doors = W.doors; hi.scan = list; hi.scanned = hn.flags; hi.others = others.current.values(); hi.integ = integ.current; hi.done = hn.done; hi.total = list.length; hi.name = W.name; hi.color = W.color ?? color; hi.t = now / 1000; hi.locked = !!lock.current; hi.target = lock.current ? lock.current.label : ""; hi.tdist = lock.current ? Math.hypot(lock.current.x - r.eye.x, lock.current.z - r.eye.z) : 0; hi.low = gov.current.scale < 1;
+          let hi = hudIn.current; if (!hi) hi = hudIn.current = { x: 0, z: 0, yaw: 0, verts: W.verts, doors: W.doors, scan: list, scanned: hn.flags, others: others.current.values(), integ: 1, done: 0, total: 0, name: "", color: "", t: 0, locked: false, low: false, target: "", tdist: 0, on: 0 };
+          hi.x = r.eye.x; hi.z = r.eye.z; hi.yaw = r.eye.yaw; hi.verts = W.verts; hi.doors = W.doors; hi.scan = list; hi.scanned = hn.flags; hi.others = others.current.values(); hi.integ = integ.current; hi.done = hn.done; hi.total = list.length; hi.name = W.name; hi.color = W.color ?? color; hi.t = now / 1000; hi.locked = !!lock.current; hi.target = lock.current ? lock.current.label : ""; hi.on = hudOnAt.current; hi.tdist = lock.current ? Math.hypot(lock.current.x - r.eye.x, lock.current.z - r.eye.z) : 0; hi.low = gov.current.scale < 1;
           drawHud(hx, sz.w, sz.h, hi);
         }
       }

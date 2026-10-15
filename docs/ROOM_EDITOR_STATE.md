@@ -99,3 +99,8 @@ Older list: see `docs/BACKLOG.md` (Monthly challenge, Twelve Artifacts, Hull, Em
 - `.rm-hurt`: edge vignette, opacity = 1 − integrity (≤ .85), eased by CSS (.5 s), set when the integrity step changes. Always on, independent of the visor.
 - Test: `_scratch/e2e_fix371.py`; roomdoc unit tests (both copies). Backend `_scratch/roomdoc.test.ts` was rewritten small (the original was overwritten by accident; scratch only).
 - Fixed in fix371: `addWire` used `wf.ev` left over from the previously selected thing when a pick came right after a selection change (the select showed the first event but the state held another kind's), so the wire was silently dropped by cleanDoc. It now validates the event against the selected thing's kind. Visor sweep and shaft breathing stand still under `prefers-reduced-motion`.
+
+## fix372 additions
+- Visor scan-in: when the visor comes on (or the canvas remounts after the editor closes), the brackets unfold and the frame fades up over 0.6 s (`HudIn.on`, set in `hudMount`). Instant under reduced motion.
+- Heavy dressing (`dress` 3) adds **screens**: a dark panel 0.85 m tall, 1.6–2.4 m wide, with three amber readout bars sliding at about 0.1 Hz. They are the only animated wall detail, so `actorLayer.screenSeen` makes the room repaint at the scrolling rate (~15 Hz) only while a screen is in view and not under reduced motion. Normal and light dressing draw exactly as before (the kind roll only changes for heavy).
+- Test: `_scratch/e2e_fix372.py`.
