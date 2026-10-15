@@ -146,6 +146,10 @@ export function BranchRoom({ tick, world, color, next, wantNext, onAdvance, go, 
   }, [syncArt, applyLook]);
   /** Whatever is being edited (the room, or the corridor) becomes the live content. */
   const applyDoc = useCallback((d: RoomDoc, run: boolean) => { if (corrEdit.current) useCorr(d, corrEdit.current.world.slug, run); else useDoc(d, wref.current.slug, run); }, [useCorr, useDoc]);
+  useEffect(() => { // the room behind the door you are walking to: fetch its document, its themes and the milestones now, so crossing finds everything ready and its look does not arrive late
+    if (!next) return; const slugs = [next.slug, ...(next.lineage ?? []).slice(0, 8)];
+    void getJson(`/api/room-doc/${next.slug}`).catch(() => undefined); for (const sl of slugs) void getJson(`/api/room-doc/${themeKey(sl)}`).catch(() => undefined); void loadMilestones().catch(() => undefined);
+  }, [next]);
   useEffect(() => { // load the room's document
     if (corrEdit.current) { corrEdit.current = null; corrLayer.edit = false; stash.current = null; setCorrW(null); }
     hist.current = { undo: [], redo: [], key: "", at: 0 }; let dead = false; setEditing(false); setPlayTest(false); setSel(null); setErr(""); setThemeMsg("");
@@ -368,7 +372,7 @@ export function BranchRoom({ tick, world, color, next, wantNext, onAdvance, go, 
       } else { const v = scanView.current; v.x = sc.s.x; v.y = sc.s.y; v.z = sc.s.z; v.p = p; scanTick = true; }
     }
     const animating = wantsDrone && a.playing && !document.hidden; // a playing drone breathes: repaint about 11 times a second, not 60
-    const scrolling = (actorLayer.anim || (actorLayer.skyAnim && actorLayer.skySeen) || (actorLayer.flockAnim && actorLayer.flockSeen) || (corrAnim.current && !!linkRef.current)) && actorLayer.slug === W.slug && !document.hidden; // flowing floors: about 15 a second
+    const scrolling = (actorLayer.anim || (actorLayer.skyAnim && actorLayer.skySeen) || (actorLayer.flockAnim && actorLayer.flockSeen) || (corrAnim.current && !!linkRef.current)) && actorLayer.slug === W.slug || actorLayer.fade && !document.hidden; // flowing floors: about 15 a second
     const tick = (animating && now - lastPaint.current >= 90) || (scrolling && now - lastPaint.current >= 66);
     const changed = r.moved || !!la.yaw || !!la.pitch || gliding || droneMoved || tick || aimMoved || linkMoved || echoTick || scanTick || ghostTick || docMoved; eye.current = r.eye;
     if (!traveling.current && !still) {
@@ -396,19 +400,20 @@ export function BranchRoom({ tick, world, color, next, wantNext, onAdvance, go, 
           const ctx = c.getContext("2d");
           if (ctx) {
             actorLayer.now = now / 1000; actorLayer.budget = gov.current.scale >= 1 ? 260 : gov.current.scale >= 0.75 ? 120 : 0;
-            lastPaint.current = now; const dv = dview.current; dv.playing = a.playing; dv.title = a.title; dv.t = now / 1000;
+            const gap = now - lastPaint.current; lastPaint.current = now; const dv = dview.current; dv.playing = a.playing; dv.title = a.title; dv.t = now / 1000;
             const fv = fxv.current; fv.now = now; fv.echo = echoBusy ? ef : null; fv.scan = scanSt.current ? scanView.current : null;
             const L = linkRef.current, spo = sp.current; spo.link = L; spo.open = L ? L.open : 0; spo.corridor = !!L && spaceRef.current === "corridor";
             const t0 = performance.now(); const stt = paintRoom(ctx, w, h, W, r.eye, W.color ?? color, t, (() => { const gp = gpool.current; if (!others.current.size && !gp.count) return NO_ONE; const dl = drawList.current; dl.length = 0; for (const o of others.current.values()) dl.push(o); for (let i = 0; i < gp.count; i++) dl.push(gp.items[i]); return dl; })(), wantsDrone ? dv : null, lock.current, L ? spo : null, fv); const ms = (performance.now() - t0) * perfMul.current;
             if (!wantsDrone) dv.hit = null;
-            if (gov.current.observe(ms, now) !== null) { fitRef.current(); dirty.current = true; }
+            // the time the paint took in JS is not all of it (a busy GPU or compositor shows up only as frames arriving late), so a continuous run of frames also counts by its spacing
+            if (gov.current.observe(gap < 60 ? Math.max(ms, gap - 8) : ms, now) !== null) { fitRef.current(); dirty.current = true; }
             if (perfOn.current && perfEl.current && now - perfAt.current > 500) { perfAt.current = now; perfEl.current.textContent = `${gov.current.averageMs.toFixed(1)} ms avg · ${gov.current.p95().toFixed(1)} p95 · scale ${gov.current.scale} · ${stt.polys} polys`; }
           }
         }
         ++drawn.current; if (now - dsAt2.current > 100) { dsAt2.current = now; st.dataset.scale = String(gov.current.scale); const hh = dview.current.hit; st.dataset.drone = wantsDrone && hh ? `${Math.round(hh.x)},${Math.round(hh.y)}` : ""; st.dataset.drawn = String(drawn.current); }
       }
     }
-    const more = !!(changed || animating || scrolling || echoBusy || pendingPaint.current || dirty.current || (!still && (k.size || stick.current.x || stick.current.y || drag.current)));
+    const more = !!(changed || animating || scrolling || actorLayer.fade || echoBusy || pendingPaint.current || dirty.current || (!still && (k.size || stick.current.x || stick.current.y || drag.current)));
     if (more || gpool.current.active) raf.current = requestAnimationFrame(frame); else { last.current = 0; flushDs(); if (ghosts.current.length) { window.clearTimeout(ghostT.current); ghostT.current = window.setTimeout(() => wakeRef.current(), Math.min(30000, Math.max(250, gpool.current.nextStartMs)) + 40); } }
   }, [color, go, onLocked, showToast, flushDs, solve, openLink, ensureFx, showCard]);
 

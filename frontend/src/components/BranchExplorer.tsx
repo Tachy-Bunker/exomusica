@@ -1,7 +1,7 @@
 import { roomHref, roomsFirst } from "../lib/roomFirst";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
-import { clampCam, defaultCam, focalOf, isTopView, panBy, pick, project, upsideDown, wrapAngle, type Cam } from "../lib/hullCamera";
+import { clampCam, defaultCam, focalOf, isTopView, panBy, walkBy, pick, project, upsideDown, wrapAngle, type Cam } from "../lib/hullCamera";
 import { pipeSegments, roomMesh, type Hull, type HullRoom } from "../lib/hullLayout";
 import type { RoomState } from "../lib/chart";
 
@@ -144,7 +144,7 @@ export function BranchExplorer({ hull, states, lastSlug, playingSlug, pulses, on
     const a = -c.yaw - Math.PI / 2; ctx.fillStyle = "#ff9d3c"; ctx.beginPath();
     ctx.moveTo(cx0 + Math.cos(a) * 24, cy0 + Math.sin(a) * 24 * (ry / 30)); ctx.lineTo(cx0 + Math.cos(a + 2.5) * 11, cy0 + Math.sin(a + 2.5) * 11 * (ry / 30)); ctx.lineTo(cx0 + Math.cos(a - 2.5) * 11, cy0 + Math.sin(a - 2.5) * 11 * (ry / 30)); ctx.closePath(); ctx.fill();
     // numbers for tests and for anyone curious: kept on the element, not in React state
-    const el = wrap.current; if (el) { el.dataset.yaw = c.yaw.toFixed(3); el.dataset.pitch = c.pitch.toFixed(3); el.dataset.dist = c.dist.toFixed(2); el.dataset.tx = c.tx.toFixed(2); el.dataset.tz = c.tz.toFixed(2); el.dataset.drawn = String(Number(el.dataset.drawn ?? 0) + 1); }
+    const el = wrap.current; if (el) { el.dataset.yaw = c.yaw.toFixed(3); el.dataset.pitch = c.pitch.toFixed(3); el.dataset.dist = c.dist.toFixed(2); el.dataset.tx = c.tx.toFixed(2); el.dataset.ty = c.ty.toFixed(2); el.dataset.tz = c.tz.toFixed(2); el.dataset.drawn = String(Number(el.dataset.drawn ?? 0) + 1); }
   }, [geo, pipes, byId, stateOf, lastRoom, playRoom, pulses, hull.radius]);
 
   const frame = useCallback(() => {
@@ -259,7 +259,7 @@ export function BranchExplorer({ hull, states, lastSlug, playingSlug, pulses, on
     else if (key === "ArrowUp") cam.current = clampCam({ ...c, pitch: c.pitch - 0.07 }, hull.radius);
     else if (key === "ArrowDown") cam.current = clampCam({ ...c, pitch: c.pitch + 0.07 }, hull.radius);
     else if (code === "KeyA") cam.current = panBy(c, 40, 0, w, h); else if (code === "KeyD") cam.current = panBy(c, -40, 0, w, h);
-    else if (code === "KeyW") cam.current = panBy(c, 0, 40, w, h); else if (code === "KeyS") cam.current = panBy(c, 0, -40, w, h);
+    else if (code === "KeyW") cam.current = walkBy(c, 40, w, h); else if (code === "KeyS") cam.current = walkBy(c, -40, w, h);
     else if (key === "+" || key === "=" || code === "NumpadAdd" || code === "PageUp") cam.current = clampCam({ ...c, dist: c.dist * 0.85 }, hull.radius);
     else if (key === "-" || key === "_" || code === "NumpadSubtract" || code === "PageDown") cam.current = clampCam({ ...c, dist: c.dist / 0.85 }, hull.radius);
     else if (code === "KeyT") { manual = false; fly({ pitch: isTopView(c) ? defaultCam(hull.radius).pitch : Math.PI / 2 }); }

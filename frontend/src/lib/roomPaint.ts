@@ -15,7 +15,7 @@ import { inRoom } from "./roomScene";
 import { PROP_BY_ID } from "./roomProps";
 
 /** What the owner built in the room you are in. Set by the room component; the painter draws it when `slug` matches. `edit` shows what visitors never see (triggers, markers, hidden things) and highlights `sel`. */
-export const actorLayer: { slug: string; doc: RoomDoc | null; rt: WireRuntime | null; edit: boolean; sel: string | null; floor: FloorLayer | null; budget: number; now: number; anim: boolean; skyAnim: boolean; skySeen: boolean; visor: boolean; flockAnim: boolean; flockSeen: boolean; look: Look } = { slug: "", doc: null, rt: null, edit: false, sel: null, floor: null, budget: 260, now: 0, anim: false, skyAnim: false, skySeen: false, visor: false, flockAnim: false, flockSeen: false, look: { grade: null, sky: null, flock: null } };
+export const actorLayer: { slug: string; doc: RoomDoc | null; rt: WireRuntime | null; edit: boolean; sel: string | null; floor: FloorLayer | null; budget: number; now: number; anim: boolean; skyAnim: boolean; skySeen: boolean; visor: boolean; flockAnim: boolean; flockSeen: boolean; fade: boolean; look: Look } = { slug: "", doc: null, rt: null, edit: false, sel: null, floor: null, budget: 260, now: 0, anim: false, skyAnim: false, skySeen: false, visor: false, flockAnim: false, flockSeen: false, fade: false, look: { grade: null, sky: null, flock: null } };
 interface ActorStyle { a: string; b: string; top: string; edge: string; faint: string; glowCol: string; pool1: string; pool2: string }
 const styles = new WeakMap<Actor, ActorStyle>();
 function styleOf(a: Actor): ActorStyle {
@@ -278,26 +278,46 @@ export class RoomPainter {
         for (let x = -Math.ceil(m / s) * s; x < m; x += s) for (let z = -Math.ceil(m / s) * s; z < m; z += s) if (inRoom(this.world, x + s / 2, z + s / 2)) cells.push({ x, z });
         this.ceilCells = cells;
       }
-      const base = ctx.getTransform().a, hw = this.W / 2, hh = this.H / 2, f = this.f, T = sheetTile(sheet); let left = Math.floor(this.tilesLeft - L.budget / 2);
+      const base = ctx.getTransform().a, T = sheetTile(sheet); let left = Math.floor(this.tilesLeft - L.budget / 2);
       for (const c of this.ceilCells!) {
         const cx = c.x + s / 2 - eye.x, cz = c.z + s / 2 - eye.z; if (cx * cx + cz * cz > 100) continue;
-        this.cam(c.x, Hh, c.z); if (this.qz < NEAR) continue; const ax = hw + (this.qx * f) / this.qz, ay = hh - (this.qy * f) / this.qz;
-        this.cam(c.x + s, Hh, c.z); if (this.qz < NEAR) continue; const bx = hw + (this.qx * f) / this.qz, by = hh - (this.qy * f) / this.qz;
-        this.cam(c.x, Hh, c.z + s); if (this.qz < NEAR) continue; const dx = hw + (this.qx * f) / this.qz, dy = hh - (this.qy * f) / this.qz;
-        ctx.setTransform(base * (bx - ax), base * (by - ay), base * (dx - ax), base * (dy - ay), base * ax, base * ay);
-        ctx.drawImage(sheet, frac((c.x + t.scroll * L.now) / t.scale) * T, frac(c.z / t.scale) * T, (T * s) / t.scale, (T * s) / t.scale, 0, 0, 1, 1);
-        this.tilesLeft--; if (--left <= 0) break;
+        const before = this.tilesLeft; this.tq(sheet, frac((c.x + t.scroll * L.now) / t.scale) * T, frac(c.z / t.scale) * T, (T * s) / t.scale, (T * s) / t.scale, c.x, Hh, c.z, s, 0, 0, 0, 0, s, 0, base);
+        left -= before - this.tilesLeft; if (left <= 0) break;
       }
       ctx.setTransform(base, 0, 0, base, 0, 0);
     }
     ctx.restore();
+  }
+  /** One textured parallelogram P, P+U, P+V (3D) drawn from a source rectangle. A flat picture stretched by three corners is only right when the tile barely changes depth, so a tile that is near, or deep for its size, is split in four (twice at most); tiles that are off screen are skipped; a tile that cannot be drawn truthfully is left to the flat colour under it. Never allocates. */
+  private tq(sheet: HTMLCanvasElement, sx: number, sy: number, sw: number, sh: number, ox: number, oy: number, oz: number, ux: number, uy: number, uz: number, vx: number, vy: number, vz: number, lvl: number, base: number): void {
+    if (this.tilesLeft <= 0) return;
+    const hw = this.W / 2, hh = this.H / 2, f = this.f, W = this.W, H = this.H;
+    this.cam(ox, oy, oz); const z0 = this.qz, x0 = hw + (this.qx * f) / z0, y0 = hh - (this.qy * f) / z0;
+    this.cam(ox + ux, oy + uy, oz + uz); const z1 = this.qz, x1 = hw + (this.qx * f) / z1, y1 = hh - (this.qy * f) / z1;
+    this.cam(ox + vx, oy + vy, oz + vz); const z2 = this.qz, x2 = hw + (this.qx * f) / z2, y2 = hh - (this.qy * f) / z2;
+    this.cam(ox + ux + vx, oy + uy + vy, oz + uz + vz); const z3 = this.qz, x3 = hw + (this.qx * f) / z3, y3 = hh - (this.qy * f) / z3;
+    const zmin = Math.min(z0, z1, z2, z3), zmax = Math.max(z0, z1, z2, z3);
+    if (zmax < NEAR) return;
+    if (zmin >= NEAR) { // wholly in front: is any of it on screen?
+      if ((x0 < 0 && x1 < 0 && x2 < 0 && x3 < 0) || (x0 > W && x1 > W && x2 > W && x3 > W) || (y0 < 0 && y1 < 0 && y2 < 0 && y3 < 0) || (y0 > H && y1 > H && y2 > H && y3 > H)) return;
+      if (zmax <= zmin * 1.3 || lvl >= 2) {
+        if (zmax > zmin * 2.4 || zmin < 0.3) return; // still too bent to be truthful: flat colour only
+        this.ctx.setTransform(base * (x1 - x0), base * (y1 - y0), base * (x2 - x0), base * (y2 - y0), base * x0, base * y0);
+        this.ctx.drawImage(sheet, sx, sy, sw, sh, 0, 0, 1, 1); this.tilesLeft--; return;
+      }
+    } else if (lvl >= 2) return;
+    const hx = sw / 2, hy = sh / 2, au = ux / 2, bu = uy / 2, cu = uz / 2, av = vx / 2, bv = vy / 2, cv = vz / 2;
+    this.tq(sheet, sx, sy, hx, hy, ox, oy, oz, au, bu, cu, av, bv, cv, lvl + 1, base);
+    this.tq(sheet, sx + hx, sy, hx, hy, ox + au, oy + bu, oz + cu, au, bu, cu, av, bv, cv, lvl + 1, base);
+    this.tq(sheet, sx, sy + hy, hx, hy, ox + av, oy + bv, oz + cv, au, bu, cu, av, bv, cv, lvl + 1, base);
+    this.tq(sheet, sx + hx, sy + hy, hx, hy, ox + au + av, oy + bu + bv, oz + cu + cv, au, bu, cu, av, bv, cv, lvl + 1, base);
   }
   private flatCol = new Map<string, string>(); private tilesLeft = 0;
   private flatOf(kind: string, tint: string): string { const a = texAvg(kind); if (a) return a; let c = this.flatCol.get(tint); if (!c) { c = rgba(tint, 0.2); this.flatCol.set(tint, c); } return c; }
   /** Strips of texture on wall `i`: a flat tint for the whole strip, then tiles of up to 1 m within 12 m while the budget lasts (walls take at most half of it). */
   private bands(i: number, eye: Eye): void {
     const L = actorLayer, doc = L.doc; if (!doc || L.slug !== this.world.slug) return;
-    const a = this.v[i], b = this.v[(i + 1) % this.n], len = this.wallLen[i], ctx = this.ctx, dx = b[0] - a[0], dz = b[1] - a[1], hw = this.W / 2, hh = this.H / 2, f = this.f;
+    const a = this.v[i], b = this.v[(i + 1) % this.n], len = this.wallLen[i], ctx = this.ctx, dx = b[0] - a[0], dz = b[1] - a[1];
     for (const bd of doc.bands) {
       if (bd.e !== i) continue; const t = doc.tex[bd.m - 1]; if (!t) continue;
       const x0 = a[0] + dx * bd.u0, z0 = a[1] + dz * bd.u0, x1 = a[0] + dx * bd.u1, z1 = a[1] + dz * bd.u1;
@@ -308,37 +328,49 @@ export class RoomPainter {
       const sheet = texSheet(t.kind, t.tint); if (!sheet) continue;
       const span = (bd.u1 - bd.u0) * len, H = bd.y1 - bd.y0, s = Math.min(1, t.scale), nx = Math.ceil(span / s), ny = Math.ceil(H / s); if (nx * ny > 70) continue;
       const base = ctx.getTransform().a;
+      ctx.save(); // clip to the strip's own outline: a tile can never spill past it
+      this.wp[0] = x0; this.wp[1] = bd.y0; this.wp[2] = z0; this.wp[3] = x1; this.wp[4] = bd.y0; this.wp[5] = z1; this.wp[6] = x1; this.wp[7] = bd.y1; this.wp[8] = z1; this.wp[9] = x0; this.wp[10] = bd.y1; this.wp[11] = z0;
+      if (!this.poly(4)) { ctx.restore(); continue; } ctx.clip();
+      const T = sheetTile(sheet);
       for (let kx = 0; kx < nx; kx++) {
         const w = Math.min(s, span - kx * s), uA = bd.u0 * len + kx * s, fa = uA / len, fb = (uA + w) / len;
         for (let ky = 0; ky < ny; ky++) {
-          const h = Math.min(s, H - ky * s), top = bd.y1 - ky * s;
-          this.cam(a[0] + dx * fa, top, a[1] + dz * fa); if (this.qz < NEAR) continue; const px = hw + (this.qx * f) / this.qz, py = hh - (this.qy * f) / this.qz;
-          this.cam(a[0] + dx * fb, top, a[1] + dz * fb); if (this.qz < NEAR) continue; const rx = hw + (this.qx * f) / this.qz, ry = hh - (this.qy * f) / this.qz;
-          this.cam(a[0] + dx * fa, top - h, a[1] + dz * fa); if (this.qz < NEAR) continue; const qx = hw + (this.qx * f) / this.qz, qy = hh - (this.qy * f) / this.qz;
-          const T = sheetTile(sheet), sx = frac((uA + (t.scroll * L.now)) / t.scale) * T, sy = frac(-top / t.scale) * T;
-          ctx.setTransform(base * (rx - px), base * (ry - py), base * (qx - px), base * (qy - py), base * px, base * py);
-          ctx.drawImage(sheet, sx, sy, (T * w) / t.scale, (T * h) / t.scale, 0, 0, 1, 1);
-          this.tilesLeft--;
+          if (this.tilesLeft <= 0) break;
+          const h = Math.min(s, H - ky * s), top = bd.y1 - ky * s, sx = frac((uA + (t.scroll * L.now)) / t.scale) * T, sy = frac(-top / t.scale) * T;
+          this.tq(sheet, sx, sy, (T * w) / t.scale, (T * h) / t.scale, a[0] + dx * fa, top, a[1] + dz * fa, dx * (fb - fa), 0, dz * (fb - fa), 0, -h, 0, 0, base);
         }
       }
-      ctx.setTransform(base, 0, 0, base, 0, 0);
+      ctx.setTransform(base, 0, 0, base, 0, 0); ctx.restore();
     }
   }
-  private fogImg: HTMLCanvasElement | null = null; private fogKey = "";
+  private fogImg: HTMLCanvasElement | null = null;
   /** The room's mood: a colour veil, then a fog band across the horizon (one cached gradient stamped once). */
+  // The mood shown eases towards the mood wanted (about 0.8 s), so walking from a plain room into a styled one, or the other way, never pops.
+  private gs = { tr: 0, tg: 0, tb: 0, ta: 0, fr: 0, fg: 0, fb: 0, fd: 0 }; private gsT = 0; private gsKey = ""; private gsFog = "";
   private grade(over?: RoomDoc["grade"]): void {
-    const L = actorLayer, g = over !== undefined ? over : L.slug === this.world.slug ? L.look.grade : null; if (!g) return;
-    const ctx = this.ctx;
-    if (g.fogD > 0 && typeof document !== "undefined") {
-      const key = g.fog + g.fogD; if (key !== this.fogKey || !this.fogImg) {
+    const L = actorLayer, g = over !== undefined ? over : L.slug === this.world.slug ? L.look.grade : null, S = this.gs, ctx = this.ctx;
+    const dt = this.gsT ? Math.min(0.1, Math.max(0, L.now - this.gsT)) : 0.5; this.gsT = L.now; const k = 1 - Math.exp(-dt / 0.28);
+    let tt = S.tr, tg = S.tg, tb = S.tb, ta = 0, ff = S.fr, fg = S.fg, fb = S.fb, fd = 0;
+    if (g) {
+      const t = parseInt(g.tint.slice(1), 16), f = parseInt(g.fog.slice(1), 16); ta = g.tintA; fd = g.fogD; tt = t >> 16; tg = (t >> 8) & 255; tb = t & 255; ff = f >> 16; fg = (f >> 8) & 255; fb = f & 255;
+      if (S.ta < 0.004) { S.tr = tt; S.tg = tg; S.tb = tb; } // coming from nothing: appear in the right colour
+      if (S.fd < 0.01) { S.fr = ff; S.fg = fg; S.fb = fb; }
+    }
+    S.tr += (tt - S.tr) * k; S.tg += (tg - S.tg) * k; S.tb += (tb - S.tb) * k; S.ta += (ta - S.ta) * k; S.fr += (ff - S.fr) * k; S.fg += (fg - S.fg) * k; S.fb += (fb - S.fb) * k; S.fd += (fd - S.fd) * k;
+    const moving = Math.abs(ta - S.ta) > 0.004 || Math.abs(fd - S.fd) > 0.01 || Math.abs(tt - S.tr) + Math.abs(tg - S.tg) + Math.abs(tb - S.tb) > 3 || Math.abs(ff - S.fr) + Math.abs(fg - S.fg) + Math.abs(fb - S.fb) > 3;
+    if (!moving) { S.tr = tt; S.tg = tg; S.tb = tb; S.ta = ta; S.fr = ff; S.fg = fg; S.fb = fb; S.fd = fd; }
+    L.fade = moving;
+    if (S.fd > 0.01 && typeof document !== "undefined") {
+      const fr = Math.round(S.fr), fgc = Math.round(S.fg), fbc = Math.round(S.fb), fdr = Math.round(S.fd * 50) / 50, key = fr + "," + fgc + "," + fbc + "," + fdr;
+      if (key !== this.gsFog || !this.fogImg) {
         const c = this.fogImg ?? document.createElement("canvas"); c.width = 4; c.height = 128; const gg = c.getContext("2d");
-        if (gg) { const gr = gg.createLinearGradient(0, 0, 0, 128); gr.addColorStop(0, rgba(g.fog, 0)); gr.addColorStop(0.5, rgba(g.fog, Math.min(0.85, g.fogD * 0.7))); gr.addColorStop(1, rgba(g.fog, 0)); gg.clearRect(0, 0, 4, 128); gg.fillStyle = gr; gg.fillRect(0, 0, 4, 128); }
-        this.fogImg = c; this.fogKey = key;
+        if (gg) { const col = "#" + ((1 << 24) | (fr << 16) | (fgc << 8) | fbc).toString(16).slice(1), gr = gg.createLinearGradient(0, 0, 0, 128); gr.addColorStop(0, rgba(col, 0)); gr.addColorStop(0.5, rgba(col, Math.min(0.85, fdr * 0.7))); gr.addColorStop(1, rgba(col, 0)); gg.clearRect(0, 0, 4, 128); gg.fillStyle = gr; gg.fillRect(0, 0, 4, 128); }
+        this.fogImg = c; this.gsFog = key;
       }
       const hy = Math.max(-this.H, Math.min(2 * this.H, this.H / 2 + (this.f * this.sp) / Math.max(0.2, this.cp))), bh = this.H * 1.3;
-      ctx.drawImage(this.fogImg, 0, hy - bh / 2, this.W, bh);
+      ctx.drawImage(this.fogImg!, 0, hy - bh / 2, this.W, bh);
     }
-    if (g.tintA > 0) { ctx.globalAlpha = g.tintA; ctx.fillStyle = g.tint; ctx.fillRect(0, 0, this.W, this.H); ctx.globalAlpha = 1; }
+    if (S.ta > 0.004) { const key = Math.round(S.tr) + "," + Math.round(S.tg) + "," + Math.round(S.tb); if (key !== this.gsKey) this.gsKey = key; ctx.globalAlpha = S.ta; ctx.fillStyle = "rgb(" + this.gsKey + ")"; ctx.fillRect(0, 0, this.W, this.H); ctx.globalAlpha = 1; }
   }
   floorPaint(eye: Eye): void {
     const L = actorLayer, fl = L.floor; if (!fl || L.slug !== this.world.slug) return;
@@ -352,21 +384,15 @@ export class RoomPainter {
       if (this.quad(r.x0, 0, r.z0, r.x1, 0, r.z0, r.x1, 0, r.z1, r.x0, 0, r.z1)) { ctx.fillStyle = col; ctx.fill(); }
     }
     let budget = this.tilesLeft; if (budget <= 0) { ctx.restore(); return; }
-    const base = ctx.getTransform().a, R2 = 100, hw = this.W / 2, hh = this.H / 2, f = this.f;
-    // screen position of three corners of each block (cam() is the only projection used)
+    const base = ctx.getTransform().a, R2 = 100;
     for (const b of fl.blocks) {
       const cx = b.x + b.s / 2 - eye.x, cz = b.z + b.s / 2 - eye.z;
       if (cx * cx + cz * cz > R2) continue;
       const t = fl.tex[b.t - 1]; if (!t) continue;
       const sheet = texSheet(t.kind, t.tint); if (!sheet) continue;
-      this.cam(b.x, 0, b.z); if (this.qz < NEAR) continue; const ax = hw + (this.qx * f) / this.qz, ay = hh - (this.qy * f) / this.qz;
-      this.cam(b.x + b.s, 0, b.z); if (this.qz < NEAR) continue; const bx = hw + (this.qx * f) / this.qz, by = hh - (this.qy * f) / this.qz;
-      this.cam(b.x, 0, b.z + b.s); if (this.qz < NEAR) continue; const dx = hw + (this.qx * f) / this.qz, dy = hh - (this.qy * f) / this.qz;
-      this.cam(b.x + b.s, 0, b.z + b.s); if (this.qz < NEAR) continue;
       const T = sheetTile(sheet), u = frac(b.x / t.scale + (t.scroll * L.now) / t.scale) * T, v = frac(b.z / t.scale) * T, sw = (T * b.s) / t.scale;
-      ctx.setTransform(base * (bx - ax), base * (by - ay), base * (dx - ax), base * (dy - ay), base * ax, base * ay);
-      ctx.drawImage(sheet, u, v, sw, sw, 0, 0, 1, 1);
-      if (--budget <= 0) break;
+      this.tilesLeft = budget; this.tq(sheet, u, v, sw, sw, b.x, 0, b.z, b.s, 0, 0, 0, 0, b.s, 0, base); budget = this.tilesLeft;
+      if (budget <= 0) break;
     }
     this.tilesLeft = budget;
     ctx.setTransform(base, 0, 0, base, 0, 0); ctx.restore();

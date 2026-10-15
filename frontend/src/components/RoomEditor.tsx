@@ -40,6 +40,7 @@ export function RoomEditor({ themeNote = "", hasTheme = false, themeMsg = "", on
   const fromPx = (px: number, py: number): [number, number] => [(px - PLAN / 2) / scale + cx, (py - PLAN / 2) / scale + cz];
   const a = doc.actors.find((x) => x.id === sel) ?? null;
   const commit = (actors: Actor[], wires: Wire[] = doc.wires) => onDoc(cleanDoc({ ...doc, actors, wires }));
+  const sv = useRef<HTMLCanvasElement>(null), SIDE_H = Math.ceil(world.H * scale) + 22;
   const [miles, setMiles] = useState<Milestone[]>([]);
   useEffect(() => { let dead = false; loadMilestones().then((l) => { if (!dead) setMiles(l); }).catch(() => undefined); return () => { dead = true; }; }, []);
   const patch = (id: string, p: Partial<Actor>) => onDoc(cleanDoc({ ...doc, actors: doc.actors.map((x) => (x.id === id ? { ...x, ...p } : x)) }), "p:" + id + Object.keys(p).join());
@@ -101,8 +102,12 @@ export function RoomEditor({ themeNote = "", hasTheme = false, themeMsg = "", on
     if (tool === "pick") { if (cells[i]) setMat(cells[i]); return; }
     if (tool === "fill") { if (first && floodFill(cells, i, mat)) setFloor(cells, doc.tex, "fill" + performance.now()); return; }
     if (tool === "brush" && !activeMat) return;
-    if (paintDisc(cells, x, z, size, tool === "erase" ? 0 : mat)) setFloor(cells);
+    // one stamp per frame would leave gaps in a fast stroke: stamp along the line from the last point, then save once
+    const lp = first ? null : lastBrush.current; lastBrush.current = [x, z]; let any = false;
+    if (lp) { const dist = Math.hypot(x - lp[0], z - lp[1]), n = Math.min(60, Math.ceil(dist / Math.max(0.25, size * 0.25))); for (let k = 1; k < n; k++) any = paintDisc(cells, lp[0] + ((x - lp[0]) * k) / n, lp[1] + ((z - lp[1]) * k) / n, size, tool === "erase" ? 0 : mat) || any; }
+    if (paintDisc(cells, x, z, size, tool === "erase" ? 0 : mat) || any) setFloor(cells);
   };
+  const lastBrush = useRef<[number, number] | null>(null);
   // ---- wall bands and mood
   const bandsOn = doc.bands.filter((b) => b.e === edge);
   const addBand = () => {
@@ -130,7 +135,7 @@ export function RoomEditor({ themeNote = "", hasTheme = false, themeMsg = "", on
 
   useEffect(() => { // the plan view
     const c = cv.current, g = c?.getContext("2d"); if (!c || !g) return;
-    const dpr = Math.min(2, window.devicePixelRatio || 1); c.width = PLAN * dpr; c.height = PLAN * dpr; g.setTransform(dpr, 0, 0, dpr, 0, 0);
+    const dpr = Math.min(2, window.devicePixelRatio || 1); if (c.width !== PLAN * dpr) { c.width = PLAN * dpr; c.height = PLAN * dpr; } g.setTransform(dpr, 0, 0, dpr, 0, 0); // resizing a canvas reallocates it: only when the size really changed
     g.clearRect(0, 0, PLAN, PLAN);
     g.beginPath(); world.verts.forEach(([x, z], i) => { const [px, py] = toPx(x, z); if (i) g.lineTo(px, py); else g.moveTo(px, py); }); g.closePath();
     g.fillStyle = "rgba(255,255,255,.04)"; g.fill(); g.strokeStyle = "rgba(255,255,255,.55)"; g.lineWidth = 2; g.stroke();
@@ -153,6 +158,24 @@ export function RoomEditor({ themeNote = "", hasTheme = false, themeMsg = "", on
       g.restore();
     }
     const e = where(), [ex, ey] = toPx(e.x, e.z); g.fillStyle = "#fff"; g.beginPath(); g.arc(ex, ey, 3.5, 0, 7); g.fill(); g.strokeStyle = "#fff"; g.beginPath(); g.moveTo(ex, ey); g.lineTo(ex + Math.cos(e.yaw) * 12, ey + Math.sin(e.yaw) * 12); g.stroke();
+    // side view: heights at the same scale as the plan, so a tall thing looks tall next to the ceiling
+    const sc = sv.current, sg = sc?.getContext("2d");
+    if (sc && sg) {
+      const hpx = Math.ceil(world.H * scale) + 22, floorY = hpx - 8, Y = (m: number) => floorY - m * scale; if (sc.height !== hpx * dpr || sc.width !== PLAN * dpr) { sc.width = PLAN * dpr; sc.height = hpx * dpr; } sg.setTransform(dpr, 0, 0, dpr, 0, 0); sg.clearRect(0, 0, PLAN, hpx);
+      sg.fillStyle = "rgba(255,255,255,.04)"; sg.fillRect(0, Y(world.H), PLAN, floorY - Y(world.H)); sg.strokeStyle = "rgba(255,255,255,.55)"; sg.lineWidth = 1.5; sg.beginPath(); sg.moveTo(0, floorY); sg.lineTo(PLAN, floorY); sg.moveTo(0, Y(world.H)); sg.lineTo(PLAN, Y(world.H)); sg.stroke();
+      sg.setLineDash([4, 4]); sg.strokeStyle = "rgba(255,255,255,.3)"; sg.beginPath(); sg.moveTo(0, Y(1.6)); sg.lineTo(PLAN, Y(1.6)); sg.stroke(); sg.setLineDash([]);
+      sg.fillStyle = "rgba(255,255,255,.7)"; sg.font = "10px sans-serif"; sg.fillText(`ceiling ${world.H} m`, 4, Y(world.H) - 3); sg.fillText("eye 1.6 m", 4, Y(1.6) - 3);
+      for (const o of doc.actors) {
+        const cs = Math.cos(o.rot), sn = Math.sin(o.rot), half = (Math.abs(o.w * cs) + Math.abs(o.d * sn)) / 2, [px] = toPx(o.x, o.z);
+        let lo = 0, hi = o.h;
+        if (o.kind === "pool") { lo = 0; hi = 0.05; } else if (o.kind === "light") { lo = Math.max(0, o.h - 0.1); hi = o.h + 0.1; } else if (o.kind === "marker") hi = 1.6;
+        else if (o.kind === "artifact") { lo = o.mode === 1 ? 0 : 0.6; hi = o.mode === 1 ? 0.05 : 0.6 + o.h; } else if (o.prop === "drifter") { const k = Math.min(1, o.h / 1.8); lo = 0.3 * k + o.h * 0.2; hi = lo + o.h * 0.75; }
+        const x0 = px - Math.max(half, 0.1) * scale, w = Math.max(3, Math.max(half, 0.1) * 2 * scale), over = hi > world.H + 0.01;
+        sg.globalAlpha = o.on ? 1 : 0.4; sg.fillStyle = over ? "#ff6a6a99" : o.color + (o.kind === "ghost" || o.kind === "trigger" ? "33" : "99"); sg.strokeStyle = o.id === sel ? "#fff" : over ? "#ff6a6a" : o.color; sg.lineWidth = o.id === sel ? 2.5 : 1.2;
+        sg.fillRect(x0, Y(hi), w, Math.max(2, Y(lo) - Y(hi))); sg.strokeRect(x0, Y(hi), w, Math.max(2, Y(lo) - Y(hi))); sg.globalAlpha = 1;
+      }
+      if (tab === "walls") for (const b of doc.bands.filter((q) => q.e === edge)) { const t = doc.tex[b.m - 1]; if (!t) continue; sg.fillStyle = t.tint + "aa"; sg.fillRect(PLAN - 10, Y(Math.min(b.y1, world.H)), 8, Math.max(2, Y(b.y0) - Y(Math.min(b.y1, world.H)))); }
+    }
   }); // eslint-disable-line react-hooks/exhaustive-deps
 
   const pick = (px: number, py: number): Actor | null => {
@@ -172,8 +195,19 @@ export function RoomEditor({ themeNote = "", hasTheme = false, themeMsg = "", on
     const [px, py] = rel(e), o = pick(px, py); setSel(o ? o.id : null);
     if (o) { const [x, z] = fromPx(px, py); drag.current = { id: o.id, dx: o.x - x, dz: o.z - z }; cv.current!.setPointerCapture(e.pointerId); }
   };
-  const move = (e: React.PointerEvent) => { if (painting.current) { const [fx, fy] = rel(e); if (tool === "brush" || tool === "erase") stroke(fx, fy, false); return; } const d = drag.current; if (!d) return; const [px, py] = rel(e), [x, z] = fromPx(px, py); patch(d.id, { x: snap(x + d.dx), z: snap(z + d.dz) }); };
-  const up = () => { drag.current = null; painting.current = false; };
+  // pointer moves arrive faster than frames (up to 1000 a second on some mice): handle only the latest one per frame
+  const pendMove = useRef<{ px: number; py: number } | null>(null), moveRaf = useRef(0);
+  const doMove = (px: number, py: number) => {
+    if (painting.current) { if (tool === "brush" || tool === "erase") stroke(px, py, false); return; }
+    const d = drag.current; if (!d) return; const [x, z] = fromPx(px, py); patch(d.id, { x: snap(x + d.dx), z: snap(z + d.dz) });
+  };
+  const doMoveRef = useRef(doMove); doMoveRef.current = doMove;
+  const move = (e: React.PointerEvent) => {
+    if (!painting.current && !drag.current) return;
+    const [px, py] = rel(e); pendMove.current = { px, py };
+    if (!moveRaf.current) moveRaf.current = requestAnimationFrame(() => { moveRaf.current = 0; const m = pendMove.current; pendMove.current = null; if (m) doMoveRef.current(m.px, m.py); });
+  };
+  const up = () => { const m = pendMove.current; pendMove.current = null; if (m && (painting.current || drag.current)) doMoveRef.current(m.px, m.py); drag.current = null; painting.current = false; };
 
   const add = (kind: Kind) => {
     if (doc.actors.length >= MAX_ACTORS) return;
@@ -215,6 +249,7 @@ export function RoomEditor({ themeNote = "", hasTheme = false, themeMsg = "", on
         <button type="button" className="re-b" data-testid="re-close" onClick={onClose} aria-label="Close editor">✕</button>
       </div>
       <canvas ref={cv} className="re-plan" data-testid="re-plan" style={{ width: PLAN, height: PLAN }} onPointerDown={down} onPointerMove={move} onPointerUp={up} onPointerCancel={up} aria-label="Plan view of the room. Click a thing to select it, drag to move it." />
+      <canvas ref={sv} className="re-plan re-side" data-testid="re-side" width={PLAN} height={SIDE_H} style={{ width: PLAN, height: SIDE_H }} aria-label={`Side view: the room is ${world.H} metres high`} />
       <div className="re-tabs" role="tablist">
         <button type="button" role="tab" className="re-b" aria-selected={tab === "things"} data-testid="re-tab-things" onClick={() => setTab("things")}>Things</button>
         {!corridor && <button type="button" role="tab" className="re-b" aria-selected={tab === "floor"} data-testid="re-tab-floor" onClick={() => setTab("floor")}>Floor</button>}
@@ -278,7 +313,7 @@ export function RoomEditor({ themeNote = "", hasTheme = false, themeMsg = "", on
                 <label>To %<input data-testid="re-bu1" type="number" min={0} max={100} step={5} value={bf.u1} onChange={(e) => setBf({ ...bf, u1: num(e.target.value, 100) })} /></label>
                 <span />
                 <label>Low (m)<input data-testid="re-by0" type="number" min={0} step={0.25} value={bf.y0} onChange={(e) => setBf({ ...bf, y0: num(e.target.value, 0) })} /></label>
-                <label>High (m)<input data-testid="re-by1" type="number" min={0} step={0.25} value={bf.y1} onChange={(e) => setBf({ ...bf, y1: num(e.target.value, 2) })} /></label>
+                <label>High (m)<input data-testid="re-by1" type="number" min={0} max={world.H} step={0.25} value={bf.y1} onChange={(e) => setBf({ ...bf, y1: Math.min(world.H, num(e.target.value, 2)) })} /></label>
               </div>
               <div className="re-row"><button type="button" className="re-b" data-testid="re-baddwhole" onClick={() => setBf({ ...bf, u0: 0, u1: 100, y0: 0, y1: Math.round(world.H * 10) / 10 })}>Whole wall</button><button type="button" className="re-b" data-testid="re-badd" onClick={addBand}>Add strip</button></div>
             </div>

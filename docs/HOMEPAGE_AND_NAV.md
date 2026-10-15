@@ -1020,3 +1020,11 @@ No schema change, no server code. Doors between branch rooms no longer play the 
 - Things tab: "+ prop…" adds Spire, Monolith, Broken pylon, Totem, Rubble, Crate stack, Hull plate (these block you) and Empty frame, Ruined arch, Ribcage, Scaffold, Drifting rock (walk-through; the rock floats and bobs slowly). Colour, size and turn work as for any thing; wires, gates and hiding work too.
 - Each prop is 3–6 prisms drawn far to near, so cost is a few polygons. No schema change.
 - Tests: roomdoc.test.ts (props), `e2e_fix367.py`.
+
+## fix368 — texture clipping, lag, mood easing, heights, Explore keys
+- Textured floor, wall strips and ceiling can no longer spill through walls or appear in front of you when you turn: tiles are split or dropped when they bend too much, off-screen tiles are skipped, wall strips are clipped to their outline.
+- Lag: the frame-rate governor also watches how late frames arrive (a busy GPU never showed in the old paint timer); brush strokes run once per frame and fill gaps; the editor plan no longer reallocates its canvas on every change.
+- Mood (tint and fog) eases in and out over under a second when you change rooms or enter/leave a corridor, and while you edit; the next room's document and themes are fetched while you walk to its door.
+- Editor: a side view shows the room height and every thing's height to scale; the wall strip "High" box stops at the ceiling.
+- Explore: W and S slide along the ground (forward/back), never up or down.
+- Tests: hull.test.ts (walkBy), `e2e_fix368.py`.

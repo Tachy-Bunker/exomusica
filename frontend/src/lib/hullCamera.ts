@@ -37,6 +37,12 @@ export function panBy(c: Cam, dx: number, dy: number, w: number, h: number): Cam
   return { ...c, tx: c.tx - (dx * rx - dy * ux) * k, ty: c.ty - (-dy * uy) * k, tz: c.tz - (dx * rz - dy * uz) * k };
 }
 
+/** Slide the view forward (+) or back (-) along the ground, whatever the pitch: W and S never change the height. `px` is in screen pixels like `panBy`. */
+export function walkBy(c: Cam, px: number, w: number, h: number): Cam {
+  const k = (c.dist / focalOf(w, h)) * px;
+  return { ...c, tx: c.tx + -Math.sin(c.yaw) * k, tz: c.tz + -Math.cos(c.yaw) * k };
+}
+
 export interface Pickable { id: number; x: number; y: number; z: number; r: number }
 /** The nearest room under a screen point (within its apparent radius plus a little slack), or null. */
 export function pick(c: Cam, rooms: Pickable[], px: number, py: number, w: number, h: number, slack = 10): number | null {
