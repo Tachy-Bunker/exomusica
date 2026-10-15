@@ -51,6 +51,7 @@ const SPIKES = { closed: spikePolys(0.85, false), open: spikePolys(0.85, true) }
 /** The iris of a door at nine degrees of openness, 0 shut .. 8 wide open (the same petals, pulled back). */
 const LEVELS = 8, PETALS: Float64Array[][] = Array.from({ length: LEVELS + 1 }, (_, i) => spikePolys(0.85, false, 0.04 + (0.66 - 0.04) * (i / LEVELS)));
 const BG = "#04080c";
+const NO_CTX = undefined as unknown as CanvasRenderingContext2D; // what a painter holds between frames: no canvas
 const NO_PEOPLE: Shown[] = [];
 
 /** What the painter needs to draw a corridor and the room beyond it. One of these is kept and updated each frame. */
@@ -172,8 +173,11 @@ export class RoomPainter {
     if (drone) this.drone(drone, eye);
     this.map(eye, sp && sp.link ? sp.link : null);
     ctx.strokeStyle = this.C.cross; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(W / 2 - 7, H / 2); ctx.lineTo(W / 2 + 7, H / 2); ctx.moveTo(W / 2, H / 2 - 7); ctx.lineTo(W / 2, H / 2 + 7); ctx.stroke();
+    this.drop();
     return this.stats;
   }
+  /** Let go of the canvas context once a frame is done. A kept context keeps its canvas, and the canvas keeps every DOM node above it (the whole room view) alive after the room is gone. */
+  private drop(): void { this.ctx = NO_CTX; }
 
   /** Floor, ceiling and walls with their doors. `skip` is a wall not to draw (the one you are looking through from the other side). */
   shell(eye: Eye, skip: number, target: Target | null, sp: ScenePaint | null): void {
@@ -705,7 +709,7 @@ export class RoomPainter {
     const e = sp.eye; e.x = eye.x - L.offx; e.z = eye.z - L.offz; e.yaw = eye.yaw; e.pitch = eye.pitch;
     np.view(this.ctx, this.W, this.H, e); np.shell(e, L.back.edge, null, null);
     if (Math.hypot(e.x, e.z) < 22) np.things(e, null, NO_PEOPLE);
-    this.stats.polys += np.stats.polys; this.ctx.restore();
+    this.stats.polys += np.stats.polys; this.ctx.restore(); np.drop();
   }
   /** Eye in the corridor: the corridor, then the room behind (through its door) and the room ahead. */
   private corridorView(eye: Eye, sp: ScenePaint): void {

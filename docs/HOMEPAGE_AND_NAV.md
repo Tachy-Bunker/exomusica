@@ -1040,3 +1040,6 @@ No schema change, no server code. Doors between branch rooms no longer play the 
 - **Map layout** (Admin → Map layout): drag rooms; orange = moved; floor number; back to automatic. Needs the `map_overrides` migration.
 - **Corridor Surfaces** tab: floor, walls, ceiling materials.
 - **Boss**: `+ boss`, Name/Seed/Length/Logbook entry; wire its `defeated` to open doors etc.
+
+## fix373
+- Player bar: expanding it from inside a room now shows the expanded player on top of the room (`.player-bar-wrapper.is-expanded`, z 72). Other overlays keep their order.

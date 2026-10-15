@@ -82,6 +82,7 @@ function bossNear(rt: WireRuntime | null, ready: boolean, e: Eye, editing: boole
 /** The first-person room. Input is read into refs and the canvas is only drawn while something moves or changes, so a parked room costs nothing. */
 export function BranchRoom({ tick, world, color, next, wantNext, onAdvance, go, mapHref, backHref, onLocked, onProp, paused, onDrone, visor, lore, onLogbook }: Props) {
   const stage = useRef<HTMLDivElement>(null), canvas = useRef<HTMLCanvasElement>(null), prompt = useRef<HTMLDivElement>(null), toast = useRef<HTMLDivElement>(null);
+  const alive = useRef(true), toastT = useRef(0); // alive: false once the room has unmounted (no frame may be requested after that)
   const wref = useRef(world), linkRef = useRef<RoomLink | null>(null), nextRef = useRef(next), wantedRef = useRef<string | null>(null), waitRef = useRef(0), spaceRef = useRef("cur");
   const sp = useRef(new ScenePaint()), wantNextRef = useRef(wantNext), advanceRef = useRef(onAdvance); nextRef.current = next; wantNextRef.current = wantNext; advanceRef.current = onAdvance;
   const shotRef = useRef<{ l: Lock; until: number } | null>(null), tpRef = useRef<{ x: number; z: number } | null>(null), moveAnim = useRef(false), surveyed = useRef(""), fyRef = useRef(0), jumpReq = useRef(false), [hasHeight, setHasHeight] = useState(false); // feet height (for the collision), a queued jump, whether this room has anything to climb
@@ -264,7 +265,7 @@ export function BranchRoom({ tick, world, color, next, wantNext, onAdvance, go, 
     st.dataset.scale = String(gov.current.scale); st.dataset.drone = droneOnRef.current && hh ? `${Math.round(hh.x)},${Math.round(hh.y)}` : ""; st.dataset.drawn = String(drawn.current); st.dataset.space = spaceRef.current; st.dataset.link = linkRef.current ? `${linkRef.current.next.slug}:${linkRef.current.open.toFixed(2)}` : ""; st.dataset.room = wref.current.slug; st.dataset.ghosts = String(gpool.current.count); st.dataset.chat = String(wref.current.chat?.length ?? 0);
     st.dataset.echo = echo.current?.busy(performance.now()) ? "1" : ""; st.dataset.scan = scanSt.current ? scanView.current.p.toFixed(2) : "";
   }, []);
-  const showToast = useCallback((s: string) => { const t = toast.current; if (!t) return; t.textContent = s; t.style.opacity = "1"; window.clearTimeout((t as unknown as { _t?: number })._t); (t as unknown as { _t?: number })._t = window.setTimeout(() => { t.style.opacity = "0"; }, 1800); }, []);
+  const showToast = useCallback((s: string) => { const t = toast.current; if (!t) return; t.textContent = s; t.style.opacity = "1"; window.clearTimeout(toastT.current); toastT.current = window.setTimeout(() => { t.style.opacity = "0"; }, 1800); }, []);
   actFn.current = (ox, oz, d, id, msg, arg) => { // a wire told a marker to teleport you there, say something, or play a sound
     if (msg === "play") { playSfx(arg); return; }
     if (msg === "say") { showToast(arg); return; }
@@ -514,7 +515,7 @@ export function BranchRoom({ tick, world, color, next, wantNext, onAdvance, go, 
     if (more || gpool.current.active) raf.current = requestAnimationFrame(frame); else { last.current = 0; flushDs(); if (ghosts.current.length) { window.clearTimeout(ghostT.current); ghostT.current = window.setTimeout(() => wakeRef.current(), Math.min(30000, Math.max(250, gpool.current.nextStartMs)) + 40); } }
   }, [color, go, onLocked, showToast, flushDs, solve, openLink, ensureFx, showCard]);
 
-  function wake() { if (!raf.current) raf.current = requestAnimationFrame(frame); }
+  function wake() { if (!raf.current && alive.current) raf.current = requestAnimationFrame(frame); }
   const wakeRef = useRef(wake); wakeRef.current = wake;
 
   // size the canvas to the stage (device pixels capped: 1.5, or 1 on small CPUs)
@@ -548,7 +549,8 @@ export function BranchRoom({ tick, world, color, next, wantNext, onAdvance, go, 
     window.addEventListener("keydown", down, true); window.addEventListener("keyup", up, true); window.addEventListener("blur", blur);
     return () => { window.removeEventListener("keydown", down, true); window.removeEventListener("keyup", up, true); window.removeEventListener("blur", blur); };
   }, [use]);
-  useEffect(() => () => { cancelAnimationFrame(raf.current); raf.current = 0; }, []); // stop the loop only when the room goes away, not when a handler is swapped
+  // Unmount only (not when a handler is swapped): stop the frame and cancel every pending timer, so a late timer cannot restart the loop or keep this room alive.
+  useEffect(() => { alive.current = true; return () => { alive.current = false; cancelAnimationFrame(raf.current); raf.current = 0; for (const t of [docT, corrT, ghostT, cardT, toastT]) window.clearTimeout(t.current); }; }, []);
 
   useEffect(() => { if (paused) { lock.current = null; setLocked(false); keys.current.clear(); stick.current = { x: 0, y: 0 }; drag.current = null; } else { stage.current?.focus({ preventScroll: true }); dirty.current = true; wakeRef.current(); } }, [paused]);
   useEffect(() => {

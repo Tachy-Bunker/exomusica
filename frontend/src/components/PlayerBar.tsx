@@ -261,7 +261,7 @@ export function PlayerBar() {
   const portalRoot = useFixedPortalRoot();
 
   const content = (
-    <div className="player-bar-wrapper" ref={wrapperRef} style={{ display: currentTrack ? "block" : "none" }}>
+    <div className={expanded ? "player-bar-wrapper is-expanded" : "player-bar-wrapper"} ref={wrapperRef} style={{ display: currentTrack ? "block" : "none" }}>
       {/* This element is created once and never unmounts across route
           changes - that's the entire mechanism behind "playback survives
           navigation". No special persistence logic needed beyond living

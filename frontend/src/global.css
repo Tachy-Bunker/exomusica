@@ -600,6 +600,8 @@ th {
   right: var(--dock-offset, 0px);
   z-index: 50;
 }
+/* Expanded player: lift the whole wrapper (the overlay lives inside it) above the room page (.hx-page, z 70). */
+.player-bar-wrapper.is-expanded { z-index: 72; }
 
 .player-bar-docked {
   background: var(--bg-elevated);
