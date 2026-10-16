@@ -64,6 +64,7 @@ import { isDoorReplay } from "../lib/doorReplay";
 import { resumeSharedContextIfNeeded } from "../lib/oneShotSfx";
 import { resumeAnalyserContextIfNeeded } from "../lib/audioAnalyser";
 import { shortcutsOn } from "../lib/shortcutsPref";
+import { useMonthlyListening } from "../lib/monthlyListen";
 
 // Pages name themselves with useDocumentTitle. A section that does not gets its name here, after the page has mounted.
 const SECTION_TITLES: [prefix: string, name: string][] = [["/soundbay", "Soundbay"], ["/xenolab", "XenoLab"], ["/telemetry", "Telemetry"], ["/wiki", "Log"]];
@@ -93,6 +94,7 @@ export function Layout() {
   useSeasonShift();
   const loadEmojis = useEmojiStore((s) => s.load);
   useGlobalPlayerShortcuts();
+  useMonthlyListening();
   const pipWindow = useChatPipStore((s) => s.pipWindow);
 
   const isDesktop = useIsDesktop();

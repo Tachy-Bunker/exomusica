@@ -1,5 +1,6 @@
 import { prisma } from "./prisma.js";
 import type { PlayableTrackDTO } from "./types.js";
+import { trackRefIds } from "./trackRefs.js";
 
 /** If fileUrl is our own storage (a relative /uploads/... path), returns
  *  it unchanged. If it's an absolute external URL, rewrites it to the
@@ -43,17 +44,17 @@ export function trackToDTO(t: TrackWithRelations): PlayableTrackDTO {
   };
 }
 
-// Matches "track:42", "/t/42", or "/track/42" anywhere in a message.
-// Deliberately independent of the frontend's eventual page-URL scheme -
-// "track:ID" always works even before routing is decided.
-const TRACK_REF = /(?:track:|\/t\/|\/track\/)(\d+)/g;
+/** Many tracks in one query. Missing or hidden ids are simply absent from the map. */
+export async function tracksById(ids: number[]): Promise<Map<number, PlayableTrackDTO>> {
+  const out = new Map<number, PlayableTrackDTO>();
+  if (ids.length === 0) return out;
+  for (const t of await fetchTracksByIds(ids)) out.set(t.id, trackToDTO(t));
+  return out;
+}
 
 export async function resolveTrackEmbeds(content: string): Promise<PlayableTrackDTO[]> {
-  const ids = new Set<number>();
-  for (const match of content.matchAll(TRACK_REF)) {
-    ids.add(Number(match[1]));
-  }
-  if (ids.size === 0) return [];
-  const tracks = await fetchTracksByIds([...ids]);
+  const ids = trackRefIds(content);
+  if (ids.length === 0) return [];
+  const tracks = await fetchTracksByIds(ids);
   return tracks.map(trackToDTO);
 }

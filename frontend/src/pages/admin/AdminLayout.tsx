@@ -39,6 +39,8 @@ export function AdminLayout() {
         <AdminNavLink to="lore" label="Room lore" att={att} />
         <AdminNavLink to="map-layout" label="Map layout" att={att} />
         <AdminNavLink to="milestones" label="Milestones" att={att} />
+        <AdminNavLink to="artifacts" label="Artifacts" att={att} />
+        <AdminNavLink to="monthly" label="Monthly" att={att} />
         <AdminNavLink to="featured" label="Featured" att={att} />
         <AdminNavLink to="rewards" label="Rewards" att={att} />
         <AdminNavLink to="signal" label="Signal" att={att} />

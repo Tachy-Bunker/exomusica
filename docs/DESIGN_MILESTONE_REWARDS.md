@@ -1,7 +1,7 @@
 # Design: Twelve Artifacts (10 000 scans) and Monthly challenge (100 members)
 
-Status: proposal. No code yet. Both milestones are in `backend/src/lib/milestonesCore.ts` with `live: false`, so they
-already count and show, labelled as not built. Owner decisions are at the end.
+Status: built (2026-10-16), with the owner's decisions applied. Both milestones are `live: true` in `backend/src/lib/milestonesCore.ts`.
+The owner's answers are at the end, and the "Built" section lists where the build differs from this proposal.
 The boss mechanics referred to here are in the sound-boss design (linked from `ROOM_EDITOR_STATE.md`); this document does
 not restate them.
 
@@ -76,3 +76,29 @@ the boss brief checker, not a hope.
 3. Monthly challenge: shared bar fed by listening minutes (recommended), or by room runs, or by both?
 4. Monthly challenge: write each boss by hand, or keep a list of ready bosses that rotate?
 5. Who writes the twelve Artifact texts and the first three monthly briefs?
+
+## Owner decisions: answered (2026-10-16)
+1. Twelve Artifacts: the owner picks all twelve by hand. The automatic pick is not used.
+2. Sound per Artifact: yes.
+3. Monthly bar: both listening minutes and room runs.
+4. Bosses: written by hand. A ready-boss list is not built.
+5. Temporary texts for the twelve Artifacts and the first three monthly briefs, to be edited by the owner. They are live now, and the admin marks each slot whose text is temporary.
+
+## Built
+- **Artifacts.** Slot k opens at `ceil(k/12 × target)` scans. Reveals are sticky the way milestones are: a raised target clears the reveal. Each slot has kind and key, title, text, picture, and optional notes; an empty slot uses the temporary text. Motifs are four notes derived from the slot's key on the server (`motifFromSeed`), and the owner can override them.
+- **Monthly challenge.** Listening: one unit (one minute) per heartbeat sent by a signed-in member while the boss track plays, at most one per 50 seconds. Room run: five units, once per member per UTC day, when a room boss is beaten (`BranchRoom` onWin). The bar is the sum of both. A brief is written per month; the first three months of the challenge fall back to temporary briefs; a month with neither shows "no brief yet". `downAt` is kept in step with the bar.
+
+## Where the build differs from the proposal
+- Room runs count toward the bar (decision 3). The proposal kept them outside it.
+- Each member's "personal attempt" is the room boss win, not a separate daily run mode. The 3D room is unchanged.
+- No sound-band mechanic: the bar is one number, not split into the boss track's bands.
+- Motifs come from the key hash, not the spectral centroid. The centroid is deferred.
+- Timing: a plate's motif is about 2.3 s (four notes, 0.35 s apart), and Play all runs about 33 s. The proposal said four seconds and 48 seconds.
+- The reveal thresholds are the twelfths the proposal gave (834, 1667, 2500, and so on at the default target).
+- The first challenge month is the month the milestone was reached, so the challenge is open at once.
+
+## Still open
+- The owner writes the twelve texts and picks the twelve items; the temporary texts stay visible until then.
+- The owner writes the first three briefs and sets each boss track by its track number. Until a track is set, only room runs count that month.
+- Past bosses have no public archive page yet (admin shows the archive).
+- Artifacts do not link to their scannable yet.

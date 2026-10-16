@@ -1,10 +1,8 @@
 # Exomusica backlog (kept through chat compaction: update this file with every delivery)
 
-Last updated: website audit delivery (after fix374). **Start with `docs/ROOM_EDITOR_STATE.md`** (architecture, decisions, queue, checklist for the rooms line). Built milestone rewards are listed in `docs/HOMEPAGE_AND_NAV.md`.
+Last updated: milestone rewards delivery (Twelve Artifacts and the Monthly challenge built). **Start with `docs/ROOM_EDITOR_STATE.md`** (architecture, decisions, queue, checklist for the rooms line). Built milestone rewards are listed in `docs/HOMEPAGE_AND_NAV.md`.
 
 ## Milestone rewards still labelled "reward being built"
-- **Monthly challenge** (100 members): a monthly challenge with a boss brief. Needs a design write-up first (item 91).
-- **Twelve Artifacts** (10000 scans): twelve Artifacts revealed, one per twelfth of the way. Needs a design write-up first (item 88).
 - **Hull** (24 milestones reached): the seed of the explorable ship, a corridor with one lit door per milestone. Ties to the 3D game below.
 - **Emoji gate**: needs a moderation decision from the owner before building.
 
@@ -20,7 +18,7 @@ Last updated: website audit delivery (after fix374). **Start with `docs/ROOM_EDI
 - Spectral wall: community tracks (today official tracks only).
 - Commons pack: builds on request; a monthly scheduled build would remove the first-visitor wait.
 - Collective jingle: real stem audio would need a per-track opt-in and a mixing job; today it is a motif read from spectral strips.
-- Design write-ups only (no build yet): 88 Twelve Artifacts, 91 boss / monthly challenge.
+- Sound-based bosses (the mechanics in the monthly design): not built. The monthly boss is written by hand and its bar is listening plus room runs.
 - Index: the "map of how pages connect" part was dropped. Item 56 dropped by the owner.
 - ABX listening tests (shelved, definitely wanted).
 - Instrument / exomusic maker (live recording and MIDI input may join it); processor module to chain any Airwindows plugin with preview and render; usable-offline desktop and mobile app.
@@ -200,16 +198,36 @@ Delivered as one delta. Schema change: `User.tokenVersion` (migrate). Re-login o
 - nodemailer 9 to 10 (high advisories on the top-level copy): outreach sends mail through it; needs an SMTP test.
 - music-metadata 12, imapflow 2, dotenv 18, TypeScript 7: major versions; each needs its own pass.
 - 20 of the 24 flagged click handlers only stop event propagation: nothing to activate from the keyboard, so no change.
-- Player seek strip: needs a keyboard design (arrow seek, announced position). Not done.
-- Upload magic-byte sniffing: not done.
 - Room CSS split: not done (the room block is in `global.css`).
-- Public list routes N+1 audit: not done.
+- Public list N+1 audit: the channel message list is fixed (see the follow-up below). The other public list routes were checked by a static search only; not verified against a live database.
 - Not run in this sandbox: the backend against a live database, the Caddy and backend Docker builds (no Docker daemon here). Typecheck and build pass.
 - Verified here: backend and frontend `tsc --noEmit` pass; frontend `vite build` passes (main 536.69 kB, 168.94 kB gzip); room e2e suite passes; non-room e2e suite passes. Five tests were updated for cookie auth (the `/api/auth/me` stub, and the jam socket asserts no token in the URL). Under parallel load, two tests (fix281, fix283) each showed one race failure; both pass alone and the waits are added.
 
 **Next in the backlog**
 - The sound-based boss design is already written (Claude Docs artifact, linked from ROOM_EDITOR_STATE). Not written again.
 - Design write-up written: `docs/DESIGN_MILESTONE_REWARDS.md` (Twelve Artifacts, Monthly challenge). Five owner decisions are listed at its end; no build until they are answered.
-- `backend/src/seed.ts` logs the default admin password text (`changeme123`) when run. Drop that line before the next seed run.
 - Blocked on the owner: editor part 2 (waits for go-ahead after height), emoji gate (moderation decision).
 
+## Audit follow-up delivery (the four items left open above)
+Delta ZIP: `exomusica-audit-followup-delta.zip`. No schema change. No new environment variables.
+
+- **Uploads are checked against their content.** `lib/fileSig.ts` reads the first bytes of each upload and refuses it when they do not match the extension (PNG, JPEG, GIF, WebP, BMP, SVG, MP3, WAV, OGG/Opus, FLAC, AAC, MP4/M4A/MOV, WebM, WOFF, WOFF2, TTF, OTF). Every save path in `lib/storage.ts` calls it before the file is written, so the error reaches the uploader as a 400 with a message. Unknown extensions are not checked, as before.
+- **Seed no longer creates a known password.** `seed.ts` used to create `demo_listener` with the password `changeme123` and fall back to it for the admin. Now the admin password is `ADMIN_PASSWORD` if set, otherwise a random one printed once when the admin account is created, and the demo account gets a random password nobody knows (reset it in Admin if you use it). Running the seed on a live database no longer leaves a public login.
+- **Message lists resolve track embeds in one query.** Each message containing a track reference used to run its own track query, so a page of 50 embedded messages made up to 50. `toMessageDTOs` (in `lib/messageDto.ts`) fetches all referenced tracks once per list. Embeds keep the order of the references in the text.
+- **Player seek strip is a keyboard slider.** It has `role="slider"` with a name, the position as text ("1:02 of 4:56") and tab focus. Left/Right step 5 s, Shift+Left/Right 15 s, Home/End jump to the ends, Up/Down behave like Right/Left. Only the visible strip is in the tab order. The global arrow shortcuts already leave sliders alone, so each key seeks once.
+
+Verified here: backend and frontend `tsc --noEmit` pass; frontend `vite build` passes; `backend/_scratch/fileSig.test.ts` and `trackRefs.test.ts` pass; `frontend/_scratch/e2e_fix376.py` (keyboard seek, 10/10) passes. The player-related e2e files are run as a subset (see the delivery message). Not verified: the batched message list against a live database, and an upload with a wrong signature through the running server.
+
+## Milestone rewards delivery (Twelve Artifacts and the Monthly challenge)
+Delta ZIP: `exomusica-milestones-delta.zip`. **Schema change: yes**, three new tables (`artifact_slots`, `monthly_bosses`, `monthly_contributions`) and a new `User` relation. Migration: `backend/prisma/migrations/20261016120000_twelve_artifacts_monthly/migration.sql`. No new environment variables.
+
+- **Twelve Artifacts (`m-artifacts`, live).** Twelve slots, each picked by hand in admin (kind and key of a scannable, title, text, picture, and optionally its own four notes in Hz). Slot k opens at `ceil(k/12 × target)` community scans (833 → 834 … 10000 at the default target). Only open slots show their content on the public page. Each open plate has a Hear button and a text line naming its motif, and Play all plays the open ones in order. Admin: `/admin/artifacts`. Public: `/artifacts`, `GET /api/artifacts`.
+- **Monthly challenge (`m-monthly`, live).** The bar is listening minutes to the boss track plus five units per room boss beaten. Each member counts one minute per heartbeat while a signed-in browser plays the boss track (server takes at most one per 50 seconds, so at most 72 an hour). A run counts once per member per UTC day. The first month is the month the milestone was reached. Bosses are written by hand in admin (`/admin/monthly`); the first three months show a temporary brief until one is saved. Public: `/monthly`, `GET /api/monthly`, `GET /api/monthly/mine`.
+- The Field Log links to both pages once their milestones are reached.
+- Decisions and deviations from the design are in `docs/DESIGN_MILESTONE_REWARDS.md` (section "Built").
+
+Owner to do: write the twelve Artifact texts and choose each slot's item (until then the temporary texts show, and the admin marks them); write the first three monthly briefs and set each boss track by its track number; set goals if the temporary ones are wrong.
+
+Not built: a page for past bosses (the archive is in admin only); links from an Artifact to its scannable; a sound-band boss mechanic; the Artifact motif from the track's spectral centroid (motifs are derived from each key for now).
+
+Verified here: backend `tsc --noEmit` passes; frontend `tsc --noEmit` and `vite build` pass; backend unit tests pass, including the new `artifactsCore.test.ts` and `monthlyCore.test.ts`; `frontend/_scratch/e2e_fix380.py` 29/29; existing milestone, admin nav, boss, and Field Log e2e files pass. The migration SQL was applied to a local Postgres 16 with a minimal `User` table and its statements were run. **Not verified here:** the Prisma client calls against a real database (the Prisma engine download is blocked in this sandbox), so run the site once after deploying and open `/artifacts`, `/monthly`, `/admin/artifacts` and `/admin/monthly`.

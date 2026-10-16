@@ -3,8 +3,15 @@ import { randomUUID } from "node:crypto";
 import { mkdir, writeFile, unlink } from "node:fs/promises";
 import path from "node:path";
 import { prisma } from "./prisma.js";
+import { signatureError } from "./fileSig.js";
 
 const UPLOADS_DIR = path.join(process.cwd(), "uploads");
+
+/** Refuses an upload whose bytes are not the type its extension claims (see lib/fileSig.ts). */
+function requireContent(ext: string, buffer: Buffer): void {
+  const problem = signatureError(ext, buffer);
+  if (problem) throw new Error(problem);
+}
 
 // Deletes an attachment's disk file and DB row, and reclaims its size
 // from the uploader's storage quota. Used whenever an attachment is
@@ -69,6 +76,7 @@ export async function saveEmojiFile(
   if (!ext) {
     throw new Error(`unsupported image type "${mimeType}" - only PNG and BMP are accepted`);
   }
+  requireContent(ext, buffer);
   const dir = path.join(UPLOADS_DIR, "emojis");
   await mkdir(dir, { recursive: true });
 
@@ -97,6 +105,7 @@ export async function saveMessageAttachment(
   buffer: Buffer,
   options: { bypassQuota?: boolean } = {},
 ) {
+  requireContent(path.extname(filename).toLowerCase(), buffer);
   const user = await prisma.user.findUniqueOrThrow({ where: { id: uploaderId } });
   const newTotal = user.storageUsedBytes + BigInt(buffer.length);
   if (!options.bypassQuota && !user.isAdmin && newTotal > user.storageLimitBytes) {
@@ -144,7 +153,7 @@ export async function saveSiteImage(
   filename: string,
   mimeType: string,
   buffer: Buffer,
-  subfolder: "albums" | "about" | "guide" | "avatars" | "moire" | "og-images" | "link-icons" | "community-albums" | "branch-identity",
+  subfolder: "albums" | "about" | "guide" | "avatars" | "moire" | "og-images" | "link-icons" | "community-albums" | "branch-identity" | "artifacts",
 ): Promise<{ url: string }> {
   const ext =
     ALLOWED_IMAGE_TYPES[mimeType] ??
@@ -154,6 +163,7 @@ export async function saveSiteImage(
   if (!ext) {
     throw new Error(`unsupported image type "${mimeType}" - PNG, JPEG, WebP, or GIF only`);
   }
+  requireContent(ext, buffer);
   const dir = path.join(UPLOADS_DIR, subfolder);
   await mkdir(dir, { recursive: true });
   const diskName = `${randomUUID()}${ext}`;
@@ -178,6 +188,7 @@ export async function saveCommunityAlbumCover(uploaderId: number, filename: stri
     ([".png", ".jpg", ".jpeg", ".webp", ".gif", ".bmp"].includes(path.extname(filename).toLowerCase()) ? path.extname(filename).toLowerCase() : null);
   if (!ext) throw new Error(`unsupported image type "${mimeType}" - PNG, JPEG, WebP, or GIF only`);
 
+  requireContent(ext, buffer);
   const dir = path.join(UPLOADS_DIR, "community-albums");
   await mkdir(dir, { recursive: true });
   const diskName = `${randomUUID()}${ext}`;
@@ -215,6 +226,7 @@ export async function saveMediaFile(filename: string, mimeType: string, buffer: 
   if (!ext) {
     throw new Error(`unsupported file type "${mimeType}"`);
   }
+  requireContent(ext, buffer);
   const dir = path.join(UPLOADS_DIR, "media");
   await mkdir(dir, { recursive: true });
   const diskName = `${randomUUID()}${ext}`;
@@ -250,6 +262,7 @@ export async function saveFontFile(filename: string, mimeType: string, buffer: B
   if (!format) {
     throw new Error(`unsupported font type - use OTF, TTF, WOFF, or WOFF2`);
   }
+  requireContent(ext, buffer);
   const dir = path.join(UPLOADS_DIR, "fonts");
   await mkdir(dir, { recursive: true });
   const diskName = `${randomUUID()}${ext || ".font"}`;
@@ -269,6 +282,7 @@ export async function saveTrackFile(filename: string, _mimeType: string, buffer:
   const ext = path.extname(filename).toLowerCase();
   const format = TRACK_FORMATS[ext];
   if (!format) throw new Error("unsupported audio type - use MP3, WAV, OGG, Opus, M4A, AAC or FLAC");
+  requireContent(ext, buffer);
   const dir = path.join(UPLOADS_DIR, "tracks");
   await mkdir(dir, { recursive: true });
   const diskName = `${randomUUID()}${ext}`;
@@ -281,6 +295,7 @@ export async function saveSoundFile(filename: string, mimeType: string, buffer: 
   if (![".mp3", ".wav", ".ogg"].includes(ext)) {
     throw new Error("unsupported sound type - use MP3, WAV, or OGG");
   }
+  requireContent(ext, buffer);
   const dir = path.join(UPLOADS_DIR, "sounds");
   await mkdir(dir, { recursive: true });
   const diskName = `${randomUUID()}${ext}`;
@@ -324,6 +339,7 @@ export async function saveCommunityTrackAudio(uploaderId: number, filename: stri
     throw new Error(`this file would push you over your ${Number(user.storageLimitBytes) / 1024 / 1024}MB storage limit`);
   }
 
+  requireContent(ext, buffer);
   const dir = path.join(UPLOADS_DIR, "community-tracks");
   await mkdir(dir, { recursive: true });
   const diskName = `${randomUUID()}${ext}`;
@@ -356,6 +372,7 @@ export async function saveSampleBankFile(uploaderId: number, filename: string, m
     throw new Error(`this file would push you over your ${Number(user.storageLimitBytes) / 1024 / 1024}MB storage limit`);
   }
 
+  requireContent(path.extname(filename).toLowerCase(), buffer);
   const dir = path.join(UPLOADS_DIR, "sample-bank");
   await mkdir(dir, { recursive: true });
   const ext = path.extname(filename) || "";
@@ -390,6 +407,7 @@ const ALLOWED_GALLERY_VIDEO_TYPES: Record<string, string> = {
 export async function saveGalleryFile(filename: string, mimeType: string, buffer: Buffer): Promise<{ url: string; kind: "image" | "video" }> {
   const videoExt = ALLOWED_GALLERY_VIDEO_TYPES[mimeType] ?? (path.extname(filename).toLowerCase() === ".mov" || path.extname(filename).toLowerCase() === ".mp4" ? path.extname(filename).toLowerCase() : null);
   if (videoExt) {
+    requireContent(videoExt, buffer);
     const dir = path.join(UPLOADS_DIR, "albums");
     await mkdir(dir, { recursive: true });
     const diskName = `${randomUUID()}${videoExt}`;
@@ -402,6 +420,7 @@ export async function saveGalleryFile(filename: string, mimeType: string, buffer
 
 /** Stores a transmission's audio or image under uploads/signal/. Lossless audio is welcome; the caller has already checked the type. */
 export async function saveSignalMedia(ext: string, buffer: Buffer): Promise<{ url: string }> {
+  requireContent(ext, buffer);
   const dir = path.join(UPLOADS_DIR, "signal");
   await mkdir(dir, { recursive: true });
   const diskName = `${randomUUID()}${ext}`;

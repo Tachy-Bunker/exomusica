@@ -26,7 +26,8 @@ export function FieldLogPage() {
     if (saved) { setSuit((s) => (s ? { ...s, choice: saved } : s)); applyTint(saved.tint); }
   }
   const [vaultOpen, setVaultOpen] = useState(false);
-  useEffect(() => { loadMilestones().then((l) => setVaultOpen(!!l.find((m) => m.key === "m-founders")?.reached)).catch(() => undefined); }, []);
+  const [openNow, setOpenNow] = useState<{ artifacts: boolean; monthly: boolean }>({ artifacts: false, monthly: false });
+  useEffect(() => { loadMilestones().then((l) => { setVaultOpen(!!l.find((m) => m.key === "m-founders")?.reached); setOpenNow({ artifacts: !!l.find((m) => m.key === "m-artifacts")?.reached, monthly: !!l.find((m) => m.key === "m-monthly")?.reached }); }).catch(() => undefined); }, []);
   useEffect(() => { api<LogSection[]>("/api/field-log").then((d) => (Array.isArray(d) ? setSections(d) : setFailed(true))).catch(() => setFailed(true)); }, []);
   useEffect(() => { if (user) void syncScans().then(() => setScanned(keysOf(scannedIds()))); }, [user]);
   const stats = useMemo(() => (sections ?? []).map((s) => sectionStat(s, scanned)), [sections, scanned]);
@@ -63,6 +64,7 @@ export function FieldLogPage() {
   return (
     <div className="field-log" data-testid="field-log">
       <h1>Field Log</h1>
+      {(openNow.artifacts || openNow.monthly) && <p data-testid="field-log-open">{openNow.artifacts && <Link to="/artifacts" data-testid="artifacts-link">Twelve Artifacts →</Link>}{openNow.artifacts && openNow.monthly && " · "}{openNow.monthly && <Link to="/monthly" data-testid="monthly-link">Monthly challenge →</Link>}</p>}
       <p className="home-dim">Turn on Probe mode (<kbd>I</kbd>) and scan things to fill this in. {user ? "Your scans follow your account." : "Without an account, scans stay on this device."} <Link to="/chart">Chart</Link></p>
       {sections.map((s, si) => {
         const st = stats[si];

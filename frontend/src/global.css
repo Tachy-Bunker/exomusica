@@ -6708,3 +6708,23 @@ label.re-b{display:inline-block;cursor:pointer}
 @media (min-width:641px){.rm.hud-on .rm-bar{top:13rem}}
 @media (prefers-reduced-motion:reduce){.rm-hud{opacity:.9}}
 .rm-hurt{position:absolute;inset:0;pointer-events:none;z-index:3;opacity:0;transition:opacity .5s ease;background:radial-gradient(ellipse at center,transparent 45%,rgba(255,70,20,.38) 100%)}
+
+/* Twelve Artifacts and the Monthly challenge */
+.artifact-grid { list-style: none; padding: 0; margin: 0.6rem 0 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 15rem), 1fr)); gap: 0.9rem; }
+.artifact-plate { border: 1px solid currentColor; border-radius: 6px; padding: 0.8rem; display: flex; flex-direction: column; gap: 0.35rem; min-width: 0; opacity: 0.55; }
+.artifact-plate.is-revealed { opacity: 1; animation: artifact-in 600ms ease both; }
+.artifact-plate.is-playing { box-shadow: 0 0 0 2px currentColor; }
+.artifact-plate h3 { margin: 0; font-size: 1.05rem; }
+.artifact-plate p { margin: 0; }
+.artifact-plate .btn { align-self: flex-start; margin-top: auto; }
+.artifact-numeral { font-size: 0.8rem; letter-spacing: 0.12em; opacity: 0.7; }
+.artifact-motif { font-size: 0.8rem; }
+.artifact-image { width: 100%; aspect-ratio: 4 / 3; object-fit: cover; border-radius: 4px; background: rgba(127, 127, 127, 0.15); }
+.artifact-image-locked { display: flex; align-items: center; justify-content: center; font-size: 2rem; opacity: 0.5; }
+@keyframes artifact-in { from { opacity: 0; } to { opacity: 1; } }
+.monthly-bar { height: 0.9rem; border: 1px solid currentColor; border-radius: 999px; overflow: hidden; margin: 0.6rem 0; }
+.monthly-bar > span { display: block; height: 100%; background: currentColor; transition: width 600ms ease; }
+@media (prefers-reduced-motion: reduce) {
+  .artifact-plate.is-revealed { animation: none; }
+  .monthly-bar > span { transition: none; }
+}

@@ -53,6 +53,10 @@ const GlossaryAdminPage = lazy(() => import("./pages/admin/GlossaryAdminPage").t
 const LoreAdminPage = lazy(() => import("./pages/admin/LoreAdminPage").then((m) => ({ default: m.LoreAdminPage })));
 const MapLayoutAdminPage = lazy(() => import("./pages/admin/MapLayoutAdminPage").then((m) => ({ default: m.MapLayoutAdminPage })));
 const MilestonesAdminPage = lazy(() => import("./pages/admin/MilestonesAdminPage").then((m) => ({ default: m.MilestonesAdminPage })));
+const ArtifactsAdminPage = lazy(() => import("./pages/admin/ArtifactsAdminPage").then((m) => ({ default: m.ArtifactsAdminPage })));
+const MonthlyAdminPage = lazy(() => import("./pages/admin/MonthlyAdminPage").then((m) => ({ default: m.MonthlyAdminPage })));
+const ArtifactsPage = lazy(() => import("./pages/ArtifactsPage").then((m) => ({ default: m.ArtifactsPage })));
+const MonthlyPage = lazy(() => import("./pages/MonthlyPage").then((m) => ({ default: m.MonthlyPage })));
 const FeaturedAdminPage = lazy(() => import("./pages/admin/FeaturedAdminPage").then((m) => ({ default: m.FeaturedAdminPage })));
 const RewardsAdminPage = lazy(() => import("./pages/admin/RewardsAdminPage").then((m) => ({ default: m.RewardsAdminPage })));
 const HypothesesPage = lazy(() => import("./pages/HypothesesPage").then((m) => ({ default: m.HypothesesPage })));
@@ -144,6 +148,8 @@ export default function App() {
             <Route path="explore" element={<ExplorePage />} />
             <Route path="radio" element={<RadioPage />} />
             <Route path="storm" element={<StormPage />} />
+            <Route path="artifacts" element={<ArtifactsPage />} />
+            <Route path="monthly" element={<MonthlyPage />} />
             <Route path="jam" element={<JamPage />} />
             <Route path="jam/:code" element={<JamPage />} />
             <Route path="studies" element={<Navigate to="/xenolab?tab=studies" replace />} />
@@ -210,6 +216,8 @@ export default function App() {
                 <Route path="lore" element={<LoreAdminPage />} />
                 <Route path="map-layout" element={<MapLayoutAdminPage />} />
                 <Route path="milestones" element={<MilestonesAdminPage />} />
+                <Route path="artifacts" element={<ArtifactsAdminPage />} />
+                <Route path="monthly" element={<MonthlyAdminPage />} />
                 <Route path="featured" element={<FeaturedAdminPage />} />
                 <Route path="rewards" element={<RewardsAdminPage />} />
                 <Route path="signal" element={<SignalAdminPage />} />

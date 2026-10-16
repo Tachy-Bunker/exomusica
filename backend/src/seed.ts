@@ -1,3 +1,4 @@
+import { randomBytes } from "node:crypto";
 import { log } from "./lib/log.js";
 import { PrismaClient } from "@prisma/client";
 import argon2 from "argon2";
@@ -12,24 +13,28 @@ const prisma = new PrismaClient();
 // documented default password in a real deployment.
 const ADMIN_USERNAME = process.env.ADMIN_USERNAME ?? "admin";
 const ADMIN_EMAIL = process.env.ADMIN_EMAIL ?? "admin@example.com";
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD ?? "changeme123";
+// No default password: when ADMIN_PASSWORD is unset, a random one is generated and printed once, if this run creates the admin.
+const ADMIN_PASSWORD_SET = Boolean(process.env.ADMIN_PASSWORD);
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || randomBytes(12).toString("base64url");
 
 async function main() {
+  const existed = (await prisma.user.findUnique({ where: { username: ADMIN_USERNAME } })) !== null;
   const passwordHash = await argon2.hash(ADMIN_PASSWORD);
   const admin = await prisma.user.upsert({
     where: { username: ADMIN_USERNAME },
     create: { username: ADMIN_USERNAME, email: ADMIN_EMAIL, passwordHash, isAdmin: true },
     update: {},
   });
-  log.info(`Admin account: ${ADMIN_USERNAME} (password from ADMIN_PASSWORD, or "changeme123" if unset)`);
-  log.info("Log in and change it immediately if you used the default.");
+  if (existed) log.info(`Admin account "${ADMIN_USERNAME}" already exists; its password was not changed.`);
+  else if (ADMIN_PASSWORD_SET) log.info(`Admin account "${ADMIN_USERNAME}" created with the password from ADMIN_PASSWORD.`);
+  else log.info(`Admin account "${ADMIN_USERNAME}" created. Generated password (shown once, not stored): ${ADMIN_PASSWORD}`);
 
   const demoUser = await prisma.user.upsert({
     where: { username: "demo_listener" },
     create: {
       username: "demo_listener",
       email: "demo_listener@example.com",
-      passwordHash: await argon2.hash("changeme123"),
+      passwordHash: await argon2.hash(randomBytes(24).toString("base64url")), // nobody knows this; reset it in admin to log in as the demo
       bio: "Just here for the ambient stuff.",
     },
     update: {},

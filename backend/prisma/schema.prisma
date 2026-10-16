@@ -40,6 +40,7 @@ enum GhostReason {
 
 model User {
   probeScans ProbeScan[]
+  monthlyContributions MonthlyContribution[]
   adminPanelSeen AdminPanelSeen[]
   id                    Int          @id @default(autoincrement())
   username              String       @unique // kept forever, even for ghosts - attribution needs a name
@@ -1875,4 +1876,50 @@ model MilestoneSetting {
   target    Int?      // null = use the default
   enabled   Boolean   @default(true)
   reachedAt DateTime? // set when the community first crossed the target; cleared if the target is raised above where it stands
+}
+
+// Twelve Artifacts (milestone m-artifacts): twelve slots the owner fills by hand. Each reveals at a twelfth of the target.
+model ArtifactSlot {
+  slot       Int       @id // 1..12
+  kind       String?   // lore | track | person | point, as ProbeScan.kind
+  key        String?   // the scannable's key, as ProbeScan.key
+  title      String?
+  text       String?   @db.Text
+  imageUrl   String?
+  notes      Json?     // optional: four frequencies in Hz for its motif; null = derived from the key
+  revealedAt DateTime? // set while the community is at or past this slot's threshold; cleared if the target is raised above it
+
+  updatedAt  DateTime  @updatedAt
+
+  @@map("artifact_slots")
+}
+
+// Monthly challenge (milestone m-monthly): one boss brief per calendar month (UTC), written by hand.
+model MonthlyBoss {
+  month     String    @id // "YYYY-MM"
+  title     String
+  brief     String    @db.Text
+  rule      String    @default("") @db.Text
+  trackId   Int?      // the boss's track: listening to it fills the bar
+  goalUnits Int       // the bar is listening minutes plus five units per room run
+  downAt    DateTime? // set when the bar first fills; cleared if the goal is raised above it
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  @@map("monthly_bosses")
+}
+
+// One row per member per month: their contribution to that month's bar.
+model MonthlyContribution {
+  month        String
+  userId       Int
+  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  listenUnits  Int       @default(0) // one unit per minute of listening to the boss track
+  runUnits     Int       @default(0) // five units per day a room boss was beaten
+  lastListenAt DateTime?
+  lastRunDay   String?   // "YYYY-MM-DD" (UTC) of the last counted run
+
+  @@id([month, userId])
+  @@index([month])
+  @@map("monthly_contributions")
 }

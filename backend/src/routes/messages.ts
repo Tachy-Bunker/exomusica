@@ -4,7 +4,7 @@ import type { FastifyInstance } from "fastify";
 import { prisma } from "../lib/prisma.js";
 import { requireAuth, verifyToken } from "../lib/auth.js";
 import { toDayKey } from "../lib/dayKey.js";
-import { toMessageDTO } from "../lib/messageDto.js";
+import { toMessageDTO, toMessageDTOs } from "../lib/messageDto.js";
 import { broadcast } from "../lib/chatHub.js";
 import { sendTemplatedMail } from "../lib/emailTemplates.js";
 import { createNotification } from "../lib/notify.js";
@@ -81,7 +81,7 @@ export async function messageRoutes(app: FastifyInstance): Promise<void> {
           orderBy: { createdAt: "desc" },
           take: limit,
         });
-        return Promise.all(messages.map(toMessageDTO));
+        return toMessageDTOs(messages);
       }
 
       // --- archived day view: the whole day, chronological ----------------
@@ -92,7 +92,7 @@ export async function messageRoutes(app: FastifyInstance): Promise<void> {
           include: messageInclude,
           orderBy: { createdAt: "asc" },
         });
-        return Promise.all(messages.map(toMessageDTO));
+        return toMessageDTOs(messages);
       }
 
       // --- live feed: most recent first, paginate backward with `before` --
@@ -108,7 +108,7 @@ export async function messageRoutes(app: FastifyInstance): Promise<void> {
         take: limit,
         ...(before ? { cursor: { id: Number(before) }, skip: 1 } : {}),
       });
-      const dtos = await Promise.all(messages.map(toMessageDTO));
+      const dtos = await toMessageDTOs(messages);
       return dtos.reverse(); // oldest-first for display
     },
   );

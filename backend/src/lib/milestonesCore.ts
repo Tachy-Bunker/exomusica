@@ -44,10 +44,10 @@ export const MILESTONES: MilestoneDef[] = [
   { key: "m-longwave", title: "Long wave", metric: "MINUTES", target: 600, live: true, perk: "A radio station looping the whole catalogue, with a shared position everyone hears together." },
   { key: "m-chart", title: "Chart layer", metric: "MEMBERS", target: 150, live: true, perk: "The Chart shows where members' recent activity sits, as anonymous pulses." },
   { key: "m-season", title: "Season shift", metric: "DAYS", target: 180, live: true, perk: "The accent colours turn with each 90-day era of the site, and an optional ambient hum changes its note." },
-  { key: "m-monthly", title: "Monthly challenge", metric: "MEMBERS", target: 100, live: false, perk: "A monthly challenge with a boss brief opens." },
+  { key: "m-monthly", title: "Monthly challenge", metric: "MEMBERS", target: 100, live: true, perk: "A monthly challenge with a boss brief opens." },
   { key: "m-storm", title: "Signal storm", metric: "SCANS", target: 5000, live: true, perk: "A 48-hour event where scanning feeds a shared meter; fill it and the Artifact forms from what everyone scanned most." },
   { key: "m-offline", title: "Offline cache", metric: "TRACKS", target: 1000, live: true, perk: "Playlists can be saved for offline listening too, not only albums." },
-  { key: "m-artifacts", title: "Twelve Artifacts", metric: "SCANS", target: 10000, live: false, perk: "The twelve Artifacts are revealed, one per twelfth of the way." },
+  { key: "m-artifacts", title: "Twelve Artifacts", metric: "SCANS", target: 10000, live: true, perk: "The twelve Artifacts are revealed, one per twelfth of the way." },
   { key: "m-hull", title: "Hull", metric: "REACHED", target: 24, live: false, perk: "The seed of the explorable ship: a corridor with one lit door per milestone reached." },
 ];
 

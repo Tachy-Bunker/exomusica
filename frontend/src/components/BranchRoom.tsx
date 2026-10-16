@@ -10,6 +10,7 @@ import { actorLayer, corrLayer, painterFor, paintRoom, ScenePaint, type DroneVie
 import { loadMilestones } from "../lib/milestones";
 import { BossPanel } from "./BossPanel";
 import { bossKey, isBeaten, markBeaten } from "../lib/roomBoss";
+import { recordMonthlyRun } from "../lib/monthlyListen";
 import { type Actor, setPathT, hazardAt, groundAt, ceilAt, BODY, PROP_SLOPE, type HazardFx, cleanDoc, emptyDoc, pushOut, WireRuntime, type RoomDoc } from "../lib/roomDoc";
 import { buildFloor } from "../lib/roomFloor";
 import { getJson, clearShared } from "../lib/sharedGet";
@@ -651,7 +652,7 @@ export function BranchRoom({ tick, world, color, next, wantNext, onAdvance, go, 
       {boss && <BossPanel key={boss.id} name={boss.text} seed={boss.img} diff={boss.mode} beaten={!!rtRef.current?.done.has(boss.id)} color={boss.color}
         onClose={() => { setBoss(null); stage.current?.focus({ preventScroll: true }); dirty.current = true; wakeRef.current(); }}
         onEngage={() => { const rt = rtRef.current; if (rt) { const ts = performance.now() / 1000; rt.emit(boss.id, "engaged", ts); rt.tick(ts); if (rt.changed.length) { rt.drain(); syncArt(); } dirty.current = true; wakeRef.current(); } }}
-        onWin={() => { const rt = rtRef.current, W = wref.current; if (!rt) return; markBeaten(bossKey(W.slug, boss.id)); rt.done.add(boss.id); const ts = performance.now() / 1000; rt.emit(boss.id, "defeated", ts); rt.tick(ts); if (rt.changed.length) { rt.drain(); syncArt(); }
+        onWin={() => { const rt = rtRef.current, W = wref.current; if (!rt) return; markBeaten(bossKey(W.slug, boss.id)); recordMonthlyRun(); rt.done.add(boss.id); const ts = performance.now() / 1000; rt.emit(boss.id, "defeated", ts); rt.tick(ts); if (rt.changed.length) { rt.drain(); syncArt(); }
           const name = boss.text || "The Unnamed Sound"; addLog({ key: `room:${W.slug}/boss/${boss.id}`, room: W.slug, title: name, text: boss.lore || `${name} resolved. It answered, and its voice is yours.`, owner: !!boss.lore, at: Date.now() }); showToast("Logbook: " + name);
           if (rt.pending) { window.clearTimeout(docT.current); docT.current = window.setTimeout(() => wakeRef.current(), Math.max(16, Math.min(60000, rt.nextDue() * 1000 - performance.now()))); } dirty.current = true; wakeRef.current(); }} />}
       <div ref={hurtEl} className="rm-hurt" aria-hidden="true" />

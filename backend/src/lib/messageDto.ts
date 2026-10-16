@@ -1,6 +1,7 @@
 import type { Message, Reaction, CustomEmoji, User, Attachment } from "@prisma/client";
-import { resolveTrackEmbeds } from "./embeds.js";
-import type { MessageDTO } from "./types.js";
+import { resolveTrackEmbeds, tracksById } from "./embeds.js";
+import { trackRefIds } from "./trackRefs.js";
+import type { MessageDTO, PlayableTrackDTO } from "./types.js";
 
 type LinkableAuthor = Pick<User, "username" | "avatarUrl" | "isGhost" | "linkedUserId"> & {
   linkedUser: Pick<User, "username" | "avatarUrl"> | null;
@@ -25,7 +26,27 @@ type MessageWithRelations = Message & {
   replyTo: (Pick<Message, "id" | "contentRaw"> & { author: Pick<User, "username"> }) | null;
 };
 
+/** One message. For a list, use toMessageDTOs: it looks up all the tracks in one query instead of one per message. */
 export async function toMessageDTO(message: MessageWithRelations): Promise<MessageDTO> {
+  return buildMessageDTO(message, message.isDeleted ? [] : await resolveTrackEmbeds(message.contentRaw));
+}
+
+/** A whole list at once: every track any message references is fetched in a single query. Order of embeds follows the text. */
+export async function toMessageDTOs(messages: MessageWithRelations[]): Promise<MessageDTO[]> {
+  const refs = messages.map((m) => (m.isDeleted ? [] : trackRefIds(m.contentRaw)));
+  const tracks = await tracksById([...new Set(refs.flat())]);
+  return messages.map((m, i) =>
+    buildMessageDTO(
+      m,
+      refs[i].flatMap((id) => {
+        const t = tracks.get(id);
+        return t ? [t] : [];
+      }),
+    ),
+  );
+}
+
+function buildMessageDTO(message: MessageWithRelations, embeds: PlayableTrackDTO[]): MessageDTO {
   const reactionsByEmoji = new Map<number, { emojiName: string; usernames: string[] }>();
   for (const r of message.reactions) {
     const entry = reactionsByEmoji.get(r.emojiId) ?? { emojiName: r.emoji.name, usernames: [] };
@@ -62,7 +83,7 @@ export async function toMessageDTO(message: MessageWithRelations): Promise<Messa
       emojiName: v.emojiName,
       usernames: v.usernames,
     })),
-    embeds: message.isDeleted ? [] : await resolveTrackEmbeds(message.contentRaw),
+    embeds,
     kind: message.isDeleted ? "text" : message.kind,
     data: message.isDeleted ? null : message.data ?? null,
   };

@@ -207,6 +207,30 @@ export function PlayerBar() {
     seek(frac * effectiveDuration);
   }
 
+  // The seek strip is a slider for keyboard and screen-reader users: arrows step 5 s (Shift: 15 s), Home and End jump to the ends.
+  // It has role="slider", which the global arrow shortcuts already leave alone, so each key seeks exactly once.
+  function handleSeekKey(e: React.KeyboardEvent<HTMLDivElement>) {
+    if (!effectiveDuration) return;
+    const step = e.shiftKey ? 15 : 5;
+    let target: number | null = null;
+    if (e.key === "ArrowRight" || e.key === "ArrowUp") target = currentTime + step;
+    else if (e.key === "ArrowLeft" || e.key === "ArrowDown") target = currentTime - step;
+    else if (e.key === "Home") target = 0;
+    else if (e.key === "End") target = effectiveDuration;
+    if (target === null) return;
+    e.preventDefault();
+    seek(Math.max(0, Math.min(effectiveDuration, target)));
+  }
+  const seekSliderProps = {
+    role: "slider" as const,
+    "aria-label": "Seek",
+    "aria-valuemin": 0,
+    "aria-valuemax": Math.round(effectiveDuration) || 0,
+    "aria-valuenow": Math.round(currentTime) || 0,
+    "aria-valuetext": `${formatTime(currentTime)} of ${formatTime(effectiveDuration)}`,
+    onKeyDown: handleSeekKey,
+  };
+
   // Spectrogram strip + comments for the current track.
   const trackId = currentTrack?.id ?? null;
   const source = currentTrack?.source;
@@ -306,7 +330,7 @@ export function PlayerBar() {
 
       {currentTrack && !expanded && (
         <div className="player-bar-docked">
-          <div className={`player-seek-strip${spec ? " has-spec" : ""}`} onClick={handleSeekStripClick}>
+          <div className={`player-seek-strip${spec ? " has-spec" : ""}`} onClick={handleSeekStripClick} {...seekSliderProps} tabIndex={expanded ? -1 : 0}>
             <EchoRings pct={progressPct} />
             <div className="player-seek-track">
               {spec ? <SpecLayer strip={spec} color={tint} pct={progressPct} comments={shown} duration={effectiveDuration} activeId={activeId} onPin={pinClick} /> : <div className="player-seek-fill" style={{ width: `${progressPct}%` }} />}
@@ -420,7 +444,7 @@ export function PlayerBar() {
 
             <div className="seek-row">
               <span className="mono">{formatTime(seekPreview ?? currentTime)}</span>
-              <div className={`player-seek-strip player-seek-strip--expanded${spec ? " has-spec" : ""}`} onClick={(e) => { e.stopPropagation(); handleSeekStripClick(e); if (effectiveDuration) { const r = e.currentTarget.getBoundingClientRect(); setPickAt(Math.max(0, Math.min(1, (e.clientX - r.left) / r.width)) * effectiveDuration); setActiveId(null); } }}>
+              <div className={`player-seek-strip player-seek-strip--expanded${spec ? " has-spec" : ""}`} {...seekSliderProps} tabIndex={0} onClick={(e) => { e.stopPropagation(); handleSeekStripClick(e); if (effectiveDuration) { const r = e.currentTarget.getBoundingClientRect(); setPickAt(Math.max(0, Math.min(1, (e.clientX - r.left) / r.width)) * effectiveDuration); setActiveId(null); } }}>
                 <EchoRings pct={progressPct} />
             <div className="player-seek-track">
                   {spec ? <SpecLayer strip={spec} color={tint} pct={progressPct} comments={shown} duration={effectiveDuration} activeId={activeId} onPin={pinClick} /> : <div className="player-seek-fill" style={{ width: `${progressPct}%` }} />}
