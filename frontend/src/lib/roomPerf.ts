@@ -6,10 +6,12 @@ export const SLOW_MS = 11, FAST_MS = 4, DOWN_AFTER = 18, UP_AFTER = 150, HOLD_MS
 
 export class ScaleGovernor {
   step = 0;
+  private pinned = false;
   private slow = 0; private fast = 0; private since = -1e9;
   private ring = new Float32Array(120); private n = 0; private i = 0; private sum = 0;
   /** Feed the time one paint took. Returns the new step when it changed, otherwise null. */
   observe(paintMs: number, now: number): number | null {
+    if (this.pinned) return null;
     this.sum += paintMs - this.ring[this.i]; this.ring[this.i] = paintMs; this.i = (this.i + 1) % this.ring.length; if (this.n < this.ring.length) this.n++;
     // a running balance, so one hiccup in a good run (or one lucky frame in a bad one) does not decide anything
     if (paintMs > SLOW_MS) { this.slow++; this.fast = Math.max(0, this.fast - 3); } else if (paintMs < FAST_MS) { this.fast++; this.slow = Math.max(0, this.slow - 1); } else { this.slow = Math.max(0, this.slow - 1); this.fast = Math.max(0, this.fast - 1); }
@@ -19,6 +21,8 @@ export class ScaleGovernor {
     return null;
   }
   private moved(now: number): number { this.since = now; this.slow = 0; this.fast = 0; this.ring.fill(0); this.n = 0; this.sum = 0; this.i = 0; return this.step; }
+  /** The visitor preview: pinned at the lowest step (on), or back to full quality and adapting again (off). */
+  pin(on: boolean): void { this.pinned = on; this.step = on ? STEPS.length - 1 : 0; this.slow = 0; this.fast = 0; this.since = -1e9; this.n = 0; this.sum = 0; this.i = 0; this.ring.fill(0); }
   get scale(): number { return STEPS[this.step]; }
   /** Smallest gap between paints, in ms (0 = every frame). */
   get minGap(): number { return this.step >= CAP_FROM ? 30 : 0; }

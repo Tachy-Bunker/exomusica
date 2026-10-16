@@ -1050,3 +1050,10 @@ No schema change, no server code. Doors between branch rooms no longer play the 
 - **Page titles**: a page without its own title gets its section's name ("Exomusica - Soundbay", "XenoLab", "Telemetry", "Log").
 - **Sign-in** is a cookie now: the homepage and the navigation read the cached account for the first paint, then confirm it with the server.
 
+## fix390 — editor part 2 (seasons, neon trim, room hum, decals, visitor view, saved versions)
+- **Mood tab**: "Neon trim along the walls" (colour, and optionally along the top), "Room hum" (none, drone, air, pulse; heard quietly while a visitor is in the room), and "Saved versions" (the last ten saves of this room; Restore brings one back as a new save, and is off while you have unsaved changes).
+- **Things**: "Shows in" (any season, spring, summer, autumn, winter; visitors see the thing only in that season, by their own clock). New thing "+ decal": words and/or a picture on a wall or the floor, not scannable.
+- **"◉ Visitor view"** in the editor header: test play as a slow phone shows the room (lowest graphics step, gates and seasons as visitors get them).
+- **Save** now also notices changes to the mood extras, the trim, the hum and the Logbook entry (before, some of those could be changed without Save lighting up).
+- The room's history is kept on the server: the newest ten saves per room.
+

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ARG_KIND, EVENTS, KINDS, SOUNDS, MAX_ACTORS, MAX_LORE, MAX_TEXT, MAX_BANDS, MAX_BANDS_PER_WALL, MAX_TEX, MAX_WIRES, MESSAGES, TEX_KINDS, cleanDoc, newId, type Actor, type Band, type Grade, type Kind, type RoomDoc, type Wire } from "../lib/roomDoc";
+import { ARG_KIND, EVENTS, KINDS, MAX_DECALS, SEASONS, SOUNDS, MAX_ACTORS, MAX_LORE, MAX_TEXT, MAX_BANDS, MAX_BANDS_PER_WALL, MAX_TEX, MAX_WIRES, MESSAGES, TEX_KINDS, cleanDoc, newId, type Actor, type Band, type Grade, type Kind, type RoomDoc, type Wire } from "../lib/roomDoc";
 import { cellAt, decode, encode, floodFill, paintDisc, rectsOf } from "../lib/roomFloor";
 import { onTexReady, texSheet } from "../lib/roomTextures";
 import { isUpload, MAX_FLOCK, MAX_SKY_SPEED } from "../lib/roomDoc";
@@ -19,12 +19,14 @@ const SNAP = 0.25, PLAN = 300;
 const PALETTE = ["#7a8cff", "#ff7ab6", "#7affc8", "#ffd27a", "#c07aff", "#7ad7ff"];
 const DEFAULTS: Record<Kind, Partial<Actor>> = {
   solid: { w: 2, d: 2, h: 1.5 }, ghost: { w: 2, d: 2, h: 1.5 }, trigger: { w: 3, d: 3, h: 2 }, light: { w: 1, d: 1, h: 2.4 }, marker: { w: 0.6, d: 0.6, h: 1.6 }, pool: { w: 4, d: 4, h: 0 }, artifact: { w: 1.6, d: 0.1, h: 1 }, hazard: { w: 4, d: 4, h: 0, mode: 0, color: "#ff9a5c" }, boss: { w: 2.6, d: 2.6, h: 2.4, mode: 0, color: "#ff7ab6", text: "The Unnamed Sound" },
+  decal: { w: 1.2, d: 0.1, h: 1, mode: 0 },
 };
 const KIND_HELP: Record<Kind, string> = {
   solid: "Blocks you. Can be shown or hidden by wires.", ghost: "You walk through it. Cosmetic.", trigger: "A zone that sends “enter” and “exit” when you step in or out.",
   light: "A glow. Can be turned on or off.", pool: "A soft pool of light on the floor. Can swell slowly and be turned on or off.", marker: "A named point other things can listen to or send to.",
   boss: "A sound you have to answer: it plays a short motif, you play it back on the pad, it changes the motif, three rounds. No health, no losing: a wrong answer just plays again. Beating it sends “defeated” (open a door, show a thing) and makes its voice yours. The seed fixes its scale, voice and body.",
   hazard: "A zone on the floor that slows you, drifts you along, or drains your integrity. Integrity refills by itself; at zero you are drawn gently back to the start of the room. Never a game-over.",
+  decal: "A picture or words stuck to a surface: on a wall, on the floor or turning to face you. Not scannable, nothing to walk into. Wires can show, hide or recolour it. Up to 64 a room.",
   artifact: "A panel with words and/or a picture, on a wall, on the floor or turning to face you. Can be scanned: it writes a Logbook entry and sends “scanned” (to open a door, say). Can be visible only through the scan visor.",
 };
 const snap = (v: number) => Math.round(v / SNAP) * SNAP;
@@ -34,12 +36,12 @@ interface Props {
   world: RoomWorld; cx?: number; cz?: number; corridor?: boolean; doc: RoomDoc; onDoc: (d: RoomDoc, key?: string) => void; onUndo: () => void; onRedo: () => void; canUndo: boolean; canRedo: boolean;
   sel: string | null; setSel: (id: string | null) => void;
   where: () => { x: number; z: number; yaw: number };
-  dirty: boolean; busy: boolean; error: string; playing: boolean; onPlay: (on: boolean) => void;
+  dirty: boolean; busy: boolean; error: string; playing: boolean; onPlay: (on: boolean) => void; preview: boolean; onPreview: (on: boolean) => void; onRestored: (d: RoomDoc) => void;
   onSave: () => void; onRevert: () => void; onClose: () => void;
 }
 
 /** The room editor: a plan view of the room, a list of what is in it, and wires between things. Pure form UI, no logic of its own: every change is a new document handed up. */
-export function RoomEditor({ themeNote = "", hasTheme = false, themeMsg = "", onTheme = () => {}, world, cx = 0, cz = 0, corridor = false, doc, onDoc, onUndo, onRedo, canUndo, canRedo, sel, setSel, where, dirty, busy, error, playing, onPlay, onSave, onRevert, onClose }: Props) {
+export function RoomEditor({ themeNote = "", hasTheme = false, themeMsg = "", onTheme = () => {}, world, cx = 0, cz = 0, corridor = false, doc, onDoc, onUndo, onRedo, canUndo, canRedo, sel, setSel, where, dirty, busy, error, playing, onPlay, preview, onPreview, onRestored, onSave, onRevert, onClose }: Props) {
   const painting = useRef(false), cv = useRef<HTMLCanvasElement>(null), drag = useRef<{ id: string; dx: number; dz: number } | null>(null);
   const scale = (PLAN / 2 - 8) / (world.inr + 1.5);
   const toPx = (x: number, z: number): [number, number] => [PLAN / 2 + (x - cx) * scale, PLAN / 2 + (z - cz) * scale];
@@ -176,7 +178,7 @@ export function RoomEditor({ themeNote = "", hasTheme = false, themeMsg = "", on
         const cs = Math.cos(o.rot), sn = Math.sin(o.rot), half = (Math.abs(o.w * cs) + Math.abs(o.d * sn)) / 2, [px] = toPx(o.x, o.z);
         let lo = o.lift, hi = o.lift + o.h;
         if (o.kind === "pool" || o.kind === "hazard") { lo = 0; hi = 0.05; } else if (o.kind === "light") { lo = Math.max(0, o.h - 0.1); hi = o.h + 0.1; } else if (o.kind === "marker") hi = 1.6;
-        else if (o.kind === "artifact") { lo = o.mode === 1 ? 0 : 0.6; hi = o.mode === 1 ? 0.05 : 0.6 + o.h; } else if (o.prop === "drifter") { const k = Math.min(1, o.h / 1.8); lo = 0.3 * k + o.h * 0.2; hi = lo + o.h * 0.75; }
+        else if (o.kind === "artifact" || o.kind === "decal") { lo = o.mode === 1 ? 0 : 0.6; hi = o.mode === 1 ? 0.05 : 0.6 + o.h; } else if (o.prop === "drifter") { const k = Math.min(1, o.h / 1.8); lo = 0.3 * k + o.h * 0.2; hi = lo + o.h * 0.75; }
         const x0 = px - Math.max(half, 0.1) * scale, w = Math.max(3, Math.max(half, 0.1) * 2 * scale), over = hi > world.H + 0.01;
         sg.globalAlpha = o.on ? 1 : 0.4; sg.fillStyle = over ? "#ff6a6a99" : o.color + (o.kind === "ghost" || o.kind === "trigger" ? "33" : "99"); sg.strokeStyle = o.id === sel ? "#fff" : over ? "#ff6a6a" : o.color; sg.lineWidth = o.id === sel ? 2.5 : 1.2;
         sg.fillRect(x0, Y(hi), w, Math.max(2, Y(lo) - Y(hi))); sg.strokeRect(x0, Y(hi), w, Math.max(2, Y(lo) - Y(hi))); sg.globalAlpha = 1;
@@ -217,10 +219,11 @@ export function RoomEditor({ themeNote = "", hasTheme = false, themeMsg = "", on
   const up = () => { const m = pendMove.current; pendMove.current = null; if (m && (painting.current || drag.current)) doMoveRef.current(m.px, m.py); drag.current = null; painting.current = false; };
 
   const add = (kind: Kind) => {
+    if (kind === "decal" && doc.actors.filter((x) => x.kind === "decal").length >= MAX_DECALS) return;
     if (doc.actors.length >= MAX_ACTORS) return;
     const e = where(), id = newId(doc.actors.map((x) => x.id)), n = doc.actors.filter((x) => x.kind === kind).length + 1;
-    const o: Actor = { id, kind, name: `${kind} ${n}`, x: snap(e.x + Math.cos(e.yaw) * 3), z: snap(e.z + Math.sin(e.yaw) * 3), w: 2, d: 2, h: 1.5, rot: 0, sides: 0, color: PALETTE[doc.actors.length % PALETTE.length], on: true, pulse: 0, text: "", lore: "", img: 0, mode: 0, visor: false, prop: "", gate: "", gateOff: false, lift: 0, pdx: 0, pdz: 0, pdy: 0, ptime: 0, pmode: 0, ...DEFAULTS[kind] };
-    if (kind === "artifact") o.rot = e.yaw + Math.PI; // faces you
+    const o: Actor = { id, kind, name: `${kind} ${n}`, x: snap(e.x + Math.cos(e.yaw) * 3), z: snap(e.z + Math.sin(e.yaw) * 3), w: 2, d: 2, h: 1.5, rot: 0, sides: 0, color: PALETTE[doc.actors.length % PALETTE.length], on: true, pulse: 0, text: "", lore: "", img: 0, mode: 0, visor: false, prop: "", gate: "", gateOff: false, lift: 0, season: 0, pdx: 0, pdz: 0, pdy: 0, ptime: 0, pmode: 0, ...DEFAULTS[kind] };
+    if (kind === "artifact" || kind === "decal") o.rot = e.yaw + Math.PI; // faces you
     if (kind === "boss") o.img = 1 + Math.floor(Math.random() * 999999);
     commit([...doc.actors, o]); setSel(id);
   };
@@ -228,12 +231,20 @@ export function RoomEditor({ themeNote = "", hasTheme = false, themeMsg = "", on
   const addProp = (pid: string) => {
     const def = PROP_BY_ID.get(pid); if (!def || doc.actors.length >= MAX_ACTORS) return;
     const e = where(), id = newId(doc.actors.map((x) => x.id)), n = doc.actors.filter((x) => x.prop === pid).length + 1;
-    const o: Actor = { id, kind: "solid", name: `${def.name} ${n}`, x: snap(e.x + Math.cos(e.yaw) * 3.5), z: snap(e.z + Math.sin(e.yaw) * 3.5), w: def.w, d: def.d, h: def.h, rot: e.yaw + Math.PI / 2, sides: def.sides, color: PALETTE[doc.actors.length % PALETTE.length], on: true, pulse: 0, text: "", lore: "", img: 0, mode: 0, visor: false, prop: pid, gate: "", gateOff: false, lift: 0, pdx: 0, pdz: 0, pdy: 0, ptime: 0, pmode: 0 };
+    const o: Actor = { id, kind: "solid", name: `${def.name} ${n}`, x: snap(e.x + Math.cos(e.yaw) * 3.5), z: snap(e.z + Math.sin(e.yaw) * 3.5), w: def.w, d: def.d, h: def.h, rot: e.yaw + Math.PI / 2, sides: def.sides, color: PALETTE[doc.actors.length % PALETTE.length], on: true, pulse: 0, text: "", lore: "", img: 0, mode: 0, visor: false, prop: pid, gate: "", gateOff: false, lift: 0, season: 0, pdx: 0, pdz: 0, pdy: 0, ptime: 0, pmode: 0 };
     commit([...doc.actors, o]); setSel(id);
   };
   const dup = () => { if (!a || doc.actors.length >= MAX_ACTORS) return; const id = newId(doc.actors.map((x) => x.id)); commit([...doc.actors, { ...a, id, name: a.name + " copy", x: a.x + 1, z: a.z + 1 }]); setSel(id); };
   const del = () => { if (!a) return; commit(doc.actors.filter((x) => x.id !== a.id), doc.wires.filter((w) => w.from !== a.id && w.to !== a.id)); setSel(null); };
 
+  // version history: the last saves of this room (the server keeps the newest ten). Restoring one saves it again as the newest.
+  const [vers, setVers] = useState<{ id: number; version: number; savedAt: string }[] | null>(null), [verMsg, setVerMsg] = useState("");
+  const loadVers = async () => { setVerMsg("Loading…"); try { const r = await api<{ id: number; version: number; savedAt: string }[]>(`/api/admin/room-doc/${world.slug}/history`, { cache: "no-store" }); setVers(Array.isArray(r) ? r : []); setVerMsg(""); } catch (e) { setVerMsg(e instanceof Error ? e.message : "Could not load the history"); } };
+  const restoreVer = async (id: number) => {
+    setVerMsg("Restoring…");
+    try { const r = await api<{ version: number; doc: RoomDoc }>(`/api/admin/room-doc/${world.slug}/restore/${id}`, { method: "POST", body: JSON.stringify({ baseVersion: doc.version }) }); onRestored(r.doc); await loadVers(); setVerMsg(`Restored. Saved again as version ${r.version}.`); }
+    catch (e) { setVerMsg(e instanceof Error ? e.message : "Could not restore"); }
+  };
   // prefabs: groups of things saved on the server, placeable anywhere
   const [pfs, setPfs] = useState<string[]>([]), [pfName, setPfName] = useState(""), [pfPick, setPfPick] = useState(""), [pfMsg, setPfMsg] = useState("");
   const loadPfs = () => { api<{ slug: string }[]>("/api/admin/room-prefabs").then((r) => setPfs(Array.isArray(r) ? r.map((x) => x.slug) : [])).catch(() => setPfMsg("Could not load the prefabs")); };
@@ -280,6 +291,7 @@ export function RoomEditor({ themeNote = "", hasTheme = false, themeMsg = "", on
         <button type="button" className="re-b" data-testid="re-undo" disabled={!canUndo} onClick={onUndo} title="Undo (Ctrl+Z)">↶</button>
         <button type="button" className="re-b" data-testid="re-redo" disabled={!canRedo} onClick={onRedo} title="Redo (Ctrl+Shift+Z)">↷</button>
         <button type="button" className="re-b" data-testid="re-play" aria-pressed={playing} onClick={() => onPlay(!playing)}>{playing ? "■ Stop test" : "▶ Test play"}</button>
+        <button type="button" className="re-b" data-testid="re-preview" aria-pressed={preview} title="Test play on the lowest graphics step, with the seasons and gates a visitor gets today" onClick={() => onPreview(!preview)}>{preview ? "■ Stop visitor view" : "◉ Visitor view"}</button>
         <button type="button" className="re-b" data-testid="re-close" onClick={onClose} aria-label="Close editor">✕</button>
       </div>
       <canvas ref={cv} className="re-plan" data-testid="re-plan" style={{ width: PLAN, height: PLAN }} onPointerDown={down} onPointerMove={move} onPointerUp={up} onPointerCancel={up} aria-label="Plan view of the room. Click a thing to select it, drag to move it." />
@@ -404,6 +416,24 @@ export function RoomEditor({ themeNote = "", hasTheme = false, themeMsg = "", on
               {(themeMsg || lookMsg) && <p className="re-note" data-testid="re-thememsg">{lookMsg || themeMsg}</p>}
             </div>
           )}
+          {!corridor && (
+            <div className="re-insp" data-testid="re-trimbox">
+              <label className="re-chk"><input type="checkbox" data-testid="re-trim" checked={!!doc.trim} onChange={(e) => onDoc(cleanDoc({ ...doc, trim: e.target.checked ? { color: "#7affc8", high: false } : null }), "trim")} />Neon trim along the walls</label>
+              {doc.trim && (
+                <div className="re-grid">
+                  <label>Colour<input type="color" data-testid="re-trimc" value={doc.trim.color} onChange={(e) => onDoc(cleanDoc({ ...doc, trim: { color: e.target.value, high: doc.trim?.high ?? false } }), "trimc")} /></label>
+                  <label className="re-chk"><input type="checkbox" data-testid="re-trimhigh" checked={doc.trim.high} onChange={(e) => onDoc(cleanDoc({ ...doc, trim: { color: doc.trim?.color ?? "#7affc8", high: e.target.checked } }), "trimhigh")} />Also along the top</label>
+                </div>
+              )}
+              <label>Room hum<select data-testid="re-hum" value={doc.hum} onChange={(e) => onDoc(cleanDoc({ ...doc, hum: Number(e.target.value) }), "hum")}>{["none", "drone (low, steady)", "air (soft, moving)", "pulse (slow swell)"].map((t, i) => <option key={t} value={i}>{t}</option>)}</select></label>
+              <p className="re-note">The hum plays quietly while a visitor is in the room. Never loud, never a flash.</p>
+            </div>
+          )}
+          <div className="re-insp" data-testid="re-history">
+            <div className="re-row"><b>Saved versions</b><button type="button" className="re-b" data-testid="re-histload" onClick={loadVers}>{vers ? "Refresh" : "Show"}</button></div>
+            {vers && <ul className="re-wires">{vers.map((v) => <li key={v.id} data-testid="re-ver"><span>version {v.version} · {new Date(v.savedAt).toLocaleString()}</span><button type="button" className="re-b" data-testid={`re-verrestore-${v.id}`} disabled={dirty || busy || v.version === doc.version} title={dirty ? "Save or undo your changes first" : "Make this version the room again (it is saved as the newest)"} onClick={() => void restoreVer(v.id)}>Restore</button></li>)}{!vers.length && <li className="re-empty">No earlier saves yet.</li>}</ul>}
+            {verMsg && <p className="re-note" data-testid="re-vermsg">{verMsg}</p>}
+          </div>
           <button type="button" className="re-b" onClick={() => onDoc(cleanDoc({ ...doc, grade: null }))}>Clear mood</button>
         </div>
       )}
@@ -423,7 +453,7 @@ export function RoomEditor({ themeNote = "", hasTheme = false, themeMsg = "", on
         </div>
       )}
       <div className="re-add" hidden={tab !== "things"} role="group" aria-label="Add">
-        {KINDS.map((k) => <button key={k} type="button" className="re-b" data-testid={`re-add-${k}`} title={KIND_HELP[k]} onClick={() => add(k)}>+ {k}</button>)}
+        {KINDS.map((k) => <button key={k} type="button" className="re-b" data-testid={`re-add-${k}`} title={KIND_HELP[k]} disabled={k === "decal" && doc.actors.filter((x) => x.kind === "decal").length >= MAX_DECALS} onClick={() => add(k)}>+ {k}</button>)}
         <select className="re-b" data-testid="re-add-prop" value="" aria-label="Add a prop" title="Black-hole debris and ruins" onChange={(e) => { if (e.target.value) addProp(e.target.value); }}><option value="">+ prop…</option>{PROP_DEFS.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</select>
       </div>
       <ul className="re-list" aria-label="Things in this room" hidden={tab !== "things"}>
@@ -474,14 +504,14 @@ export function RoomEditor({ themeNote = "", hasTheme = false, themeMsg = "", on
               <p className="re-note">The seed fixes its scale, voice, body and motifs: the same for everyone. Walk up to it in play and press Use.</p>
             </div>
           )}
-          {a.kind === "artifact" && (
-            <div className="re-insp" data-testid="re-artifact">
+          {(a.kind === "artifact" || a.kind === "decal") && (
+            <div className="re-insp" data-testid={a.kind === "decal" ? "re-decal" : "re-artifact"}>
               <label>Words on it<input data-testid="re-atext" value={a.text} maxLength={MAX_TEXT} onChange={(e) => patch(a.id, { text: e.target.value })} /></label>
               <label>Picture<select data-testid="re-aimg" value={a.img} onChange={(e) => patch(a.id, { img: Number(e.target.value) })}><option value={0}>none</option>{lib.filter((t) => !t.sky).map((t) => <option key={t.id} value={t.id}>{t.name.slice(0, 24)}</option>)}{a.img > 0 && !lib.some((t) => t.id === a.img) && <option value={a.img}>picture #{a.img}</option>}</select></label>
               <label>Placement<select data-testid="re-amode" value={a.mode} onChange={(e) => patch(a.id, { mode: Number(e.target.value) })}><option value={0}>On a wall (fixed, turn it with Turn°)</option><option value={1}>On the floor</option><option value={2}>Billboard (faces you)</option></select></label>
-              <label className="re-chk"><input type="checkbox" data-testid="re-avisor" checked={a.visor} onChange={(e) => patch(a.id, { visor: e.target.checked })} />Only visible through the scan visor</label>
-              <label>Logbook entry (what scanning it writes)<textarea data-testid="re-alore" rows={5} maxLength={MAX_LORE} value={a.lore} onChange={(e) => patch(a.id, { lore: e.target.value })} /></label>
-              <p className="re-note">{a.lore.length}/{MAX_LORE}. Width and Height size the panel; wall panels hang 0.6 m up.</p>
+              {a.kind === "artifact" && <label className="re-chk"><input type="checkbox" data-testid="re-avisor" checked={a.visor} onChange={(e) => patch(a.id, { visor: e.target.checked })} />Only visible through the scan visor</label>}
+              {a.kind === "artifact" && <label>Logbook entry (what scanning it writes)<textarea data-testid="re-alore" rows={5} maxLength={MAX_LORE} value={a.lore} onChange={(e) => patch(a.id, { lore: e.target.value })} /></label>}
+              <p className="re-note">{a.kind === "artifact" ? `${a.lore.length}/${MAX_LORE}. ` : ""}Width and Height size the panel; wall panels hang 0.6 m up.</p>
             </div>
           )}
           <div className="re-insp" data-testid="re-gate">
@@ -489,6 +519,7 @@ export function RoomEditor({ themeNote = "", hasTheme = false, themeMsg = "", on
             {a.gate && <label className="re-chk"><input type="checkbox" data-testid="re-gateoff" checked={a.gateOff} onChange={(e) => patch(a.id, { gateOff: e.target.checked })} />Reverse: it is there only until that is reached</label>}
             {a.gate && <p className="re-note">Here in the editor you always see it. Visitors see it {a.gateOff ? "until" : "once"} “{miles.find((m) => m.key === a.gate)?.title ?? a.gate}” {a.gateOff ? "is reached" : "is reached"}. Pair a “there until” thing with a “there once” thing to swap one for the other.</p>}
           </div>
+          <label title="Visitors see it only in that season (their own clock)">Shows in<select data-testid="re-season" value={a.season} onChange={(e) => patch(a.id, { season: Number(e.target.value) })}>{SEASONS.map((s, i) => <option key={s} value={i}>{s === "any" ? "any season" : s}</option>)}</select></label>
           <label>Colour<input type="color" value={a.color} onChange={(e) => patch(a.id, { color: e.target.value })} /></label>
           <label className="re-chk"><input type="checkbox" data-testid="re-on" checked={a.on} onChange={(e) => patch(a.id, { on: e.target.checked })} />{a.kind === "trigger" ? "Starts enabled" : "Starts visible"}</label>
           <div className="re-row"><button type="button" className="re-b" onClick={dup}>Duplicate</button><button type="button" className="re-b re-del" data-testid="re-delete" onClick={del}>Delete</button></div>

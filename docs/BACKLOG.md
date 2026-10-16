@@ -1,6 +1,6 @@
 # Exomusica backlog (kept through chat compaction: update this file with every delivery)
 
-Last updated: milestone rewards delivery (Twelve Artifacts and the Monthly challenge built). **Start with `docs/ROOM_EDITOR_STATE.md`** (architecture, decisions, queue, checklist for the rooms line). Built milestone rewards are listed in `docs/HOMEPAGE_AND_NAV.md`.
+Last updated: editor part 2 (fix390: seasons, neon trim, room hum, decals, visitor view, saved versions). **Start with `docs/ROOM_EDITOR_STATE.md`** (architecture, decisions, queue, checklist for the rooms line). Built milestone rewards are listed in `docs/HOMEPAGE_AND_NAV.md`.
 
 ## Milestone rewards still labelled "reward being built"
 - **Hull** (24 milestones reached): the seed of the explorable ship, a corridor with one lit door per milestone. Ties to the 3D game below.
@@ -91,7 +91,7 @@ Last updated: milestone rewards delivery (Twelve Artifacts and the Monthly chall
 ## fix355 notes
 - Done: rooms first, terminal preview. Design write-ups written: Room editor, Bosses made of sound (artifacts in claude.ai; recommendation: call-and-response boss first).
 - Next: fix356 height (Eye.y, level ramps, platforms, ceilings, jump, look up/down); fix357 admin map overrides (new table MapOverride).
-- Editor (E1-E5) waits for the owner's go-ahead after height.
+- Editor (E1-E5): done. E3–E5 in fix390 (see ROOM_EDITOR_STATE.md, "fix390 additions").
 
 ## Vision (owner, fix355 round): THANATON
 - Setting: everything inside a supermassive black hole, Thanaton. Members fell in; alien lifeforms and tribes adapted and built the ephemeral rooms. Solo campaign by default (players see each other until they choose a boss/puzzle, which is solo; co-op later). Opens with a scan lore, then the player is dropped into a room.
@@ -206,7 +206,7 @@ Delivered as one delta. Schema change: `User.tokenVersion` (migrate). Re-login o
 **Next in the backlog**
 - The sound-based boss design is already written (Claude Docs artifact, linked from ROOM_EDITOR_STATE). Not written again.
 - Design write-up written: `docs/DESIGN_MILESTONE_REWARDS.md` (Twelve Artifacts, Monthly challenge). Five owner decisions are listed at its end; no build until they are answered.
-- Blocked on the owner: editor part 2 (waits for go-ahead after height), emoji gate (moderation decision).
+- Blocked on the owner: emoji gate (moderation decision). Editor part 2 is done (fix390).
 
 ## Audit follow-up delivery (the four items left open above)
 Delta ZIP: `exomusica-audit-followup-delta.zip`. No schema change. No new environment variables.

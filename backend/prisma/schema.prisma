@@ -1763,6 +1763,18 @@ model RoomDoc {
   @@map("room_docs")
 }
 
+// Room editor history: the last saves of each room document, newest first when read. The server keeps the newest ten per room (see routes/roomDoc.ts).
+model RoomDocVersion {
+  id      Int      @id @default(autoincrement())
+  slug    String
+  version Int
+  doc     String   @db.Text
+  savedAt DateTime @default(now())
+
+  @@index([slug, id])
+  @@map("room_doc_versions")
+}
+
 // Where the owner has moved a room on the explorable map (the Scan map and the 3D rooms' doors follow it). Every field is optional; empty = the automatic layout decides. Keyed by branch slug.
 model MapOverride {
   id        Int      @id @default(autoincrement())

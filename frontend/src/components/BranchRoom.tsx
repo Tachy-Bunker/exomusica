@@ -11,13 +11,15 @@ import { loadMilestones } from "../lib/milestones";
 import { BossPanel } from "./BossPanel";
 import { bossKey, isBeaten, markBeaten } from "../lib/roomBoss";
 import { recordMonthlyRun } from "../lib/monthlyListen";
-import { type Actor, setPathT, hazardAt, groundAt, ceilAt, BODY, PROP_SLOPE, type HazardFx, cleanDoc, emptyDoc, pushOut, WireRuntime, type RoomDoc } from "../lib/roomDoc";
+import { type Actor, setPathT, hazardAt, groundAt, ceilAt, BODY, PROP_SLOPE, type HazardFx, cleanDoc, emptyDoc, pushOut, WireRuntime, seasonOf, type RoomDoc } from "../lib/roomDoc";
+import { setHum } from "../lib/roomHum";
 import { buildFloor } from "../lib/roomFloor";
 import { getJson, clearShared } from "../lib/sharedGet";
 import { api } from "../lib/api";
 import { effectiveLook, themeKey } from "../lib/roomTheme";
 import { corrKey, corrShift, corridorWorld, type CorrWorld } from "../lib/roomCorr";
 import { onTexReady } from "../lib/roomTextures";
+const seasonNow = (): number => seasonOf(new Date().getMonth());
 const RoomEditor = lazy(() => import("./RoomEditor").then((m) => ({ default: m.RoomEditor }))); // the editor is only downloaded when an admin opens it
 import { makePool, parseGhosts, stepGhosts, type Ghost } from "../lib/roomGhosts";
 import { buildLink, crossed, eyeSpace, flipLink, inRoom, resolveMove, type Link as RoomLink } from "../lib/roomScene";
@@ -119,7 +121,7 @@ export function BranchRoom({ tick, world, color, next, wantNext, onAdvance, go, 
   const track = useAudioStore((s) => s.currentTrack), playing = useAudioStore((s) => s.isPlaying);
   const audioRef = useRef({ title: "", playing: false }); audioRef.current = { title: track?.title ?? "", playing };
   // ---- what the owner built in this room (and the editor for the admin)
-  const [doc, setDoc] = useState<RoomDoc>(emptyDoc), [editing, setEditing] = useState(false), [playTest, setPlayTest] = useState(false), [sel, setSel] = useState<string | null>(null);
+  const [doc, setDoc] = useState<RoomDoc>(emptyDoc), [editing, setEditing] = useState(false), [playTest, setPlayTest] = useState(false), [previewLow, setPreviewLow] = useState(false), [sel, setSel] = useState<string | null>(null);
   const corrEdit = useRef<CorrWorld | null>(null), [corrW, setCorrW] = useState<CorrWorld | null>(null), [inCorr, setInCorr] = useState(false), stash = useRef<{ doc: RoomDoc; saved: RoomDoc } | null>(null), corrScan = useRef<Scannable[]>([]), corrT = useRef(0), lastLink = useRef<RoomLink | null>(null), lastSpace = useRef("cur"), corrAnim = useRef(false);
   const [saved, setSaved] = useState<RoomDoc>(emptyDoc), [busy, setBusy] = useState(false), [err, setErr] = useState(""), editRef = useRef(false), playRef = useRef(false), docT = useRef(0);
   editRef.current = editing; playRef.current = playTest;
@@ -151,7 +153,7 @@ export function BranchRoom({ tick, world, color, next, wantNext, onAdvance, go, 
   const actFn = useRef<(ox: number, oz: number, d: RoomDoc, id: string, msg: string, arg: string) => void>(() => {});
   /** Make `d` the live content of the corridor you are in or looking into (its things, its mood). */
   const useCorr = useCallback((d: RoomDoc | null, key: string, run: boolean) => {
-    const C = corrLayer; C.key = key; C.doc = d; C.rt = d ? new WireRuntime(d, reachedRef.current) : null; hazCorr.current = !!d?.actors.some((x) => x.kind === "hazard"); if (C.rt && d) C.rt.onAct = (id, msg, arg) => actFn.current(C.ox, C.oz, d, id, msg, arg); C.edit = !!corrEdit.current && !playRef.current; C.sel = corrEdit.current ? C.sel : null; corrAnim.current = !!d?.actors.some((x) => x.pulse > 0 || x.prop === "drifter" || x.ptime > 0) || !!d?.tex.some((t) => t.scroll !== 0);
+    const C = corrLayer; C.key = key; C.doc = d; C.rt = d ? new WireRuntime(d, reachedRef.current, seasonNow()) : null; hazCorr.current = !!d?.actors.some((x) => x.kind === "hazard"); if (C.rt && d) C.rt.onAct = (id, msg, arg) => actFn.current(C.ox, C.oz, d, id, msg, arg); C.edit = !!corrEdit.current && !playRef.current; C.sel = corrEdit.current ? C.sel : null; corrAnim.current = !!d?.actors.some((x) => x.pulse > 0 || x.prop === "drifter" || x.ptime > 0) || !!d?.tex.some((t) => t.scroll !== 0);
     if (d && C.rt && run) { const t0 = performance.now() / 1000; C.rt.start(t0); const done = scannedIds(); for (const a of d.actors) if (a.kind === "artifact" && done.has(scanId("lore", `room:${key}/artifact/${a.id}`))) C.rt.emit(a.id, "scanned", t0); }
     reshift(); dirty.current = true; wakeRef.current();
   }, [syncArt, reshift]);
@@ -171,7 +173,8 @@ export function BranchRoom({ tick, world, color, next, wantNext, onAdvance, go, 
     const th = themeRef.current, r = effectiveLook(d, th.docs, th.slugs); actorLayer.look = r.look; actorLayer.skyAnim = !!r.look.sky?.speed; actorLayer.flockAnim = !!r.look.flock; setLookFrom(r.from); dirty.current = true; wakeRef.current();
   }, []);
   const useDoc = useCallback((d: RoomDoc, slug: string, run: boolean) => { // make `d` the live content of the room
-    const rt = new WireRuntime(d, reachedRef.current); rtRef.current = rt; docSlug.current = slug; for (const a of d.actors) if (a.kind === "boss" && isBeaten(bossKey(slug, a.id))) rt.done.add(a.id); hazRoom.current = d.actors.some((x) => x.kind === "hazard"); moveAnim.current = d.actors.some((x) => x.ptime > 0 && x.pmode !== 1); setHasHeight(d.actors.some((x) => x.kind === "solid" && (x.lift > 0 || (!!x.prop && PROP_SLOPE[x.prop] !== undefined)))); rt.onAct = (id, msg, arg) => actFn.current(0, 0, d, id, msg, arg);
+    const rt = new WireRuntime(d, reachedRef.current, seasonNow()); rtRef.current = rt; docSlug.current = slug; for (const a of d.actors) if (a.kind === "boss" && isBeaten(bossKey(slug, a.id))) rt.done.add(a.id); hazRoom.current = d.actors.some((x) => x.kind === "hazard"); moveAnim.current = d.actors.some((x) => x.ptime > 0 && x.pmode !== 1); setHasHeight(d.actors.some((x) => x.kind === "solid" && (x.lift > 0 || (!!x.prop && PROP_SLOPE[x.prop] !== undefined)))); rt.onAct = (id, msg, arg) => actFn.current(0, 0, d, id, msg, arg);
+    setHum(run && (!editRef.current || playRef.current) ? d.hum : 0);
     actorLayer.slug = slug; actorLayer.doc = d; actorLayer.rt = rt; actorLayer.floor = buildFloor(d.floor, d.tex); actorLayer.anim = !!actorLayer.floor?.scrolls || d.tex.some((t) => t.scroll !== 0) || d.actors.some((x) => x.pulse > 0 || x.prop === "drifter" || x.ptime > 0); actorLayer.edit = editRef.current && !playRef.current;
     if (run) { const t0 = performance.now() / 1000; rt.start(t0); const done = scannedIds(); for (const a of d.actors) { if (a.kind === "artifact" && done.has(scanId("lore", `room:${slug}/artifact/${a.id}`))) rt.emit(a.id, "scanned", t0); if (a.kind === "boss" && rt.done.has(a.id)) rt.emit(a.id, "defeated", t0); } } // what you already scanned or answered here stays so
     applyLook(d); fxWorld.current = null; syncArt(); // the scanner rebuilds its list with this room's artifacts
@@ -194,7 +197,7 @@ export function BranchRoom({ tick, world, color, next, wantNext, onAdvance, go, 
     Promise.all([getJson<{ version: number; doc: unknown }>(`/api/room-doc/${world.slug}`), gates]).then(([r]) => {
       if (dead) return; const d = cleanDoc({ ...(r.doc as object), version: r.version }); setDoc(d); setSaved(d); useDoc(d, world.slug, true);
     }).catch(() => { if (!dead) { const d = emptyDoc(); setDoc(d); setSaved(d); useDoc(d, world.slug, false); } });
-    return () => { dead = true; if (actorLayer.slug === world.slug) { actorLayer.doc = null; actorLayer.rt = null; actorLayer.floor = null; actorLayer.slug = ""; artifactLocks.list = []; fxWorld.current = null; } rtRef.current = null; window.clearTimeout(docT.current); actorLayer.look = { grade: null, sky: null, flock: null }; };
+    return () => { dead = true; setHum(0); if (actorLayer.slug === world.slug) { actorLayer.doc = null; actorLayer.rt = null; actorLayer.floor = null; actorLayer.slug = ""; artifactLocks.list = []; fxWorld.current = null; } rtRef.current = null; window.clearTimeout(docT.current); actorLayer.look = { grade: null, sky: null, flock: null }; };
   }, [world.slug, world.lineage, useDoc, applyLook]);
   useEffect(() => { syncArt(); dirty.current = true; wakeRef.current(); }, [visor.on, syncArt]);
   useEffect(() => onTexReady(() => { dirty.current = true; wakeRef.current(); }), []);
@@ -216,9 +219,11 @@ export function BranchRoom({ tick, world, color, next, wantNext, onAdvance, go, 
     };
     window.addEventListener("keydown", k); return () => window.removeEventListener("keydown", k);
   }, [editing, undoDoc, redoDoc]);
-  const setPlay = useCallback((on: boolean) => { setPlayTest(on); playRef.current = on; applyDoc(doc, on); }, [doc, applyDoc]);
+  const setPlay = useCallback((on: boolean) => { setPlayTest(on); playRef.current = on; if (!on) { setPreviewLow(false); gov.current.pin(false); } applyDoc(doc, on); }, [doc, applyDoc]);
+  /** Visitor view: test play with the graphics on the lowest step, the way a slow phone shows the room. */
+  const setPreview = useCallback((on: boolean) => { gov.current.pin(on); setPreviewLow(on); setPlay(on); fitRef.current(); dirty.current = true; wakeRef.current(); }, [setPlay]);
   const closeEditor = useCallback(() => {
-    setEditing(false); setPlayTest(false); editRef.current = false; playRef.current = false; actorLayer.edit = false; corrLayer.edit = false;
+    setEditing(false); setPlayTest(false); setPreviewLow(false); gov.current.pin(false); editRef.current = false; playRef.current = false; actorLayer.edit = false; corrLayer.edit = false;
     if (corrEdit.current) { const st = stash.current; corrLayer.sel = null; applyDoc(saved, true); corrLayer.edit = false; corrEdit.current = null; setCorrW(null); stash.current = null; if (st) { setDoc(st.doc); setSaved(st.saved); } return; }
     useDoc(saved, wref.current.slug, true); setDoc(saved);
   }, [saved, useDoc, applyDoc]);
@@ -253,7 +258,7 @@ export function BranchRoom({ tick, world, color, next, wantNext, onAdvance, go, 
     const parts = (["grade", "sky", "flock"] as const).filter((k) => lookFrom[k]).map((k) => `${k === "grade" ? "mood" : k === "flock" ? "specks" : "sky"} from ${lookFrom[k]}`);
     return parts.length ? `Inherited: ${parts.join(", ")}.` : "Nothing inherited.";
   }, [lookFrom]);
-  const sameDoc = JSON.stringify({ a: doc.actors, w: doc.wires, t: doc.tex, f: doc.floor, b: doc.bands, g: doc.grade, c: doc.ceil, k: doc.sky, fl: doc.flock, i: doc.inherit }) === JSON.stringify({ a: saved.actors, w: saved.wires, t: saved.tex, f: saved.floor, b: saved.bands, g: saved.grade, c: saved.ceil, k: saved.sky, fl: saved.flock, i: saved.inherit });
+  const sameDoc = JSON.stringify({ ...doc, version: 0 }) === JSON.stringify({ ...saved, version: 0 }); // every field counts, so a change to mood, trim, hum or the log is never "Saved"
   useEffect(() => { dirty.current = true; wakeRef.current(); }, [track?.id, playing, droneOn]);
   useEffect(() => { const on = () => setDroneOn(droneWanted()); window.addEventListener("exomusica-drone-pref", on); return () => window.removeEventListener("exomusica-drone-pref", on); }, []);
 
@@ -672,7 +677,7 @@ export function BranchRoom({ tick, world, color, next, wantNext, onAdvance, go, 
         <RoomTile icon="lock" label={locked ? "Unlock" : "Lock on"} keys="Z" pressed={locked} testid="room-lock" onClick={toggleLock} />
         <RoomTile icon={visible ? "eye" : "eyeoff"} label={visible ? "Visible" : "Hidden"} pressed={visible} testid="room-visible" onClick={() => { const v = !visible; setVisible(v); setVis(v); }} />
       </div>
-      {isAdmin && editing && <Suspense fallback={null}><RoomEditor themeNote={themeNote} hasTheme={ownTheme} themeMsg={themeMsg} onTheme={(k) => void (k === "save" ? saveTheme() : clearTheme())} world={corrW ? corrW.world : world} cx={corrW?.cx ?? 0} cz={corrW?.cz ?? 0} corridor={!!corrW} doc={doc} onDoc={changeDoc} onUndo={undoDoc} onRedo={redoDoc} canUndo={hist.current.undo.length > 0} canRedo={hist.current.redo.length > 0} sel={sel} setSel={(id) => { setSel(id); if (corrEdit.current) corrLayer.sel = id; else actorLayer.sel = id; dirty.current = true; wakeRef.current(); }} where={() => (corrEdit.current ? { x: eye.current.x - corrLayer.ox, z: eye.current.z - corrLayer.oz, yaw: eye.current.yaw } : eye.current)} dirty={!sameDoc} busy={busy} error={err} playing={playTest} onPlay={setPlay} onSave={saveDoc} onRevert={() => { setDoc(saved); useDoc(saved, wref.current.slug, false); }} onClose={closeEditor} /></Suspense>}
+      {isAdmin && editing && <Suspense fallback={null}><RoomEditor themeNote={themeNote} hasTheme={ownTheme} themeMsg={themeMsg} onTheme={(k) => void (k === "save" ? saveTheme() : clearTheme())} world={corrW ? corrW.world : world} cx={corrW?.cx ?? 0} cz={corrW?.cz ?? 0} corridor={!!corrW} doc={doc} onDoc={changeDoc} onUndo={undoDoc} onRedo={redoDoc} canUndo={hist.current.undo.length > 0} canRedo={hist.current.redo.length > 0} sel={sel} setSel={(id) => { setSel(id); if (corrEdit.current) corrLayer.sel = id; else actorLayer.sel = id; dirty.current = true; wakeRef.current(); }} where={() => (corrEdit.current ? { x: eye.current.x - corrLayer.ox, z: eye.current.z - corrLayer.oz, yaw: eye.current.yaw } : eye.current)} dirty={!sameDoc} busy={busy} error={err} playing={playTest} onPlay={setPlay} preview={previewLow} onPreview={setPreview} onRestored={(d) => { const c = cleanDoc(d); hist.current = { undo: [], redo: [], key: "", at: 0 }; setHistN((n) => n + 1); setDoc(c); setSaved(c); applyDoc(c, playRef.current); }} onSave={saveDoc} onRevert={() => { setDoc(saved); useDoc(saved, wref.current.slug, false); }} onClose={closeEditor} /></Suspense>}
       <div className="rm-pad"><RoomStick onChange={onStick} /></div>
       {hasHeight && <button type="button" className="rm-jump" data-testid="room-jump" aria-label="Jump" onClick={() => { jumpReq.current = true; wakeRef.current(); }} onPointerDown={(e) => e.stopPropagation()}>Jump</button>}
       <button type="button" className="rm-use" data-testid="room-use" onClick={() => { if (scanMode) startScan(); else use(); }} onPointerDown={(e) => e.stopPropagation()}><Glyph name={scanMode ? "scan" : "door"} /><span>{scanMode ? "Scan" : "Use"}</span></button>

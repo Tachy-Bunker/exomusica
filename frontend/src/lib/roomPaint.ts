@@ -181,6 +181,7 @@ export class RoomPainter {
   /** Floor, ceiling and walls with their doors. `skip` is a wall not to draw (the one you are looking through from the other side). */
   shell(eye: Eye, skip: number, target: Target | null, sp: ScenePaint | null): void {
     const { n, v, world, C, ctx } = this, Hh = this.H3;
+    const trim = actorLayer.doc && actorLayer.slug === world.slug ? actorLayer.doc.trim : null, glow = actorLayer.budget >= 260;
     // ceiling and floor
     for (let i = 0; i < n; i++) { this.wp[i * 3] = v[i][0]; this.wp[i * 3 + 1] = Hh; this.wp[i * 3 + 2] = v[i][1]; }
     if (this.poly(n)) { ctx.fillStyle = C.ceil; ctx.fill(); }
@@ -208,10 +209,21 @@ export class RoomPainter {
       ctx.lineWidth = 1; ctx.strokeStyle = C.line; ctx.stroke();
       if (near && actorLayer.budget > 0 && this.dist[i] < 169 && (actorLayer.doc?.dress ?? 2) > 0) this.greeble(i);
       ctx.beginPath(); this.seg(a[0], 0, a[1], a[0], Hh, a[1]); ctx.lineWidth = 2; ctx.strokeStyle = C.edge; ctx.stroke();
+      if (trim) this.trim(a[0], a[1], b[0], b[1], Hh, trim, glow);
       for (let di = 0; di < world.doors.length; di++) if (world.doors[di].edge === i) this.door(di, eye, target?.kind === "door" && target.door.id === world.doors[di].id, sp);
     }
   }
 
+  // ---- neon trim: a thin line of light along the foot of a wall (and the top when high). Static, never animated; the soft glow is left out on slow devices
+  private trim(ax: number, az: number, bx: number, bz: number, Hh: number, t: { color: string; high: boolean }, glow: boolean): void {
+    this.neon(ax, 0.08, az, bx, 0.08, bz, t.color, glow);
+    if (t.high) this.neon(ax, Hh - 0.08, az, bx, Hh - 0.08, bz, t.color, glow);
+  }
+  private neon(ax: number, ay: number, az: number, bx: number, by: number, bz: number, col: string, glow: boolean): void {
+    const ctx = this.ctx;
+    if (glow) { ctx.beginPath(); this.seg(ax, ay, az, bx, by, bz); ctx.lineWidth = 7; ctx.strokeStyle = rgba(col, 0.22); ctx.stroke(); }
+    ctx.beginPath(); this.seg(ax, ay, az, bx, by, bz); ctx.lineWidth = 2; ctx.strokeStyle = col; ctx.stroke();
+  }
   // ---- wall dressing: panel seams, vents, cable runs, hazard strips and light strips, laid out once per wall from the room's name (same every visit), drawn only on near walls
   private gr: (Float32Array | null)[] | null = null; private grD = 2;
   private greebleBuild(i: number): Float32Array {
@@ -512,6 +524,7 @@ export class RoomPainter {
       else if (a.kind === "hazard") this.hazard(a, sel);
       else if (a.kind === "boss") this.boss(a, sel, rt.done.has(a.id));
       else if (a.kind === "artifact") this.artifact(a, eye, sel);
+      else if (a.kind === "decal") { if (L.edit || (actorLayer.budget !== 0 && (a.x - eye.x) ** 2 + (a.z - eye.z) ** 2 < 144)) this.artifact(a, eye, sel); }
       else this.marker(a, eye, sel);
       if (L.edit && !on) ctx.globalAlpha = 1;
     }
@@ -557,7 +570,7 @@ export class RoomPainter {
       }
       ctx.setTransform(base, 0, 0, base, 0, 0);
     }
-    if (sel || a.visor || back) {
+    if (sel || a.visor || (back && (a.kind !== "decal" || actorLayer.edit))) {
       const w = this.wp; for (let k = 0; k < 4; k++) { const s = k === 1 || k === 2 ? 1 : 0, t = k >= 2 ? 1 : 0; w[k * 3] = px(s, t, 0); w[k * 3 + 1] = px(s, t, 1); w[k * 3 + 2] = px(s, t, 2); }
       if (this.poly(4)) { ctx.lineWidth = sel ? 2.5 : 1.2; ctx.strokeStyle = sel ? "#ffffff" : a.visor ? "rgba(120,255,240,.9)" : "rgba(160,160,160,.5)"; if (back) ctx.setLineDash([4, 4]); ctx.stroke(); ctx.setLineDash([]); }
     }

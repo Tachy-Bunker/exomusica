@@ -1,6 +1,6 @@
 # Rooms, editor and Thanaton — state of the build (read this first after a chat compaction)
 
-Owner: Tachy (designer; no programming knowledge). Last updated: fix371. Update this file with every delivery, together with `docs/BACKLOG.md` (queue) and `docs/HOMEPAGE_AND_NAV.md` (per-fix notes).
+Owner: Tachy (designer; no programming knowledge). Last updated: fix390. Update this file with every delivery, together with `docs/BACKLOG.md` (queue) and `docs/HOMEPAGE_AND_NAV.md` (per-fix notes).
 
 ## Owner preferences (standing)
 - Direct tone, no flattery, rare/on-point ideas. Maximum convenience for the designer (everything via editor UI, no code). Optimised code that runs on weak devices (allocation-free painters, budgets, adaptive resolution).
@@ -36,7 +36,7 @@ Everything is inside a supermassive black hole, **Thanaton**. Members fell in; a
 - Shared GET cache `lib/sharedGet.ts` (`clearShared` after saves). `lib/heat.ts` `pathOfHref` strips `/branch/<slug>/room`.
 
 ## Delivered (rooms line)
-fix347 rooms · 348 people/terminals · 349 drone/player · 352 scan/visor/Logbook · 355 rooms-first · 356 actors+wires editor · 357 floor textures · 358 walls/mood/pools · 359 library pictures, ceiling, zip · 360 skies · 361 artifacts · 362 ambient flock · 363 editable corridors · 364 subtree themes + copy look · 365 milestone gates (conditional swap) · 366 layout fixes (chat dock beside rooms/map, no joystick on desktop, phone map/room buttons) · 367 prop catalogue · 368 fixes (texture tiles, mood easing, side view, Explore W/S, door prefetch).
+fix347 rooms · 348 people/terminals · 349 drone/player · 352 scan/visor/Logbook · 355 rooms-first · 356 actors+wires editor · 357 floor textures · 358 walls/mood/pools · 359 library pictures, ceiling, zip · 360 skies · 361 artifacts · 362 ambient flock · 363 editable corridors · 364 subtree themes + copy look · 365 milestone gates (conditional swap) · 366 layout fixes (chat dock beside rooms/map, no joystick on desktop, phone map/room buttons) · 367 prop catalogue · 368 fixes (texture tiles, mood easing, side view, Explore W/S, door prefetch). · 390 editor part 2 (seasons, neon trim, room hum, decals, visitor view, saved versions; roadmap E1–E5 complete)
 
 ## Queue (priority order, from the owner's additions)
 1. (corridors DONE in fix363: own doc `low~high`, things + mood only) Remaining: corridor floor/walls/ceiling/sky/flock, and elevators (not a space in the room view yet: needs the elevator space first).
@@ -133,3 +133,16 @@ Older list: see `docs/BACKLOG.md` (Monthly challenge, Twelve Artifacts, Hull, Em
 - Visor sweep already freezes under reduced motion (`visorHud.ts`, `REDUCED`): no change needed.
 - Tests for these: see the audit delivery entry in `docs/BACKLOG.md`.
 
+## fix390 additions (editor part 2: roadmap E3–E5)
+- **Seasons** (Actor `season`: 0 any, 1 spring, 2 summer, 3 autumn, 4 winter): decided by the visitor's own clock, Northern months (Mar–May spring, Jun–Aug summer, Sep–Nov autumn, Dec–Feb winter). `seasonOf(month)` and `seasonShut(a, season)` in `roomDoc.ts`; `WireRuntime(doc, reached, season)` shuts an out-of-season thing exactly like a gate. Editor: "Shows in" in every thing's inspector. The plan view still shows everything.
+- **Neon trim** (`RoomDoc.trim` = {color, high} or null): a 2 px line with a 7 px soft glow at the foot of every wall (and along the top when `high`). Painter `trim()` / `neon()` in the wall loop; static, never animated. The glow is dropped below the full tile budget, so weak devices keep the line. Rooms only: corridors have no trim yet.
+- **Room hum** (`RoomDoc.hum` 0–3: none, drone, air, pulse): `lib/roomHum.ts`, one AudioContext, level 0.05 × SFX volume, 1.2 s fades. The pulse is a 0.2 Hz swell, never a flash. Plays while a visitor is in the room and during test play; stops on leaving the room or editing. Rooms only.
+- **Decals** (kind `decal`, at most `MAX_DECALS` = 64 a room): words and/or a picture on a wall, the floor or as a billboard. Same fields as an artifact (text, picture, placement, colour), but not scannable, no visor, no Logbook entry, no collision. Events shown / hidden / start; messages show / hide / toggle / setcolor. Painted by the artifact painter, only within 12 m and only while the tile budget is not zero.
+- **Visitor view** (editor button "◉ Visitor view"): test play with the governor pinned at its lowest step (`ScaleGovernor.pin()`, scale 0.42); gates and seasons work as a visitor gets them today. At that step the budget is 0, so decals are hidden and trims are lines only: this is what a slow phone shows.
+- **Saved versions** (Mood tab, "Saved versions"): the server keeps the newest 10 saves per room in `room_doc_versions`, written on every save; older ones are dropped. `GET /api/admin/room-doc/:slug/history`, `POST /api/admin/room-doc/:slug/restore/:id` (body `baseVersion`). A restore is saved again as the newest version and keeps the 409 rule. The Restore buttons are off while there are unsaved changes. Deleting a room deletes its history too. Prefab saves keep history as well.
+- **Fixed on the way**: the dirty check compared only some fields (actors, wires, tex, floor, bands, grade, ceil, sky, flock, inherit). Changes to dress, shafts, the Logbook entry, corridor floor/walls, and now trim and hum never enabled Save. It now compares the whole document.
+- **Schema change**: model `RoomDocVersion` (table `room_doc_versions`), migration `20261016140000_room_doc_versions` (additive; verified on Postgres 16).
+  `docker compose run --rm -v "$(pwd)/backend/prisma:/app/prisma" backend npx prisma migrate dev --name room_doc_versions` (answer "no" to any reset prompt) / `docker compose run --rm backend npx prisma generate` / `docker compose up -d --build`.
+- **Tests**: `backend/_scratch/roomeditor2.test.ts` (seasons, cleaning of trim/hum/decals, the 64 cap, wires to decals, season-shut runtime, frontend/backend copy identical); `frontend/_scratch/e2e_fix390.py` (16/16: the new controls save, decal inspector has no visor or Logbook, visitor view pins 0.42 and unpins, restore is blocked with unsaved changes and saves a new version).
+- **Limits**: decals are not capped per frame (64 a room, 12 m reach); trims and the hum are rooms only; seasons follow the visitor's clock, so the same room changes with the month (by design); history is 10 saves, restore only (no compare view).
+- **Still open**: the PS1 wobble question (owner); elevators as a real space; the emoji gate (moderation); corridor trim and hum if wanted.

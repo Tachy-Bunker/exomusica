@@ -8,8 +8,8 @@ export const MAX_PER_ACTOR_TICK = 8;       // per target, so a loop cannot run a
 export const MAX_DELAY = 600;              // seconds
 export const RANGE = 200;                  // metres, positions are clamped to +-RANGE
 
-export type Kind = "solid" | "ghost" | "trigger" | "light" | "marker" | "pool" | "artifact" | "hazard" | "boss";
-export const KINDS: Kind[] = ["solid", "ghost", "trigger", "light", "marker", "pool", "artifact", "hazard", "boss"];
+export type Kind = "solid" | "ghost" | "trigger" | "light" | "marker" | "pool" | "artifact" | "hazard" | "boss" | "decal";
+export const KINDS: Kind[] = ["solid", "ghost", "trigger", "light", "marker", "pool", "artifact", "hazard", "boss", "decal"];
 
 /** Events an actor can emit, per kind. "start" fires once when the room loads. */
 export const EVENTS: Record<Kind, string[]> = {
@@ -22,6 +22,7 @@ export const EVENTS: Record<Kind, string[]> = {
   artifact: ["scanned", "shown", "hidden", "start"],
   hazard: ["enter", "exit", "shown", "hidden", "start"],
   boss: ["engaged", "defeated", "shown", "hidden", "start"],
+  decal: ["shown", "hidden", "start"],
 };
 /** Messages an actor accepts. */
 export const MESSAGES: Record<Kind, string[]> = {
@@ -34,6 +35,7 @@ export const MESSAGES: Record<Kind, string[]> = {
   artifact: ["show", "hide", "toggle", "setcolor"],
   hazard: ["show", "hide", "toggle", "setcolor"],
   boss: ["show", "hide", "toggle", "setcolor"],
+  decal: ["show", "hide", "toggle", "setcolor"],
 };
 /** Messages that need a value (`Wire.arg`): a colour, a line of text, a sound name. */
 export const ARG_KIND: Record<string, "color" | "text" | "sound" | "secs"> = { setcolor: "color", say: "text", play: "sound", shot: "secs" };
@@ -64,6 +66,7 @@ export interface Actor {
   pmode: number;                       // 0 = travels back and forth for ever, 1 = only when called (message "move": goes to the far end, the next call brings it back)
   ptime: number;                       // seconds for one way (1..120); 0 = stands still
   lift: number;                        // solid/ghost: height of its underside above the floor (a platform, a low ceiling), 0..12 m
+  season: number;                      // shows only in one season of the visitor's calendar: 0 any, 1 spring, 2 summer, 3 autumn, 4 winter (see seasonOf)
 }
 export const MAX_LORE = 1500, MAX_TEXT = 60;
 /** Catalogue props (shapes in `roomProps.ts`): id -> blocks you? Frames, arches and the like are walk-through. */
@@ -92,6 +95,11 @@ export const STEP = 0.5, BODY = 1.7;       // you step up this much for free; yo
 export const GATE = /^[a-z0-9][a-z0-9-]{0,31}$/;
 /** True when the actor is shut away by its milestone gate: `reached` holds the milestone keys the community has reached. */
 export const gatedOut = (a: Pick<Actor, "gate" | "gateOff">, reached: ReadonlySet<string> | null): boolean => !!a.gate && (reached?.has(a.gate) === true) === a.gateOff;
+/** Seasons, by the month on the visitor's clock (Northern reckoning): 0 any, 1 spring, 2 summer, 3 autumn, 4 winter. */
+export const SEASONS = ["any", "spring", "summer", "autumn", "winter"] as const, MAX_SEASON = 4;
+export const seasonOf = (month: number): number => { const m = Math.min(11, Math.max(0, Math.floor(month) || 0)); return m >= 2 && m <= 4 ? 1 : m >= 5 && m <= 7 ? 2 : m >= 8 && m <= 10 ? 3 : 4; };
+/** True when the actor is out of season. `season` is the visitor's season (0 = unknown: nothing is seasonal). */
+export const seasonShut = (a: Pick<Actor, "season">, season: number): boolean => a.season !== 0 && season !== 0 && a.season !== season;
 export interface Wire { from: string; ev: string; to: string; msg: string; delay: number; once: boolean; arg?: string }
 /** Looping floor textures. `kind` picks a procedural pattern; a room has up to MAX_TEX materials, and each floor cell is 0 (none) or a material number (1-based). */
 export const TEX_KINDS = ["noise", "scan", "grid", "diamond", "circuit", "water", "brick", "static"] as const;
@@ -111,9 +119,15 @@ export const MAX_SKY_SPEED = 30;
 /** A few drifting specks: `kind` 0 dust, 1 fireflies; `n` at most MAX_FLOCK. They ignore walls and objects, fade out and reappear elsewhere. */
 export interface Flock { kind: 0 | 1; n: number; color: string }
 export const MAX_FLOCK = 12;
-export interface RoomDoc { v: 1; version: number; actors: Actor[]; wires: Wire[]; tex: Tex[]; floor: number[]; bands: Band[]; grade: Grade | null; ceil: number; sky: Sky | null; flock: Flock | null; inherit: boolean; /** corridors: material (1-based, 0 = none) on the floor and on both walls; the ceiling is `ceil` */ cfloor: number; cwall: number; /** wall dressing: 0 none, 1 light, 2 normal, 3 heavy */ dress: number; /** light shafts from the ceiling, 0 = none .. 1 */ shafts: number; /** the Logbook entry written once this room has been explored ("" = made from the branch description) */ log: string }
+/** Neon trim: a thin line of light along the foot of every wall, and along the top of them when `high`. */
+export interface Trim { color: string; high: boolean }
+/** Room hum: a quiet bed of sound while you are in the room. 0 none, 1 drone, 2 air, 3 pulse (a slow swell, never a flash). */
+export const HUMS = ["none", "drone", "air", "pulse"] as const, MAX_HUM = 3;
+/** Decals: a picture or words stuck to a surface. Not scannable, nothing to walk into. At most this many a room. */
+export const MAX_DECALS = 64;
+export interface RoomDoc { v: 1; version: number; actors: Actor[]; wires: Wire[]; tex: Tex[]; floor: number[]; bands: Band[]; grade: Grade | null; ceil: number; sky: Sky | null; flock: Flock | null; inherit: boolean; /** corridors: material (1-based, 0 = none) on the floor and on both walls; the ceiling is `ceil` */ cfloor: number; cwall: number; /** wall dressing: 0 none, 1 light, 2 normal, 3 heavy */ dress: number; /** light shafts from the ceiling, 0 = none .. 1 */ shafts: number; /** neon trim along the walls, null = none */ trim: Trim | null; /** room hum, see HUMS */ hum: number; /** the Logbook entry written once this room has been explored ("" = made from the branch description) */ log: string }
 
-export const emptyDoc = (): RoomDoc => ({ v: 1, version: 0, actors: [], wires: [], tex: [], floor: [], bands: [], grade: null, ceil: 0, sky: null, flock: null, inherit: true, cfloor: 0, cwall: 0, dress: 2, shafts: 0, log: "" });
+export const emptyDoc = (): RoomDoc => ({ v: 1, version: 0, actors: [], wires: [], tex: [], floor: [], bands: [], grade: null, ceil: 0, sky: null, flock: null, inherit: true, cfloor: 0, cwall: 0, dress: 2, shafts: 0, trim: null, hum: 0, log: "" });
 
 const num = (x: unknown, lo: number, hi: number, d: number) => { const n = typeof x === "number" && Number.isFinite(x) ? x : d; return Math.min(hi, Math.max(lo, n)); };
 const str = (x: unknown, max: number, d = "") => (typeof x === "string" ? x.replace(/[\u0000-\u001f]/g, "").slice(0, max) : d);
@@ -124,26 +138,28 @@ export function cleanDoc(raw: unknown): RoomDoc {
   const out = emptyDoc();
   const r = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
   out.version = Math.floor(num(r.version, 0, 1e9, 0));
-  const ids = new Set<string>();
+  const ids = new Set<string>(); let decals = 0;
   if (Array.isArray(r.actors)) for (const a of r.actors) {
     if (out.actors.length >= MAX_ACTORS || !a || typeof a !== "object") continue;
     const o = a as Record<string, unknown>;
     const id = str(o.id, 24).replace(/[^a-zA-Z0-9_-]/g, "");
     const kind = KINDS.find((k) => k === o.kind);
     if (!id || !kind || ids.has(id)) continue;
+    if (kind === "decal") { if (decals >= MAX_DECALS) continue; decals++; }
+    const panel = kind === "artifact" || kind === "boss" || kind === "decal";
     ids.add(id);
     const sides = Math.round(num(o.sides, 0, 8, 0));
     out.actors.push({
       id, kind, name: str(o.name, 40, kind), x: num(o.x, -RANGE, RANGE, 0), z: num(o.z, -RANGE, RANGE, 0),
-      w: num(o.w, 0.1, 60, 2), d: num(o.d, 0.1, 60, 2), h: num(o.h, 0, 30, kind === "solid" || kind === "ghost" ? 1.5 : kind === "artifact" ? 1 : 2),
+      w: num(o.w, 0.1, 60, 2), d: num(o.d, 0.1, 60, 2), h: num(o.h, 0, 30, kind === "solid" || kind === "ghost" ? 1.5 : kind === "artifact" || kind === "decal" ? 1 : 2),
       rot: num(o.rot, -7, 7, 0), sides: sides === 1 || sides === 2 ? 0 : sides,
       color: typeof o.color === "string" && COLOR.test(o.color) ? o.color.toLowerCase() : "#7a8cff",
       on: o.on === false ? false : true, pulse: kind === "light" || kind === "pool" || kind === "hazard" ? Math.round(num(o.pulse, 0, 2, 0) * 4) / 4 : 0,
-      text: kind === "artifact" || kind === "boss" ? str(o.text, MAX_TEXT, "") : "", lore: kind === "artifact" || kind === "boss" ? str(o.lore, MAX_LORE, "") : "",
-      img: kind === "artifact" || kind === "boss" ? Math.round(num(o.img, 0, 1e9, 0)) : 0, mode: kind === "artifact" || kind === "boss" ? Math.round(num(o.mode, 0, 2, 0)) : kind === "hazard" ? Math.round(num(o.mode, 0, 2, 0)) : 0, visor: kind === "artifact" && o.visor === true,
+      text: panel ? str(o.text, MAX_TEXT, "") : "", lore: kind === "artifact" || kind === "boss" ? str(o.lore, MAX_LORE, "") : "",
+      img: panel ? Math.round(num(o.img, 0, 1e9, 0)) : 0, mode: panel || kind === "hazard" ? Math.round(num(o.mode, 0, 2, 0)) : 0, visor: kind === "artifact" && o.visor === true,
       prop: (kind === "solid" || kind === "ghost") && typeof o.prop === "string" && Object.hasOwn(PROP_BLOCKS, o.prop) ? o.prop : "",
       gate: typeof o.gate === "string" && GATE.test(o.gate) ? o.gate : "", gateOff: typeof o.gate === "string" && GATE.test(o.gate) && o.gateOff === true,
-      lift: kind === "solid" || kind === "ghost" ? Math.round(num(o.lift, 0, 12, 0) * 4) / 4 : 0,
+      lift: kind === "solid" || kind === "ghost" ? Math.round(num(o.lift, 0, 12, 0) * 4) / 4 : 0, season: Math.round(num(o.season, 0, MAX_SEASON, 0)),
       ...pathOf(kind, o),
     });
   }
@@ -189,6 +205,8 @@ export function cleanDoc(raw: unknown): RoomDoc {
   out.cfloor = Math.round(num(r.cfloor, 0, out.tex.length, 0)); out.cwall = Math.round(num(r.cwall, 0, out.tex.length, 0));
   if (r.sky && typeof r.sky === "object") { const k = r.sky as Record<string, unknown>, id = Number(k.id); if (Number.isInteger(id) && id >= 1 && id <= 1e9) out.sky = { id, speed: Math.round(num(k.speed, -MAX_SKY_SPEED, MAX_SKY_SPEED, 0) * 2) / 2 }; }
   out.dress = Math.round(num(r.dress, 0, 3, 2)); out.shafts = Math.round(num(r.shafts, 0, 1, 0) * 10) / 10;
+  if (r.trim && typeof r.trim === "object") { const t = r.trim as Record<string, unknown>; if (typeof t.color === "string" && COLOR.test(t.color)) out.trim = { color: t.color.toLowerCase(), high: t.high === true }; }
+  out.hum = Math.round(num(r.hum, 0, MAX_HUM, 0));
   out.log = str(r.log, MAX_LORE);
   out.inherit = r.inherit !== false; // true: mood, sky and flock this room does not set come from the theme of the branch above it
   if (r.flock && typeof r.flock === "object") { const k = r.flock as Record<string, unknown>, n = Math.round(num(k.n, 0, MAX_FLOCK, 0)); if (n >= 1) out.flock = { kind: k.kind === 1 ? 1 : 0, n, color: typeof k.color === "string" && COLOR.test(k.color) ? k.color.toLowerCase() : "#ffe9a8" }; }
@@ -234,8 +252,8 @@ export class WireRuntime {
   col = new Map<string, string>();
   /** Actors shut away by a milestone gate: always off, whatever wires say. */
   shut = new Set<string>();
-  constructor(readonly doc: RoomDoc, reached: ReadonlySet<string> | null = null) {
-    for (const a of doc.actors) { const g = gatedOut(a, reached); if (g) this.shut.add(a.id); this.on.set(a.id, a.on && !g); this.enabled.set(a.id, a.on && !g); }
+  constructor(readonly doc: RoomDoc, reached: ReadonlySet<string> | null = null, season = 0) {
+    for (const a of doc.actors) { const g = gatedOut(a, reached) || seasonShut(a, season); if (g) this.shut.add(a.id); this.on.set(a.id, a.on && !g); this.enabled.set(a.id, a.on && !g); }
     for (const w of doc.wires) { const k = w.from + "|" + w.ev; const l = this.byEvent.get(k); if (l) l.push(w); else this.byEvent.set(k, [w]); }
   }
   isOn(id: string) { return this.on.get(id) === true; }
