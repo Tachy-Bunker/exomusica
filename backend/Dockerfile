@@ -25,5 +25,8 @@ COPY --from=build /app/dist ./dist
 COPY --from=build /app/package*.json ./
 COPY prisma ./prisma
 COPY seed-assets ./seed-assets
+# The named volume mounted here inherits this owner on first use, so uploads stay writable without running as root.
+RUN mkdir -p /app/uploads && chown -R node:node /app/uploads
+USER node
 EXPOSE 3001
 CMD ["node", "dist/server.js"]

@@ -2,6 +2,8 @@ import type { FastifyInstance } from "fastify";
 import { requireAdmin } from "../lib/auth.js";
 import { saveMediaFile } from "../lib/storage.js";
 import { prisma } from "../lib/prisma.js";
+import type { IncomingMessage } from "node:http";
+import { safeGet, BlockedAddressError } from "../lib/netGuard.js";
 
 export async function mediaRoutes(app: FastifyInstance): Promise<void> {
   app.post("/api/admin/media", { preHandler: requireAdmin }, async (req, reply) => {
@@ -53,31 +55,43 @@ export async function mediaRoutes(app: FastifyInstance): Promise<void> {
       return reply.code(400).send({ error: "only http/https URLs can be proxied", storedValue: externalUrl });
     }
 
-    const upstreamHeaders: Record<string, string> = {
-      "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36",
-    };
-    if (req.headers.range) upstreamHeaders.range = req.headers.range;
-
-    let upstream: Response;
+    let upstream: IncomingMessage;
     try {
-      upstream = await fetch(parsed.href, { headers: upstreamHeaders });
+      // Every address is checked before it is connected to, and each redirect too (see lib/netGuard.ts).
+      ({ res: upstream } = await safeGet(parsed, {
+        headers: {
+          "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36",
+          ...(req.headers.range ? { range: req.headers.range } : {}),
+        },
+        timeoutMs: 15000,
+        maxRedirects: 3,
+      }));
     } catch (err) {
-      req.log.error({ err, url: parsed.href }, "audio-proxy: upstream fetch failed");
+      if (err instanceof BlockedAddressError) return reply.code(400).send({ error: "this address is not allowed" });
+      req.log.error({ err: (err as Error).message, url: parsed.href }, "audio-proxy: upstream fetch failed");
       return reply.code(502).send({ error: "failed to fetch the source audio" });
     }
-    if (!upstream.ok && upstream.status !== 206) {
-      req.log.warn({ url: parsed.href, upstreamStatus: upstream.status, upstreamStatusText: upstream.statusText }, "audio-proxy: upstream returned an error status");
-      return reply.code(502).send({ error: `upstream returned ${upstream.status}` });
+    const status = upstream.statusCode ?? 502;
+    if (status !== 200 && status !== 206) {
+      upstream.resume();
+      req.log.warn({ url: parsed.href, upstreamStatus: status }, "audio-proxy: upstream returned an error status");
+      return reply.code(502).send({ error: `upstream returned ${status}` });
+    }
+    // Only audio goes through: a web page or a data file from the source is refused.
+    const type = String(upstream.headers["content-type"] ?? "");
+    if (!/^(audio|video)\//.test(type) && !/application\/(ogg|octet-stream)/.test(type)) {
+      upstream.resume();
+      return reply.code(502).send({ error: "the source is not an audio file" });
     }
 
-    reply.code(upstream.status);
-    const passthroughHeaders = ["content-type", "content-length", "content-range", "accept-ranges"];
-    for (const h of passthroughHeaders) {
-      const v = upstream.headers.get(h);
-      if (v) reply.header(h, v);
+    reply.code(status);
+    for (const h of ["content-type", "content-length", "content-range", "accept-ranges"] as const) {
+      const v = upstream.headers[h];
+      if (v) reply.header(h, String(v));
     }
-    if (!upstream.headers.get("accept-ranges")) reply.header("accept-ranges", "bytes");
-
-    return reply.send(upstream.body);
+    if (!upstream.headers["accept-ranges"]) reply.header("accept-ranges", "bytes");
+    // The listener went away: stop pulling the file from the source.
+    req.raw.on("close", () => { if (!upstream.complete) upstream.destroy(); });
+    return reply.send(upstream);
   });
 }

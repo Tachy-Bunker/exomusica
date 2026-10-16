@@ -9,6 +9,7 @@ import { useNavigate, Link } from "react-router-dom";
 import { api, ApiError } from "../lib/api";
 import { useAuth } from "../lib/auth";
 import { useNotificationWidgetVisibility } from "../lib/notificationWidgetVisibility";
+import { setShortcutsOn, shortcutsOn } from "../lib/shortcutsPref";
 import { useProfileStore } from "../lib/profileStore";
 import { Avatar } from "../components/Avatar";
 import { useVolumeMixerStore } from "../lib/volumeMixerStore";
@@ -67,6 +68,7 @@ interface Sound {
 
 export function AccountSettingsPage() {
   const { logout } = useAuth();
+  const [letterShortcuts, setLetterShortcuts] = useState(shortcutsOn);
   const classic = useClassicMode((s) => s.classic);
   const setClassic = useClassicMode((s) => s.set);
   const eraState = useEra();
@@ -518,6 +520,15 @@ export function AccountSettingsPage() {
           notification widget
         </label>
       </div>
+
+      <h2 style={{ fontSize: "1rem", marginTop: "1.5rem" }}>Keyboard</h2>
+      <label>
+        <input
+          type="checkbox"
+          checked={letterShortcuts}
+          onChange={(e) => { setShortcutsOn(e.target.checked); setLetterShortcuts(e.target.checked); }}
+        /> Letter shortcuts on desktop (C, B, X, M, G, E). Turn them off if you type those letters into other apps.
+      </label>
 
       <h2 style={{ fontSize: "1rem", marginTop: "1.5rem" }}>Change password</h2>
       <form onSubmit={handlePasswordChange}>

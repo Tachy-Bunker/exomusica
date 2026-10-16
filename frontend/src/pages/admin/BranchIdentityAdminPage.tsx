@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { BranchEmblem } from "../../components/BranchEmblem";
-import { api, ApiError, getToken } from "../../lib/api";
+import { api, ApiError } from "../../lib/api";
 import { GLYPHS, GLYPH_LABEL, PALETTE, derivedColor, identityOf, isHexColor, type Glyph } from "../../lib/branchIdentity";
 import type { BranchPicture } from "../../lib/home";
 import { colorFromImageUrl } from "../../lib/imageColor";
@@ -65,7 +65,7 @@ export function BranchIdentityAdminPage() {
     try {
       const form = new FormData();
       form.append("file", file);
-      const res = await fetch(`/api/admin/branches/${branch.id}/identity-image`, { method: "POST", body: form, headers: getToken() ? { authorization: `Bearer ${getToken()}` } : {} });
+      const res = await fetch(`/api/admin/branches/${branch.id}/identity-image`, { method: "POST", body: form });
       const body = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(body.error ?? "Couldn't upload that picture.");
       await chooseMain(body.identityImageUrl);

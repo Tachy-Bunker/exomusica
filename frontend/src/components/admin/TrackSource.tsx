@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { api, getToken } from "../../lib/api";
+import { api } from "../../lib/api";
 
 interface TrackHit { source: "album" | "upload" | "community"; title: string; fileUrl: string; format: string; durationSeconds: number | null; detail: string }
 export interface PickedTrack { title: string; fileUrl: string; format: string }
@@ -35,7 +35,7 @@ export function TrackSource({ onPick, after = "Check the title, then press Add t
     try {
       const form = new FormData();
       form.append("file", file);
-      const res = await fetch("/api/admin/track-upload", { method: "POST", body: form, headers: getToken() ? { authorization: `Bearer ${getToken()}` } : {} });
+      const res = await fetch("/api/admin/track-upload", { method: "POST", body: form, });
       const body = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(body.error ?? "Couldn't upload that file.");
       onPick({ title: body.title, fileUrl: body.url, format: body.format });

@@ -1,3 +1,4 @@
+import { log } from "./lib/log.js";
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import path from "node:path";
 import { parse } from "csv-parse/sync";
@@ -40,7 +41,7 @@ function parseArgs() {
   const mediaDir = get("--media-dir");
   const archiveOrgPrefix = get("--archive-org-prefix");
   if (!csvPath || !channelSlug) {
-    console.error(
+    log.error(
       "Usage: node dist/import-discord.js --csv <path> --channel <slug> [--media-dir <path> | --archive-org-prefix <url>]",
     );
     process.exit(1);
@@ -53,7 +54,7 @@ async function main() {
 
   const channel = await prisma.forumChannel.findUnique({ where: { slug: channelSlug } });
   if (!channel) {
-    console.error(`No channel with slug "${channelSlug}" - create it first (branch or admin discussion topic).`);
+    log.error(`No channel with slug "${channelSlug}" - create it first (branch or admin discussion topic).`);
     process.exit(1);
   }
 
@@ -67,18 +68,18 @@ async function main() {
 
   const summary = await importDiscordRows(prisma, channel.id, rows, attachments);
 
-  console.log("\nImport complete.");
-  console.log(`  Messages imported:    ${summary.imported}`);
-  console.log(`  Skipped (system):     ${summary.skippedSystem}`);
-  console.log(`  Skipped (duplicate):  ${summary.skippedDuplicate}`);
-  console.log(`  Attachments resolved: ${summary.attachmentsResolved}`);
-  console.log(`  Attachments missing:  ${summary.attachmentsMissing}`);
-  console.log("\nNot imported from this format (not present in CSV export): replies, reactions.");
+  log.info("\nImport complete.");
+  log.info(`  Messages imported:    ${summary.imported}`);
+  log.info(`  Skipped (system):     ${summary.skippedSystem}`);
+  log.info(`  Skipped (duplicate):  ${summary.skippedDuplicate}`);
+  log.info(`  Attachments resolved: ${summary.attachmentsResolved}`);
+  log.info(`  Attachments missing:  ${summary.attachmentsMissing}`);
+  log.info("\nNot imported from this format (not present in CSV export): replies, reactions.");
 }
 
 main()
   .catch((err) => {
-    console.error(err);
+    log.error(err);
     process.exit(1);
   })
   .finally(() => prisma.$disconnect());

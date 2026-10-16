@@ -1,7 +1,7 @@
 import { adminEdit, memberNotifications, memberProfile, memberVisualEffects } from "../lib/profileInput.js";
 import type { FastifyInstance } from "fastify";
 import { prisma } from "../lib/prisma.js";
-import { requireAuth, requireAdmin, hashPassword, verifyPassword } from "../lib/auth.js";
+import { requireAuth, requireAdmin, hashPassword, verifyPassword, refreshAccount, sessionCookie, signToken } from "../lib/auth.js";
 import { ghostifyUser } from "../services/accountService.js";
 import { createNotification } from "../lib/notify.js";
 import { saveSiteImage } from "../lib/storage.js";
@@ -164,10 +164,13 @@ export async function accountRoutes(app: FastifyInstance): Promise<void> {
       if (!me?.passwordHash || !(await verifyPassword(me.passwordHash, currentPassword))) {
         return reply.code(401).send({ error: "current password is incorrect" });
       }
+      // Changing the password signs out every other session (the token version goes up); this one gets a fresh cookie.
       await prisma.user.update({
         where: { id: req.user!.id },
-        data: { passwordHash: await hashPassword(newPassword) },
+        data: { passwordHash: await hashPassword(newPassword), tokenVersion: { increment: 1 } },
       });
+      await refreshAccount(req.user!.id);
+      reply.header("Set-Cookie", sessionCookie(signToken(req.user!)));
       void createNotification(req.user!.id, "account_updated", "Password changed", "Your password was updated.").catch((err) =>
         app.log.error(err, "createNotification failed"),
       );
@@ -223,7 +226,10 @@ export async function accountRoutes(app: FastifyInstance): Promise<void> {
       const clash = await prisma.user.findFirst({ where: { id: { not: id }, email: { equals: data.email, mode: "insensitive" } }, select: { id: true } });
       if (clash) return reply.code(409).send({ error: "Another account already uses that email" });
     }
-    if (edit.password) data.passwordHash = await hashPassword(edit.password);
+    if (edit.password) {
+      data.passwordHash = await hashPassword(edit.password);
+      data.tokenVersion = { increment: 1 }; // the account's other sessions end with the old password
+    }
     if (edit.clear.frame || edit.clear.tint) {
       const cur = (target.upgradeChoice ?? { frame: null, tint: null }) as { frame: string | null; tint: string | null };
       data.upgradeChoice = { frame: edit.clear.frame ? null : cur.frame, tint: edit.clear.tint ? null : cur.tint };
@@ -234,6 +240,9 @@ export async function accountRoutes(app: FastifyInstance): Promise<void> {
     } catch {
       return reply.code(409).send({ error: "Save failed: that username or email may already be taken" });
     }
+    // Role, name, ban and password changes take effect now, not at the next 30-second snapshot refresh.
+    await refreshAccount(id);
+    if (edit.password && id === req.user!.id) reply.header("Set-Cookie", sessionCookie(signToken(req.user!)));
     await prisma.auditLog.create({
       data: { actorId: req.user!.id, action: "user.edit", targetType: "User", targetId: id, meta: { fields: [...Object.keys(edit.data).map((k) => (k === "storageLimitBytes" ? "storageLimit" : k)), ...(edit.password ? ["password"] : []), ...(edit.clear.frame ? ["clearFrame"] : []), ...(edit.clear.tint ? ["clearTint"] : [])] } },
     }).catch(() => undefined);

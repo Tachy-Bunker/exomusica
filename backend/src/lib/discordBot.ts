@@ -1,3 +1,4 @@
+import { log } from "./log.js";
 import { Client, GatewayIntentBits, Partials, type User } from "discord.js";
 import { createDiscordLookup, discordIdOf, type DiscordIdentity, type FoundDiscordUser } from "./discordLookup.js";
 import { allowedMentions, webhookBody } from "./discordPayload.js";
@@ -111,7 +112,7 @@ async function handleIncomingDiscordMessage(message: {
         const attachment = await saveMessageAttachment(author.id, a.filename, a.contentType ?? "application/octet-stream", buffer, { bypassQuota: true });
         await prisma.attachment.update({ where: { id: attachment.id }, data: { messageId: created.id } });
       } catch (err) {
-        console.error("Discord bridge: failed to import attachment:", err);
+        log.error("Discord bridge: failed to import attachment:", err);
       }
     }
   }
@@ -129,7 +130,7 @@ async function handleIncomingDiscordMessage(message: {
       `${dto.authorUsername} mentioned you`,
       `In ${channel.name}: ${translatedContent.slice(0, 120)}`,
       { channelSlug: channel.slug, messageId: created.id },
-    ).catch((err) => console.error("Discord bridge: mention notification failed:", err));
+    ).catch((err) => log.error("Discord bridge: mention notification failed:", err));
   }
 }
 
@@ -170,7 +171,7 @@ const lookup = createDiscordLookup({
         if (match) return toFound(match.user);
       } catch (err) {
         searchFailed = true;
-        console.warn(`Discord bridge: member search for "${username}" failed in "${guild.name}":`, err);
+        log.warn(`Discord bridge: member search for "${username}" failed in "${guild.name}":`, err);
       }
     }
     if (searchFailed) throw new Error("member search failed in at least one server");
@@ -186,7 +187,7 @@ async function resolveDiscordUser(identity: DiscordIdentity) {
   try {
     return await client.users.fetch(found.id);
   } catch (err) {
-    console.warn(`Discord bridge: could not fetch user "${found.id}":`, err);
+    log.warn(`Discord bridge: could not fetch user "${found.id}":`, err);
     return null;
   }
 }
@@ -212,7 +213,7 @@ async function discordIdentityForUser(userId: number, given?: DiscordIdentity): 
     if (!u) return given;
     return { discordUserId: discordIdOf(u) ?? given?.discordUserId ?? null, discordUsername: u.discordUsername ?? given?.discordUsername ?? null };
   } catch (err) {
-    console.warn("Discord bridge: could not read the author's Discord identity:", err);
+    log.warn("Discord bridge: could not read the author's Discord identity:", err);
     return given;
   }
 }
@@ -222,12 +223,12 @@ export async function sendDiscordDM(identity: DiscordIdentity, message: string):
   try {
     const user = await resolveDiscordUser(identity);
     if (!user) {
-      console.warn(`Discord bridge: no user found for`, identity, `- DM not sent.`);
+      log.warn(`Discord bridge: no user found for`, identity, `- DM not sent.`);
       return;
     }
     await user.send(message);
   } catch (err) {
-    console.error("Discord bridge: failed to send DM:", err);
+    log.error("Discord bridge: failed to send DM:", err);
   }
 }
 
@@ -255,7 +256,7 @@ export async function sendDiscordAnnouncement(event: AnnouncementEvent, message:
       await channel.send(message);
     }
   } catch (err) {
-    console.error("Discord bridge: failed to send announcement:", err);
+    log.error("Discord bridge: failed to send announcement:", err);
   }
 }
 
@@ -270,7 +271,7 @@ export async function triggerDiscordTyping(discordChannelId: string): Promise<vo
     const channel = await client.channels.fetch(discordChannelId);
     if (channel?.isTextBased() && "sendTyping" in channel) await channel.sendTyping();
   } catch (err) {
-    console.error("Discord bridge: failed to send typing indicator:", err);
+    log.error("Discord bridge: failed to send typing indicator:", err);
   }
 }
 
@@ -309,7 +310,7 @@ export async function forwardMessageToDiscord(
         const targetChannel = await client.channels.fetch(channel.discordChannelId);
         if (targetChannel?.isThread()) threadIdParam = `&thread_id=${targetChannel.id}`;
       } catch (err) {
-        console.error("Failed to check whether the target Discord channel is a thread:", err);
+        log.error("Failed to check whether the target Discord channel is a thread:", err);
       }
     }
 
@@ -361,7 +362,7 @@ export async function forwardMessageToDiscord(
     }
     return null;
   } catch (err) {
-    console.error("Failed to forward message to Discord:", err);
+    log.error("Failed to forward message to Discord:", err);
     return null;
   }
 }
@@ -382,7 +383,7 @@ export async function initDiscordBot(): Promise<void> {
     connectionStatus = "disconnected";
     lastError = null;
     setDiscordOnlineCount(0);
-    console.log("Discord bridge: no token configured, bridge inactive.");
+    log.info("Discord bridge: no token configured, bridge inactive.");
     return;
   }
 
@@ -415,7 +416,7 @@ export async function initDiscordBot(): Promise<void> {
         if (!channel) return;
         broadcast(channel.slug, { type: "typing", username: typing.user.username });
       } catch (err) {
-        console.error("Discord bridge: failed to relay typing indicator to the website:", err);
+        log.error("Discord bridge: failed to relay typing indicator to the website:", err);
       }
     })();
   });
@@ -430,18 +431,18 @@ export async function initDiscordBot(): Promise<void> {
       createdAt: message.createdAt,
       attachments: [...message.attachments.values()].map((a) => ({ url: a.url, filename: a.name, contentType: a.contentType })),
       referencedMessageId: message.reference?.messageId ?? null,
-    }).catch((err) => console.error("Discord bridge: failed to process incoming message:", err));
+    }).catch((err) => log.error("Discord bridge: failed to process incoming message:", err));
   });
 
   newClient.on("error", (err) => {
     connectionStatus = "error";
     lastError = err instanceof Error ? err.message : String(err);
-    console.error("Discord client error:", err);
+    log.error("Discord client error:", err);
   });
 
   newClient.on("shardDisconnect", () => {
     connectionStatus = "disconnected";
-    console.warn("Discord bridge: shard disconnected.");
+    log.warn("Discord bridge: shard disconnected.");
   });
 
   // Blends Discord's own online-member count into the website's presence
@@ -473,7 +474,7 @@ export async function initDiscordBot(): Promise<void> {
         }
         setDiscordOnlineCount(count);
       } catch (err) {
-        console.error("Discord bridge: failed to compute online presence count:", err);
+        log.error("Discord bridge: failed to compute online presence count:", err);
       }
     }, 5000);
   }
@@ -486,11 +487,11 @@ export async function initDiscordBot(): Promise<void> {
     startedWithToken = token;
     connectionStatus = "connected";
     lastError = null;
-    console.log("Discord bridge connected.");
+    log.info("Discord bridge connected.");
   } catch (err) {
     connectionStatus = "error";
     lastError = err instanceof Error ? err.message : String(err);
-    console.error("Discord bridge failed to connect - check the bot token:", err);
+    log.error("Discord bridge failed to connect - check the bot token:", err);
   }
 }
 

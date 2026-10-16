@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { getToken } from "./api";
+import { isSignedIn } from "./api";
 
 interface PresenceState {
   onlineCount: number;
@@ -16,11 +16,10 @@ export const usePresenceStore = create<PresenceState>((set, get) => ({
 
   connect: () => {
     if (get().socket) return; // already connected this session
-    const token = getToken();
-    if (!token) return;
+    if (!isSignedIn()) return;
 
     const proto = location.protocol === "https:" ? "wss" : "ws";
-    const socket = new WebSocket(`${proto}://${location.host}/ws/presence?token=${encodeURIComponent(token)}`);
+    const socket = new WebSocket(`${proto}://${location.host}/ws/presence`);
 
     socket.onmessage = (ev) => {
       const data = JSON.parse(ev.data) as { onlineCount: number; viewers: { channelSlug: string; username: string }[] };

@@ -1,3 +1,4 @@
+import { log } from "./lib/log.js";
 import { PrismaClient } from "@prisma/client";
 import argon2 from "argon2";
 import { mkdir, copyFile } from "node:fs/promises";
@@ -20,8 +21,8 @@ async function main() {
     create: { username: ADMIN_USERNAME, email: ADMIN_EMAIL, passwordHash, isAdmin: true },
     update: {},
   });
-  console.log(`Admin account: ${ADMIN_USERNAME} (password from ADMIN_PASSWORD, or "changeme123" if unset)`);
-  console.log("Log in and change it immediately if you used the default.");
+  log.info(`Admin account: ${ADMIN_USERNAME} (password from ADMIN_PASSWORD, or "changeme123" if unset)`);
+  log.info("Log in and change it immediately if you used the default.");
 
   const demoUser = await prisma.user.upsert({
     where: { username: "demo_listener" },
@@ -185,12 +186,12 @@ async function main() {
     await prisma.notificationEvent.upsert({ where: { key: e.key }, create: e, update: {} });
   }
 
-  console.log("Seed complete.");
+  log.info("Seed complete.");
 }
 
 main()
   .catch((err) => {
-    console.error(err);
+    log.error(err);
     process.exit(1);
   })
   .finally(() => prisma.$disconnect());

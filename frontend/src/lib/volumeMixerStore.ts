@@ -26,8 +26,17 @@ export const useVolumeMixerStore = create<VolumeMixerState>((set, get) => ({
     const me = await api<{ volumeNotifications: number; volumeSfxIdle: number; volumeSfxPlaying: number; volumeMusic: number }>(
       "/api/account/me",
     );
-    set({ notifications: me.volumeNotifications, sfxIdle: me.volumeSfxIdle, sfxPlaying: me.volumeSfxPlaying, music: me.volumeMusic, loaded: true });
-    setMusicVolume(me.volumeMusic);
+    // A missing or malformed value keeps its default. Assigning NaN to an audio element throws and would take the whole page down.
+    const level = (v: unknown, fallback: number): number => (typeof v === "number" && Number.isFinite(v) ? Math.min(1, Math.max(0, v)) : fallback);
+    const music = level(me.volumeMusic, get().music);
+    set({
+      notifications: level(me.volumeNotifications, get().notifications),
+      sfxIdle: level(me.volumeSfxIdle, get().sfxIdle),
+      sfxPlaying: level(me.volumeSfxPlaying, get().sfxPlaying),
+      music,
+      loaded: true,
+    });
+    setMusicVolume(music);
   },
 
   setVolume: (key, value) => {

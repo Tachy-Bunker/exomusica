@@ -1,5 +1,6 @@
 import type { FastifyInstance } from "fastify";
 import { requireAuth } from "../lib/auth.js";
+import { safeGet, readBody, checkUrlShape } from "../lib/netGuard.js";
 
 function extractMeta(html: string, property: string): string | null {
   // Handles both attribute orders: property/content and content/property.
@@ -31,44 +32,32 @@ export async function linkPreviewRoutes(app: FastifyInstance): Promise<void> {
     let parsed: URL;
     try {
       parsed = new URL(target);
+      checkUrlShape(parsed);
     } catch {
-      return reply.code(400).send({ error: "invalid url" });
-    }
-    // Only ever fetch plain web pages - never let this become a way to
-    // reach internal services or other schemes via a pasted chat link.
-    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
-      return reply.code(400).send({ error: "only http/https URLs are supported" });
+      return reply.code(400).send({ error: "only public http/https web addresses can be previewed" });
     }
 
+    const fallback = { url: parsed.toString(), title: parsed.hostname, description: null, image: null };
     try {
-      const res = await fetch(parsed.toString(), {
-        headers: { "User-Agent": "Mozilla/5.0 (compatible; ExomusicaLinkPreview/1.0)" },
-        redirect: "follow",
-        signal: AbortSignal.timeout(5000),
+      // Every address is checked before it is connected to, and each redirect too (see lib/netGuard.ts).
+      const { res, url: finalUrl } = await safeGet(parsed, {
+        headers: { "User-Agent": "Mozilla/5.0 (compatible; ExomusicaLinkPreview/1.0)", accept: "text/html,*/*;q=0.5" },
+        timeoutMs: 5000,
+        maxRedirects: 3,
       });
-      const contentType = res.headers.get("content-type") ?? "";
+      const contentType = String(res.headers["content-type"] ?? "");
       if (!contentType.includes("text/html")) {
-        return { url: parsed.toString(), title: parsed.hostname, description: null, image: null };
+        res.resume();
+        return fallback;
       }
-      // Only read the head - og/title tags are always near the top, and
-      // this avoids downloading an entire large page just for metadata.
-      const reader = res.body?.getReader();
-      let html = "";
-      if (reader) {
-        const decoder = new TextDecoder();
-        while (html.length < 65536) {
-          const { done, value } = await reader.read();
-          if (done) break;
-          html += decoder.decode(value, { stream: true });
-        }
-        reader.cancel().catch(() => {});
-      }
+      // Only read the head - og/title tags are always near the top, and this avoids downloading a whole large page.
+      const html = (await readBody(res, 65536, 6000)).subarray(0, 65536).toString("utf8");
 
       const title = extractMeta(html, "og:title") ?? html.match(/<title[^>]*>([^<]*)<\/title>/i)?.[1] ?? parsed.hostname;
       const description = extractMeta(html, "og:description") ?? extractMeta(html, "description");
       let image = extractMeta(html, "og:image");
       if (image && !image.startsWith("http")) {
-        image = new URL(image, parsed.toString()).toString();
+        image = new URL(image, finalUrl).toString();
       }
 
       return {
@@ -78,8 +67,8 @@ export async function linkPreviewRoutes(app: FastifyInstance): Promise<void> {
         image,
       };
     } catch (err) {
-      req.log.warn(err, "link preview fetch failed");
-      return { url: parsed.toString(), title: parsed.hostname, description: null, image: null };
+      req.log.warn({ err: (err as Error).message }, "link preview not fetched");
+      return fallback;
     }
   });
 }

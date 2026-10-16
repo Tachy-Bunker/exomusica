@@ -6,6 +6,11 @@ import { addDone, cleanDone } from "../lib/jinglesDone.js";
 
 const slugOk = (s: string): boolean => /^[a-z0-9][a-z0-9_-]{0,63}$/i.test(s);
 
+// The dial's lamps: each member's answer is kept for 20 seconds, so several open tabs asking at once cost one set of queries.
+const PULSE_TTL_MS = 20_000;
+const PULSE_CACHE_MAX = 500;
+const pulseCache = new Map<string, { at: number; body: unknown }>();
+
 export async function dialRoutes(app: FastifyInstance): Promise<void> {
   // The member's dial follows them across devices. Stored as one small JSON blob; always re-cleaned on the way in and out.
   app.get("/api/account/dial", { preHandler: requireAuth }, async (req) => {
@@ -42,6 +47,9 @@ export async function dialRoutes(app: FastifyInstance): Promise<void> {
   app.get<{ Querystring: { slugs?: string; seen?: string } }>("/api/dial/pulse", { preHandler: requireAuth }, async (req) => {
     const slugs = [...new Set((req.query.slugs ?? "").split(",").map((s) => s.trim()).filter(slugOk))].slice(0, 12);
     if (slugs.length === 0) return {};
+    const cacheKey = `${req.user!.id}|${[...slugs].sort().join(",")}|${req.query.seen ?? ""}`;
+    const hit = pulseCache.get(cacheKey);
+    if (hit && Date.now() - hit.at < PULSE_TTL_MS) return hit.body;
     const seen = new Map<string, number>();
     for (const part of (req.query.seen ?? "").split(",")) { const [s, id] = part.split(":"); const n = Number(id); if (s && slugOk(s) && Number.isFinite(n) && n > 0) seen.set(s, n); }
     const me = req.user!.id;
@@ -60,6 +68,11 @@ export async function dialRoutes(app: FastifyInstance): Promise<void> {
         line: last ? { by: last.author.username, text: last.kind !== "text" && !last.contentRaw.trim() ? `[${last.kind}]` : last.contentRaw.replace(/\s+/g, " ").trim().slice(0, 90) } : null,
       };
     }));
+    pulseCache.set(cacheKey, { at: Date.now(), body: out });
+    if (pulseCache.size > PULSE_CACHE_MAX) {
+      const oldest = pulseCache.keys().next().value;
+      if (oldest !== undefined) pulseCache.delete(oldest);
+    }
     return out;
   });
 }

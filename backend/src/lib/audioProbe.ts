@@ -1,7 +1,9 @@
+import { log } from "./log.js";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { UPLOADS_DIR } from "./storage.js";
 import { parseBuffer } from "music-metadata";
+import { safeGet, readBody } from "./netGuard.js";
 
 /** Fetches an audio file and reads its duration from embedded metadata.
  *  Returns null on any failure (network error, unparseable format, no
@@ -28,13 +30,13 @@ export async function probeAudioDuration(url: string): Promise<number | null> {
       if (!file.startsWith(root + path.sep)) return null;
       buffer = await readFile(file);
     } else {
-      const res = await fetch(url);
-      if (!res.ok) return null;
-      buffer = Buffer.from(await res.arrayBuffer());
+      const { res } = await safeGet(url, { timeoutMs: 15000 });
+      if ((res.statusCode ?? 0) !== 200) { res.resume(); return null; }
+      buffer = await readBody(res, 200 * 1024 * 1024, 60000);
     }
     return await probeAudioDurationOfBuffer(buffer);
   } catch (err) {
-    console.error(`Failed to probe audio duration for ${url}:`, err);
+    log.error(`Failed to probe audio duration for ${url}:`, err);
     return null;
   }
 }

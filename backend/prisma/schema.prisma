@@ -58,6 +58,7 @@ model User {
   bio                   String?
   links                 Json?
   isAdmin               Boolean      @default(false)
+  tokenVersion          Int          @default(0) // raised to sign out every session of this account (logout, password change)
   isGhost               Boolean      @default(false)
   ghostReason           GhostReason?
   claimToken            String?      @unique // only ever set for DISCORD_IMPORT ghosts

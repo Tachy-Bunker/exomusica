@@ -5,6 +5,7 @@ import { mkdir, writeFile } from "node:fs/promises";
 import { statSync } from "node:fs";
 import path from "node:path";
 import { prisma } from "../lib/prisma.js";
+import { sessionSecret } from "../lib/auth.js";
 import { UPLOADS_DIR } from "../lib/storage.js";
 import { seal, unseal } from "../lib/secretBox.js";
 import { renderMail } from "../lib/mailMarkdown.js";
@@ -20,7 +21,7 @@ import { outreachWorkspaceRoutes, sendDigests } from "./outreachWorkspace.js";
 import { checkFeeds, checkInbox, checkInboxes, outreachCollectRoutes } from "./outreachCollect.js";
 import { outreachEmlRoutes } from "./outreachEml.js";
 
-const SECRET = (): string => process.env.OUTREACH_SECRET ?? process.env.JWT_SECRET ?? "";
+const SECRET = (): string => process.env.OUTREACH_SECRET || sessionSecret();
 const FILE_EXT = new Set([".jpg", ".jpeg", ".png", ".gif", ".webp", ".mp3", ".wav", ".flac", ".ogg", ".m4a", ".aac", ".opus", ".pdf", ".zip", ".txt", ".doc", ".docx", ".odt", ".rtf", ".mid", ".midi"]);
 
 type AcctRow = Awaited<ReturnType<typeof prisma.outreachAccount.findFirstOrThrow>>;

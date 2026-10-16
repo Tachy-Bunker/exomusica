@@ -694,7 +694,7 @@ export function SpaceMap({
           className="space-map-field"
           style={{ transform: `translate(${cameraRef.current.x}px, ${cameraRef.current.y}px)` }}
         >
-          <div className="space-node space-node-center" onClick={() => { playLinkClickSound(); navigate(centerHref); }} style={{ left: 0, top: 0 }}>
+          <div className="space-node space-node-center" role="link" tabIndex={0} onKeyDown={(e) => { if (e.key === "Enter") { playLinkClickSound(); navigate(centerHref); } }} onClick={() => { playLinkClickSound(); navigate(centerHref); }} style={{ left: 0, top: 0 }}>
             {centerLabel}
         </div>
 

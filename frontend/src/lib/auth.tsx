@@ -1,14 +1,8 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
-import { api, getToken, setToken } from "./api";
-
-interface AuthedUser {
-  id: number;
-  username: string;
-  isAdmin: boolean;
-}
+import { api, cacheUser, forgetUser, readCachedUser, takeLegacyToken, type CachedUser } from "./api";
 
 interface AuthContextValue {
-  user: AuthedUser | null;
+  user: CachedUser | null;
   loading: boolean;
   login: (username: string, password: string) => Promise<void>;
   logout: () => void;
@@ -16,42 +10,55 @@ interface AuthContextValue {
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
-// The backend never sends "who am I" from a bare token - login's response
-// is the only place we learn the user object, so we cache it alongside the
-// token rather than re-decoding the JWT client-side.
-const USER_KEY = "exomusica_user";
-
+// The session is an httpOnly cookie the page cannot read. This provider keeps only the account's public details (name,
+// admin flag) so the first paint is immediate, and asks the server on every load who the cookie belongs to.
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<AuthedUser | null>(null);
+  const [user, setUser] = useState<CachedUser | null>(() => readCachedUser());
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const token = getToken();
-    const cached = localStorage.getItem(USER_KEY);
-    if (token && cached) setUser(JSON.parse(cached));
-    setLoading(false);
-
-    function onSessionExpired() {
-      localStorage.removeItem(USER_KEY);
-      setUser(null);
-    }
+    let alive = true;
+    const onSessionExpired = () => { forgetUser(); setUser(null); };
     window.addEventListener("exomusica:session-expired", onSessionExpired);
-    return () => window.removeEventListener("exomusica:session-expired", onSessionExpired);
+
+    (async () => {
+      try {
+        // A login token an older page kept becomes the session cookie here, once, and is removed from the browser.
+        const legacy = takeLegacyToken();
+        if (legacy) await api("/api/auth/session", { method: "POST", headers: { Authorization: `Bearer ${legacy}` } });
+        else if (!readCachedUser()) return; // never signed in on this browser: nothing to check
+        const { user: me } = await api<{ user?: CachedUser }>("/api/auth/me");
+        if (!me) throw new Error("no account in the reply");
+        if (!alive) return;
+        cacheUser(me);
+        setUser(me);
+      } catch {
+        // Not signed in any more: the cookie expired, the account was signed out elsewhere, or it was removed.
+        if (alive) { forgetUser(); setUser(null); }
+      } finally {
+        if (alive) setLoading(false);
+      }
+    })();
+
+    return () => {
+      alive = false;
+      window.removeEventListener("exomusica:session-expired", onSessionExpired);
+    };
   }, []);
 
   async function login(username: string, password: string) {
-    const result = await api<{ token: string; user: AuthedUser }>("/api/auth/login", {
+    const result = await api<{ user: CachedUser }>("/api/auth/login", {
       method: "POST",
       body: JSON.stringify({ username, password }),
     });
-    setToken(result.token);
-    localStorage.setItem(USER_KEY, JSON.stringify(result.user));
+    cacheUser(result.user);
     setUser(result.user);
   }
 
   function logout() {
-    setToken(null);
-    localStorage.removeItem(USER_KEY);
+    // Ends every session of this account on the server; the local state clears at once either way.
+    api("/api/auth/logout", { method: "POST" }).catch(() => undefined);
+    forgetUser();
     setUser(null);
   }
 

@@ -1179,7 +1179,7 @@ export function ChannelPage({ channelSlug, fillHeight, parentControlsHeight }: {
         {messages.length === 0 && <p style={{ color: "var(--text-dim)" }}>Nothing here yet.</p>}
         {mode === "search" ? (
           messages.map((m) => (
-            <div key={m.id} style={{ cursor: "pointer" }} onClick={() => jumpToMessage(m)} title="Jump to this message">
+            <div key={m.id} role="button" tabIndex={0} style={{ cursor: "pointer" }} onClick={() => jumpToMessage(m)} onKeyDown={(e) => { if (e.key === "Enter") jumpToMessage(m); }} title="Jump to this message">
               <StandardMessage message={m} onDelete={handleDelete} onQuote={handleQuote} onCopyLink={handleCopyLink} />
             </div>
           ))

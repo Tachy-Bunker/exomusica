@@ -3,7 +3,7 @@ import { getCurrentSfxVolume } from "./volumeMixerStore";
 import { playOneShotSfx } from "./oneShotSfx";
 import { useClassicMode } from "./classicMode";
 import { JINGLE_EVENTS, type JingleEvent } from "./jingleBus";
-import { api, getToken } from "./api";
+import { api, isSignedIn } from "./api";
 import { playMotif } from "./motif";
 // Pickup sounds are the admin's own recordings. A listener hears each one once, only if they switched them on, never in classic mode.
 const ON = "exomusica_jingles", DONE = "exomusica_jingles_done";
@@ -20,7 +20,7 @@ export function mergeDone(a: readonly string[], b: readonly string[]): string[] 
 }
 /** Logged in: pull what the account has already heard (so another device's jingles stay quiet) and push what only this device knows. */
 export async function syncJingles(): Promise<void> {
-  if (!getToken()) return;
+  if (!isSignedIn()) return;
   try {
     const r = await api<{ done?: string[] }>("/api/account/jingles-done");
     const remote = Array.isArray(r?.done) ? r.done : [], local = readDone();
@@ -34,7 +34,7 @@ export const useJingles = create<S>((set) => ({
   on: rd(ON) === "1", urls: {},
   setOn: (v) => { wr(ON, v ? "1" : ""); set({ on: v }); },
   setUrls: (u) => { const o: Partial<Record<JingleEvent, string>> = {}; if (u && typeof u === "object") for (const e of JINGLE_EVENTS) { const v = (u as Record<string, unknown>)[e]; if (typeof v === "string" && v) o[e] = v; } set({ urls: o }); },
-  forget: () => { wr(DONE, ""); if (getToken()) void api("/api/account/jingles-done", { method: "DELETE" }).catch(() => undefined); },
+  forget: () => { wr(DONE, ""); if (isSignedIn()) void api("/api/account/jingles-done", { method: "DELETE" }).catch(() => undefined); },
 }));
 /** The collective jingle's notes (null while locked or not yet drawn). Asked for only when a jingle would actually play; a miss is retried after a minute. */
 export interface CollectiveSeed { notes: number[]; credits: { title: string; by: string }[] }
@@ -60,14 +60,14 @@ export function installJingles(): void {
       void loadCollective().then((seed) => {
         if (!seed || readDone().includes(event)) return;
         wr(DONE, JSON.stringify([...readDone(), event]));
-        if (getToken()) void api("/api/account/jingles-done", { method: "POST", body: JSON.stringify({ event }) }).catch(() => undefined);
+        if (isSignedIn()) void api("/api/account/jingles-done", { method: "POST", body: JSON.stringify({ event }) }).catch(() => undefined);
         playMotif(seed.notes, getCurrentSfxVolume());
       });
       return;
     }
     if (!shouldPlay({ classic: useClassicMode.getState().classic, on, done, event, url })) return;
     wr(DONE, JSON.stringify([...done, event]));
-    if (getToken()) void api("/api/account/jingles-done", { method: "POST", body: JSON.stringify({ event }) }).catch(() => undefined);
+    if (isSignedIn()) void api("/api/account/jingles-done", { method: "POST", body: JSON.stringify({ event }) }).catch(() => undefined);
     void playOneShotSfx(url!, getCurrentSfxVolume());
   });
 }

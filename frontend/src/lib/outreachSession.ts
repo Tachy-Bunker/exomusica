@@ -22,7 +22,7 @@ export function outreachHeaders(path: string): Record<string, string> {
 
 /** A file download that needs the same headers as any other call (the export of mail files, say). */
 export async function oxDownload(path: string, body: unknown, fallbackName: string): Promise<void> {
-  const res = await fetch(path, { method: "POST", headers: { "Content-Type": "application/json", ...outreachHeaders(path), ...(localStorage.getItem("exomusica_token") ? { Authorization: `Bearer ${localStorage.getItem("exomusica_token")}` } : {}) }, body: JSON.stringify(body) });
+  const res = await fetch(path, { method: "POST", headers: { "Content-Type": "application/json", ...outreachHeaders(path) }, body: JSON.stringify(body) });
   if (!res.ok) { let msg = res.statusText; try { msg = ((await res.json()) as { error?: string }).error ?? msg; } catch { /* not json */ } throw new Error(msg); }
   const name = /filename="([^"]+)"/.exec(res.headers.get("content-disposition") ?? "")?.[1] ?? fallbackName;
   const url = URL.createObjectURL(await res.blob()); const a = document.createElement("a"); a.href = url; a.download = name; a.click(); setTimeout(() => URL.revokeObjectURL(url), 2000);

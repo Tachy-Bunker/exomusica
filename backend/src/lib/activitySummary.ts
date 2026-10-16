@@ -1,3 +1,4 @@
+import { log } from "./log.js";
 import { PrismaClient } from "@prisma/client";
 import { sendTemplatedMail } from "./emailTemplates.js";
 import type { EmailType } from "./emailTemplates.js";
@@ -39,6 +40,6 @@ export async function sendActivitySummary(
       await sendDiscordDM({ discordUserId: user.discordUserId, discordUsername: user.discordUsername }, `Your Exomusica activity summary:\n${lines.join("\n")}`);
     }
   }
-  console.log(`${emailType} sent to ${sent} of ${users.length} eligible users.`);
+  log.info(`${emailType} sent to ${sent} of ${users.length} eligible users.`);
   await prisma.$disconnect();
 }

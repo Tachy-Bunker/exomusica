@@ -63,6 +63,10 @@ import { useSeasonShift } from "../lib/useSeasonShift";
 import { isDoorReplay } from "../lib/doorReplay";
 import { resumeSharedContextIfNeeded } from "../lib/oneShotSfx";
 import { resumeAnalyserContextIfNeeded } from "../lib/audioAnalyser";
+import { shortcutsOn } from "../lib/shortcutsPref";
+
+// Pages name themselves with useDocumentTitle. A section that does not gets its name here, after the page has mounted.
+const SECTION_TITLES: [prefix: string, name: string][] = [["/soundbay", "Soundbay"], ["/xenolab", "XenoLab"], ["/telemetry", "Telemetry"], ["/wiki", "Log"]];
 
 const NAV_SECTIONS: { section: Section; label: string; to: string; letter: string }[] = [
   { section: "soundbay", label: "Soundbay", to: "/soundbay", letter: "b" },
@@ -75,6 +79,16 @@ export function Layout() {
   const { user } = useAuth();
   useEffect(() => { if (user) void loadChoice(); else applyTint(null); }, [user?.id]);
   useEffect(() => { if (user) void syncJingles(); }, [user?.id]); // each pickup jingle plays once per account, on any device
+  const pathname = useLocation().pathname;
+  useEffect(() => {
+    // A timeout, so every page's own title (set in its effects during this same render) is in place first.
+    const t = window.setTimeout(() => {
+      if (document.title !== "Exomusica") return;
+      const name = SECTION_TITLES.find(([prefix]) => pathname.startsWith(prefix))?.[1];
+      if (name) document.title = `Exomusica - ${name}`;
+    }, 0);
+    return () => window.clearTimeout(t);
+  }, [pathname]);
   useGuestOnline(!user);
   useSeasonShift();
   const loadEmojis = useEmojiStore((s) => s.load);
@@ -110,6 +124,7 @@ export function Layout() {
   useEffect(() => {
     if (!isDesktop) return;
     function handleShortcut(e: KeyboardEvent) {
+      if (!shortcutsOn()) return;
       if (isTypingTarget(e.target)) return;
       if (e.ctrlKey || e.metaKey || e.altKey) return;
       if (document.querySelector('[aria-modal="true"]')) return; // a dialog or the full-screen map is open: its keys are its own

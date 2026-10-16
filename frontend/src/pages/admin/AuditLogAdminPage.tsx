@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { api, getToken } from "../../lib/api";
+import { api } from "../../lib/api";
 import { useToastStore } from "../../lib/toastStore";
 
 interface LogEntry {
@@ -26,7 +26,7 @@ export function AuditLogAdminPage() {
   }, [query, actor, from, to]); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function exportCsv() {
-    const res = await fetch(`/api/admin/audit-log.csv?${qs()}`, { headers: { Authorization: `Bearer ${getToken()}` } });
+    const res = await fetch(`/api/admin/audit-log.csv?${qs()}`);
     if (!res.ok) return useToastStore.getState().showToast("Export failed");
     const url = URL.createObjectURL(await res.blob());
     const a = document.createElement("a"); a.href = url; a.download = "action-log.csv"; a.click();

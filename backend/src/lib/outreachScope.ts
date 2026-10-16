@@ -1,7 +1,8 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
+import { sessionSecret } from "./auth.js";
 
 // ---- who may enter: a signed token per workspace, valid until the password changes
-const secret = (): string => process.env.OUTREACH_SECRET ?? process.env.JWT_SECRET ?? "changeme";
+const secret = (): string => process.env.OUTREACH_SECRET || sessionSecret();
 const b64 = (s: string): string => Buffer.from(s).toString("base64url");
 const sign = (body: string): string => createHmac("sha256", secret()).update(body).digest("base64url");
 

@@ -114,19 +114,7 @@ export function readOpportunity(input: { html?: string; text?: string; url?: str
 }
 
 // ------------------------------------------------------------ keeping the page fetch away from private networks
-export function isPublicAddress(ip: string): boolean {
-  if (net.isIPv4(ip)) {
-    const [a, b] = ip.split(".").map(Number);
-    return !(a === 0 || a === 10 || a === 127 || (a === 100 && b >= 64 && b <= 127) || (a === 169 && b === 254) || (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 168) || (a === 192 && b === 0) || (a === 198 && (b === 18 || b === 19)) || a >= 224);
-  }
-  if (net.isIPv6(ip)) {
-    const l = ip.toLowerCase();
-    if (l === "::1" || l === "::" || l.startsWith("fe80") || l.startsWith("fc") || l.startsWith("fd")) return false;
-    const mapped = /^::ffff:(\d+\.\d+\.\d+\.\d+)$/.exec(l); if (mapped) return isPublicAddress(mapped[1]);
-    return true;
-  }
-  return false;
-}
+export { isPublicAddress } from "./netGuard.js";
 
 // ------------------------------------------------------------ pipeline and results
 export const STATUSES = ["lead", "contacted", "replied", "accepted", "declined", "ghosted"] as const;

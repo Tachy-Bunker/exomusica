@@ -12,6 +12,7 @@ import { resolvePlayableUrl } from "../lib/embeds.js";
 import { isWaveProfile } from "../lib/waveProfile.js";
 import { probeAudioDuration } from "../lib/audioProbe.js";
 import { deletePlaylistPreview, regeneratePlaylistPreview } from "../lib/playlistPreview.js";
+import { checkUrlShape } from "../lib/netGuard.js";
 
 async function uniqueCommunityAlbumSlug(title: string): Promise<string> {
   const base = title.toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") || "album";
@@ -426,6 +427,7 @@ export async function communityMusicRoutes(app: FastifyInstance): Promise<void> 
 
     const { title, url, permission, remixOfId } = (req.body ?? {}) as { title?: string; url?: string; permission?: string; remixOfId?: number };
     if (!title || !url) return reply.code(400).send({ error: "title and url are required" });
+    try { checkUrlShape(new URL(url)); } catch { return reply.code(400).send({ error: "the link must be a public http or https address" }); }
     const position = await prisma.communityTrack.count({ where: { albumId: album.id } });
     const track = await prisma.communityTrack.create({
       data: {

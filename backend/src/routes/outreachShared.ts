@@ -6,6 +6,8 @@ import { readWorkspaceToken } from "../lib/outreachScope.js";
 import { scopedDb, type ScopedDb } from "../lib/outreachScopeDb.js";
 import { isPublicAddress } from "../lib/outreachPlus.js";
 import { cleanColumnInput, cleanCell, MAX_COLUMNS, slugKey } from "../lib/outreach.js";
+import type { IncomingMessage } from "node:http";
+import { safeGet, readBody, BlockedAddressError } from "../lib/netGuard.js";
 
 type Workspace = NonNullable<Awaited<ReturnType<typeof prisma.outreachWorkspace.findUnique>>>;
 declare module "fastify" {
@@ -64,22 +66,20 @@ export async function setCell(db: ScopedDb, contactId: number, column: { name: s
 
 // ---- reading an open call from a link or pasted text
 export async function fetchPage(url: string, opts: { feed?: boolean } = {}): Promise<{ html: string; finalUrl: string } | string> {
-  let cur = url;
-  for (let hop = 0; hop < 4; hop++) {
-    let u: URL; try { u = new URL(cur); } catch { return "That isn't a web address."; }
-    if (u.protocol !== "https:" && u.protocol !== "http:") return "Only web addresses (http/https) can be read.";
-    if (u.port && u.port !== "80" && u.port !== "443") return "Only ordinary web ports are read.";
-    let addrs: { address: string }[]; try { addrs = await dnsLookup(u.hostname, { all: true }); } catch { return "That address doesn't resolve."; }
-    if (!addrs.length || addrs.some((a) => !isPublicAddress(a.address))) return "That address points inside a private network; only public pages are read.";
-    const res = await fetch(u, { redirect: "manual", signal: AbortSignal.timeout(8000), headers: { "user-agent": "Mozilla/5.0 (compatible; ExomusicaOutreach/1.0)", accept: "text/html,text/plain;q=0.8" } }).catch(() => null);
-    if (!res) return "The page didn't answer in time.";
-    if (res.status >= 300 && res.status < 400 && res.headers.get("location")) { cur = new URL(res.headers.get("location") as string, u).toString(); continue; }
-    if (!res.ok) return `The page answered ${res.status}.`;
-    const type = res.headers.get("content-type") ?? ""; if (!(opts.feed ? /xml|rss|atom|text\/plain/i : /text\/(html|plain)|xhtml/i).test(type)) return opts.feed ? "That isn't a feed I can read." : "That isn't a web page I can read.";
-    const reader = res.body?.getReader(); if (!reader) return "The page was empty.";
-    const chunks: Uint8Array[] = []; let n = 0;
-    for (;;) { const { done, value } = await reader.read(); if (done) break; n += value.length; if (n > 1_500_000) { await reader.cancel(); break; } chunks.push(value); }
-    return { html: Buffer.concat(chunks).toString("utf8"), finalUrl: cur };
+  let u: URL; try { u = new URL(url); } catch { return "That isn't a web address."; }
+  let res: IncomingMessage; let finalUrl: URL;
+  try {
+    // Every address is checked before it is connected to, and each redirect too (see lib/netGuard.ts).
+    ({ res, url: finalUrl } = await safeGet(u, { headers: { "user-agent": "Mozilla/5.0 (compatible; ExomusicaOutreach/1.0)", accept: "text/html,text/plain;q=0.8" }, timeoutMs: 8000, maxRedirects: 3 }));
+  } catch (err) {
+    if (err instanceof BlockedAddressError) return err.message[0].toUpperCase() + err.message.slice(1) + "; only public pages are read.";
+    return "The page didn't answer in time.";
   }
-  return "Too many redirects.";
+  const code = res.statusCode ?? 0;
+  if (code < 200 || code >= 300) { res.resume(); return `The page answered ${code}.`; }
+  const type = String(res.headers["content-type"] ?? "");
+  if (!(opts.feed ? /xml|rss|atom|text\/plain/i : /text\/(html|plain)|xhtml/i).test(type)) { res.resume(); return opts.feed ? "That isn't a feed I can read." : "That isn't a web page I can read."; }
+  const body = await readBody(res, 1_500_000, 8000);
+  if (!body.length) return "The page was empty.";
+  return { html: body.toString("utf8"), finalUrl: finalUrl.toString() };
 }

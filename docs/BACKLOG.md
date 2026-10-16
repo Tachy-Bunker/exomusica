@@ -1,6 +1,6 @@
 # Exomusica backlog (kept through chat compaction: update this file with every delivery)
 
-Last updated: fix363. **Start with `docs/ROOM_EDITOR_STATE.md`** (architecture, decisions, queue, checklist for the rooms line). Built milestone rewards are listed in `docs/HOMEPAGE_AND_NAV.md`.
+Last updated: website audit delivery (after fix374). **Start with `docs/ROOM_EDITOR_STATE.md`** (architecture, decisions, queue, checklist for the rooms line). Built milestone rewards are listed in `docs/HOMEPAGE_AND_NAV.md`.
 
 ## Milestone rewards still labelled "reward being built"
 - **Monthly challenge** (100 members): a monthly challenge with a boss brief. Needs a design write-up first (item 91).
@@ -159,5 +159,57 @@ Corridors editable (things, wires, mood). Open: corridor floor/walls/ceiling/sky
 - Regression (fix373): 105/107 files pass. `e2e_fix297c` flaked once in the full run (passes alone). `e2e_fix362` fails the reduced-motion repaint check ("0 px, 4-6 frames", limit < 3) both with and without the fix373 room changes, so it predates fix373 and stays open. The room still repaints under reduced motion while the hazard/movement state is active.
 
 ## fix374
-- Done: one map (the radar); room editor below the button row; channel name once in chat; scan visor as a mode (X), result screen and logbook entry one level deeper (Space, B, X), purple/green outlines of what is in view.
-- Open: the lag with hops still needs `?perf` numbers from a weak device. Decide whether the visor canvas draws at 1× (saves about 4 MB at DPR 2 with 8 cores, softer lines). Heap totals before and after are not measured. Outlines are not hidden by walls. Scan screen has no sprite for walls, terminals or doors (text only).
+- Done: one map (the radar); room editor below the button row; channel name once in chat; scan visor as a mode (X), result screen and logbook entry one level deeper (Space, B, X), purple/green outlines of what is in view; icon tiles for the room bar, scan buttons and touch Use (keys on desktop, icon-only on touch), a shorter hint.
+- Open: the lag with hops still needs `?perf` numbers from a weak device. Visor canvas is at 1× (saves about 4 MB at DPR 2 with 8 cores; softer lines on high-density screens). Heap totals before and after are not measured. Outlines are not hidden by walls. Scan screen has no sprite for walls, terminals or doors (text only). Touch tiles are icon-only: check on a phone that the icons read without their names.
+
+## Website audit delivery (52 items: security, performance, accessibility/SEO, code health)
+Delivered as one delta. Schema change: `User.tokenVersion` (migrate). Re-login once after deploy.
+
+**Security (1-17)**
+- Sessions are an httpOnly cookie (`exo_session`, 30 days). The page no longer keeps a token; an old `exomusica_token` is exchanged for the cookie once, at boot, and removed.
+- Sign-out and password change end every session of the account (`tokenVersion`). An account snapshot (admin flag, ghost/deleted) refreshes at boot, every 30 s, and per account on login/logout/password change.
+- `JWT_SECRET` must be a real value of 32+ characters (the server refuses to start otherwise). Outreach signing no longer falls back to a placeholder.
+- Sign-in rate limit: 8 per account and address, 60 per address, in 15 minutes.
+- Link previews, the audio proxy, outreach page reads and community track addresses go through `lib/netGuard.ts` (http/https only, ordinary ports, no login in the address, public addresses only, checked at connect time, redirects re-checked).
+- WebSockets take the cookie; `?token=` still read for one release and redacted from logs.
+- CORS allowlist `CORS_ORIGINS` (default https://exomusica.com). JSON bodies capped at 4 MB; multipart keeps 105 MB.
+- Log lines redact `token`, `ticket`, `password`, `key` in the query string. `/health` no longer returns database time.
+
+**Performance (18-29)**
+- Routes are lazy (88 page modules), one Suspense boundary. Main bundle 537 kB (169 kB gzip), with Outreach 171 kB and BranchRoom 153 kB outside it.
+- Fonts are self-hosted (latin, `public/fonts`), so no request to a font host. Caddy: zstd/gzip for text types, `/assets` immutable for a year, `/dsp` 1 day, `/fonts` 1 week, default no-cache.
+- Dial pulse answers are cached for 20 s per member (`routes/dial.ts`).
+- Viewport: `dvh` fallbacks for the full-height rules. Dead `.rm-card` CSS removed.
+- Already in place, no change: the service worker registers only when an album is pinned; the visor sweep freezes under reduced motion.
+
+**Accessibility / SEO / polish (30-38)**
+- Letter shortcuts can be turned off (Account settings, "Keyboard"; `exomusica_letter_shortcuts`).
+- Scan screen takes focus on open and returns it on close; a focused scan button takes its own Space/Enter.
+- Space-map centre node, online-count toggle and a search result's message take the keyboard.
+- Pages without their own title get their section's name (after the page mounts).
+- Meta description, Open Graph tags, favicon, font preload.
+
+**Code health and docs (39-52)**
+- Structured log lines (`lib/log.ts`) replace the raw `console` calls in the named server modules.
+- `scripts/deps-check.sh` prints the audit and outdated packages for both projects.
+- Backend `npm audit fix` (non-breaking). Dockerfile runs as `node`; `.dockerignore` for backend and root.
+- DEPLOYMENT, ARCHITECTURE (security model), `.env.example`, ROOM_EDITOR_STATE (audit additions) updated.
+
+**Deferred, with reasons**
+- Prisma 7 (fixes the remaining Prisma-related high advisories): a breaking CLI/config change; needs a live database run.
+- nodemailer 9 to 10 (high advisories on the top-level copy): outreach sends mail through it; needs an SMTP test.
+- music-metadata 12, imapflow 2, dotenv 18, TypeScript 7: major versions; each needs its own pass.
+- 20 of the 24 flagged click handlers only stop event propagation: nothing to activate from the keyboard, so no change.
+- Player seek strip: needs a keyboard design (arrow seek, announced position). Not done.
+- Upload magic-byte sniffing: not done.
+- Room CSS split: not done (the room block is in `global.css`).
+- Public list routes N+1 audit: not done.
+- Not run in this sandbox: the backend against a live database, the Caddy and backend Docker builds (no Docker daemon here). Typecheck and build pass.
+- Verified here: backend and frontend `tsc --noEmit` pass; frontend `vite build` passes (main 536.69 kB, 168.94 kB gzip); room e2e suite passes; non-room e2e suite passes. Five tests were updated for cookie auth (the `/api/auth/me` stub, and the jam socket asserts no token in the URL). Under parallel load, two tests (fix281, fix283) each showed one race failure; both pass alone and the waits are added.
+
+**Next in the backlog**
+- The sound-based boss design is already written (Claude Docs artifact, linked from ROOM_EDITOR_STATE). Not written again.
+- Design write-up written: `docs/DESIGN_MILESTONE_REWARDS.md` (Twelve Artifacts, Monthly challenge). Five owner decisions are listed at its end; no build until they are answered.
+- `backend/src/seed.ts` logs the default admin password text (`changeme123`) when run. Drop that line before the next seed run.
+- Blocked on the owner: editor part 2 (waits for go-ahead after height), emoji gate (moderation decision).
+

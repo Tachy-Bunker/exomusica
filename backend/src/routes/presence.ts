@@ -1,5 +1,5 @@
 import type { FastifyInstance } from "fastify";
-import { verifyToken } from "../lib/auth.js";
+import { wsUser } from "../lib/auth.js";
 import { registerPresence, unregisterPresence, setViewing, onlineNow } from "../lib/presence.js";
 
 export async function presenceRoutes(app: FastifyInstance): Promise<void> {
@@ -10,7 +10,7 @@ export async function presenceRoutes(app: FastifyInstance): Promise<void> {
   });
 
   app.get<{ Querystring: { token?: string } }>("/ws/presence", { websocket: true }, (socket, req) => {
-    const user = req.query.token ? verifyToken(req.query.token) : null;
+    const user = wsUser(req);
     if (!user) {
       socket.close();
       return;

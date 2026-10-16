@@ -1043,3 +1043,10 @@ No schema change, no server code. Doors between branch rooms no longer play the 
 
 ## fix373
 - Player bar: expanding it from inside a room now shows the expanded player on top of the room (`.player-bar-wrapper.is-expanded`, z 72). Other overlays keep their order.
+
+## Audit delivery (homepage and navigation)
+- **Dial lamps** are cached on the server for 20 s per member: several open tabs ask at once and the answer moves slowly.
+- **Letter shortcuts** (C, B, X, M, G, E) can be turned off in Account settings, "Keyboard". The default is on.
+- **Page titles**: a page without its own title gets its section's name ("Exomusica - Soundbay", "XenoLab", "Telemetry", "Log").
+- **Sign-in** is a cookie now: the homepage and the navigation read the cached account for the first paint, then confirm it with the server.
+

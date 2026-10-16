@@ -128,8 +128,11 @@ Edit `backend/.env`:
   container itself, which has no database on it. (Yes, this is a from-
   experience warning: the shipped `.env.example` used to say `localhost`
   here, which was wrong and caused exactly this failure.)
-- `JWT_SECRET` — replace with a long random string (`openssl rand -hex 32`
-  works).
+- `JWT_SECRET` — required: a random string of at least 32 characters
+  (`openssl rand -hex 32` works). The server refuses to start with it
+  missing, short, or still containing `changeme`.
+- `CORS_ORIGINS` — leave as `https://exomusica.com` (your domain). Only
+  other websites that call the API from their own pages need adding here.
 - `PORT` — leave as 3001.
 
 Then create a root `.env` (docker-compose reads this one):
@@ -202,7 +205,7 @@ folder so the generated SQL files land back on the VPS's disk (not just
 inside the container, where they'd vanish on the next rebuild):
 
 ```
-docker compose run --rm -v "$(pwd)/backend/prisma:/app/prisma" backend npx prisma migrate dev --name init
+docker compose run --rm --user root -v "$(pwd)/backend/prisma:/app/prisma" backend npx prisma migrate dev --name init
 ```
 
 Commit the result so it's reproducible:
@@ -308,7 +311,30 @@ docker compose --env-file .env up -d --build
 ```
 
 If that change touched `schema.prisma`, generate and commit the migration
-first (step 8's command), then redeploy.
+first (step 8's command), then redeploy and apply it on the server:
+
+```
+docker compose run --rm backend npx prisma migrate deploy
+```
+
+### The security and performance release (sessions move to a cookie)
+
+- It adds a `tokenVersion` column to users. Commit that migration, then apply
+  it as above.
+- Sign-in now sets an httpOnly session cookie. The first time an older page
+  loads, its stored login is exchanged for that cookie and removed from the
+  browser. Anyone who was signed in on another device is asked to sign in
+  again when that session stops being valid, and signing out or changing a
+  password ends every session of that account.
+- Sign-in attempts are rate limited (8 per account and address, 60 per
+  address, in 15 minutes). Repeated wrong guesses get a message asking the
+  person to wait.
+- The container runs as the `node` user. If the uploads volume was created
+  before this release, fix its owner once:
+  `docker compose run --rm --user root backend chown -R node:node /app/uploads`
+- The Caddy image now sends security headers and a Content-Security-Policy in
+  report-only mode: violations appear in the browser console and change
+  nothing for visitors.
 
 ## Useful commands
 

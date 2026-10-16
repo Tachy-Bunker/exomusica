@@ -121,7 +121,7 @@ export function OnlineOrbs() {
         onClick={() => setOpen((v) => !v)}
         style={{ position: "relative", width: SIZE, height: SIZE, flexShrink: 0, cursor: "pointer" }}
       />
-      <span onClick={() => setOpen((v) => !v)} style={{ fontSize: "0.8rem", color: "var(--text-dim)", cursor: "pointer" }}>
+      <span role="button" tabIndex={0} aria-expanded={open} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setOpen((v) => !v); } }} onClick={() => setOpen((v) => !v)} style={{ fontSize: "0.8rem", color: "var(--text-dim)", cursor: "pointer" }}>
         {onlineCount} online
       </span>
 

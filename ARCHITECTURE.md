@@ -49,7 +49,7 @@ The one real coupling point: a forum message can reference a track (`track:42`, 
 
 Everything from before, plus:
 
-- **Frontend scaffold**: Vite + React + TS + React Router, `AuthProvider` (JWT in localStorage), a typed `api()` fetch wrapper.
+- **Frontend scaffold**: Vite + React + TS + React Router, `AuthProvider` (httpOnly session cookie; only the account's name and admin flag are cached in the browser), a typed `api()` fetch wrapper.
 - **Persistent audio player**: `useAudioStore` (Zustand) holds player state; the actual `<audio>` element lives once in `PlayerBar`, mounted inside `Layout` next to `<Outlet/>` rather than inside it — that placement is the entire mechanism. `Layout` never remounts on route change, so the element (and playback) survives navigation with no special-case code.
 - **Homepage tree**: radial layout computed from `Branch.parentId`/`posX`/`posY` (`lib/treeLayout.ts`), rendered as SVG with bezier branch paths. Hover/tap lazy-loads a two-half card — forum preview via the existing messages endpoint, music preview via the new `/api/branches/:slug/albums` — using real DOM measurement to position the card, not raw SVG coordinates (those don't match once the SVG scales to its container).
 - **Message formatting**: full renderer for the Discord-style syntax — bold/italic/underline/strikethrough/code/spoiler (click-to-reveal)/links/`<t:UNIX>`/headers/subtitles/quotes. Mentions and channel refs render with their raw id for now; resolving them to names needs a bulk id→name lookup that doesn't exist yet.
@@ -122,4 +122,23 @@ Frontend: `npm run build` is still fully clean after all of the above — zero e
 
 ## Open question you haven't decided yet
 What happens to a user's messages if their account is deleted — keep them attributed, or anonymize ("deleted user")? **Answered**: keep attributed via ghost account, see above.
+
+## Security model (current)
+
+- **Sessions**: a signed token (HS256, 30 days) in an httpOnly, SameSite=Lax cookie named `exo_session`. A hook turns the
+  cookie into the Bearer header, so every route reads the session the same way. Page scripts never see the token.
+- **Revocation**: each account has a `tokenVersion`. Logout and password changes raise it, which ends every session of
+  that account. The server keeps a snapshot of live accounts (tokenVersion, admin flag, ghost and deleted state), reloaded
+  at boot, every 30 seconds, and per account after a login, logout or password change. Token checks stay synchronous.
+- **Secrets**: `JWT_SECRET` must be a real value of at least 32 characters, or the server does not start. Outreach
+  signing falls back to the same secret, never to a placeholder.
+- **Outbound requests** (link previews, audio proxy, outreach page reads, community track addresses): `lib/netGuard.ts`.
+  Only http and https on the ordinary ports, no login in the address, and every address the name resolves to must be
+  public, checked at connection time. Redirects are followed by hand and checked again at each hop.
+- **Sign-in limits**: `routes/auth.ts`, per address and per account and address (see `lib/resourceAccess.ts` for the limiter).
+- **WebSockets**: the cookie authenticates the handshake (`wsUser` in `lib/auth.ts`). The old `?token=` is read for one
+  release only and is redacted from logs (`lib/redact.ts`).
+- **Browser side**: CORS allows only `CORS_ORIGINS`. JSON bodies stop at 4 MB; multipart uploads keep the 105 MB ceiling.
+  The Caddy image adds HSTS, nosniff, a referrer policy, a permissions policy and a report-only CSP.
+- **Container**: the backend runs as `node`, with a `.dockerignore` that keeps dependencies, build output and env files out of the image.
 

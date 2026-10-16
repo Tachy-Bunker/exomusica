@@ -1,3 +1,4 @@
+import { log } from "./log.js";
 import nodemailer from "nodemailer";
 import { prisma } from "./prisma.js";
 
@@ -54,13 +55,13 @@ function buildTransport(config: SmtpConfig) {
 export async function sendMail(to: string, subject: string, text: string, html?: string): Promise<void> {
   const config = await resolveSmtpConfig();
   if (!config) {
-    console.warn(`[mailer] SMTP not configured - would have sent "${subject}" to ${to}`);
+    log.warn(`[mailer] SMTP not configured - would have sent "${subject}" to ${to}`);
     return;
   }
   try {
     await buildTransport(config).sendMail({ from: config.from, to, subject, text, html });
   } catch (err) {
-    console.error(`[mailer] failed to send "${subject}" to ${to}:`, err);
+    log.error(`[mailer] failed to send "${subject}" to ${to}:`, err);
   }
 }
 

@@ -1,6 +1,6 @@
 import type { FastifyInstance } from "fastify";
 import type { WebSocket } from "ws";
-import { requireAuth, verifyToken } from "../lib/auth.js";
+import { requireAuth, wsUser } from "../lib/auth.js";
 import { RoomHub } from "../lib/roomHub.js";
 import { GhostStore } from "../lib/roomGhosts.js";
 
@@ -22,7 +22,7 @@ export async function roomPresenceRoutes(app: FastifyInstance): Promise<void> {
   /** Going invisible also takes your echoes out of every room. */
   app.post("/api/rooms/forget-echoes", { preHandler: requireAuth }, async (req) => { ghosts.forget(req.user!.id); return { status: "ok" }; });
   app.get<{ Querystring: { token?: string; room?: string } }>("/ws/room", { websocket: true }, (socket, req) => {
-    const user = req.query.token ? verifyToken(req.query.token) : null;
+    const user = wsUser(req);
     const key = user && req.query.room ? hub.join(user.id, user.username, req.query.room) : null;
     if (!user || key == null) { socket.close(); return; }
     sockets.set(key, socket); ghosts.begin(key, user.id, user.username, req.query.room!);

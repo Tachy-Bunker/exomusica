@@ -1,6 +1,6 @@
 import type { FastifyInstance } from "fastify";
 import type { WebSocket } from "ws";
-import { requireAuth, verifyToken } from "../lib/auth.js";
+import { requireAuth, wsUser } from "../lib/auth.js";
 import { getMilestones } from "../lib/milestones.js";
 import { BIG_MEMBERS, MAX_MEMBERS, applyOp, cleanChat, cleanCursor, guestName, JamRooms, normalizeCode, pushChat, Throttle } from "../lib/jamRoom.js";
 
@@ -24,7 +24,7 @@ export async function jamRoutes(app: FastifyInstance): Promise<void> {
   });
 
   app.get<{ Params: { code: string }; Querystring: { token?: string } }>("/ws/jam/:code", { websocket: true }, (socket, req) => {
-    const authed = req.query.token ? verifyToken(req.query.token) : null;
+    const authed = wsUser(req);
     const code = normalizeCode(req.params.code);
     if (!code) { socket.close(4404); return; }
     const room0 = rooms.rooms.get(code);

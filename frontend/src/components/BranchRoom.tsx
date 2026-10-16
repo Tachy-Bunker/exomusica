@@ -31,6 +31,7 @@ import { playEcho, playScan } from "../lib/roomEchoAudio";
 import { addLog, loadLog, noteRoom, surveyDraft, surveyKey, scannables, shownOf, type Lore, type Scannable, type ShownLore } from "../lib/roomLore";
 import { RoomStick } from "./RoomStick";
 import { ScanScreen, type ScanRes } from "./ScanScreen";
+import { Glyph, RoomTile } from "./RoomGlyph";
 
 const KEYS: Record<string, [number, number, number, number]> = { // forward, strafe, turn, look
   KeyW: [1, 0, 0, 0], KeyS: [-1, 0, 0, 0], ArrowUp: [0, 0, 0, 1], ArrowDown: [0, 0, 0, -1],
@@ -141,7 +142,7 @@ export function BranchRoom({ tick, world, color, next, wantNext, onAdvance, go, 
   const [hud, setHud] = useState(hudOn), hudRef = useRef(hud), hudC = useRef<HTMLCanvasElement>(null), hudAt = useRef(0), hudIn = useRef<HudIn | null>(null), hudOnAt = useRef(0), hudN = useRef({ at: 0, list: null as readonly { x: number; z: number }[] | null, flags: new Uint8Array(0), done: 0, marks: [] as ScanMark[], pool: [] as ScanMark[] });
   hudRef.current = hud;
   const hudMount = useCallback((el: HTMLCanvasElement | null) => { // size the visor canvas as it appears (it is created when the visor is switched on or the editor closes)
-    hudC.current = el; const st = stage.current; if (!el || !st) return; const d = dprBase.current, w = st.clientWidth, h = st.clientHeight;
+    hudC.current = el; const st = stage.current; if (!el || !st) return; const d = 1, w = st.clientWidth, h = st.clientHeight;
     el.width = Math.max(1, Math.round(w * d)); el.height = Math.max(1, Math.round(h * d)); el.getContext("2d")?.setTransform(d, 0, 0, d, 0, 0); hudAt.current = 0; hudOnAt.current = performance.now() / 1000; dirty.current = true; wakeRef.current();
   }, []);
   const integ = useRef(1), hazRoom = useRef(false), hazCorr = useRef(false), hz = useRef<HazardFx>({ slow: 1, px: 0, pz: 0, drain: 0 }), hz2 = useRef<HazardFx>({ slow: 1, px: 0, pz: 0, drain: 0 }), integEl = useRef<HTMLDivElement>(null), hurtEl = useRef<HTMLDivElement>(null), integShown = useRef(-1), softT = useRef(0);
@@ -566,7 +567,7 @@ export function BranchRoom({ tick, world, color, next, wantNext, onAdvance, go, 
       const w = st.clientWidth, h = st.clientHeight; dprBase.current = Math.min(window.devicePixelRatio || 1, (navigator.hardwareConcurrency ?? 8) <= 4 ? 1 : 1.5);
       const dpr = dprBase.current * gov.current.scale;
       c.width = Math.max(1, Math.round(w * dpr)); c.height = Math.max(1, Math.round(h * dpr)); size.current = { w, h };
-      c.getContext("2d")?.setTransform(dpr, 0, 0, dpr, 0, 0); { const hc = hudC.current; if (hc) { const hd = dprBase.current; hc.width = Math.max(1, Math.round(w * hd)); hc.height = Math.max(1, Math.round(h * hd)); hc.getContext("2d")?.setTransform(hd, 0, 0, hd, 0, 0); hudAt.current = 0; } } dirty.current = true; wakeRef.current();
+      c.getContext("2d")?.setTransform(dpr, 0, 0, dpr, 0, 0); { const hc = hudC.current; if (hc) { const hd = 1 /* the visor is line art: at 1x it has a quarter of the pixels of 2x on a retina screen */; hc.width = Math.max(1, Math.round(w * hd)); hc.height = Math.max(1, Math.round(h * hd)); hc.getContext("2d")?.setTransform(hd, 0, 0, hd, 0, 0); hudAt.current = 0; } } dirty.current = true; wakeRef.current();
     };
     fitRef.current = fit;
     fit(); const ro = new ResizeObserver(fit); ro.observe(st); return () => ro.disconnect();
@@ -576,6 +577,8 @@ export function BranchRoom({ tick, world, color, next, wantNext, onAdvance, go, 
     const down = (e: KeyboardEvent) => {
       if (isTypingTarget(e.target) || e.ctrlKey || e.metaKey || e.altKey) return;
       if (scanResRef.current) { // the scan screen is open: the room stands still and these keys answer it
+        const onScanButton = (e.target as HTMLElement | null)?.closest?.(".scan-screen button, .scan-screen [role='button']");
+        if (onScanButton && (e.code === "Space" || e.code === "Enter")) return; // a focused scan button takes its own keys
         if (e.code === "Space" || e.code === "Enter" || e.code === "KeyB" || e.code === "KeyX") { e.preventDefault(); e.stopPropagation(); if (!e.repeat) scanActRef.current(e.code === "KeyX" ? "exit" : e.code === "KeyB" || scanResRef.current?.view === "entry" ? "back" : "read"); }
         return;
       }
@@ -656,23 +659,23 @@ export function BranchRoom({ tick, world, color, next, wantNext, onAdvance, go, 
       {scanRes && <ScanScreen res={scanRes} onRead={() => scanAct("read")} onBack={() => scanAct("back")} onExit={() => scanAct("exit")} />}
       {perfOn.current && <div ref={perfEl} className="rm-perf" data-testid="room-perf" />}
       <div className="rm-bar">
-        <Link to={backHref} className="rm-btn" data-testid="room-back" title="The ordinary page of this branch">Classic view</Link>
-        <Link to={mapHref} className="rm-btn" data-testid="room-map">Map</Link>
-        <button type="button" className="rm-btn" data-testid="room-drone" onClick={callDrone}>Drone</button>
-        <button type="button" className="rm-btn" data-testid="room-ping" aria-disabled={!visor.on} onClick={doPing}>Ping</button>
-        <button type="button" className="rm-btn" data-testid="room-scan" aria-pressed={scanMode} title="Scan visor (X)" onClick={toggleScan}>{scanMode ? "Combat visor" : "Scan visor"}</button>
-        <button type="button" className="rm-btn" data-testid="room-hud-toggle" aria-pressed={hud} title="Visor display (H)" onClick={() => { const v = !hud; setHudOn(v); setHud(v); }}>Visor</button>
-        <button type="button" className="rm-btn" data-testid="room-logbook" onClick={onLogbook}>Logbook</button>
-        {isAdmin && <button type="button" className="rm-btn" data-testid="room-edit" aria-pressed={editing} onClick={() => { if (editing) closeEditor(); else { setEditing(true); editRef.current = true; useDoc(doc, wref.current.slug, false); } }}>{corrW ? "Close corridor editor" : "Edit room"}</button>}
-        {isAdmin && inCorr && !editing && <button type="button" className="rm-btn" data-testid="room-edit-corr" onClick={() => void editCorridor()}>Edit corridor</button>}
-        <button type="button" className="rm-btn" data-testid="room-lock" aria-pressed={locked} onClick={toggleLock}>{locked ? "Unlock" : "Lock on"}</button>
-        <button type="button" className="rm-btn" aria-pressed={visible} data-testid="room-visible" title={visible ? "Others in this room can see you. Press to hide (you will not see them either)." : "You are hidden. Press to appear."} onClick={() => { const v = !visible; setVisible(v); setVis(v); }}>{visible ? "Visible" : "Hidden"}</button>
+        <RoomTile to={backHref} icon="page" label="Classic view" testid="room-back" />
+        <RoomTile to={mapHref} icon="map" label="Map" testid="room-map" />
+        <RoomTile icon="note" label="Drone" keys="C" testid="room-drone" onClick={callDrone} />
+        <RoomTile icon="ping" label="Ping" keys="V" disabled={!visor.on} testid="room-ping" onClick={doPing} />
+        <RoomTile icon="scan" label={scanMode ? "Combat visor" : "Scan visor"} keys="X" pressed={scanMode} testid="room-scan" onClick={toggleScan} />
+        <RoomTile icon="hud" label="Visor" keys="H" pressed={hud} testid="room-hud-toggle" onClick={() => { const v = !hud; setHudOn(v); setHud(v); }} />
+        <RoomTile icon="book" label="Logbook" keys="L" testid="room-logbook" onClick={onLogbook} />
+        {isAdmin && <RoomTile icon="pencil" label={corrW ? "Close corridor editor" : "Edit room"} pressed={editing} testid="room-edit" onClick={() => { if (editing) closeEditor(); else { setEditing(true); editRef.current = true; useDoc(doc, wref.current.slug, false); } }} />}
+        {isAdmin && inCorr && !editing && <RoomTile icon="pencil" label="Edit corridor" testid="room-edit-corr" onClick={() => void editCorridor()} />}
+        <RoomTile icon="lock" label={locked ? "Unlock" : "Lock on"} keys="Z" pressed={locked} testid="room-lock" onClick={toggleLock} />
+        <RoomTile icon={visible ? "eye" : "eyeoff"} label={visible ? "Visible" : "Hidden"} pressed={visible} testid="room-visible" onClick={() => { const v = !visible; setVisible(v); setVis(v); }} />
       </div>
       {isAdmin && editing && <Suspense fallback={null}><RoomEditor themeNote={themeNote} hasTheme={ownTheme} themeMsg={themeMsg} onTheme={(k) => void (k === "save" ? saveTheme() : clearTheme())} world={corrW ? corrW.world : world} cx={corrW?.cx ?? 0} cz={corrW?.cz ?? 0} corridor={!!corrW} doc={doc} onDoc={changeDoc} onUndo={undoDoc} onRedo={redoDoc} canUndo={hist.current.undo.length > 0} canRedo={hist.current.redo.length > 0} sel={sel} setSel={(id) => { setSel(id); if (corrEdit.current) corrLayer.sel = id; else actorLayer.sel = id; dirty.current = true; wakeRef.current(); }} where={() => (corrEdit.current ? { x: eye.current.x - corrLayer.ox, z: eye.current.z - corrLayer.oz, yaw: eye.current.yaw } : eye.current)} dirty={!sameDoc} busy={busy} error={err} playing={playTest} onPlay={setPlay} onSave={saveDoc} onRevert={() => { setDoc(saved); useDoc(saved, wref.current.slug, false); }} onClose={closeEditor} /></Suspense>}
       <div className="rm-pad"><RoomStick onChange={onStick} /></div>
       {hasHeight && <button type="button" className="rm-jump" data-testid="room-jump" aria-label="Jump" onClick={() => { jumpReq.current = true; wakeRef.current(); }} onPointerDown={(e) => e.stopPropagation()}>Jump</button>}
-      <button type="button" className="rm-use" data-testid="room-use" onClick={() => { if (scanMode) startScan(); else use(); }} onPointerDown={(e) => e.stopPropagation()}>{scanMode ? "Scan" : "Use"}</button>
-      <p className="rm-hint">{scanMode ? "Scan visor · W A S D move · arrows look · Space scan · F use · X combat visor · V ping · L logbook · Esc leave" : "W A S D move · arrows look · Q E turn · Space use · J jump · right-click / Z lock on · X scan visor · V ping · L logbook · C drone · Esc leave"}</p>
+      <button type="button" className="rm-use" data-testid="room-use" onClick={() => { if (scanMode) startScan(); else use(); }} onPointerDown={(e) => e.stopPropagation()}><Glyph name={scanMode ? "scan" : "door"} /><span>{scanMode ? "Scan" : "Use"}</span></button>
+      <p key={scanMode ? "scan" : "walk"} className="rm-hint">{scanMode ? "W A S D move · Space scan · F use · X combat visor" : "W A S D move · Space use · X scan visor"}</p>
       <ul className="sr-only">
         {world.doors.map((d) => (
           <li key={d.id}>

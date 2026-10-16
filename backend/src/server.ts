@@ -1,5 +1,6 @@
+import { log } from "./lib/log.js";
 import "dotenv/config";
-import Fastify from "fastify";
+import Fastify, { type FastifyRequest } from "fastify";
 
 // Without this, an uncaught error in any fire-and-forget background task
 // (a background email, a notification insert, anything not directly
@@ -8,10 +9,10 @@ import Fastify from "fastify";
 // Individual background calls should still have their own .catch(), but
 // this is the safety net for anything that doesn't.
 process.on("unhandledRejection", (reason) => {
-  console.error("Unhandled rejection (process kept alive):", reason);
+  log.error("Unhandled rejection (process kept alive):", reason);
 });
 process.on("uncaughtException", (err) => {
-  console.error("Uncaught exception (process kept alive):", err);
+  log.error("Uncaught exception (process kept alive):", err);
 });
 
 import cors from "@fastify/cors";
@@ -20,6 +21,8 @@ import multipart from "@fastify/multipart";
 import fastifyStatic from "@fastify/static";
 import { uploadHeaders } from "./lib/uploadHeaders.js";
 import { prisma } from "./lib/prisma.js";
+import { readCookie, SESSION_COOKIE, refreshAllAccounts, sessionSecret } from "./lib/auth.js";
+import { redactUrl } from "./lib/redact.js";
 import { UPLOADS_DIR } from "./lib/storage.js";
 import { authRoutes } from "./routes/auth.js";
 import { joinRoutes } from "./routes/join.js";
@@ -107,9 +110,42 @@ import { outreachRoutes } from "./routes/outreach.js";
 // (cover art, gallery images, message attachments), not anything in
 // multipart's own config. Raised for the whole app, not just admin routes,
 // since Fastify's bodyLimit isn't naturally scoped per-route by auth.
-const app = Fastify({ logger: true, bodyLimit: 105 * 1024 * 1024, ignoreTrailingSlash: true });
+// Request logs keep the path but not the query's secret values (tokens, tickets), so nothing sensitive is written down.
+const app = Fastify({
+  logger: {
+    level: process.env.LOG_LEVEL ?? "info",
+    serializers: {
+      req: (req: FastifyRequest) => ({ method: req.method, url: redactUrl(req.url), host: req.hostname, remoteAddress: req.ip, remotePort: req.socket?.remotePort }),
+    },
+  },
+  bodyLimit: 105 * 1024 * 1024,
+  ignoreTrailingSlash: true,
+});
 
-await app.register(cors, { origin: true });
+// JSON bodies stop at 4 MB. The 105 MB ceiling above stays for multipart uploads, which need it.
+app.removeContentTypeParser("application/json");
+app.addContentTypeParser("application/json", { parseAs: "string", bodyLimit: 4 * 1024 * 1024 }, (_req, body, done) => {
+  if (body === "") {
+    done(Object.assign(new Error("Body cannot be empty when content-type is set to 'application/json'"), { statusCode: 400 }), undefined);
+    return;
+  }
+  try {
+    done(null, JSON.parse(body as string));
+  } catch (err) {
+    done(Object.assign(err as Error, { statusCode: 400 }), undefined);
+  }
+});
+
+// The session cookie becomes the Authorization header once, here, so every route reads the session the same way.
+app.addHook("onRequest", async (req) => {
+  if (req.headers.authorization) return;
+  const token = readCookie(req, SESSION_COOKIE);
+  if (token) req.headers.authorization = `Bearer ${token}`;
+});
+
+// Only the site itself may call the API from a page script. Requests with no Origin header (the site's own pages, tools) are not affected.
+const ORIGINS = (process.env.CORS_ORIGINS ?? "https://exomusica.com").split(",").map((s) => s.trim()).filter(Boolean);
+await app.register(cors, { origin: (origin: string | undefined, cb: (err: Error | null, allow: boolean) => void) => cb(null, !origin || ORIGINS.includes(origin)) });
 await app.register(websocketPlugin);
 await app.register(multipart);
 await app.register(fastifyStatic, {
@@ -122,9 +158,13 @@ await app.register(fastifyStatic, {
   },
 });
 
-app.get("/health", async () => {
-  const rows = await prisma.$queryRaw<{ now: Date }[]>`SELECT now()`;
-  return { status: "ok", dbTime: rows[0]?.now };
+app.get("/health", async (_req, reply) => {
+  try {
+    await prisma.$queryRaw`SELECT 1`;
+    return { status: "ok" };
+  } catch {
+    return reply.code(503).send({ status: "database unreachable" });
+  }
 });
 
 await app.register(authRoutes);
@@ -206,6 +246,14 @@ await app.register(lettersRoutes);
 await app.register(signalRoutes);
 await app.register(trackCommentRoutes);
 await app.register(outreachRoutes);
+
+// The account snapshot the token check reads (see lib/auth.ts). Loaded before the first request is served; a missing
+// JWT_SECRET stops the server here rather than letting it run with a guessable secret.
+sessionSecret();
+await refreshAllAccounts();
+setInterval(() => {
+  refreshAllAccounts().catch((err) => app.log.error(err, "account snapshot refresh failed"));
+}, 30_000).unref();
 
 const port = Number(process.env.PORT ?? 3001);
 app.listen({ port, host: "0.0.0.0" }).catch((err) => {

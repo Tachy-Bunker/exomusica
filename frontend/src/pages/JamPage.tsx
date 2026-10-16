@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { api, getToken } from "../lib/api";
+import { api } from "../lib/api";
 import { useAuth } from "../lib/auth";
 import { useDocumentTitle } from "../lib/useDocumentTitle";
 import { useToastStore } from "../lib/toastStore";
@@ -87,7 +87,7 @@ function Room({ code }: { code: string }) {
 
   useEffect(() => {
     const proto = location.protocol === "https:" ? "wss" : "ws";
-    const sock = new WebSocket(`${proto}://${location.host}/ws/jam/${code}?token=${encodeURIComponent(getToken() ?? "")}`);
+    const sock = new WebSocket(`${proto}://${location.host}/ws/jam/${code}`);
     ws.current = sock;
     const samples: { sent: number; got: number; server: number }[] = [];
     let sent = 0;

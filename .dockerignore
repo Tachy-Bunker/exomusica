@@ -1,0 +1,12 @@
+# Build context for Dockerfile.caddy (the frontend and Caddyfile). The backend has its own context and ignore file.
+**/node_modules
+**/dist
+**/_scratch
+**/.env
+**/.env.*
+!**/.env.example
+**/*.log
+.git
+backend
+docs
+frontend/wasm
