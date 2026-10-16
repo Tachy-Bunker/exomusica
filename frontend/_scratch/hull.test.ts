@@ -1,97 +1,101 @@
+// The Hull (fix402, straight hall in fix403): the door to it in the Core, the hall with a door per milestone on both side walls, the corridor between them, collision, and the milestone door's hit test.
 import assert from "node:assert/strict";
-import { layoutHull, pipeSegments, roomMesh, shapeOf, type HullNode } from "../src/lib/hullLayout.js";
-import { clampCam, defaultCam, isTopView, panBy, pick, project, upsideDown, wrapAngle, type Cam } from "../src/lib/hullCamera.js";
-const N = (id: number, parentId: number | null, over: Partial<HullNode> = {}): HullNode => ({ id, parentId, slug: `b${id}`, name: `B${id}`, tracks: id * 3, albums: 1, ...over });
+import { buildRoom, buildHullRoom, wallsOf, DOOR_W, HULL_HALF_W, HULL_HOST, HULL_SLUG, HULL_MAX, type RoomWorld } from "../src/lib/roomWorld.js";
+import { buildLink, inRoom, flipLink } from "../src/lib/roomScene.js";
+import { collide, milestoneDoorAt, facing } from "../src/lib/roomView.js";
+import type { Milestone } from "../src/lib/milestones.js";
 
-// --- layout
-const tree = [N(1, null), N(2, 1), N(3, 1), N(4, 1), N(5, 2), N(6, 2), N(7, 3)];
-const h = layoutHull(tree, { outer: false });
-assert.equal(h.rooms.length, 7);
-assert.equal(h.rooms.find((r) => r.id === 1)!.shape, "ring"); // the single root is the central hall
-assert.deepEqual([h.rooms[0].x, h.rooms[0].z], [0, 0]);
-assert.equal(h.links.length, 6);
-// no two rooms on top of each other
-for (const a of h.rooms) for (const b of h.rooms) if (a.id < b.id) assert.ok(Math.hypot(a.x - b.x, a.z - b.z) > 2.2, `${a.id} and ${b.id} overlap`);
-// children sit farther out than their parent
-for (const r of h.rooms) if (r.parentId != null) { const p = h.rooms.find((x) => x.id === r.parentId)!; assert.ok(Math.hypot(r.x, r.z) > Math.hypot(p.x, p.z)); }
-// same input, same world
-assert.deepEqual(layoutHull(tree, { outer: false }).rooms.map((r) => [r.x, r.y, r.z, r.shape]), h.rooms.map((r) => [r.x, r.y, r.z, r.shape]));
-assert.equal(shapeOf("abc"), shapeOf("abc"));
-// many siblings: radius grows so they don't touch
-const wide = [N(1, null), ...Array.from({ length: 40 }, (_, i) => N(i + 2, 1))];
-const hw = layoutHull(wide, { outer: false });
-for (const a of hw.rooms) for (const b of hw.rooms) if (a.id < b.id) assert.ok(Math.hypot(a.x - b.x, a.z - b.z) > 2.2);
-// several roots: no hub, all on the first ring
-const multi = layoutHull([N(1, null), N(2, null), N(3, 1)], { outer: false });
-assert.ok(!multi.rooms.some((r) => r.shape === "ring"));
-// a cycle and an orphan cannot hang it
-const odd = layoutHull([N(1, 2), N(2, 1), N(3, 99), N(4, 4)], { outer: false });
-assert.equal(odd.rooms.length, 4);
-assert.equal(layoutHull([], { outer: true }).rooms.length, 0);
-// floors: the link between different heights has a shaft
-assert.ok(h.links.some((l) => l.shaft) );
-// sealed rooms: left out without the outer ring, on it with
-const withSecret = [...tree, N(8, 2, { secret: true, slug: "", name: "", key: "zz" }), N(9, 8, { secret: true, slug: "", name: "", key: "yy" })];
-const no = layoutHull(withSecret, { outer: false });
-assert.equal(no.rooms.length, 7); assert.ok(!no.rooms.some((r) => r.secret));
-const yes = layoutHull(withSecret, { outer: true });
-assert.equal(yes.rooms.filter((r) => r.secret).length, 2);
-const maxVis = Math.max(...yes.rooms.filter((r) => !r.secret).map((r) => Math.hypot(r.x, r.z)));
-for (const s of yes.rooms.filter((r) => r.secret)) { assert.ok(s.outer && Math.hypot(s.x, s.z) > maxVis, "sealed rooms are on the outer ring"); assert.equal(s.name, ""); }
-assert.equal(yes.links.filter((l) => l.dashed).length, 2);
-// a visible child of a sealed parent hangs from the grandparent instead of vanishing
-const hang = layoutHull([N(1, null), N(2, 1, { secret: true, slug: "", name: "", key: "q" }), N(3, 2)], { outer: false });
-assert.equal(hang.rooms.length, 2); assert.equal(hang.links.length, 1); assert.equal(hang.links[0].from, 1);
+const M = (key: string, title: string, reached: boolean): Milestone => ({ key, title, perk: "p", metric: "TRACKS", label: "tracks", target: 10, now: reached ? 10 : 3, reached, reachedAt: null, live: true });
+const list = [M("m-roll", "Roll call", true), M("m-tracks", "First hundred", false), M("m-scans", "Wide lens", true), M("m-hull", "Hull", true)];
+const core = (ms: Milestone[] | null, slug = HULL_HOST): RoomWorld => buildRoom({ hull: null, slug, name: "Core", states: null, albums: [{ slug: "a1", title: "A1" }], channelSlug: null, milestones: ms });
 
-// --- meshes
-for (const shape of ["box", "oct", "tower", "slab", "ring"] as const) {
-  const m = roomMesh({ shape, w: 3, d: 3, h: 2 });
-  const nv = m.verts.length / 3;
-  assert.ok(nv >= 8 && m.edges.length % 2 === 0);
-  for (const i of m.edges) assert.ok(i < nv, `${shape}: edge index out of range`);
-  for (const f of m.faces) for (const i of f) assert.ok(i < nv);
-  assert.ok(m.edges.length < 400, "stays cheap");
+// 1. the Core gets one door to the Hull; open when the Hull milestone is reached, locked (carrying its card) when not
+const reachedCore = core(list);
+const hullDoor = reachedCore.doors.find((d) => d.toSlug === HULL_SLUG);
+assert.ok(hullDoor, "the Core has a door to the Hull");
+assert.equal(hullDoor!.state, "open"); assert.equal(hullDoor!.name, "The Hull"); assert.equal(hullDoor!.milestone?.key, "m-hull");
+const lockedCore = core(list.map((m) => (m.key === "m-hull" ? { ...m, reached: false } : m)));
+const lockedDoor = lockedCore.doors.find((d) => d.toSlug === HULL_SLUG)!;
+assert.equal(lockedDoor.state, "locked"); assert.equal(lockedDoor.name, null); assert.equal(lockedDoor.milestone?.reached, false);
+assert.equal(core(null).doors.some((d) => d.toSlug === HULL_SLUG), false, "no milestones given: no Hull door");
+assert.equal(core(list, "other").doors.some((d) => d.toSlug === HULL_SLUG), false, "another branch gets no Hull door");
+// the regular Core's walls are unchanged: from its corners they are its regular walls
+for (let k = 0; k < reachedCore.sides; k++) {
+  const a = reachedCore.rot + (k + 0.5) * ((Math.PI * 2) / reachedCore.sides), w = wallsOf(reachedCore)[k];
+  assert.ok(Math.abs(w.nx - Math.cos(a)) < 1e-9 && Math.abs(w.nz - Math.sin(a)) < 1e-9 && Math.abs(w.d - reachedCore.inr) < 1e-9, `Core wall ${k} is the regular wall`);
 }
-assert.equal(roomMesh({ shape: "box", w: 2, d: 2, h: 1 }).edges.length / 2, 12); // a box has twelve edges
-assert.equal(pipeSegments([[0, 0, 0], [5, 0, 0]]).length % 6, 0);
-assert.ok(pipeSegments([[0, 0, 0], [5, 0, 0], [5, 0, 5], [5, 2, 5]]).length > pipeSegments([[0, 0, 0], [5, 0, 0]]).length);
-assert.equal(pipeSegments([[0, 0, 0]]).length, 0);
 
-// --- camera
-const W = 800, H = 600;
-const cam: Cam = { yaw: 0.7, pitch: 0.5, dist: 30, tx: 4, ty: 1, tz: -3 };
-const c0 = project(cam, 4, 1, -3, W, H);
-assert.ok(Math.abs(c0[0] - W / 2) < 1e-6 && Math.abs(c0[1] - H / 2) < 1e-6, "the target is at the middle of the screen");
-assert.ok(Math.abs(c0[2] - 30) < 1e-6);
-// a point behind the camera is not drawn
-assert.ok(Number.isNaN(project({ ...cam, dist: 2 }, 4, 1, -3 + 10 * Math.cos(0), W, H)[0]) || true);
-const back = project({ yaw: 0, pitch: 0, dist: 5, tx: 0, ty: 0, tz: 0 }, 0, 0, -20, W, H);
-assert.ok(Number.isNaN(back[0]) && back[2] <= 0.5);
-// up is up on screen; right is right
-const up = project({ yaw: 0, pitch: 0, dist: 20, tx: 0, ty: 0, tz: 0 }, 0, 1, 0, W, H); assert.ok(up[1] < H / 2);
-const rt = project({ yaw: 0, pitch: 0, dist: 20, tx: 0, ty: 0, tz: 0 }, 1, 0, 0, W, H); assert.ok(rt[0] > W / 2);
-// nearer things look bigger
-const near = project({ yaw: 0, pitch: 0, dist: 20, tx: 0, ty: 0, tz: 0 }, 1, 0, -5, W, H), farp = project({ yaw: 0, pitch: 0, dist: 20, tx: 0, ty: 0, tz: 0 }, 1, 0, 5, W, H);
-assert.ok(Math.abs(near[0] - W / 2) > Math.abs(farp[0] - W / 2));
-// pan: the scene follows the pointer, whatever the angle
-for (const [yaw, pitch] of [[0, 0.5], [1.3, 0.9], [4, 0.2], [2.2, 1.4]]) {
-  const c: Cam = { yaw, pitch, dist: 25, tx: 0, ty: 0, tz: 0 };
-  const before = project(c, 0, 0, 0, W, H), c2 = panBy(c, 60, -35, W, H), after = project(c2, 0, 0, 0, W, H);
-  assert.ok(Math.abs(after[0] - before[0] - 60) < 0.5 && Math.abs(after[1] - before[1] + 35) < 0.5, `pan at yaw ${yaw} pitch ${pitch}: ${after[0] - before[0]}, ${after[1] - before[1]}`);
+// 2. the Hall: a straight hall, one segment of wall per two milestones on each side, the two ends; a door on each segment, milestones alternating sides
+const ux = hullDoor!.nx, uz = hullDoor!.nz, px = -uz, pz = ux; // u: from the Core to the Hall; p: across the hall
+const hall = buildHullRoom({ core: reachedCore, door: hullDoor!, milestones: list });
+const K = Math.ceil(list.length / 2);
+assert.equal(hall.slug, HULL_SLUG);
+assert.equal(hall.sides, 2 * K + 2, "walls: the two sides in K segments each, and the two ends");
+assert.equal(hall.verts.length, hall.sides);
+assert.equal(hall.doors.length, list.length + 1, "one door back, one door per milestone");
+const back = hall.doors.find((d) => d.id === "back")!;
+assert.ok(back.toSlug === reachedCore.slug && back.state === "open" && back.kind === "parent", "the back door leads to the Core");
+assert.ok(back.nx * -ux + back.nz * -uz > 0.999, "the back door faces the Core");
+const ms = hall.doors.filter((d) => d.milestone);
+assert.deepEqual(ms.map((d) => d.name), list.map((m) => m.title), "one door per milestone, in order, named as the milestone");
+assert.deepEqual(ms.map((d) => d.state), ["open", "locked", "open", "open"], "lit once reached, dark until then");
+assert.equal(new Set(hall.doors.map((d) => d.edge)).size, hall.doors.length, "each door on its own wall");
+const side = (d: { nx: number; nz: number }) => Math.sign(d.nx * px + d.nz * pz);
+ms.forEach((d, i) => { if (i > 0) assert.notEqual(side(d), side(ms[i - 1]), "milestones alternate sides"); });
+const along = (d: { x: number; z: number }) => d.x * ux + d.z * uz;
+for (const a of ms) for (const b of ms) if (a !== b && side(a) === side(b)) assert.ok(Math.abs(along(a) - along(b)) >= DOOR_W + 0.5, "doors on one side do not overlap");
+// each door sits on the wall it names: its normal and its distance are the wall's
+const walls = wallsOf(hall);
+for (const d of hall.doors) {
+  const w = walls[d.edge];
+  assert.ok(Math.abs(w.nx - d.nx) < 1e-6 && Math.abs(w.nz - d.nz) < 1e-6, `door ${d.id} faces its wall`);
+  assert.ok(Math.abs(w.d - (d.x * d.nx + d.z * d.nz)) < 1e-6, `door ${d.id} is on its wall`);
 }
-// clamps
-const cl = clampCam({ yaw: -1, pitch: 9, dist: 0.1, tx: 0, ty: 0, tz: 0 }, 50);
-assert.ok(Math.abs(cl.yaw) <= Math.PI && Math.abs(cl.pitch) <= Math.PI && cl.dist >= 5);
-assert.ok(Math.abs(wrapAngle(Math.PI * 2 + 0.5) - 0.5) < 1e-9 && Math.abs(wrapAngle(-Math.PI * 1.5) - Math.PI / 2) < 1e-9);
-assert.ok(Math.abs(clampCam({ yaw: 0, pitch: 4, dist: 20, tx: 0, ty: 0, tz: 0 }, 50).pitch - (4 - Math.PI * 2)) < 1e-9, "pitch wraps past the top instead of stopping");
-assert.ok(!upsideDown({ yaw: 0, pitch: 0.6, dist: 20, tx: 0, ty: 0, tz: 0 }) && upsideDown({ yaw: 0, pitch: 2.5, dist: 20, tx: 0, ty: 0, tz: 0 }));
-assert.ok(isTopView({ yaw: 0, pitch: Math.PI / 2, dist: 20, tx: 0, ty: 0, tz: 0 }) && !isTopView({ yaw: 0, pitch: 0.6, dist: 20, tx: 0, ty: 0, tz: 0 }));
-assert.ok(defaultCam(100).dist > defaultCam(1).dist);
-// picking
-const rooms = [{ id: 1, x: 0, y: 0, z: 0, r: 2 }, { id: 2, x: 10, y: 0, z: 0, r: 2 }];
-const pc: Cam = { yaw: 0, pitch: 0.3, dist: 30, tx: 0, ty: 0, tz: 0 };
-const p1 = project(pc, 0, 0, 0, W, H), p2 = project(pc, 10, 0, 0, W, H);
-assert.equal(pick(pc, rooms, p1[0], p1[1], W, H), 1);
-assert.equal(pick(pc, rooms, p2[0] + 3, p2[1] - 2, W, H), 2);
-assert.equal(pick(pc, rooms, 5, 5, W, H), null);
+assert.ok(hall.R > HULL_HALF_W && hall.R < 40, `the hall is a sensible size (R ${hall.R.toFixed(2)})`);
+assert.ok(inRoom(hall, hall.spawn.x, hall.spawn.z, 0.5), "you arrive inside the Hull");
+assert.equal(inRoom(hall, back.x + back.nx * 1, back.z + back.nz * 1), false, "outside the back door is not the Hull");
+
+// 3. collision: walking into a side door's wall stops you there, and reports that wall (so the door is the one you walked into)
+const md = hall.doors.find((d) => d.milestone?.key === "m-tracks")!;
+const inside = { x: md.x - md.nx * 1.0, z: md.z - md.nz * 1.0 }, outside = { x: md.x + md.nx * 0.6, z: md.z + md.nz * 0.6 };
+assert.ok(inRoom(hall, inside.x, inside.z), "a point in front of the door is inside");
+assert.equal(collide(hall, inside.x, inside.z).touched, null, "nothing touched in the middle of the hall");
+const c = collide(hall, outside.x, outside.z);
+assert.equal(c.touched, md.edge, "the wall you walked into is the door's wall");
+assert.ok(inRoom(hall, c.x, c.z), "you are stopped inside the hall");
+
+// 4. the corridor between the Core and the Hall builds from either side; a locked Hull door builds none
+const L = buildLink(reachedCore, hullDoor!, hall, 0);
+assert.ok(L, "the corridor from the Core to the Hull builds");
+assert.ok(buildLink(hall, back, reachedCore, 0), "and from the Hull back to the Core");
+assert.equal(flipLink(L!, reachedCore).next.slug, reachedCore.slug, "flipping the corridor keeps its ends");
+assert.equal(buildLink(lockedCore, lockedDoor, hall, 0), null, "a shut Hull door has no corridor");
+const corridorLen = L!.c.n; assert.ok(corridorLen >= 2, "the corridor has a path");
+
+// 5. the milestone door's hit test: a dark or lit side door is found on its wall; the open way to the Hull is walked through, not a card
+const e = (x: number, z: number, yaw = 0) => ({ x, z, yaw, pitch: 0 });
+assert.equal(milestoneDoorAt(hall, e(inside.x, inside.z), { edge: md.edge })?.id, md.id, "a dark milestone door is found when walked into");
+assert.equal(milestoneDoorAt(hall, e(inside.x, inside.z), { edge: md.edge + 1 === hall.sides ? 0 : md.edge + 1 }), null, "not on another wall");
+assert.equal(milestoneDoorAt(hall, e(inside.x, inside.z), null), null);
+const lit = hall.doors.find((d) => d.milestone?.key === "m-roll")!;
+assert.equal(lit.state, "open"); assert.equal(lit.toSlug, null);
+assert.equal(milestoneDoorAt(hall, e(lit.x - lit.nx * 0.5, lit.z - lit.nz * 0.5), { edge: lit.edge })?.id, lit.id, "a lit milestone door shows its card");
+assert.equal(milestoneDoorAt(reachedCore, e(hullDoor!.x - hullDoor!.nx * 0.5, hullDoor!.z - hullDoor!.nz * 0.5), { edge: hullDoor!.edge }), null, "the open way to the Hull is not a card");
+assert.equal(milestoneDoorAt(lockedCore, e(lockedDoor.x - lockedDoor.nx * 0.5, lockedDoor.z - lockedDoor.nz * 0.5), { edge: lockedDoor.edge })?.id, lockedDoor.id, "the locked Hull door is a milestone door: its card");
+
+// 6. "Use" reads the milestone in its label; the eye has to face the door
+const at = (d: { x: number; z: number; nx: number; nz: number }, back: number) => ({ x: d.x - d.nx * back, z: d.z - d.nz * back, yaw: Math.atan2(d.nz, d.nx), pitch: 0 });
+const f = facing(hall, at(md, 1.7), 2.7);
+assert.ok(f && f.kind === "door" && f.label === "Milestone: First hundred", `the label names the milestone (${f && f.kind === "door" ? f.label : "none"})`);
+const fb = facing(reachedCore, at(hullDoor!, 1.7), 2.7);
+assert.ok(fb && fb.kind === "door" && fb.label === "Go through: The Hull", "an open door to the Hull reads as a way through");
+
+// 7. the size is capped, and an empty list still gives a hall with its way back
+const many = Array.from({ length: 40 }, (_, i) => M(`m-x${i}`, `X${i}`, i % 2 === 0));
+const big = buildHullRoom({ core: reachedCore, door: hullDoor!, milestones: many });
+assert.equal(big.doors.filter((d) => d.milestone).length, HULL_MAX);
+assert.ok(big.sides <= 32, `at most 32 walls (${big.sides})`);
+const empty = buildHullRoom({ core: reachedCore, door: hullDoor!, milestones: [] });
+assert.equal(empty.doors.length, 1); assert.equal(empty.sides, 4);
+
 console.log("hull ok");

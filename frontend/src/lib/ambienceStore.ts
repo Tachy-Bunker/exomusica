@@ -1,8 +1,17 @@
-import { create } from "zustand";
+import { createStore, type StoreApi } from "zustand/vanilla";
+import { useStore } from "zustand";
 import { useVolumeMixerStore } from "./volumeMixerStore";
 
 const FADE_MS = 1500;
 const TARGET_VOLUME = 0.35;
+
+// One ambience per page. A terminal frame (a same-origin iframe inside a room, see TerminalShell) borrows the page's store, so it never starts a loop of its own.
+type AmbienceApi = StoreApi<AmbienceState>;
+const inFrame = typeof window !== "undefined" && window.top !== window.self;
+const hostAmbience: { api: AmbienceApi } | null = (() => {
+  if (!inFrame) return null;
+  try { return (window.parent as Window & { __exoAmbience?: { api: AmbienceApi } }).__exoAmbience ?? null; } catch { return null; }
+})();
 
 function fadeTo(audio: HTMLAudioElement, target: number) {
   const steps = 20;
@@ -53,7 +62,7 @@ function reevaluate() {
   }
 }
 
-export const useAmbienceStore = create<AmbienceState>((set) => ({
+const makeAmbienceApi = (): AmbienceApi => createStore<AmbienceState>((set) => ({
   enabled: typeof localStorage !== "undefined" ? localStorage.getItem("exomusica_ambience_enabled") !== "0" : true,
   url: null,
   hasMainTrack: false,
@@ -81,3 +90,13 @@ export const useAmbienceStore = create<AmbienceState>((set) => ({
     if (audio && !audio.paused) fadeTo(audio, 0);
   },
 }));
+
+const ambienceApi: AmbienceApi = hostAmbience ? hostAmbience.api : makeAmbienceApi();
+if (!inFrame) (window as Window & { __exoAmbience?: { api: AmbienceApi } }).__exoAmbience = { api: ambienceApi };
+
+type AmbienceHook = { (): AmbienceState; <U>(selector: (s: AmbienceState) => U): U } & AmbienceApi;
+/** The same hook and store API as before. In a terminal frame it is the page's ambience. */
+export const useAmbienceStore: AmbienceHook = Object.assign(
+  ((selector: (s: AmbienceState) => unknown = (s) => s) => useStore(ambienceApi, selector)) as unknown as AmbienceHook,
+  ambienceApi,
+);

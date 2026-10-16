@@ -19,6 +19,35 @@ interface Profile {
 
 interface Stats { signals: number; trace: number[]; studies: { slug: string; title: string; status: string }[] }
 
+type RoomFind = { state: "in"; room: { slug: string; name: string } } | { state: "out" } | { state: "hidden" };
+/** Find in room: where this member is right now. Shown on every profile, unless the member has switched their room to Hidden: then nothing is shown to anyone. */
+function FindInRoom({ username }: { username: string }) {
+  const [now, setNow] = useState<RoomFind | null>(null);
+  const [shown, setShown] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const path = `/api/users/${encodeURIComponent(username)}/room`;
+  useEffect(() => {
+    let alive = true;
+    setNow(null); setShown(false);
+    api<RoomFind>(path).then((r) => { if (alive) setNow(r); }).catch(() => { if (alive) setNow({ state: "out" }); });
+    return () => { alive = false; };
+  }, [path]);
+  if (!now || now.state === "hidden") return null;
+  const find = () => {
+    setBusy(true);
+    api<RoomFind>(path).then((r) => setNow(r)).catch(() => setNow({ state: "out" })).finally(() => { setBusy(false); setShown(true); });
+  };
+  return (
+    <div className="pf-find" data-testid="profile-find">
+      {!shown
+        ? <button type="button" className="btn" data-testid="profile-find-btn" onClick={find} disabled={busy}>Find in room</button>
+        : now.state === "in"
+          ? <p className="pf-find-result" data-testid="profile-find-result">Right now in <Link to={`/branch/${now.room.slug}/room`}>{now.room.name}</Link></p>
+          : <p className="pf-find-result home-dim" data-testid="profile-find-result">Not in a room right now.</p>}
+    </div>
+  );
+}
+
 /** 14 days of messages as a thin bar trace. Pure SVG, no state. */
 function Trace({ trace }: { trace: number[] }) {
   const max = Math.max(1, ...trace);
@@ -113,6 +142,7 @@ export function ProfilePage() {
           )}
         </section>
       )}
+      <FindInRoom username={profile.username} />
       {user && user.username !== profile.username && !profile.isGhost && (
         <Link className="btn" to={`/pms/${profile.username}`}>
           Message

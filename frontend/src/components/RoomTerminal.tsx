@@ -106,6 +106,20 @@ export function DroneTerminal({ onClose }: { onClose: () => void }) {
 }
 
 /** The logbook: how much of the rooms you have been in is scanned, room by room, and what each scan said. */
+/** The site from inside a room: the pages a terminal can open (this branch, XenoLab, the Log). Each one opens in a terminal, not on the full site. */
+export function SiteIndex({ sites, onOpen }: { sites: { path: string; title: string }[]; onOpen: (path: string, title: string) => void }) {
+  return (
+    <section className="rt-site" aria-label="Site" data-testid="logbook-site">
+      <p className="rt-dim">Open a page in this terminal. Inside it, links stay in this branch, XenoLab and the Log.</p>
+      <ul className="rt-list">
+        {sites.map((s) => (
+          <li key={s.path}><button type="button" className="rt-track" data-testid={`logbook-site-${s.path.split("/").filter(Boolean).join("-")}`} onClick={() => onOpen(s.path, s.title)}><span className="rt-t">&gt; {s.title}</span></button></li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
 export function LogbookTerminal({ lore }: { lore: ReadonlyMap<string, Lore> | null }) {
   const [open, setOpen] = useState<string | null>(null);
   const rooms = loadRooms(), log = loadLog(), scanned = scannedIds(), comp = completion(rooms, scanned);

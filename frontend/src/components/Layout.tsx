@@ -57,6 +57,8 @@ import { OnlineOrbs } from "./OnlineOrbs";
 import { useGuestOnline } from "../lib/useGuestOnline";
 import { PlayerBar } from "./PlayerBar";
 import { AtlasShell } from "./AtlasShell";
+import { TerminalShell } from "./TerminalShell";
+import { terminalCtx } from "../lib/terminal";
 import { takeArrival } from "../lib/arrive";
 import { TrackPreloader } from "./TrackPreloader";
 import { useSeasonShift } from "../lib/useSeasonShift";
@@ -375,6 +377,10 @@ export function Layout() {
       document.documentElement.style.removeProperty("--font-display");
     }
   }, [siteFont]);
+
+  // Inside a room's terminal the window is a page of the site and nothing else: no header, no menus, no way out but the links the terminal allows.
+  const termCtx = window.top !== window.self ? terminalCtx(window.name) : null;
+  if (termCtx) return <TerminalShell ctx={termCtx} />;
 
   return (
     <div

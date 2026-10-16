@@ -36,5 +36,7 @@ export class GhostStore {
   }
   /** Forget everything about a person (they went invisible or asked). */
   forget(userId: number): void { for (const [room, l] of this.rooms) this.rooms.set(room, l.filter((g) => g.id !== userId)); for (const r of this.recs.values()) if (r.userId === userId) r.s = []; }
+  /** Stop recording a person's walks at once (they switched to Hidden): nothing they walk from now on becomes an echo. */
+  stopFor(userId: number): void { for (const [k, r] of this.recs) if (r.userId === userId) this.recs.delete(k); }
   recording(): number { return this.recs.size; }
 }

@@ -5,7 +5,7 @@ import { fillTokens } from "../src/lib/newsTokens.js";
 assert.equal(MILESTONES.length, 26);
 assert.equal(new Set(MILESTONES.map((m) => m.key)).size, 26, "keys are unique");
 assert.ok(MILESTONES.every((m) => m.target >= 1 && m.title && m.perk));
-assert.deepEqual(MILESTONES.filter((m) => m.live).map((m) => m.key).sort(), ["m-chart", "m-commons", "m-crateradio", "m-echo", "m-founders", "m-index", "m-jam", "m-jingle", "m-longwave", "m-offline", "m-posts", "m-ring", "m-roll", "m-scans", "m-season", "m-sharedlens", "m-spectral", "m-storm", "m-thermal", "m-tracks", "m-visor", "m-xray"]);
+assert.deepEqual(MILESTONES.filter((m) => m.live).map((m) => m.key).sort(), ["m-artifacts", "m-chart", "m-commons", "m-crateradio", "m-echo", "m-founders", "m-hull", "m-index", "m-jam", "m-jingle", "m-longwave", "m-monthly", "m-offline", "m-posts", "m-ring", "m-roll", "m-scans", "m-season", "m-sharedlens", "m-spectral", "m-storm", "m-thermal", "m-tracks", "m-visor", "m-xray"]);
 
 const NOW = new Date("2026-10-14T00:00:00Z");
 const by = (list: ReturnType<typeof resolveMilestones>, k: string) => list.find((m) => m.key === k)!;

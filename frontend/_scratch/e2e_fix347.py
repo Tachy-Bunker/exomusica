@@ -91,7 +91,7 @@ def run(pw):
     tg = pg.get_attribute(S, "data-target")
     check(tg.startswith("Go through: "), f"Facing a door names where it goes ({tg})")
     dest_name = tg.replace("Go through: ", "")
-    pg.keyboard.press("Space"); dest = through(pg, "KeyW"); pg.wait_for_timeout(500)
+    pg.keyboard.press("KeyF"); dest = through(pg, "KeyW"); pg.wait_for_timeout(500)
     check(re.search(r"/branch/b\d/room$", pg.url) is not None, f"The address follows you into the next room ({pg.url})")
     check(next(n for n in NODES if n.get("slug") == dest)["name"] == dest_name, "The door led to the room it named")
     check(pg.get_attribute(S, "data-room") == dest, "The next room is shown")
@@ -151,7 +151,7 @@ def run(pw):
         if pg.get_attribute(S, "data-target").startswith("Go through"): break
     ev("pointerup", cx, cy)
     check(pg.get_attribute(S, "data-target").startswith("Go through"), "Aiming at a door shows the prompt")
-    pg.locator("[data-testid=room-use]").click()
+    pg.locator("[data-testid=room-use]").dispatch_event("click")
     ev("pointerdown", cx, cy); ev("pointermove", cx, cy - bb["height"] * 0.3)
     check(re.match(r"b\d", through(pg, "", hold=False)) is not None, "The Use button and the stick take you through the door")
     ev("pointerup", cx, cy); pg.wait_for_timeout(500)

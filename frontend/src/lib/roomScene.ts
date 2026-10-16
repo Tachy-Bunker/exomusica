@@ -1,7 +1,7 @@
 // Rooms joined by corridors, in one coordinate frame: the room you are in, the corridor behind an open door, and the room at its far end. Pure (no DOM).
 // Only two rooms are ever held: the one you are in and the one behind the door you are heading for. The corridor is a few points, built when the door opens.
 import { collide } from "./roomView";
-import { DOOR_H, type RoomDoor, type RoomWorld } from "./roomWorld";
+import { DOOR_H, wallsOf, type RoomDoor, type RoomWorld } from "./roomWorld";
 
 export const CORR_HW = 1.05, CORR_H = DOOR_H + 0.55, LEAD = 2.4, PASS = 0.3, OPEN_AT = 0.95;
 
@@ -20,7 +20,11 @@ export interface Link {
   offx: number; offz: number;   // where the far room's middle is, in this room's frame
   c: Corridor;
   open: number;           // 0 shut .. 1 open
+  /** The floors, measured from the lower of the two rooms: the corridor's own floor is 0 and each room's floor is this high above it. */
+  curLev: number; farLev: number;
 }
+/** How high the corridor's walls and ceiling go: the normal height, plus the climb of an elevator. */
+export const corrTop = (L: Link): number => CORR_H + Math.abs(L.curLev - L.farLev);
 export type Space = "cur" | "corridor";
 
 const dirOf = (p: Float64Array, i: number, j: number, out: number[]): void => { const dx = p[j * 2] - p[i * 2], dz = p[j * 2 + 1] - p[i * 2 + 1], L = Math.hypot(dx, dz) || 1; out[0] = dx / L; out[1] = dz / L; };
@@ -68,8 +72,7 @@ export function clampToPath(c: Corridor, x: number, z: number, lim: number): { x
 
 /** Is (x,z) inside the room's walls, `inset` in from them? */
 export function inRoom(w: RoomWorld, x: number, z: number, inset = 0): boolean {
-  const step = (Math.PI * 2) / w.sides, lim = w.inr - inset;
-  for (let k = 0; k < w.sides; k++) { const a = w.rot + (k + 0.5) * step; if (x * Math.cos(a) + z * Math.sin(a) > lim) return false; }
+  for (const wl of wallsOf(w)) if (x * wl.nx + z * wl.nz > wl.d - inset) return false;
   return true;
 }
 
@@ -107,7 +110,7 @@ function route(A: RoomWorld, B: RoomWorld, offx: number, offz: number, dA: RoomD
 export function flipLink(L: Link, from: RoomWorld): Link {
   const f: number[] = [], p = L.c.pts;
   for (let i = L.c.n - 1; i >= 0; i--) f.push(p[i * 2] - L.offx, p[i * 2 + 1] - L.offz);
-  return { door: L.back, back: L.door, next: from, offx: -L.offx, offz: -L.offz, c: makeCorridor(f), open: L.open };
+  return { door: L.back, back: L.door, next: from, offx: -L.offx, offz: -L.offz, c: makeCorridor(f), open: L.open, curLev: L.farLev, farLev: L.curLev };
 }
 /** A corridor from `door` of `cur` to the door of `next` that leads back. Always built from the same end (the lower slug), so walking it either way is the same corridor. */
 export function buildLink(cur: RoomWorld, door: RoomDoor, next: RoomWorld, open = 0): Link | null {
@@ -117,7 +120,8 @@ export function buildLink(cur: RoomWorld, door: RoomDoor, next: RoomWorld, open 
   const mx = next.map.x - cur.map.x, mz = next.map.z - cur.map.z, m = Math.hypot(mx, mz);
   const ux = m > 1e-6 ? mx / m : door.nx, uz = m > 1e-6 ? mz / m : door.nz;
   const Dc = Math.max(cur.R + next.R + 9, Math.min(cur.R + next.R + 48, m * 2.6)), offx = ux * Dc, offz = uz * Dc;
-  return { door, back, next, offx, offz, c: makeCorridor(route(cur, next, offx, offz, door, back)), open };
+  const low = Math.min(cur.floorY ?? 0, next.floorY ?? 0);
+  return { door, back, next, offx, offz, c: makeCorridor(route(cur, next, offx, offz, door, back)), open, curLev: (cur.floorY ?? 0) - low, farLev: (next.floorY ?? 0) - low };
 }
 
 // ---- moving through it all

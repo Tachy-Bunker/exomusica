@@ -48,7 +48,7 @@ export const MILESTONES: MilestoneDef[] = [
   { key: "m-storm", title: "Signal storm", metric: "SCANS", target: 5000, live: true, perk: "A 48-hour event where scanning feeds a shared meter; fill it and the Artifact forms from what everyone scanned most." },
   { key: "m-offline", title: "Offline cache", metric: "TRACKS", target: 1000, live: true, perk: "Playlists can be saved for offline listening too, not only albums." },
   { key: "m-artifacts", title: "Twelve Artifacts", metric: "SCANS", target: 10000, live: true, perk: "The twelve Artifacts are revealed, one per twelfth of the way." },
-  { key: "m-hull", title: "Hull", metric: "REACHED", target: 24, live: false, perk: "The seed of the explorable ship: a corridor with one lit door per milestone reached." },
+  { key: "m-hull", title: "Hull", metric: "REACHED", target: 24, live: true, perk: "The seed of the explorable ship: a corridor with one lit door per milestone reached." },
 ];
 
 export interface MilestoneSettingRow { key: string; target: number | null; enabled: boolean; reachedAt: Date | null }

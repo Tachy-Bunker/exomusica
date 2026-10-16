@@ -123,6 +123,7 @@ export function LogPage() {
         <span className="log-tree-buttons">
           <button type="button" className="btn" onClick={() => { setOpen(new Set(folderIds(nodes))); setNewsOpen(true); setStudiesOpen(true); }} disabled={searching} data-testid="log-expand">Open all</button>
           <button type="button" className="btn" onClick={() => { setOpen(new Set()); setNewsOpen(false); setStudiesOpen(false); }} disabled={searching} data-testid="log-collapse">Close all</button>
+          <a className="btn" href="/api/log/export.zip" download data-testid="log-export" title="Every wiki page, news post and study as Markdown files, plus one Exomusica Log.md with all of it">Download the Log (.zip)</a>
         </span>
       </div>
       {rows.length === 0 ? (

@@ -1,4 +1,5 @@
-import { create } from "zustand";
+import { createStore, type StoreApi } from "zustand/vanilla";
+import { useStore } from "zustand";
 import { fireJingle } from "./jingleBus";
 import type { PlayableTrackDTO } from "./types";
 import { useAmbienceStore } from "./ambienceStore";
@@ -53,23 +54,36 @@ interface AudioState {
   ended: () => void;
 }
 
+// One player per page. The page exposes its player on its window; a terminal frame (a same-origin iframe inside a room, see
+// TerminalShell) borrows that store and never binds audio elements of its own, so opening a terminal cannot start a second stream.
+type HostAudio = { api: StoreApi<AudioState>; setMusicVolume: (v: number) => void };
+declare global { interface Window { __exoAudio?: HostAudio } }
+const inFrame = typeof window !== "undefined" && window.top !== window.self;
+const host: HostAudio | null = (() => {
+  if (!inFrame) return null;
+  try { return (window.parent as Window).__exoAudio ?? null; } catch { return null; }
+})();
+
 // The player owns two <audio> elements so one track can start while the last one is still fading out.
 // `audioEl` always points at the audible one.
 const els: (HTMLAudioElement | null)[] = [null, null];
 let active = 0;
 let audioEl: HTMLAudioElement | null = null;
 export function bindAudioElement(el: HTMLAudioElement | null, slot: 0 | 1 = 0): void {
+  if (host) return; // a terminal frame never plays: the page's player does
   els[slot] = el;
   if (el) el.volume = musicVolume;
   audioEl = els[active];
 }
 /** Events from the element that is not audible are ignored. */
 export function isActiveEl(el: HTMLAudioElement): boolean {
+  if (host) return false;
   return els[active] === el;
 }
 
 let musicVolume = 1;
 export function setMusicVolume(v: number): void {
+  if (host) { host.setMusicVolume(v); return; }
   musicVolume = v;
   for (const e of els) if (e) e.volume = v;
 }
@@ -205,7 +219,7 @@ function startTransition(t: Transition): void {
   if (!ramped) { from.pause(); }
 }
 
-export const useAudioStore = create<AudioState>((set, get) => ({
+const makeAudioApi = (): StoreApi<AudioState> => createStore<AudioState>((set, get) => ({
   ab: { A: null, B: null, active: null },
   currentTrack: null,
   queue: [],
@@ -392,3 +406,13 @@ export const useAudioStore = create<AudioState>((set, get) => ({
     get().playNext();
   },
 }));
+
+const audioApi: StoreApi<AudioState> = host ? host.api : makeAudioApi();
+if (!inFrame) window.__exoAudio = { api: audioApi, setMusicVolume };
+
+type AudioHook = { (): AudioState; <U>(selector: (s: AudioState) => U): U } & StoreApi<AudioState>;
+/** The same hook and store API as before: `useAudioStore(selector)`, `useAudioStore.getState()`, `.setState`, `.subscribe`. */
+export const useAudioStore: AudioHook = Object.assign(
+  ((selector: (s: AudioState) => unknown = (s) => s) => useStore(audioApi, selector)) as unknown as AudioHook,
+  audioApi,
+);

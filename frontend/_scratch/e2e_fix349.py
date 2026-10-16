@@ -18,6 +18,7 @@ def run(pw):
         ctx.add_init_script(f"localStorage.setItem('exomusica_token','t');localStorage.setItem('exomusica_user', {json.dumps(json.dumps(ADMIN))});localStorage.setItem('exomusica_classic','0');localStorage.setItem('exomusica_visits', {json.dumps(json.dumps(list(vis)))});")
         def handle(route):
             path = route.request.url.replace(BASE, ""); key = path.split("?")[0]
+            if key in ("/api/auth/me", "/api/auth/session"): return route.fulfill(status=200, content_type="application/json", body=json.dumps({"user": ADMIN}))
             ok = lambda x, st=200: route.fulfill(status=st, content_type="application/json", body=json.dumps(x))
             if key == "/api/chart": return ok(NODES)
             if key == "/api/home": return ok(HOME)
@@ -65,7 +66,7 @@ def run(pw):
     pg.keyboard.press("Escape")
     # play an album through a terminal, then use the drone
     pg.evaluate("[...document.querySelectorAll('[data-prop]')].find(e=>e.dataset.prop==='a:alb-one').click()"); pg.wait_for_timeout(250)
-    pg.keyboard.press("Space"); pg.wait_for_selector("[data-testid=terminal-play]"); pg.click("[data-testid=terminal-play]"); pg.wait_for_timeout(400)
+    pg.keyboard.press("KeyF"); pg.wait_for_selector("[data-testid=terminal-play]"); pg.click("[data-testid=terminal-play]"); pg.wait_for_timeout(400)
     pg.keyboard.press("Escape"); pg.wait_for_timeout(300)
     pg.keyboard.press("KeyC"); pg.wait_for_selector("[data-testid=drone-screen]")
     check(pg.inner_text("[data-testid=drone-title]") == "First Light", "The drone shows what is playing")

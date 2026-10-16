@@ -5,7 +5,13 @@ export interface Other { id: number; name: string; x: number; z: number; yaw: nu
 export interface Shown extends Other { tx: number; tz: number; tyaw: number; /** An echo of someone who was here: how visible it is (0..1). Absent for people who are here now. */ ghost?: number; note?: string }
 const KEY = "exomusica_room_visible";
 export const isVisible = (): boolean => { try { return localStorage.getItem(KEY) !== "0"; } catch { return true; } };
-export const setVisible = (v: boolean): void => { try { localStorage.setItem(KEY, v ? "1" : "0"); } catch { /* storage blocked */ } if (!v && isSignedIn()) void api("/api/rooms/forget-echoes", { method: "POST" }).catch(() => undefined); }
+/** The room's Visible / Hidden switch. It is remembered on this device; a signed-in member's Hidden is also saved to the account, so their profile's Find in room respects it. */
+export const setVisible = (v: boolean): void => {
+  try { localStorage.setItem(KEY, v ? "1" : "0"); } catch { /* storage blocked */ }
+  if (!isSignedIn()) return;
+  void api("/api/account/room-visibility", { method: "PATCH", body: JSON.stringify({ hidden: !v }) }).catch(() => undefined);
+  if (!v) void api("/api/rooms/forget-echoes", { method: "POST" }).catch(() => undefined);
+};
 
 const wrap = (a: number): number => { const t = Math.PI * 2, m = ((a % t) + t) % t; return m > Math.PI ? m - t : m; };
 /** Move what is shown toward where each person is now. Returns true while anything is still moving. */

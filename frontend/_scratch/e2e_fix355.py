@@ -18,6 +18,7 @@ def run(pw):
         ctx.add_init_script(f"localStorage.setItem('exomusica_token','t');localStorage.setItem('exomusica_user', {json.dumps(json.dumps(ADMIN))});localStorage.setItem('exomusica_classic','0');localStorage.setItem('exomusica_visits', {json.dumps(json.dumps(list(vis)))});")
         def handle(route):
             path = route.request.url.replace(BASE, ""); key = path.split("?")[0]
+            if key in ("/api/auth/me", "/api/auth/session"): return route.fulfill(status=200, content_type="application/json", body=json.dumps({"user": ADMIN}))
             ok = lambda x, st=200: route.fulfill(status=st, content_type="application/json", body=json.dumps(x))
             if key == "/api/chart": return ok(NODES)
             if key == "/api/home": return ok(HOME)
@@ -60,7 +61,7 @@ def run(pw):
     check(any("limit=3" in u for u in hits), "…read with one small request")
     pg.evaluate("document.querySelector('[data-prop=terminal]').click()"); pg.wait_for_timeout(250)
     MSGS.append({**MSGS[0], "id": 9, "authorUsername": "dee", "contentRaw": "new one"}); n0 = len(hits)
-    pg.keyboard.press("Space"); pg.wait_for_selector("[data-testid=room-terminal]", timeout=3000); pg.wait_for_timeout(300)
+    pg.keyboard.press("KeyF"); pg.wait_for_selector("[data-testid=room-terminal]", timeout=3000); pg.wait_for_timeout(300)
     pg.keyboard.press("Escape"); pg.wait_for_selector("[data-testid=room-terminal]", state="detached", timeout=3000); pg.wait_for_timeout(600)
     check(len(hits) > n0, "Closing the terminal reads the lines again")
     check(not errs, f"No page errors {errs}")

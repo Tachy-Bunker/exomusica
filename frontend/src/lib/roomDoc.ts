@@ -363,6 +363,19 @@ export function pushOut(doc: RoomDoc, rt: WireRuntime, x: number, z: number, r: 
   }
   return moved;
 }
+/** The moving solid under (x, z) whose top is the floor for feet at `fy` (within a step), or null. Fixed blocks and open floor give null: only moving solids carry you. Returns the stored actor, not the scratch copy. */
+export function carrierAt(doc: RoomDoc, rt: WireRuntime, x: number, z: number, fy: number): Actor | null {
+  let g = 0, best: Actor | null = null;
+  for (const a0 of doc.actors) {
+    if (a0.kind !== "solid" || !a0.ptime || !rt.isOn(a0.id)) continue;
+    const a = atNow(a0, rt); if (!insideBox(a, x, z)) continue;
+    const slope = a.prop ? PROP_SLOPE[a.prop] !== undefined : false;
+    if (a.prop && !PROP_BLOCKS[a.prop] && !slope) continue;
+    const top = slope ? slopeTop(a, x, z) : a.lift + a.h;
+    if (top <= fy + STEP + 1e-6 && top > g) { g = top; best = a0; }
+  }
+  return best;
+}
 /** The floor under (x, z) for someone whose feet are at `fy`: 0, or the top of a solid / slope they can step onto. */
 export function groundAt(doc: RoomDoc, rt: WireRuntime, x: number, z: number, fy: number): number {
   let g = 0;

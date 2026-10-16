@@ -1,6 +1,6 @@
 // The sound of a ping: a short blip, a tick as the ring meets each wall, a bell at its own note for each sealed door, a soft tink for anything unscanned. Only runs when a ping is sent.
 import { ECHO_RANGE, ECHO_SPEED, type EchoField } from "./roomEcho";
-import type { RoomWorld } from "./roomWorld";
+import { wallsOf, type RoomWorld } from "./roomWorld";
 
 let ctx: AudioContext | null = null;
 function audio(): AudioContext | null {
@@ -23,9 +23,9 @@ export function playEcho(world: RoomWorld, field: EchoField, x: number, z: numbe
   const c = audio(); if (!c) return; const t = c.currentTime + 0.01, rx = -Math.sin(yaw), rz = Math.cos(yaw);
   const pan = (px: number, pz: number): number => { const dx = px - x, dz = pz - z, L = Math.hypot(dx, dz) || 1; return (dx * rx + dz * rz) / L; };
   voice(c, t, 1100, 640, 0.09, 0.1, 0, "sine");
-  const step = (Math.PI * 2) / world.sides;
-  for (let k = 0; k < world.sides; k++) { // the wall answers when the ring reaches it
-    const a = world.rot + (k + 0.5) * step, nx = Math.cos(a), nz = Math.sin(a), d = world.inr - (x * nx + z * nz); if (d > ECHO_RANGE) continue;
+  const walls = wallsOf(world);
+  for (let k = 0; k < walls.length; k++) { // the wall answers when the ring reaches it
+    const nx = walls[k].nx, nz = walls[k].nz, d = walls[k].d - (x * nx + z * nz); if (d > ECHO_RANGE) continue;
     voice(c, t + d / ECHO_SPEED, 420 + (k % 4) * 70, 300, 0.16, 0.05 / (1 + d / 6), pan(x + nx * d, z + nz * d), "triangle");
   }
   let heard = 0;

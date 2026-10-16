@@ -18,6 +18,7 @@ def run(pw):
         ctx.add_init_script(f"localStorage.setItem('exomusica_token','t');localStorage.setItem('exomusica_user', {json.dumps(json.dumps(ADMIN))});localStorage.setItem('exomusica_classic','0');localStorage.setItem('exomusica_visits', {json.dumps(json.dumps(list(vis)))});")
         def handle(route):
             path = route.request.url.replace(BASE, ""); key = path.split("?")[0]
+            if key in ("/api/auth/me", "/api/auth/session"): return route.fulfill(status=200, content_type="application/json", body=json.dumps({"user": ADMIN}))
             ok = lambda x, st=200: route.fulfill(status=st, content_type="application/json", body=json.dumps(x))
             if key == "/api/chart": return ok(NODES)
             if key == "/api/home": return ok(HOME)
@@ -57,7 +58,7 @@ def run(pw):
     pg.route_web_socket(re.compile(r".*/ws/room.*"), ws)
     pg.route_web_socket(re.compile(r".*/ws/presence.*"), lambda w: None)
     pg.goto(f"{BASE}/branch/core/room"); pg.wait_for_selector(S); pg.wait_for_timeout(700)
-    check("room=core" in srv.get("url", "") and "token=t" in srv.get("url", ""), "Joins the room's live channel with the member's token")
+    check("room=core" in srv.get("url", "") and "token=" not in srv.get("url", ""), "Joins the room's live channel (the session cookie authenticates it; no token in the address)")
     check(any(m.get("t") == "pose" for m in sent), "…and tells where you stand")
     n0 = len(sent); walk(pg, "KeyW", 1000); pg.wait_for_timeout(300)
     k = len(sent) - n0; check(2 <= k <= 8, f"Walking sends a few positions, not a flood ({k} in ~1.3 s)")
@@ -84,7 +85,7 @@ def run(pw):
     # aim at the pedestal through its yaw: the ring pedestals sit at known spots; find the prop from the page by walking the list of yaw offsets
     pg.evaluate("document.querySelector('[data-prop=\\'a:alb-one\\']').click()"); pg.wait_for_timeout(250)
     check("Open album" in (pg.get_attribute(S, "data-target") or ""), "Walking up to a pedestal names the album")
-    pg.keyboard.press("Space"); pg.wait_for_selector("[data-testid=room-terminal]", timeout=3000)
+    pg.keyboard.press("KeyF"); pg.wait_for_selector("[data-testid=room-terminal]", timeout=3000)
     check(pg.url.endswith("/branch/core/room"), "Using it opens a screen in the room, not a new page")
     pg.wait_for_selector(".rt-track"); check("First Light" in pg.inner_text(".rt-body") and "2:05" in pg.inner_text(".rt-body"), "The album terminal lists the tracks with their lengths")
     check(pg.get_attribute("[data-testid=terminal-open]", "href") == "/album/alb-one", "…and links to the full page")
@@ -97,7 +98,7 @@ def run(pw):
     # chat terminal
     pg.evaluate("document.querySelector('[data-prop=terminal]').click()"); pg.wait_for_timeout(250)
     check(pg.get_attribute(S, "data-target") == "TALK" or "Talk" in (pg.get_attribute(S, "data-target") or ""), "The chat terminal can be aimed at")
-    pg.keyboard.press("Space"); pg.wait_for_selector("[data-testid=terminal-chat]", timeout=3000)
+    pg.keyboard.press("KeyF"); pg.wait_for_selector("[data-testid=terminal-chat]", timeout=3000)
     check(True, "It opens the branch chat on a screen")
     pg.keyboard.press("Escape")
     check(not errs, f"No page errors {errs}")

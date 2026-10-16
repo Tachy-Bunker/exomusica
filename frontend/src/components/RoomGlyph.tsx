@@ -3,7 +3,7 @@
 import type { ReactNode } from "react";
 import { Link } from "react-router-dom";
 
-export type GlyphName = "page" | "map" | "note" | "ping" | "scan" | "lock" | "door" | "hud" | "eye" | "eyeoff" | "book" | "back" | "cross" | "pencil";
+export type GlyphName = "page" | "map" | "note" | "ping" | "scan" | "lock" | "door" | "hud" | "eye" | "eyeoff" | "book" | "back" | "cross" | "pencil" | "up";
 
 const SHAPE: Record<GlyphName, ReactNode> = {
   page: <><path d="M7 3h7l5 5v13H7z" /><path d="M14 3v5h5M10 13h6M10 17h4" /></>,
@@ -20,6 +20,7 @@ const SHAPE: Record<GlyphName, ReactNode> = {
   back: <><path d="M10 6l-6 6 6 6M4 12h12" /></>,
   cross: <><path d="M6 6l12 12M18 6L6 18" /></>,
   pencil: <><path d="M4 20l4-1 11-11-3-3L5 16z" /><path d="M14 6l3 3" /></>,
+  up: <><path d="M12 19V5M5.5 11.5L12 5l6.5 6.5" /></>,
 };
 
 export function Glyph({ name }: { name: GlyphName }) {

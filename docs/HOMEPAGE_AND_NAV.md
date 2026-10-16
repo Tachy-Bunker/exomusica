@@ -1033,7 +1033,7 @@ No schema change, no server code. Doors between branch rooms no longer play the 
 ## fix369 — hazards, wire messages, height, paths, prefabs, Logbook notes, map layout, corridor surfaces, first boss
 - **Hazards**: add `+ hazard`, pick Effect (slows / drifts along Turn° / drains integrity). A thin amber bar shows integrity only when it is below full; at zero you are drawn gently back to the room's start. Nothing flashes.
 - **Wires with a value**: `setcolor` (colour picker), marker `say` (line of text), `play` (sound), `teleport` (to the marker), `shot` (the view turns to the marker for 1–20 s).
-- **Height**: "Raised by (m)" on solids/ghosts makes platforms and low ceilings; props Stairs and Ramp; J jumps (touch: Jump button). Side view in the editor shows the lift.
+- **Height**: "Raised by (m)" on solids/ghosts makes platforms and low ceilings; props Stairs and Ramp; Space jumps (touch: a Jump button beside Use). Side view in the editor shows the lift.
 - **Travels**: per solid/ghost, sideways/forward/up metres and seconds one way; "all the time" or "only when called" (wire message `move`, event `arrived`): lifts, drawbridges, sliding walls.
 - **Prefabs** (Things tab): save the picked thing plus everything wired to it (or the whole room), place it in front of you anywhere.
 - **Logbook**: "Logbook entry for this room" (Things tab, nothing picked). Empty = made from the branch description. Written when a player has walked >6 m into the room.
@@ -1057,3 +1057,28 @@ No schema change, no server code. Doors between branch rooms no longer play the 
 - **Save** now also notices changes to the mood extras, the trim, the hum and the Logbook entry (before, some of those could be changed without Save lighting up).
 - The room's history is kept on the server: the newest ten saves per room.
 
+## fix391 (corridor sky and specks)
+- A corridor can have its own sky and drifting specks, set in its editor's Mood tab. The sky covers its ceilings; the specks drift along the corridor. Rooms are unchanged. Details: `docs/ROOM_EDITOR_STATE.md`, "fix391 additions".
+
+## fix392 (elevator spiral)
+- A corridor between two rooms on different floors is a climb now: a spiral of small platforms on the side walls, one jump per step, with a solid deck over the high end. Walk onto it, steer toward the side of the next platform and press Space (touch: the Jump button beside Use). The jump button shows in that corridor. Details: `docs/ROOM_EDITOR_STATE.md`, "fix392 additions".
+
+## fix393 (jump key and touch Jump)
+- Jump is Space (J is gone). Touch: a Jump button with an arrow sits beside Use, left of it, and shows wherever there is a height to climb.
+- The corridor editor now works at the corridor's real height and shows the elevator climb as grey, dashed, read-only steps. A note in the Things tab explains it. Details: `docs/ROOM_EDITOR_STATE.md`, "fix393 additions".
+- Resolved in fix395: scanning is Enter, and Space always jumps (also while scanning).
+
+## fix394 (riding moving platforms)
+- Standing on a sliding platform carries you with it, and you no longer slide off a platform that moves out from under you. Details: `docs/ROOM_EDITOR_STATE.md`, "fix394 additions".
+
+## fix395 and fix396 (scan key, Log export, room presence, room ticker)
+- Scanning is Enter; Space always jumps. Details: `docs/ROOM_EDITOR_STATE.md`, "fix395 + fix396 additions".
+- The Log page has "Download the Log (.zip)": every wiki page, news post and study as Markdown files, plus one `Exomusica Log.md` with all of it.
+- Homepage: "N people in the rooms right now" under Happening now (a total only: no names, no rooms).
+- Room: the branch chat's newest lines appear one at a time in the top-right corner.
+
+## fix397 (page terminals, Core card, Find in room)
+- The room's logbook lists the site: this branch, XenoLab and the Log. Each opens in a terminal inside the room; "leave ↗" takes you to the whole site. Details: `docs/ROOM_EDITOR_STATE.md`, "fix397 additions".
+- Homepage: an "Enter the game" card with a picture of the Core room, above the branches.
+- Profiles: "Find in room" on every profile, unless the member is Hidden. The room's Visible/Hidden switch is saved to the account while signed in.
+- Schema change: `User.roomHidden`.

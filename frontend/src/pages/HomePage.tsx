@@ -8,7 +8,7 @@ import { FeaturedArticles } from "../components/FeaturedArticles";
 import { EchoCard, StormBanner } from "../components/Resurface";
 import { api } from "../lib/api";
 import { useAuth } from "../lib/auth";
-import { useHome, type HomeActivity } from "../lib/home";
+import { useHome, type HomeActivity, type HomeBranch } from "../lib/home";
 import { useProfileStore } from "../lib/profileStore";
 import { Username } from "../components/Username";
 import { timeAgo } from "../lib/relativeTime";
@@ -59,6 +59,44 @@ function HappeningNow({ activity, members }: { activity: HomeActivity[]; members
         {other.length ? <ul className="hb-list">{other.map((a, i) => <ActivityRow key={`${a.kind}-${a.href}-${i}`} a={a} />)}</ul> : <p className="home-dim">No other news yet.</p>}
       </section>
     </div>
+  );
+}
+
+/** Presence as weather: how many people are in the rooms right now. A total only, no names and no rooms. No line at zero or when it can't be read; it asks once a minute, and not while the tab is hidden. */
+function RoomsWeather() {
+  const [n, setN] = useState<number | null>(null);
+  useEffect(() => {
+    let alive = true;
+    const pull = () => {
+      if (document.hidden) return;
+      api<{ total: number }>("/api/rooms/online").then((r) => { if (alive) setN(r && typeof r.total === "number" ? r.total : null); }).catch(() => { if (alive) setN(null); });
+    };
+    pull();
+    const timer = window.setInterval(pull, 60_000);
+    const onVis = () => { if (!document.hidden) pull(); };
+    document.addEventListener("visibilitychange", onVis);
+    return () => { alive = false; window.clearInterval(timer); document.removeEventListener("visibilitychange", onVis); };
+  }, []);
+  if (!n) return null;
+  return <p className="home-rooms-live" data-testid="rooms-live">{n === 1 ? "1 person" : `${n.toLocaleString()} people`} in the rooms right now</p>;
+}
+
+/** The Core room as a picture: the way into the game from the front page. The picture is a static file (public/img/core-room.jpg). The card is left out when the Core is not on the map. */
+function CoreRoomCard({ branches }: { branches: HomeBranch[] }) {
+  const core = branches.find((b) => b.slug === "core") ?? branches.find((b) => b.parentSlug === null && !b.anchor);
+  if (!core) return null;
+  return (
+    <section className="home-section home-core" aria-labelledby="home-core-h" data-testid="home-core">
+      <h2 id="home-core-h" className="sr-only">Enter the game</h2>
+      <Link className="home-core-card" to={`/branch/${core.slug}/room`} data-testid="home-core-enter">
+        <img className="home-core-img" src="/img/core-room.jpg" width={960} height={540} loading="lazy" decoding="async" alt="" />
+        <span className="home-core-text">
+          <span className="home-card-tag">Enter the game</span>
+          <span className="home-card-title">Walk into the {core.name} room</span>
+          <span className="home-dim">Look around, scan what is there, and step through the doors.</span>
+        </span>
+      </Link>
+    </section>
   );
 }
 
@@ -124,6 +162,8 @@ export function HomePage() {
         </header>
       )}
 
+      {home && <CoreRoomCard branches={home.branches} />}
+
       <div data-tour="branches">{home ? (
         <HomeExplore branches={home.branches} openFull={params.get("map") === "full"} initialSlug={params.get("branch")} />
       ) : (
@@ -136,6 +176,7 @@ export function HomePage() {
 
       <section className="home-section" aria-labelledby="home-now-h" data-tour="now">
         <h2 id="home-now-h" className="sr-only">Happening now</h2>
+        <RoomsWeather />
         {home ? <HappeningNow activity={home.activity} members={home.stats.members} /> : <div className="home-placeholder" aria-busy={!failed}>{failed ? "Couldn't load the latest activity." : "Loading…"}</div>}
       </section>
 

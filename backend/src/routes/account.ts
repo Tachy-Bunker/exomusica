@@ -5,6 +5,7 @@ import { requireAuth, requireAdmin, hashPassword, verifyPassword, refreshAccount
 import { ghostifyUser } from "../services/accountService.js";
 import { createNotification } from "../lib/notify.js";
 import { saveSiteImage } from "../lib/storage.js";
+import { setRoomHidden } from "./roomPresence.js";
 
 export async function accountRoutes(app: FastifyInstance): Promise<void> {
   // Self view - includes email and notification prefs, unlike the public
@@ -59,6 +60,7 @@ export async function accountRoutes(app: FastifyInstance): Promise<void> {
       volumeMusic: me.volumeMusic,
       caEnabled: me.caEnabled,
       exclusiveMediaPlayback: me.exclusiveMediaPlayback,
+      roomHidden: me.roomHidden,
       moireEnabled: me.moireEnabled,
       notifyWeeklySummary: me.notifyWeeklySummary,
       notifyDailySummary: me.notifyDailySummary,
@@ -116,6 +118,15 @@ export async function accountRoutes(app: FastifyInstance): Promise<void> {
       return prisma.user.update({ where: { id: req.user!.id }, data });
     },
   );
+
+  /** The room's Hidden switch, saved to the account too: a hidden member is not found on their profile and nobody in a room sees them. */
+  app.patch<{ Body: { hidden?: unknown } }>("/api/account/room-visibility", { preHandler: requireAuth }, async (req, reply) => {
+    const hidden = (req.body as { hidden?: unknown } | undefined)?.hidden;
+    if (typeof hidden !== "boolean") return reply.code(400).send({ error: "hidden must be true or false" });
+    await prisma.user.update({ where: { id: req.user!.id }, data: { roomHidden: hidden }, select: { id: true } });
+    setRoomHidden(req.user!.id, hidden);
+    return { roomHidden: hidden };
+  });
 
   app.patch<{ Body: Partial<{ caEnabled: boolean; moireEnabled: boolean; exclusiveMediaPlayback: boolean }> }>(
     "/api/account/visual-effects",

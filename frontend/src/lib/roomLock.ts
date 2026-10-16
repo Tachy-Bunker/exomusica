@@ -13,7 +13,7 @@ export const artifactLocks: { list: Lock[] } = { list: [] };
 export function lockables(world: RoomWorld, others: Iterable<Shown>): Lock[] {
   const out: Lock[] = [];
   for (const d of world.doors) out.push({ kind: "door", id: d.id, x: d.x, y: 1.25, z: d.z, label: d.state === "open" ? `Door: ${d.name}` : "Sealed door" });
-  for (const p of world.props) out.push({ kind: "prop", id: p.id, x: p.x, y: 1.3, z: p.z, label: p.kind === "terminal" ? "Terminal: talk" : p.label });
+  for (const p of world.props) out.push({ kind: "prop", id: p.id, x: p.x, y: 1.3, z: p.z, label: p.kind === "terminal" ? "Terminal: talk" : p.kind === "computer" ? "Terminal: site" : p.label });
   if (world.plaque) out.push({ kind: "plaque", id: "plaque", x: world.plaque.x, y: 1.6, z: world.plaque.z, label: "Inscription" });
   for (const l of artifactLocks.list) out.push(l);
   for (const o of others) out.push({ kind: "person", id: String(o.id), x: o.x, y: 1.2, z: o.z, label: o.name });

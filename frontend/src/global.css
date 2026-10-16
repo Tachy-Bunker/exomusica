@@ -5136,6 +5136,7 @@ th {
 .hb-title a { color: inherit; text-decoration: none; }
 .hb-title a:hover { text-decoration: underline; }
 .hb-count { font-weight: 400; font-size: 0.85rem; }
+.home-rooms-live { margin: 0 0 0.75rem; font-size: 0.9rem; opacity: 0.85; }
 .hb-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
 .hb-item { position: relative; display: flex; flex-direction: column; gap: 0.1rem; padding: 0.45rem 0; border-bottom: 1px solid var(--border); min-width: 0; overflow-wrap: anywhere; }
 .hb-item:last-child { border-bottom: none; }
@@ -6578,11 +6579,14 @@ body:has(.term-backdrop, .fp-panel, .pocket-pad, .probe-hud, .visor-hud) { touch
 .rm-knob{position:absolute;left:50%;top:50%;width:42%;height:42%;margin:-21% 0 0 -21%;border-radius:50%;background:var(--rm);opacity:.8;box-shadow:0 0 12px var(--rm)}
 .rm-use{position:absolute;right:max(1rem,env(safe-area-inset-right));bottom:max(1.4rem,env(safe-area-inset-bottom));width:clamp(76px,20vmin,104px);height:clamp(76px,20vmin,104px);border-radius:50%;border:2px solid var(--rm);background:rgba(4,8,12,.6);color:#fff;box-shadow:0 0 14px var(--rm);touch-action:none;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;font-size:.66rem;letter-spacing:.12em;text-transform:uppercase}
 .rm-use .rg{width:clamp(24px,5.5vmin,34px);height:clamp(24px,5.5vmin,34px)}
-.rm-jump{position:absolute;right:max(1.6rem,env(safe-area-inset-right));bottom:calc(max(1.4rem,env(safe-area-inset-bottom)) + clamp(76px,20vmin,104px) + .6rem);width:clamp(54px,14vmin,72px);height:clamp(54px,14vmin,72px);border-radius:50%;border:2px solid var(--rm);background:rgba(4,8,12,.6);color:#fff;font-size:.8rem;touch-action:manipulation}.rm-jump:active{background:var(--rm);color:#000}
+/* the Jump button sits beside Use, on its left: the same bottom line, a little smaller, an arrow for its picture */
+.rm-jump{position:absolute;right:calc(max(1rem,env(safe-area-inset-right)) + clamp(76px,20vmin,104px) + .7rem);bottom:calc(max(1.4rem,env(safe-area-inset-bottom)) + (clamp(76px,20vmin,104px) - clamp(52px,13vmin,66px)) / 2);width:clamp(52px,13vmin,66px);height:clamp(52px,13vmin,66px);border-radius:50%;border:2px solid var(--rm);background:rgba(4,8,12,.6);color:#fff;box-shadow:0 0 10px var(--rm);touch-action:none;display:flex;align-items:center;justify-content:center}.rm-jump .rg{width:clamp(20px,4.6vmin,28px);height:clamp(20px,4.6vmin,28px)}.rm-jump:active{background:var(--rm);color:#000}
 .rm-use:active{background:var(--rm);color:#000}
 .rm-hint{position:absolute;left:50%;bottom:.5rem;transform:translateX(-50%);margin:0;font-size:.75rem;opacity:.6;pointer-events:none;white-space:nowrap;animation:rmHintOut 1.2s ease 7.8s forwards}
 @keyframes rmHintOut{to{opacity:0}}
 @media (pointer:coarse){.rm-hint{display:none}}
+/* the branch chat, heard from the room: one line in the top-right corner, quiet, never in the way */
+.rm-ticker{position:absolute;top:.6rem;right:max(.7rem,env(safe-area-inset-right));max-width:min(18rem,46%);margin:0;font-size:.72rem;line-height:1.35;opacity:.5;pointer-events:none;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:right}
 @media (hover:hover) and (pointer:fine){.rm-pad,.rm-use,.rm-jump{display:none}}
 
 /* fix348: terminal screens and people in the room */
@@ -6728,3 +6732,27 @@ label.re-b{display:inline-block;cursor:pointer}
   .artifact-plate.is-revealed { animation: none; }
   .monthly-bar > span { transition: none; }
 }
+
+/* fix397: the Core room card on the homepage (a static picture; the card is left out when the Core is not on the map) */
+.home-core-card { display: flex; flex-direction: column; border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; background: var(--bg-elevated); color: inherit; text-decoration: none; }
+.home-core-card:hover .home-card-title, .home-core-card:focus-visible .home-card-title { text-decoration: underline; }
+.home-core-img { display: block; width: 100%; height: auto; aspect-ratio: 16 / 9; object-fit: cover; background: #05090d; }
+.home-core-text { display: flex; flex-direction: column; gap: 0.2rem; padding: 0.7rem 0.95rem 0.9rem; }
+
+/* fix397: Find in room on a profile */
+.pf-find { display: flex; flex-direction: column; align-items: flex-start; gap: 0.35rem; margin: 0.4rem 0; }
+.pf-find-result { margin: 0; }
+
+/* fix397: a website page inside a room's terminal (the frame fills the glass; its shell has no site chrome) */
+.pt-glass { width: min(1100px, 94vw); }
+.pt-body { padding: 0; min-height: 0; display: flex; flex-direction: column; }
+.pt-frame { display: block; width: 100%; flex: 1 1 auto; min-height: 0; height: 100%; border: 0; background: #05090d; }
+.pt-actions { display: flex; align-items: center; gap: 0.4rem; }
+.pt-main { box-sizing: border-box; min-height: 100vh; padding: 0.75rem 0.75rem 3.5rem; }
+.rt-site { margin: 0 0 0.8rem; padding-bottom: 0.6rem; border-bottom: 1px dashed rgba(255, 255, 255, 0.12); }
+/* fix398: the page's player inside a terminal. It shows and steers the page's player; it plays nothing itself. */
+.pt-transport { position: fixed; left: 0; right: 0; bottom: 0; display: flex; align-items: center; gap: 0.6rem; padding: 0.5rem 0.75rem; background: #05090d; border-top: 1px solid rgba(255, 255, 255, 0.12); z-index: 5; }
+.pt-transport .pt-title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 0.9rem; }
+.pt-transport button { background: transparent; color: inherit; border: 1px solid rgba(255, 255, 255, 0.25); padding: 0.2rem 0.6rem; cursor: pointer; font: inherit; }
+/* fix400: a link inside a logbook inscription; it opens that page in the room's terminal */
+.scan-link { font: inherit; color: inherit; background: transparent; border: 1px solid currentColor; padding: 0 0.35rem; margin: 0 0.15rem; cursor: pointer; text-decoration: underline; }

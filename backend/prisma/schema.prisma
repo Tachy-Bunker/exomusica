@@ -78,6 +78,7 @@ model User {
   caEnabled             Boolean      @default(false)
   moireEnabled          Boolean      @default(false)
   exclusiveMediaPlayback Boolean     @default(true) // when on, starting any audio/video (main player or chat-embedded) pauses every other one playing
+  roomHidden            Boolean       @default(false) // the room's Hidden switch: not found on the profile, not shown to anyone in a room, not counted
   notifyWeeklySummary   Boolean      @default(true)
   notifyDailySummary    Boolean      @default(false)
   notifyFollowedReplies Boolean      @default(true)

@@ -11,21 +11,52 @@ import { hashStr } from "../lib/probeCore";
 import { recordVisit, visitedSlugs } from "../lib/visits";
 import { loadChartBranches } from "../lib/chartLoad";
 import { loadHome, type HomeData } from "../lib/home";
-import { loadMilestones } from "../lib/milestones";
+import { loadMilestones, type Milestone } from "../lib/milestones";
 import { layoutHull, type Hull, type HullNode } from "../lib/hullLayout";
 import { loadMapOverrides } from "../lib/mapOverrides";
-import { buildRoom, type RoomWorld } from "../lib/roomWorld";
+import { buildHullRoom, buildRoom, HULL_HOST, HULL_SLUG, type RoomWorld } from "../lib/roomWorld";
+import { MilestoneView } from "../components/MilestoneCard";
 import { themeOf } from "../lib/headerTheme";
 import { neon } from "../lib/legibleColor";
 import type { Branch, BranchAlbum } from "../lib/types";
 import { BranchRoom } from "../components/BranchRoom";
-import { AlbumTerminal, ChatTerminal, DroneTerminal, ListTerminal, LogbookTerminal, RoomTerminal } from "../components/RoomTerminal";
+import { AlbumTerminal, ChatTerminal, DroneTerminal, ListTerminal, LogbookTerminal, RoomTerminal, SiteIndex } from "../components/RoomTerminal";
+import { PageTerminal } from "../components/PageTerminal";
+import { terminalSites } from "../lib/terminal";
 import type { Lore } from "../lib/roomLore";
 import type { RoomProp } from "../lib/roomWorld";
 import { previewLines } from "../lib/roomPreview";
 import { Loading } from "../components/Loading";
 
 const noop = (): void => undefined;
+
+/** The branch chat heard from the room: its newest lines, one at a time, in a corner. Read-only and quiet: it asks every 30 s, and only while the tab is showing. */
+function RoomTicker({ channel }: { channel: string }) {
+  const [lines, setLines] = useState<string[]>([]);
+  const [at, setAt] = useState(0);
+  useEffect(() => {
+    let alive = true;
+    const pull = () => {
+      if (document.hidden) return;
+      api<unknown>(`/api/channels/${channel}/messages?limit=3`).then((m) => {
+        const next = previewLines(m);
+        if (alive) setLines((prev) => (prev.join("\n") === next.join("\n") ? prev : next));
+      }).catch(() => undefined);
+    };
+    pull();
+    const timer = window.setInterval(pull, 30_000);
+    const onVis = () => { if (!document.hidden) pull(); };
+    document.addEventListener("visibilitychange", onVis);
+    return () => { alive = false; window.clearInterval(timer); document.removeEventListener("visibilitychange", onVis); };
+  }, [channel]);
+  useEffect(() => {
+    if (lines.length < 2) return;
+    const t = window.setInterval(() => setAt((x) => (x + 1) % lines.length), 6_000);
+    return () => window.clearInterval(t);
+  }, [lines.length]);
+  if (!lines.length) return null;
+  return <div className="rm-ticker" aria-hidden="true" data-testid="room-ticker">{lines[at % lines.length]}</div>;
+}
 
 /** /branch/:slug/room — the branch as a room you walk round. Doors open onto corridors that lead the way the rooms lie on the Scan map, and the room at the end is already waiting. */
 export function BranchRoomPage() {
@@ -50,14 +81,21 @@ function RoomInner({ slug }: { slug: string }) {
   const [pick, setPick] = useState<string | null>(null);
   const [tick, setTick] = useState(0);
   const [droneOpen, setDroneOpen] = useState(false), [logOpen, setLogOpen] = useState(false);
+  const [site, setSite] = useState<{ path: string; title: string } | null>(null);
+  const [card, setCard] = useState<Milestone | null>(null); // the card of a milestone door
   const [lore, setLore] = useState<Map<string, Lore> | null>(null), [visor, setVisor] = useState({ on: false, hint: "The echo visor is not unlocked yet." });
-  const openTerm = useCallback((p: RoomProp) => { setPick(null); setDroneOpen(false); setLogOpen(false); setTerm(p); }, []);
-  const openDrone = useCallback(() => { setTerm(null); setPick(null); setLogOpen(false); setDroneOpen(true); }, []);
-  const openLog = useCallback(() => { setTerm(null); setPick(null); setDroneOpen(false); setLogOpen(true); }, []);
+  const openTerm = useCallback((p: RoomProp) => { setPick(null); setDroneOpen(false); setLogOpen(false); setSite(null); setCard(null); setTerm(p); }, []);
+  const openDrone = useCallback(() => { setTerm(null); setPick(null); setLogOpen(false); setSite(null); setCard(null); setDroneOpen(true); }, []);
+  const openLog = useCallback(() => { setTerm(null); setPick(null); setDroneOpen(false); setSite(null); setCard(null); setLogOpen(true); }, []);
+  /** A page of the site, opened in a terminal in this room (from the logbook's site list). */
+  const openSite = useCallback((path: string, title: string) => { setTerm(null); setPick(null); setDroneOpen(false); setLogOpen(false); setCard(null); setSite({ path, title }); }, []);
+  /** A milestone door: its card. */
+  const openMs = useCallback((m: Milestone) => { setTerm(null); setPick(null); setDroneOpen(false); setLogOpen(false); setSite(null); setCard(m); }, []);
   useDocumentTitle(cur ? `${cur.branch.name} (room)` : "Room");
 
   const visited = useRef<Set<string>>(null as unknown as Set<string>);
   if (!visited.current) { const v = visitedSlugs(); for (const k of keysOf(scannedIds())) if (k.startsWith("branch:")) v.add(k.slice(7)); v.add(slug); visited.current = v; }
+  const curRef = useRef<RoomData | null>(null); curRef.current = cur || null; // the room you are in, for the Hull (entered from it)
   const graphRef = useRef<Graph | null>(null), nextRef = useRef<RoomData | null>(null), wantRef = useRef<string | null>(null), curSlug = useRef(slug), alive = useRef(true);
   useEffect(() => { alive.current = true; return () => { alive.current = false; }; }, []);
 
@@ -69,7 +107,8 @@ function RoomInner({ slug }: { slug: string }) {
     const vis = new Set(visited.current); vis.add(s);
     const states = g.chart.length ? roomStates(g.chart, vis, new Set([...vis].map(hashStr))) : null;
     const color = theme ? neon(theme.color) : "#5fd3ee";
-    const world = buildRoom({ hull: g.hull, slug: s, name: branch.name, states, albums: (albums ?? []).map((a) => ({ slug: a.slug, title: a.title })), channelSlug: branch.channel?.slug ?? null, from: via });
+    const mile = s === HULL_HOST ? await loadMilestones().catch(() => [] as Milestone[]) : null; // the Core is where the Hull's door is, and that door depends on the milestones
+    const world = buildRoom({ hull: g.hull, slug: s, name: branch.name, states, albums: (albums ?? []).map((a) => ({ slug: a.slug, title: a.title })), channelSlug: branch.channel?.slug ?? null, from: via, milestones: mile });
     world.color = color; world.blurb = branch.description ?? undefined; world.lineage = lineageOf(g.chart, s);
     if (branch.channel?.slug) { const m = await getJson<unknown>(`/api/channels/${branch.channel.slug}/messages?limit=3`).catch(() => null); const l = previewLines(m); if (l.length) world.chat = l; }
     return { slug: s, branch, albums: albums ?? [], color, world };
@@ -95,29 +134,39 @@ function RoomInner({ slug }: { slug: string }) {
     });
   }, [slug, from, loadRoom]);
 
+  /** The Hull, built from the Core room it is entered from: a ring hall whose doors are the milestones. Its branch is the Core's (its site and chat), under its own name. */
+  const buildHull = useCallback(async (core: RoomData): Promise<RoomData | false> => {
+    const door = core.world.doors.find((d) => d.toSlug === HULL_SLUG); if (!door) return false;
+    const list = await loadMilestones().catch(() => [] as Milestone[]);
+    const world = buildHullRoom({ core: core.world, door, milestones: list });
+    world.color = core.color; world.lineage = core.world.lineage; world.blurb = core.world.blurb;
+    return { slug: HULL_SLUG, branch: { ...core.branch, name: "The Hull" }, albums: [], color: core.color, world };
+  }, []);
+
   /** The room behind the door you are near (null: none). Only one is kept; asking for another drops it. */
   const wantNext = useCallback((s: string | null) => {
     if (s === null) { wantRef.current = null; nextRef.current = null; setNext(null); return; }
     if (wantRef.current === s) return;
     wantRef.current = s; if (nextRef.current && nextRef.current.slug !== s) { nextRef.current = null; setNext(null); }
-    void loadRoom(s, curSlug.current).then((d) => { if (alive.current && d && wantRef.current === s) { nextRef.current = d; setNext(d); } });
-  }, [loadRoom]);
+    const job = s === HULL_SLUG ? (curRef.current ? buildHull(curRef.current) : Promise.resolve<RoomData | false>(false)) : loadRoom(s, curSlug.current);
+    void job.then((d) => { if (alive.current && d && wantRef.current === s) { nextRef.current = d; setNext(d); } });
+  }, [loadRoom, buildHull]);
 
   /** You walked through into the room that was waiting: it becomes the room you are in, the address follows, and the one behind you is let go. */
   const advance = useCallback((s: string) => {
-    const n = nextRef.current; curSlug.current = s; visited.current.add(s); recordVisit(s);
-    try { window.history.replaceState(window.history.state, "", `/branch/${s}/room`); } catch { /* sandboxed frame */ }
-    setTerm(null); setPick(null); setDroneOpen(false); setLogOpen(false);
+    const n = nextRef.current; curSlug.current = s;
+    if (s !== HULL_SLUG) { visited.current.add(s); recordVisit(s); try { window.history.replaceState(window.history.state, "", `/branch/${s}/room`); } catch { /* sandboxed frame */ } } // the Hull keeps the address of the room it opens from
+    setTerm(null); setPick(null); setDroneOpen(false); setLogOpen(false); setCard(null);
     nextRef.current = null; wantRef.current = null; setNext(null);
     if (n && n.slug === s) setCur(n); else void loadRoom(s, null).then((d) => { if (alive.current && d) setCur(d); });
   }, [loadRoom]);
 
   const here = cur || null, name = here ? here.branch.name : "";
-  const back = `/branch/${here ? here.slug : slug}`;
+  const back = `/branch/${here ? here.branch.slug : slug}`;
   useEffect(() => {
-    const on = (e: KeyboardEvent) => { if (e.code === "Escape" && !document.fullscreenElement) { e.stopPropagation(); if (term || droneOpen || logOpen) { setTerm(null); setPick(null); setDroneOpen(false); setLogOpen(false); } else navigate("/explore"); } };
+    const on = (e: KeyboardEvent) => { if (e.code === "Escape" && !document.fullscreenElement) { e.stopPropagation(); if (term || droneOpen || logOpen || site || card) { setTerm(null); setPick(null); setDroneOpen(false); setLogOpen(false); setSite(null); setCard(null); } else navigate("/explore"); } };
     window.addEventListener("keydown", on); return () => window.removeEventListener("keydown", on);
-  }, [navigate, back, term, droneOpen, logOpen]);
+  }, [navigate, back, term, droneOpen, logOpen, site, card]);
 
   const go = useCallback((to: string, door: boolean) => {
     const el = link.current; if (!el) return;
@@ -131,12 +180,15 @@ function RoomInner({ slug }: { slug: string }) {
     <div className="hx-page rm-page" data-testid="room-page">
       {cur === false || graph === false ? <p className="home-dim" style={{ padding: "2rem" }}>There is no room by that name. <Link to="/explore">Scan map</Link></p>
         : !here ? <Loading />
-        : <BranchRoom tick={tick} world={here.world} color={color} next={next ? next.world : null} wantNext={wantNext} onAdvance={advance} go={go} mapHref="/explore" backHref={back} onLocked={noop} onProp={openTerm} onDrone={openDrone} visor={visor} lore={lore} onLogbook={openLog} paused={!!term || droneOpen || logOpen} />}
+        : <BranchRoom tick={tick} world={here.world} color={color} next={next ? next.world : null} wantNext={wantNext} onAdvance={advance} go={go} mapHref="/explore" backHref={back} onLocked={noop} onProp={openTerm} onDrone={openDrone} visor={visor} lore={lore} onLogbook={openLog} onSite={openSite} onMilestone={openMs} paused={!!term || droneOpen || logOpen || !!site || !!card}ticker={branch?.channel?.slug ? <RoomTicker channel={branch.channel.slug} /> : null} />}
       {droneOpen && branch && <RoomTerminal title="drone // player" color={color} onClose={() => setDroneOpen(false)}><DroneTerminal onClose={() => setDroneOpen(false)} /></RoomTerminal>}
-      {logOpen && branch && <RoomTerminal title="logbook" color={color} onClose={() => setLogOpen(false)}><LogbookTerminal lore={lore} /></RoomTerminal>}
+      {logOpen && branch && <RoomTerminal title="logbook" color={color} onClose={() => setLogOpen(false)}><SiteIndex sites={terminalSites(branch.slug, branch.name)} onOpen={openSite} /><LogbookTerminal lore={lore} /></RoomTerminal>}
+      {site && branch && here && <PageTerminal path={site.path} title={site.title} color={color} ctx={{ room: branch.slug, albums: here.albums.map((a) => a.slug) }} onClose={() => setSite(null)} />}
+      {card && branch && <RoomTerminal title={`${name} // milestone`} color={color} onClose={() => setCard(null)}><MilestoneView m={card} /></RoomTerminal>}
       {term && branch && here && (() => {
         const close = () => { setTerm(null); setPick(null); if (term.kind === "terminal" && branch.channel?.slug) void api<unknown>(`/api/channels/${branch.channel.slug}/messages?limit=3`).then((m) => { const l = previewLines(m); if (l.length) { here.world.chat = l; setTick((t) => t + 1); } }).catch(() => undefined); };
         if (term.kind === "terminal") return <RoomTerminal title={`${name} // talk`} color={color} onClose={close}><ChatTerminal slug={branch.channel?.slug ?? ""} name={name} /></RoomTerminal>;
+        if (term.kind === "computer") return <RoomTerminal title={`${name} // site`} color={color} onClose={close}><SiteIndex sites={terminalSites(branch.slug, branch.name)} onOpen={openSite} /></RoomTerminal>;
         const slugOf = pick ?? (term.kind === "album" ? term.id.slice(2) : null);
         if (slugOf) return <RoomTerminal title={`${name} // disc`} color={color} onClose={close}><AlbumTerminal slug={slugOf} /></RoomTerminal>;
         return <RoomTerminal title={`${name} // all albums`} color={color} onClose={close}><ListTerminal albums={here.albums.map((a) => ({ slug: a.slug, title: a.title }))} onPick={setPick} /></RoomTerminal>;

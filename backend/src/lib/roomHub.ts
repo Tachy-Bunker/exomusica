@@ -1,7 +1,8 @@
 // Who is standing where in the branch rooms. In memory only (nothing is stored): a room is a slug, a person is one socket.
 export interface Pose { x: number; z: number; yaw: number }
 export interface RoomPerson { id: number; name: string; x: number; z: number; yaw: number }
-interface Member { key: number; userId: number; name: string; room: string; pose: Pose; at: number; posed: boolean }
+// hidden: the person switched the room to Hidden. A hidden member is never shown to anyone else, never counted, never found on a profile.
+interface Member { key: number; userId: number; name: string; room: string; pose: Pose; at: number; posed: boolean; hidden: boolean }
 
 export const MAX_PER_ROOM = 40, STALE_MS = 15_000, LIMIT = 40, MIN_GAP_MS = 80;
 const finite = (n: unknown): n is number => typeof n === "number" && Number.isFinite(n);
@@ -12,11 +13,11 @@ export class RoomHub {
   private next = 1;
 
   /** Join a room: returns a key for later calls, or null when the room is full. */
-  join(userId: number, name: string, room: string, now = Date.now()): number | null {
+  join(userId: number, name: string, room: string, now = Date.now(), hidden = false): number | null {
     if (!/^[a-z0-9][a-z0-9-]{0,80}$/i.test(room)) return null;
     if (this.count(room) >= MAX_PER_ROOM) return null;
     const key = this.next++;
-    this.members.set(key, { key, userId, name, room, pose: { x: 0, z: 0, yaw: 0 }, at: now, posed: false });
+    this.members.set(key, { key, userId, name, room, pose: { x: 0, z: 0, yaw: 0 }, at: now, posed: false, hidden });
     this.dirty.add(room);
     return key;
   }
@@ -30,6 +31,7 @@ export class RoomHub {
   }
   /** The vetted (clamped) position last accepted for this socket. */
   poseOf(key: number): Pose | null { return this.members.get(key)?.pose ?? null; }
+  isHidden(key: number): boolean { return !!this.members.get(key)?.hidden; }
   count(room: string): number { let n = 0; for (const m of this.members.values()) if (m.room === room) n++; return n; }
   /** Drop people who stopped talking (closed laptop, lost signal). */
   sweep(now = Date.now()): number[] {
@@ -37,11 +39,11 @@ export class RoomHub {
     for (const m of this.members.values()) if (now - m.at > STALE_MS) { gone.push(m.key); this.members.delete(m.key); this.dirty.add(m.room); }
     return gone;
   }
-  /** Everyone in the room except the person asking, one entry per member (two tabs show once). Nobody who has not yet sent a position. */
+  /** Everyone in the room except the person asking, one entry per member (two tabs show once). Nobody who has not yet sent a position, and nobody hidden. */
   others(room: string, forKey: number): RoomPerson[] {
     const me = this.members.get(forKey), seen = new Map<number, RoomPerson>();
     for (const m of this.members.values()) {
-      if (m.room !== room || m.key === forKey || !m.posed || (me && m.userId === me.userId)) continue;
+      if (m.room !== room || m.key === forKey || !m.posed || m.hidden || (me && m.userId === me.userId)) continue;
       seen.set(m.userId, { id: m.userId, name: m.name, ...m.pose });
     }
     return [...seen.values()];
@@ -50,4 +52,22 @@ export class RoomHub {
   takeDirty(): string[] { const d = [...this.dirty]; this.dirty.clear(); return d; }
   keysIn(room: string): number[] { return [...this.members.values()].filter((m) => m.room === room).map((m) => m.key); }
   size(): number { return this.members.size; }
+  /** Totals for the homepage: people who are sending a position (so not opted-out ones), each counted once however many tabs, and how many rooms have someone in them. No names and no per-room counts: one person alone in a room would show where they are. */
+  census(now = Date.now()): { total: number; rooms: number } {
+    const all = new Set<number>(), occupied = new Set<string>();
+    for (const m of this.members.values()) {
+      if (!m.posed || m.hidden || now - m.at > STALE_MS) continue;
+      all.add(m.userId); occupied.add(m.room);
+    }
+    return { total: all.size, rooms: occupied.size };
+  }
+  /** The room a person is in right now, for Find in room. Null when they are not in one, or when they are hidden. */
+  roomOf(userId: number): string | null {
+    for (const m of this.members.values()) if (m.userId === userId && !m.hidden) return m.room;
+    return null;
+  }
+  /** The Hidden switch changed: every open socket of this person follows at once, and the rooms they are in are told. */
+  setHidden(userId: number, hidden: boolean): void {
+    for (const m of this.members.values()) if (m.userId === userId && m.hidden !== hidden) { m.hidden = hidden; this.dirty.add(m.room); }
+  }
 }

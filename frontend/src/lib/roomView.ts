@@ -1,5 +1,5 @@
 // First-person view of a room: camera, near-plane clipping, projection, walking with collision, and what you are facing. Pure (no DOM).
-import { DOOR_H, type RoomDoor, type RoomProp, type RoomWorld } from "./roomWorld";
+import { DOOR_H, wallsOf, type RoomDoor, type RoomProp, type RoomWorld, type Wall } from "./roomWorld";
 
 export interface Eye { x: number; z: number; yaw: number; pitch: number; /** height of the feet above the floor (platforms, jumps); 0 when omitted */ y?: number; /** vertical speed, m/s */ vy?: number }
 export const EYE_Y = 1.6, NEAR = 0.12, MAX_PITCH = 0.75, WALL_MARGIN = 0.45, WALK = 3.0, RUN = 5.2, TURN = 2.2;
@@ -33,9 +33,20 @@ export function toScreen(p: P3, w: number, h: number, out: [number, number] = [0
 }
 
 export interface Move { forward: number; strafe: number; turn: number; look: number; run?: boolean }
+/** The wall a point has walked past. Several walls can share a line (a straight hall's side segments), so among those the point is past, prefer the one whose own segment holds the point; else the last one past. */
+function wallHit(walls: Wall[], x: number, z: number): number | null {
+  let any: number | null = null, on: number | null = null;
+  for (let k = 0; k < walls.length; k++) {
+    const wl = walls[k];
+    if (x * wl.nx + z * wl.nz <= wl.d - WALL_MARGIN) continue;
+    any = k;
+    if (wl.len !== undefined) { const t = (x - wl.ax!) * wl.tx! + (z - wl.az!) * wl.tz!; if (t >= -0.05 && t <= wl.len + 0.05) on = k; }
+  }
+  return on ?? any;
+}
 /** Keep the eye inside the walls and out of the pedestals. */
 export function collide(world: RoomWorld, x: number, z: number): { x: number; z: number; touched: number | null } {
-  const n = world.sides, step = (Math.PI * 2) / n, lim = world.inr - WALL_MARGIN;
+  const walls = wallsOf(world);
   let touched: number | null = null;
   for (let pass = 0; pass < 3; pass++) {
     for (const p of world.props) {
@@ -44,9 +55,10 @@ export function collide(world: RoomWorld, x: number, z: number): { x: number; z:
       const ux = L > 1e-6 ? dx / L : 1, uz = L > 1e-6 ? dz / L : 0; // pushed straight out of the pedestal
       x = p.x + ux * min; z = p.z + uz * min;
     }
-    for (let k = 0; k < n; k++) { // walls last, so you can never end up outside
-      const a = world.rot + (k + 0.5) * step, ox = Math.cos(a), oz = Math.sin(a), d = x * ox + z * oz;
-      if (d > lim) { x -= ox * (d - lim); z -= oz * (d - lim); if (pass === 0) touched = k; }
+    if (pass === 0) touched = wallHit(walls, x, z); // before pushing: which wall the walk ran into
+    for (let k = 0; k < walls.length; k++) { // walls last, so you can never end up outside
+      const wl = walls[k], d = x * wl.nx + z * wl.nz, lim = wl.d - WALL_MARGIN;
+      if (d > lim) { x -= wl.nx * (d - lim); z -= wl.nz * (d - lim); }
     }
   }
   return { x, z, touched };
@@ -60,7 +72,7 @@ export function stepEye(world: RoomWorld, e: Eye, m: Move, dt: number, solve?: (
   const wantX = e.x + vx * sp, wantZ = e.z + vz * sp, r = solve ? solve(wantX, wantZ) : collide(world, wantX, wantZ);
   const pushed = Math.hypot(wantX - r.x, wantZ - r.z) > 1e-4;
   let into: { nx: number; nz: number; edge: number } | null = null;
-  if (pushed && r.touched != null) { const a = world.rot + (r.touched + 0.5) * ((Math.PI * 2) / world.sides); const nx = Math.cos(a), nz = Math.sin(a); if (vx * nx + vz * nz > 0.15) into = { nx, nz, edge: r.touched }; }
+  if (pushed && r.touched != null) { const wl = wallsOf(world)[r.touched], nx = wl.nx, nz = wl.nz; if (vx * nx + vz * nz > 0.15) into = { nx, nz, edge: r.touched }; }
   return { eye: { x: r.x, z: r.z, yaw: wrapYaw(yaw), pitch, y: e.y, vy: e.vy }, into, moved: Math.hypot(r.x - e.x, r.z - e.z) > 1e-5 || m.turn !== 0 || m.look !== 0 };
 }
 export const wrapYaw = (a: number): number => { const t = Math.PI * 2, m = ((a % t) + t) % t; return m > Math.PI ? m - t : m; };
@@ -70,6 +82,17 @@ export function doorWalkedInto(world: RoomWorld, e: Eye, into: { edge: number } 
   if (!into) return null;
   for (const d of world.doors) {
     if (d.edge !== into.edge || d.state !== "open") continue;
+    const along = (e.x - d.x) * d.tx + (e.z - d.z) * d.tz;
+    if (Math.abs(along) <= d.hw) return d;
+  }
+  return null;
+}
+
+/** A milestone door you are walking into (or standing at): a door that stands for a milestone, and is not an open way to another room. */
+export function milestoneDoorAt(world: RoomWorld, e: Eye, into: { edge: number } | null): RoomDoor | null {
+  if (!into) return null;
+  for (const d of world.doors) {
+    if (!d.milestone || d.edge !== into.edge || (d.toSlug && d.state === "open")) continue;
     const along = (e.x - d.x) * d.tx + (e.z - d.z) * d.tz;
     if (Math.abs(along) <= d.hw) return d;
   }
@@ -92,7 +115,7 @@ export function facing(world: RoomWorld, e: Eye, reach = 2.7): Target | null {
     const score = d * (2 - cos); if (score < bestScore) { bestScore = score; bestKind = 2; bestIdx = i; }
   }
   if (bestKind === 1) { const p = world.props[bestIdx]; return { kind: "prop", prop: p, label: p.kind === "album" ? `Open album: ${p.label}` : p.label }; }
-  if (bestKind === 2) { const d = world.doors[bestIdx]; return { kind: "door", door: d, label: d.state === "open" ? `Go through: ${d.name}` : "Sealed: not found yet" }; }
+  if (bestKind === 2) { const d = world.doors[bestIdx]; return { kind: "door", door: d, label: d.state === "open" && d.toSlug ? `Go through: ${d.name}` : d.milestone ? `Milestone: ${d.milestone.title}` : "Sealed: not found yet" }; }
   return null;
 }
 

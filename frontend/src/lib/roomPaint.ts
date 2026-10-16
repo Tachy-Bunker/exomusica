@@ -1,7 +1,8 @@
 // Draws the room from the eye: 2D canvas, painter's order, no 3D library. Everything is lines and flat fills.
 // Built to make no garbage while painting: all the geometry, colour strings and labels of a room are prepared once (RoomPainter), and a frame only fills typed scratch buffers.
 import { DOOR_H, type RoomDoor, type RoomProp, type RoomWorld } from "./roomWorld";
-import { CORR_H, type Corridor, type Link } from "./roomScene";
+import { corrTop, type Corridor, type Link } from "./roomScene";
+import { elevLayer } from "./roomElevator";
 import type { EchoField } from "./roomEcho";
 import type { Shown } from "./roomNet";
 import type { Drone } from "./roomDrone";
@@ -110,7 +111,7 @@ export class RoomPainter {
       hotFill: rgba(color, 0.42), map: rgba(color, 0.8), mapLine: rgba(color, 0.8), cross: rgba(color, 0.7), scan: rgba("#9fe9ff", 0.35), propHotFill: rgba(color, 0.28),
     };
     this.propCol = world.props.map((p) => (p.kind === "terminal" ? hueColor(p.hue, 58) : p.kind === "more" ? color : hueColor(p.hue, 62)));
-    this.propLabel = world.props.map((p) => (p.kind === "terminal" ? "TALK" : p.label.length > 22 ? p.label.slice(0, 21) + "…" : p.label));
+    this.propLabel = world.props.map((p) => (p.kind === "terminal" ? "TALK" : p.kind === "computer" ? "SITE" : p.label.length > 22 ? p.label.slice(0, 21) + "…" : p.label));
     this.doorLabel = world.doors.map((d) => (d.state === "open" ? d.name ?? "" : "sealed"));
     this.wallLen = []; this.wallMid = new Float64Array(this.n * 2);
     for (let i = 0; i < this.n; i++) { const a = this.v[i], b = this.v[(i + 1) % this.n]; this.wallLen.push(Math.hypot(b[0] - a[0], b[1] - a[1])); this.wallMid[i * 2] = (a[0] + b[0]) / 2; this.wallMid[i * 2 + 1] = (a[1] + b[1]) / 2; }
@@ -124,7 +125,7 @@ export class RoomPainter {
   }
   /** The world points in `wp` (n of them) as a screen path, cut at the near plane; false when none is in front. */
   private pm = 0;
-  private poly(n: number): boolean {
+  private poly(n: number, add = false): boolean {
     const wp = this.wp, cc = this.cc, cl = this.cl;
     for (let i = 0; i < n; i++) { this.cam(wp[i * 3], wp[i * 3 + 1], wp[i * 3 + 2]); cc[i * 3] = this.qx; cc[i * 3 + 1] = this.qy; cc[i * 3 + 2] = this.qz; }
     let m = 0;
@@ -135,7 +136,7 @@ export class RoomPainter {
     }
     if (m < 3) return false;
     this.pm = m;
-    const ctx = this.ctx, hw = this.W / 2, hh = this.H / 2, f = this.f; ctx.beginPath();
+    const ctx = this.ctx, hw = this.W / 2, hh = this.H / 2, f = this.f; if (!add) ctx.beginPath();
     for (let i = 0; i < m; i++) { const z = cl[i * 3 + 2], x = hw + (cl[i * 3] * f) / z, y = hh - (cl[i * 3 + 1] * f) / z; if (i) ctx.lineTo(x, y); else ctx.moveTo(x, y); }
     ctx.closePath(); this.stats.polys++; return true;
   }
@@ -304,18 +305,32 @@ export class RoomPainter {
     ctx.globalCompositeOperation = gc; ctx.globalAlpha = ga;
   }
   // ---- the flock: up to 12 specks (dust or fireflies) that drift, fade out and come back somewhere else. They ignore walls and objects; off-screen ones are not drawn.
-  private fp = new Float64Array(12 * 8); private fpKey = ""; private fpT = 0;
+  private fp = new Float64Array(12 * 8); private fpKey = ""; private fpT = 0; private fpLink: Link | null = null; // the corridor the specks are in, or null for the room
   private fpSpawn(i: number, first: boolean): void {
-    const f = this.fp, o = i * 8, w = this.world; let x = 0, z = 0, m = 0;
-    for (const p of this.v) m = Math.max(m, Math.abs(p[0]), Math.abs(p[1]));
-    for (let t = 0; t < 8; t++) { x = (Math.random() * 2 - 1) * m; z = (Math.random() * 2 - 1) * m; if (inRoom(w, x, z)) break; }
+    const f = this.fp, o = i * 8, w = this.world, lk = this.fpLink; let x = 0, z = 0, m = 0;
+    if (lk) { // a corridor: a random place along its middle line, anywhere across its width
+      const c = lk.c, ns = Math.min(c.n - 1, 30), A = c.left, B = c.right, r = Math.random() * c.cum[ns];
+      let s = 0; while (s < ns - 1 && c.cum[s + 1] < r) s++;
+      const t = Math.min(1, Math.max(0, (r - c.cum[s]) / ((c.cum[s + 1] - c.cum[s]) || 1))), u = Math.random();
+      const lx = A[s * 2] + (A[s * 2 + 2] - A[s * 2]) * t, lz = A[s * 2 + 1] + (A[s * 2 + 3] - A[s * 2 + 1]) * t, rx = B[s * 2] + (B[s * 2 + 2] - B[s * 2]) * t, rz = B[s * 2 + 1] + (B[s * 2 + 3] - B[s * 2 + 1]) * t;
+      x = lx + (rx - lx) * u; z = lz + (rz - lz) * u;
+    } else {
+      for (const p of this.v) m = Math.max(m, Math.abs(p[0]), Math.abs(p[1]));
+      for (let t = 0; t < 8; t++) { x = (Math.random() * 2 - 1) * m; z = (Math.random() * 2 - 1) * m; if (inRoom(w, x, z)) break; }
+    }
     f[o] = x; f[o + 1] = 0.4 + Math.random() * 2.2; f[o + 2] = z; f[o + 3] = (Math.random() - 0.5) * 0.3; f[o + 4] = (Math.random() - 0.5) * 0.08; f[o + 5] = (Math.random() - 0.5) * 0.3;
     f[o + 7] = 6 + Math.random() * 9; f[o + 6] = first ? Math.random() * f[o + 7] : 0;
   }
   private flock(eye: Eye): void {
-    const L = actorLayer, fk = L.look.flock; L.flockSeen = false;
-    if (!fk || L.slug !== this.world.slug || L.budget === 0 || REDUCED) return;
-    const key = L.slug + "|" + fk.n; if (key !== this.fpKey) { this.fpKey = key; this.fpT = L.now; for (let i = 0; i < fk.n; i++) this.fpSpawn(i, true); }
+    const L = actorLayer;
+    if (L.slug === this.world.slug) this.flockRun(eye, L.look.flock, L.slug, null); else L.flockSeen = false;
+  }
+  /** The specks of the room (`link` null) or of a corridor, drawn in the world frame. `key` names the set, so a change of place respawns them. */
+  private flockRun(eye: Eye, fk: { kind: number; n: number; color: string } | null, key: string, link: Link | null): void {
+    const L = actorLayer; L.flockSeen = false;
+    if (!fk || L.budget === 0 || REDUCED) return;
+    this.fpLink = link;
+    const k = key + "|" + fk.n; if (k !== this.fpKey) { this.fpKey = k; this.fpT = L.now; for (let i = 0; i < fk.n; i++) this.fpSpawn(i, true); }
     const dt = Math.min(0.1, Math.max(0, L.now - this.fpT)); this.fpT = L.now;
     const ctx = this.ctx, f = this.fp, W = this.W, H = this.H, hw = W / 2, hh = H / 2, fl = this.f, fire = fk.kind === 1, g = fire ? glow(fk.color, 0.9) : null, t = L.now, base = ctx.globalAlpha;
     if (!fire) ctx.fillStyle = rgba(fk.color, 0.55);
@@ -334,12 +349,16 @@ export class RoomPainter {
   // ---- the painted floor: flat colour for every painted rectangle, then textured tiles near the eye until the budget is spent
   /** The sky: the ceiling becomes an open view. One wide picture, sampled by direction, turning `speed` degrees a second and wrapping round (two draws at most per frame). */
   private skyPaint(eye: Eye, sky: { id: number; speed: number }): void {
-    const ctx = this.ctx, n = this.n, v = this.v, Hh = this.H3, img = skyImage(sky.id);
+    const ctx = this.ctx, n = this.n, v = this.v, Hh = this.H3;
     for (let i = 0; i < n; i++) { this.wp[i * 3] = v[i][0]; this.wp[i * 3 + 1] = Hh; this.wp[i * 3 + 2] = v[i][1]; }
     if (!this.poly(n)) { actorLayer.skySeen = false; return; }
     { const hh = this.H / 2, f = this.f, cl = this.cl; let top = 1e9, bot = -1e9; for (let i = 0; i < this.pm; i++) { const y = hh - (cl[i * 3 + 1] * f) / cl[i * 3 + 2]; if (y < top) top = y; if (y > bot) bot = y; } actorLayer.skySeen = bot > 0 && top < this.H; }
     if (!actorLayer.skySeen) { this.ctx.beginPath(); return; }
-    ctx.save(); ctx.clip(); ctx.fillStyle = "#05060c"; ctx.fillRect(0, 0, this.W, this.H);
+    ctx.save(); ctx.clip(); this.skyDraw(eye, sky); ctx.restore();
+  }
+  /** The sky picture over whatever is clipped: the eye's turn picks the part shown, and it turns with time. */
+  private skyDraw(eye: Eye, sky: { id: number; speed: number }): void {
+    const ctx = this.ctx, img = skyImage(sky.id); ctx.fillStyle = "#05060c"; ctx.fillRect(0, 0, this.W, this.H);
     if (img) {
       const W = this.W, H = this.H, f = this.f, iw = img.naturalWidth, ih = img.naturalHeight, TAU = Math.PI * 2;
       const ha = Math.atan(W / 2 / f), va = Math.atan(H / 2 / f), yaw = eye.yaw + (sky.speed * Math.PI / 180) * actorLayer.now;
@@ -355,7 +374,6 @@ export class RoomPainter {
         if (first < sw) ctx.drawImage(img, 0, sy0, sw - first, sh, dw, dy0, W - dw, dh);
       }
     }
-    ctx.restore();
   }
   private ceilCells: { x: number; z: number }[] | null = null; private ceilKey = "";
   /** The ceiling: one material over the whole of it, flat first and then tiles overhead while half of what is left of the budget lasts. */
@@ -709,26 +727,32 @@ export class RoomPainter {
 
   // ---- corridors
   /** Clip to a door's opening in this painter's frame, with (ox,oz) added to the door's place, and blank it so what is drawn inside hides the wall. */
-  private clipDoor(d: RoomDoor, ox: number, oz: number): boolean {
+  private clipDoor(d: RoomDoor, ox: number, oz: number, y0 = 0): boolean {
     const hw = d.hw, ix = -d.nx * 0.03, iz = -d.nz * 0.03, ax = ox + d.x - d.tx * hw + ix, az = oz + d.z - d.tz * hw + iz, bx = ox + d.x + d.tx * hw + ix, bz = oz + d.z + d.tz * hw + iz;
-    if (!this.quad(ax, 0, az, bx, 0, bz, bx, DOOR_H, bz, ax, DOOR_H, az)) return false;
+    if (!this.quad(ax, y0, az, bx, y0, bz, bx, y0 + DOOR_H, bz, ax, y0 + DOOR_H, az)) return false;
     this.ctx.save(); this.ctx.clip(); this.ctx.fillStyle = BG; this.ctx.fillRect(0, 0, this.W, this.H); return true;
   }
   /** The room at the far end of the corridor, seen through its door. */
   private beyond(sp: ScenePaint, eye: Eye): void {
     const L = sp.link!, np = sp.nextPainter; if (!np) return;
-    if (!this.clipDoor(L.back, L.offx, L.offz)) return;
-    const e = sp.eye; e.x = eye.x - L.offx; e.z = eye.z - L.offz; e.yaw = eye.yaw; e.pitch = eye.pitch;
+    const ey = this.ey; this.ey = ey + L.curLev; // the far door is clipped in the corridor's frame, where its floor is farLev up
+    const seen = this.clipDoor(L.back, L.offx, L.offz, L.farLev); this.ey = ey; if (!seen) return;
+    const e = sp.eye; e.x = eye.x - L.offx; e.z = eye.z - L.offz; e.yaw = eye.yaw; e.pitch = eye.pitch; e.y = (eye.y ?? 0) + L.curLev - L.farLev;
     np.view(this.ctx, this.W, this.H, e); np.shell(e, L.back.edge, null, null);
     if (Math.hypot(e.x, e.z) < 22) np.things(e, null, NO_PEOPLE);
     this.stats.polys += np.stats.polys; this.ctx.restore(); np.drop();
   }
+  /** Runs `f` in the corridor's frame: its floor is the lower room's, so from a higher room the eye is `curLev` above it. */
+  private inCorr(L: Link, f: () => void): void { const ey = this.ey; this.ey = ey + L.curLev; f(); this.ey = ey; }
+  /** The elevator's platforms and deck, in the link's frame (call inside inCorr). */
+  private elevActors(eye: Eye): void { this.drawActors(elevLayer, eye); }
   /** Eye in the corridor: the corridor, then the room behind (through its door) and the room ahead. */
   private corridorView(eye: Eye, sp: ScenePaint): void {
     const L = sp.link!;
-    this.corridorShell(L, eye, true); this.corrActors(eye);
+    this.inCorr(L, () => { this.corridorShell(L, eye, true); this.corrActors(eye); this.elevActors(eye); });
     if (this.clipDoor(L.door, 0, 0)) { this.shell(eye, L.door.edge, null, null); this.things(eye, null, NO_PEOPLE); this.ctx.restore(); }
     this.beyond(sp, eye);
+    const C = corrLayer; this.inCorr(L, () => this.flockRun(eye, C.doc?.flock ?? null, C.key, L));
   }
   /** Tiles of a material over the quad P00 P10 / P01 P11 (u along `uLen` metres, v across `vLen`), clipped to its outline. Only near the eye, only while half the tile budget lasts, and never more than 70 cells. */
   private surf(t: { kind: string; tint: string; scale: number; scroll: number }, x00: number, y00: number, z00: number, x10: number, y10: number, z10: number, x01: number, y01: number, z01: number, x11: number, y11: number, z11: number, uLen: number, vLen: number, u0: number, v0: number, d2: number): void {
@@ -755,14 +779,20 @@ export class RoomPainter {
   private bil(k: number, tu: number, tv: number): number { const P = this.sq; return (1 - tv) * ((1 - tu) * P[k] + tu * P[3 + k]) + tv * ((1 - tu) * P[6 + k] + tu * P[9 + k]); }
   /** The corridor: floor, ceiling and two walls for each stretch (far to near), and the end walls with the doors cut out. */
   private corridorShell(L: Link, eye: Eye, capNear: boolean): void {
-    const c = L.c, ns = Math.min(c.n - 1, 30), ctx = this.ctx, C = this.C, P = c.pts, A = c.left, B = c.right, CH = CORR_H;
+    const c = L.c, ns = Math.min(c.n - 1, 30), ctx = this.ctx, C = this.C, P = c.pts, A = c.left, B = c.right, CH = corrTop(L);
     for (let i = 0; i < ns; i++) { const dx = (P[i * 2] + P[i * 2 + 2]) / 2 - eye.x, dz = (P[i * 2 + 1] + P[i * 2 + 3]) / 2 - eye.z; this.segD[i] = dx * dx + dz * dz; let j = i; while (j > 0 && this.segD[this.segOrd[j - 1]] < this.segD[i]) { this.segOrd[j] = this.segOrd[j - 1]; j--; } this.segOrd[j] = i; }
+    const sky = corrLayer.doc?.sky ?? null; // a sky replaces the ceilings: one picture under all of them, the walls and floors go over it
+    if (sky) {
+      ctx.beginPath(); const w = this.wp;
+      for (let i = 0; i < ns; i++) { w[0] = A[i * 2]; w[1] = CH; w[2] = A[i * 2 + 1]; w[3] = B[i * 2]; w[4] = CH; w[5] = B[i * 2 + 1]; w[6] = B[i * 2 + 2]; w[7] = CH; w[8] = B[i * 2 + 3]; w[9] = A[i * 2 + 2]; w[10] = CH; w[11] = A[i * 2 + 3]; this.poly(4, true); }
+      ctx.save(); ctx.clip(); this.skyDraw(eye, sky); ctx.restore();
+    }
     for (let oi = 0; oi < ns; oi++) {
       const i = this.segOrd[oi], near = this.segD[i] < 200, a0x = A[i * 2], a0z = A[i * 2 + 1], a1x = A[i * 2 + 2], a1z = A[i * 2 + 3], b0x = B[i * 2], b0z = B[i * 2 + 1], b1x = B[i * 2 + 2], b1z = B[i * 2 + 3];
       const cd = corrLayer.doc, len = c.cum[i + 1] - c.cum[i], u0 = c.cum[i], wid = Math.hypot(a0x - b0x, a0z - b0z);
       const mF = cd && cd.cfloor ? cd.tex[cd.cfloor - 1] : undefined, mC = cd && cd.ceil ? cd.tex[cd.ceil - 1] : undefined, mW = cd && cd.cwall ? cd.tex[cd.cwall - 1] : undefined; // the owner's materials, if any
       if (this.quad(a0x, 0, a0z, b0x, 0, b0z, b1x, 0, b1z, a1x, 0, a1z)) { ctx.fillStyle = mF ? this.flatOf(mF.kind, mF.tint) : C.floor; ctx.fill(); if (mF && near) this.surf(mF, a0x, 0, a0z, a1x, 0, a1z, b0x, 0, b0z, b1x, 0, b1z, len, wid, u0, 0, this.segD[i]); }
-      if (this.quad(a0x, CH, a0z, b0x, CH, b0z, b1x, CH, b1z, a1x, CH, a1z)) { ctx.fillStyle = mC ? this.flatOf(mC.kind, mC.tint) : C.ceil; ctx.fill(); if (mC && near) this.surf(mC, a0x, CH, a0z, a1x, CH, a1z, b0x, CH, b0z, b1x, CH, b1z, len, wid, u0, 0, this.segD[i]); }
+      if (!sky && this.quad(a0x, CH, a0z, b0x, CH, b0z, b1x, CH, b1z, a1x, CH, a1z)) { ctx.fillStyle = mC ? this.flatOf(mC.kind, mC.tint) : C.ceil; ctx.fill(); if (mC && near) this.surf(mC, a0x, CH, a0z, a1x, CH, a1z, b0x, CH, b0z, b1x, CH, b1z, len, wid, u0, 0, this.segD[i]); }
       if (this.quad(a0x, 0, a0z, a1x, 0, a1z, a1x, CH, a1z, a0x, CH, a0z)) { ctx.fillStyle = mW ? this.flatOf(mW.kind, mW.tint) : C.wallA; ctx.fill(); if (mW && near) this.surf(mW, a0x, 0, a0z, a1x, 0, a1z, a0x, CH, a0z, a1x, CH, a1z, len, CH, u0, 0, this.segD[i]); }
       if (this.quad(b0x, 0, b0z, b1x, 0, b1z, b1x, CH, b1z, b0x, CH, b0z)) { ctx.fillStyle = mW ? this.flatOf(mW.kind, mW.tint) : C.wallB; ctx.fill(); if (mW && near) this.surf(mW, b0x, 0, b0z, b1x, 0, b1z, b0x, CH, b0z, b1x, CH, b1z, len, CH, u0, 0, this.segD[i]); }
       ctx.beginPath();
@@ -776,17 +806,19 @@ export class RoomPainter {
       ctx.lineWidth = 1; ctx.strokeStyle = C.line; ctx.stroke();
       ctx.beginPath(); this.seg(a1x, 0, a1z, a1x, CH, a1z); this.seg(b1x, 0, b1z, b1x, CH, b1z); ctx.lineWidth = 2; ctx.strokeStyle = C.edge; ctx.stroke();
     }
-    this.cap(L.c, 0, L.door, capNear); this.cap(L.c, c.n - 1, L.back, true);
+    this.cap(L.c, 0, L.door, capNear, L.curLev, CH); this.cap(L.c, c.n - 1, L.back, true, L.farLev, CH);
   }
   /** The wall across the end of the corridor, with the door cut out of it. */
-  private cap(c: Corridor, i: number, d: RoomDoor, draw: boolean): void {
+  private cap(c: Corridor, i: number, d: RoomDoor, draw: boolean, base: number, CH: number): void {
     if (!draw) return;
-    const ctx = this.ctx, CH = CORR_H, lx = c.left[i * 2], lz = c.left[i * 2 + 1], rx = c.right[i * 2], rz = c.right[i * 2 + 1], px = c.pts[i * 2], pz = c.pts[i * 2 + 1];
+    const ctx = this.ctx, lx = c.left[i * 2], lz = c.left[i * 2 + 1], rx = c.right[i * 2], rz = c.right[i * 2 + 1], px = c.pts[i * 2], pz = c.pts[i * 2 + 1];
     const L = Math.hypot(lx - rx, lz - rz) || 1, tx = (lx - rx) / L, tz = (lz - rz) / L, ax = px + tx * d.hw, az = pz + tz * d.hw, bx = px - tx * d.hw, bz = pz - tz * d.hw;
+    const top = base + DOOR_H; // the opening runs from the door's floor (base) up; a door on a higher floor has wall under it
     ctx.fillStyle = this.C.wallB;
     if (this.quad(lx, 0, lz, ax, 0, az, ax, CH, az, lx, CH, lz)) ctx.fill();
     if (this.quad(bx, 0, bz, rx, 0, rz, rx, CH, rz, bx, CH, bz)) ctx.fill();
-    if (this.quad(ax, DOOR_H, az, bx, DOOR_H, bz, bx, CH, bz, ax, CH, az)) ctx.fill();
+    if (this.quad(ax, top, az, bx, top, bz, bx, CH, bz, ax, CH, az)) ctx.fill();
+    if (base > 0 && this.quad(ax, 0, az, bx, 0, bz, bx, base, bz, ax, base, az)) ctx.fill();
   }
 
   private door(di: number, e: Eye, hot: boolean, sp: ScenePaint | null): void {
@@ -796,7 +828,7 @@ export class RoomPainter {
     if (!this.quad(ax, 0, az, bx, 0, bz, bx, DOOR_H, bz, ax, DOOR_H, az)) return;
     ctx.fillStyle = open ? (hot ? C.doorOpenHot : C.doorOpen) : "rgba(8,14,20,.9)"; ctx.fill();
     // a door that is opening shows the corridor behind it
-    if (linked && this.clipDoor(d, 0, 0)) { this.corridorShell(sp!.link!, e, false); this.corrActors(e); this.beyond(sp!, e); ctx.restore(); }
+    if (linked && this.clipDoor(d, 0, 0)) { this.inCorr(sp!.link!, () => { this.corridorShell(sp!.link!, e, false); this.corrActors(e); this.elevActors(e); }); this.beyond(sp!, e); ctx.restore(); }
     // the iris: shut for a door that leads somewhere or is sealed, pulled back as it opens. Only when all four corners are in front and the door is near.
     let allFront = dist < 16;
     if (allFront) for (let k = 0; k < 4 && allFront; k++) { this.cam(k & 1 ? bx : ax, k > 1 ? DOOR_H : 0, k & 1 ? bz : az); if (this.qz < NEAR) allFront = false; }
@@ -824,7 +856,7 @@ export class RoomPainter {
   }
 
   private prop(k: number, d: number, e: Eye, hot: boolean): void {
-    const ctx = this.ctx, p: RoomProp = this.world.props[k], chat = p.kind === "terminal", h = chat ? 1.0 : 0.9, col = this.propCol[k];
+    const ctx = this.ctx, p: RoomProp = this.world.props[k], chat = p.kind === "terminal", screen = chat || p.kind === "computer", h = screen ? 1.0 : 0.9, col = this.propCol[k];
     // pedestal: a square column; the farthest face is hidden, the other three drawn far to near
     const r = p.r * 0.85, cx = this.pcx, cz = this.pcz; cx[0] = p.x + r; cx[1] = p.x - r; cx[2] = p.x - r; cx[3] = p.x + r; cz[0] = p.z + r; cz[1] = p.z + r; cz[2] = p.z - r; cz[3] = p.z - r;
     for (let i = 0; i < 4; i++) { const j = (i + 1) & 3; this.fd[i] = Math.hypot((cx[i] + cx[j]) / 2 - e.x, (cz[i] + cz[j]) / 2 - e.z); this.fi[i] = i; }
@@ -833,7 +865,7 @@ export class RoomPainter {
     for (let q = 1; q < 4; q++) { const i = this.fi[q], j = (i + 1) & 3; if (this.quad(cx[i], 0, cz[i], cx[j], 0, cz[j], cx[j], h, cz[j], cx[i], h, cz[i])) { ctx.fill(); ctx.stroke(); } }
     if (this.quad(cx[0], h, cz[0], cx[1], h, cz[1], cx[2], h, cz[2], cx[3], h, cz[3])) { ctx.fill(); ctx.stroke(); }
     // the screen: leans back from the middle of the room
-    const L = Math.hypot(p.x, p.z) || 1, ux = L > 1e-6 ? -p.x / L : 1, uz = L > 1e-6 ? -p.z / L : 0, tx = -uz, tz = ux, hw = chat ? 0.55 : 0.42, sh = chat ? 0.7 : 0.6, back = -0.28;
+    const L = Math.hypot(p.x, p.z) || 1, ux = L > 1e-6 ? -p.x / L : 1, uz = L > 1e-6 ? -p.z / L : 0, tx = -uz, tz = ux, hw = screen ? 0.55 : 0.42, sh = screen ? 0.7 : 0.6, back = -0.28;
     const x0 = p.x + tx * hw, z0 = p.z + tz * hw, x1 = p.x - tx * hw, z1 = p.z - tz * hw;
     if (this.quad(x1, h, z1, x0, h, z0, x0 + ux * back, h + sh, z0 + uz * back, x1 + ux * back, h + sh, z1 + uz * back)) {
       ctx.fillStyle = hot ? this.C.hotFill : chat ? "rgba(255,170,60,.26)" : "rgba(120,220,255,.16)"; ctx.fill(); ctx.lineWidth = hot ? 3 : 1.6; ctx.strokeStyle = hot ? "#fff" : col; ctx.stroke();

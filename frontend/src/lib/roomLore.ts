@@ -25,6 +25,7 @@ export function scannables(w: RoomWorld, arts: readonly ArtifactLike[] = []): Sc
   if (w.plaque) out.push({ key: `branch:${w.slug}`, what: "wall", id: "plaque", lockKind: "plaque", label: "Inscription", text: w.blurb?.trim() || (w.lineage?.length === 0 ? OPENING_LORE : `${w.name}. Nobody has written anything on this wall yet.`), opening: w.lineage?.length === 0, x: w.plaque.x, y: 1.6, z: w.plaque.z });
   for (const p of w.props) {
     if (p.kind === "terminal") out.push({ key: `room:${w.slug}/terminal`, what: "terminal", id: p.id, lockKind: "prop", label: "Terminal", text: `A terminal wired to ${w.name}'s room chat. Whatever is said here is kept, day by day.`, x: p.x, y: 1.3, z: p.z });
+    else if (p.kind === "computer") out.push({ key: `room:${w.slug}/computer`, what: "terminal", id: p.id, lockKind: "prop", label: "Terminal", text: `A terminal wired to the site. From here you can open this branch's page, XenoLab and the Log, and stay inside the room.`, x: p.x, y: 1.3, z: p.z });
     else if (p.kind === "album") out.push({ key: `album:${p.id.slice(2)}`, what: "album", id: p.id, lockKind: "prop", label: p.label, text: `Pedestal: the album "${p.label}". Its disc can be read from the screen.`, x: p.x, y: 1.3, z: p.z });
   }
   for (const d of w.doors) {

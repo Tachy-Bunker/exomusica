@@ -16,6 +16,7 @@ import { tone } from "../lib/roomSfx";
 import { groupOf, makePrefab, placePrefab, prefabKey, prefabSlug } from "../lib/roomPrefab";
 
 const SNAP = 0.25, PLAN = 300;
+const NO_CLIMB: Actor[] = [];
 const PALETTE = ["#7a8cff", "#ff7ab6", "#7affc8", "#ffd27a", "#c07aff", "#7ad7ff"];
 const DEFAULTS: Record<Kind, Partial<Actor>> = {
   solid: { w: 2, d: 2, h: 1.5 }, ghost: { w: 2, d: 2, h: 1.5 }, trigger: { w: 3, d: 3, h: 2 }, light: { w: 1, d: 1, h: 2.4 }, marker: { w: 0.6, d: 0.6, h: 1.6 }, pool: { w: 4, d: 4, h: 0 }, artifact: { w: 1.6, d: 0.1, h: 1 }, hazard: { w: 4, d: 4, h: 0, mode: 0, color: "#ff9a5c" }, boss: { w: 2.6, d: 2.6, h: 2.4, mode: 0, color: "#ff7ab6", text: "The Unnamed Sound" },
@@ -33,7 +34,7 @@ const snap = (v: number) => Math.round(v / SNAP) * SNAP;
 
 interface Props {
   themeNote?: string; hasTheme?: boolean; themeMsg?: string; onTheme?: (k: "save" | "clear") => void;
-  world: RoomWorld; cx?: number; cz?: number; corridor?: boolean; doc: RoomDoc; onDoc: (d: RoomDoc, key?: string) => void; onUndo: () => void; onRedo: () => void; canUndo: boolean; canRedo: boolean;
+  world: RoomWorld; cx?: number; cz?: number; corridor?: boolean; climb?: Actor[]; doc: RoomDoc; onDoc: (d: RoomDoc, key?: string) => void; onUndo: () => void; onRedo: () => void; canUndo: boolean; canRedo: boolean;
   sel: string | null; setSel: (id: string | null) => void;
   where: () => { x: number; z: number; yaw: number };
   dirty: boolean; busy: boolean; error: string; playing: boolean; onPlay: (on: boolean) => void; preview: boolean; onPreview: (on: boolean) => void; onRestored: (d: RoomDoc) => void;
@@ -41,7 +42,7 @@ interface Props {
 }
 
 /** The room editor: a plan view of the room, a list of what is in it, and wires between things. Pure form UI, no logic of its own: every change is a new document handed up. */
-export function RoomEditor({ themeNote = "", hasTheme = false, themeMsg = "", onTheme = () => {}, world, cx = 0, cz = 0, corridor = false, doc, onDoc, onUndo, onRedo, canUndo, canRedo, sel, setSel, where, dirty, busy, error, playing, onPlay, preview, onPreview, onRestored, onSave, onRevert, onClose }: Props) {
+export function RoomEditor({ themeNote = "", hasTheme = false, themeMsg = "", onTheme = () => {}, world, cx = 0, cz = 0, corridor = false, climb = NO_CLIMB, doc, onDoc, onUndo, onRedo, canUndo, canRedo, sel, setSel, where, dirty, busy, error, playing, onPlay, preview, onPreview, onRestored, onSave, onRevert, onClose }: Props) {
   const painting = useRef(false), cv = useRef<HTMLCanvasElement>(null), drag = useRef<{ id: string; dx: number; dz: number } | null>(null);
   const scale = (PLAN / 2 - 8) / (world.inr + 1.5);
   const toPx = (x: number, z: number): [number, number] => [PLAN / 2 + (x - cx) * scale, PLAN / 2 + (z - cz) * scale];
@@ -156,6 +157,12 @@ export function RoomEditor({ themeNote = "", hasTheme = false, themeMsg = "", on
     if (tab === "walls") { const n = world.verts.length, A = world.verts[edge % n], B = world.verts[(edge + 1) % n], [x0, y0] = toPx(A[0], A[1]), [x1, y1] = toPx(B[0], B[1]); g.strokeStyle = "#fff"; g.lineWidth = 2.5; g.setLineDash([6, 4]); g.beginPath(); g.moveTo(x0, y0); g.lineTo(x1, y1); g.stroke(); g.setLineDash([]); }
     for (const d of world.doors) { const [px, py] = toPx(d.x, d.z); g.fillStyle = d.state === "open" ? "#7affc8" : "#888"; g.fillRect(px - 4, py - 4, 8, 8); }
     for (const p of world.props) { const [px, py] = toPx(p.x, p.z); g.fillStyle = "#ffd27a"; g.beginPath(); g.arc(px, py, 3, 0, 7); g.fill(); }
+    for (const o of climb) { // the climb between the two floors: read-only, under the things
+      const [px, py] = toPx(o.x, o.z); g.save(); g.translate(px, py); g.rotate(o.rot);
+      const hw = (o.w * scale) / 2, hd = (o.d * scale) / 2;
+      g.fillStyle = "rgba(170,182,194,.22)"; g.strokeStyle = "rgba(200,212,224,.7)"; g.lineWidth = 1; g.setLineDash([3, 3]);
+      g.fillRect(-hw, -hd, hw * 2, hd * 2); g.strokeRect(-hw, -hd, hw * 2, hd * 2); g.setLineDash([]); g.restore();
+    }
     for (const o of doc.actors) {
       const [px, py] = toPx(o.x, o.z); g.save(); g.translate(px, py); g.rotate(o.rot);
       const hw = (o.w * scale) / 2, hd = Math.max(o.kind === "artifact" ? 2 : 0, (o.d * scale) / 2);
@@ -174,6 +181,12 @@ export function RoomEditor({ themeNote = "", hasTheme = false, themeMsg = "", on
       sg.fillStyle = "rgba(255,255,255,.04)"; sg.fillRect(0, Y(world.H), PLAN, floorY - Y(world.H)); sg.strokeStyle = "rgba(255,255,255,.55)"; sg.lineWidth = 1.5; sg.beginPath(); sg.moveTo(0, floorY); sg.lineTo(PLAN, floorY); sg.moveTo(0, Y(world.H)); sg.lineTo(PLAN, Y(world.H)); sg.stroke();
       sg.setLineDash([4, 4]); sg.strokeStyle = "rgba(255,255,255,.3)"; sg.beginPath(); sg.moveTo(0, Y(1.6)); sg.lineTo(PLAN, Y(1.6)); sg.stroke(); sg.setLineDash([]);
       sg.fillStyle = "rgba(255,255,255,.7)"; sg.font = "10px sans-serif"; sg.fillText(`ceiling ${world.H} m`, 4, Y(world.H) - 3); sg.fillText("eye 1.6 m", 4, Y(1.6) - 3);
+      for (const o of climb) { // the climb, grey and dashed, from the floor to its height
+        const cs = Math.cos(o.rot), sn = Math.sin(o.rot), half = (Math.abs(o.w * cs) + Math.abs(o.d * sn)) / 2, [px] = toPx(o.x, o.z);
+        const x0 = px - Math.max(half, 0.1) * scale, w = Math.max(3, Math.max(half, 0.1) * 2 * scale), hi = o.lift + o.h;
+        sg.fillStyle = "rgba(170,182,194,.25)"; sg.strokeStyle = "rgba(200,212,224,.7)"; sg.lineWidth = 1; sg.setLineDash([3, 3]);
+        sg.fillRect(x0, Y(hi), w, Math.max(2, Y(o.lift) - Y(hi))); sg.strokeRect(x0, Y(hi), w, Math.max(2, Y(o.lift) - Y(hi))); sg.setLineDash([]);
+      }
       for (const o of doc.actors) {
         const cs = Math.cos(o.rot), sn = Math.sin(o.rot), half = (Math.abs(o.w * cs) + Math.abs(o.d * sn)) / 2, [px] = toPx(o.x, o.z);
         let lo = o.lift, hi = o.lift + o.h;
@@ -392,7 +405,8 @@ export function RoomEditor({ themeNote = "", hasTheme = false, themeMsg = "", on
             <label>Tint colour<input type="color" value={grade.tint} onChange={(e) => setGrade({ tint: e.target.value })} /></label>
             <label>Tint<input type="range" data-testid="re-tinta" min={0} max={0.4} step={0.02} value={grade.tintA} onChange={(e) => setGrade({ tintA: num(e.target.value, 0) })} /></label>
           </div>
-          {!corridor && <>
+          <>
+          {corridor && <p className="re-note" data-testid="re-corrnote">A corridor has its own sky and specks (no theme). In a corridor the sky replaces its ceiling.</p>}
           <div className="re-insp" data-testid="re-flockbox">
             <label>Drifting specks<select data-testid="re-flock" value={doc.flock ? doc.flock.kind : -1} onChange={(e) => { const v = Number(e.target.value); onDoc(cleanDoc({ ...doc, flock: v < 0 ? null : { kind: v, n: doc.flock?.n ?? 8, color: doc.flock?.color ?? (v ? "#c8ff7a" : "#ffe9a8") } }), "flock"); }}><option value={-1}>none</option><option value={0}>dust</option><option value={1}>fireflies</option></select></label>
             {doc.flock && <div className="re-grid"><label>How many<input type="range" data-testid="re-flockn" min={1} max={MAX_FLOCK} step={1} value={doc.flock.n} onChange={(e) => onDoc(cleanDoc({ ...doc, flock: { ...doc.flock!, n: Number(e.target.value) } }), "flockn")} /></label><label>Colour<input type="color" data-testid="re-flockc" value={doc.flock.color} onChange={(e) => onDoc(cleanDoc({ ...doc, flock: { ...doc.flock!, color: e.target.value } }), "flockc")} /></label></div>}
@@ -405,8 +419,8 @@ export function RoomEditor({ themeNote = "", hasTheme = false, themeMsg = "", on
             {skyPend && <div className="re-insp"><canvas ref={skyPrev} width={256} height={128} className="re-seam" data-testid="re-skyprev" /><input data-testid="re-skyname" value={skyName} maxLength={60} onChange={(e) => setSkyName(e.target.value)} /><div className="re-row"><button type="button" className="re-b re-save" data-testid="re-skysave" onClick={() => void saveSky()}>Save to library</button><button type="button" className="re-b" onClick={() => setSkyPend(null)}>Cancel</button></div></div>}
             {skyMsg && <p className="re-note" data-testid="re-skymsg">{skyMsg}</p>}
           </div>
-          <label>Ceiling<select data-testid="re-ceil" value={doc.ceil} onChange={(e) => onDoc(cleanDoc({ ...doc, ceil: Number(e.target.value) }), "ceil")}><option value={0}>none</option>{doc.tex.map((t, i) => <option key={i} value={i + 1}>{i + 1} · {isUpload(t.kind) ? "picture" : t.kind}</option>)}</select></label>
-          </>}
+          {!corridor && <label>Ceiling<select data-testid="re-ceil" value={doc.ceil} onChange={(e) => onDoc(cleanDoc({ ...doc, ceil: Number(e.target.value) }), "ceil")}><option value={0}>none</option>{doc.tex.map((t, i) => <option key={i} value={i + 1}>{i + 1} · {isUpload(t.kind) ? "picture" : t.kind}</option>)}</select></label>}
+          </>
           {!corridor && (
             <div className="re-insp" data-testid="re-theme">
               <label className="re-chk"><input type="checkbox" data-testid="re-inherit" checked={doc.inherit} onChange={(e) => onDoc(cleanDoc({ ...doc, inherit: e.target.checked }), "inherit")} />Use the theme of the branches above</label>
@@ -438,6 +452,7 @@ export function RoomEditor({ themeNote = "", hasTheme = false, themeMsg = "", on
         </div>
       )}
       {tab === "things" && <p className="re-note">White dot: you. Drag things to move. New things appear 3 m in front of you.</p>}
+      {tab === "things" && corridor && climb.length > 0 && <p className="re-note" data-testid="re-climbnote">Grey and dashed: the climb between the two floors. It is made from the corridor, so it cannot be edited here; anything you place on it stands on it.</p>}
       {tab === "things" && (
         <div className="re-insp" data-testid="re-prefabs">
           <b>Prefabs</b>
