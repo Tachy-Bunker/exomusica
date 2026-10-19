@@ -14,7 +14,8 @@ import { loadHome, type HomeData } from "../lib/home";
 import { loadMilestones, type Milestone } from "../lib/milestones";
 import { layoutHull, type Hull, type HullNode } from "../lib/hullLayout";
 import { loadMapOverrides } from "../lib/mapOverrides";
-import { buildHullRoom, buildRoom, HULL_HOST, HULL_SLUG, type RoomWorld } from "../lib/roomWorld";
+import { liftDestinations, loadMapLinks, type MapLink } from "../lib/mapLinks";
+import { buildHullRoom, buildLiftRoom, buildRoom, HULL_HOST, HULL_SLUG, type RoomWorld } from "../lib/roomWorld";
 import { MilestoneView } from "../components/MilestoneCard";
 import { themeOf } from "../lib/headerTheme";
 import { neon } from "../lib/legibleColor";
@@ -65,7 +66,7 @@ export function BranchRoomPage() {
   return <RoomInner key={`${slug}|${loc.key}`} slug={slug} />;
 }
 
-interface Graph { chart: ChartBranch[]; hull: Hull | null; outer: boolean }
+interface Graph { chart: ChartBranch[]; hull: Hull | null; outer: boolean; links: MapLink[] }
 /** Everything a room needs, loaded once: only the room you are in and the one behind your door are kept. */
 interface RoomData { slug: string; branch: Branch; albums: BranchAlbum[]; color: string; world: RoomWorld }
 
@@ -83,6 +84,7 @@ function RoomInner({ slug }: { slug: string }) {
   const [droneOpen, setDroneOpen] = useState(false), [logOpen, setLogOpen] = useState(false);
   const [site, setSite] = useState<{ path: string; title: string } | null>(null);
   const [card, setCard] = useState<Milestone | null>(null); // the card of a milestone door
+  const [lift, setLift] = useState<{ options: { slug: string; name: string }[] } | null>(null); // the cabin of a lift pad: the rooms it can take you to
   const [lore, setLore] = useState<Map<string, Lore> | null>(null), [visor, setVisor] = useState({ on: false, hint: "The echo visor is not unlocked yet." });
   const openTerm = useCallback((p: RoomProp) => { setPick(null); setDroneOpen(false); setLogOpen(false); setSite(null); setCard(null); setTerm(p); }, []);
   const openDrone = useCallback(() => { setTerm(null); setPick(null); setLogOpen(false); setSite(null); setCard(null); setDroneOpen(true); }, []);
@@ -123,11 +125,11 @@ function RoomInner({ slug }: { slug: string }) {
 
   useEffect(() => {
     recordVisit(slug);
-    Promise.all([loadChartBranches(visited.current).catch(() => null), loadHome().catch(() => null), loadMilestones().then((l) => !!l.find((m) => m.key === "m-ring")?.reached).catch(() => false), loadMapOverrides()]).then(async ([chart, home, outer, overrides]) => {
+    Promise.all([loadChartBranches(visited.current).catch(() => null), loadHome().catch(() => null), loadMilestones().then((l) => !!l.find((m) => m.key === "m-ring")?.reached).catch(() => false), loadMapOverrides(), loadMapLinks()]).then(async ([chart, home, outer, overrides, links]) => {
       if (!alive.current) return;
       const by = new Map((home ? home.branches : []).map((b) => [b.slug, b]));
       const nodes: HullNode[] = (chart || []).map((b) => ({ id: b.id, parentId: b.parentId, slug: b.slug, name: b.name, secret: b.secret, key: b.key, gate: b.gate, tracks: by.get(b.slug)?.tracks ?? 0, albums: by.get(b.slug)?.albums ?? 0 }));
-      const g: Graph = { chart: chart || [], hull: nodes.length ? layoutHull(nodes, { outer, overrides }) : null, outer };
+      const g: Graph = { chart: chart || [], hull: nodes.length ? layoutHull(nodes, { outer, overrides, links }) : null, outer, links };
       graphRef.current = g; setGraph(g);
       const d = await loadRoom(slug, from);
       if (alive.current) setCur(d);
@@ -152,6 +154,29 @@ function RoomInner({ slug }: { slug: string }) {
     void job.then((d) => { if (alive.current && d && wantRef.current === s) { nextRef.current = d; setNext(d); } });
   }, [loadRoom, buildHull]);
 
+  /** You stepped onto a lift pad: its cabin lists the rooms open to you (the Scan map's open rooms; a sealed room only once its gate is reached). */
+  const openLift = useCallback(async () => {
+    const c = curRef.current, g = graphRef.current; if (!c || !g) return;
+    const mile = await loadMilestones().catch(() => [] as Milestone[]);
+    const vis = new Set(visited.current); vis.add(c.slug);
+    const states = roomStates(g.chart, vis, new Set([...vis].map(hashStr)));
+    const open = g.chart.filter((b) => b.slug && b.slug !== c.slug && (states.get(b.id) === "visited" || states.get(b.id) === "heard") && (!b.gate || !!mile.find((m) => m.key === b.gate)?.reached)).map((b) => ({ slug: b.slug, name: b.name }));
+    // fix406: a room whose lift has its own destination list (Map layout, lift rows) offers exactly that list, each behind its gate
+    const names = new Map(g.chart.filter((b) => b.slug && b.slug !== c.slug).map((b) => [b.slug, b.name] as const));
+    const options = liftDestinations(c.slug, g.links, names, new Set(mile.filter((m) => m.reached).map((m) => m.key)), open);
+    if (alive.current) setLift({ options });
+  }, []);
+
+  /** The cabin takes you to the room you chose: the tube is the room you are in until its far door, where that room is already waiting. */
+  const startLift = useCallback((to: string, toName: string) => {
+    const c = curRef.current; if (!c) return;
+    const tube = buildLiftRoom({ from: c.world, to, name: toName });
+    tube.color = c.color;
+    setLift(null); setTerm(null); setCard(null);
+    void wantNext(to);
+    setCur({ slug: tube.slug, branch: { ...c.branch, name: "Lift" }, albums: [], color: c.color, world: tube });
+  }, [wantNext]);
+
   /** You walked through into the room that was waiting: it becomes the room you are in, the address follows, and the one behind you is let go. */
   const advance = useCallback((s: string) => {
     const n = nextRef.current; curSlug.current = s;
@@ -164,9 +189,9 @@ function RoomInner({ slug }: { slug: string }) {
   const here = cur || null, name = here ? here.branch.name : "";
   const back = `/branch/${here ? here.branch.slug : slug}`;
   useEffect(() => {
-    const on = (e: KeyboardEvent) => { if (e.code === "Escape" && !document.fullscreenElement) { e.stopPropagation(); if (term || droneOpen || logOpen || site || card) { setTerm(null); setPick(null); setDroneOpen(false); setLogOpen(false); setSite(null); setCard(null); } else navigate("/explore"); } };
+    const on = (e: KeyboardEvent) => { if (e.code === "Escape" && !document.fullscreenElement) { e.stopPropagation(); if (term || droneOpen || logOpen || site || card || lift) { setLift(null); setTerm(null); setPick(null); setDroneOpen(false); setLogOpen(false); setSite(null); setCard(null); } else navigate("/explore"); } };
     window.addEventListener("keydown", on); return () => window.removeEventListener("keydown", on);
-  }, [navigate, back, term, droneOpen, logOpen, site, card]);
+  }, [navigate, back, term, droneOpen, logOpen, site, card, lift]);
 
   const go = useCallback((to: string, door: boolean) => {
     const el = link.current; if (!el) return;
@@ -180,10 +205,15 @@ function RoomInner({ slug }: { slug: string }) {
     <div className="hx-page rm-page" data-testid="room-page">
       {cur === false || graph === false ? <p className="home-dim" style={{ padding: "2rem" }}>There is no room by that name. <Link to="/explore">Scan map</Link></p>
         : !here ? <Loading />
-        : <BranchRoom tick={tick} world={here.world} color={color} next={next ? next.world : null} wantNext={wantNext} onAdvance={advance} go={go} mapHref="/explore" backHref={back} onLocked={noop} onProp={openTerm} onDrone={openDrone} visor={visor} lore={lore} onLogbook={openLog} onSite={openSite} onMilestone={openMs} paused={!!term || droneOpen || logOpen || !!site || !!card}ticker={branch?.channel?.slug ? <RoomTicker channel={branch.channel.slug} /> : null} />}
+        : <BranchRoom tick={tick} world={here.world} color={color} next={next ? next.world : null} wantNext={wantNext} onAdvance={advance} go={go} mapHref="/explore" backHref={back} onLocked={noop} onProp={openTerm} onDrone={openDrone} visor={visor} lore={lore} onLogbook={openLog} onSite={openSite} onMilestone={openMs} onLift={openLift} paused={!!term || droneOpen || logOpen || !!site || !!card || !!lift}ticker={branch?.channel?.slug ? <RoomTicker channel={branch.channel.slug} /> : null} />}
       {droneOpen && branch && <RoomTerminal title="drone // player" color={color} onClose={() => setDroneOpen(false)}><DroneTerminal onClose={() => setDroneOpen(false)} /></RoomTerminal>}
       {logOpen && branch && <RoomTerminal title="logbook" color={color} onClose={() => setLogOpen(false)}><SiteIndex sites={terminalSites(branch.slug, branch.name)} onOpen={openSite} /><LogbookTerminal lore={lore} /></RoomTerminal>}
       {site && branch && here && <PageTerminal path={site.path} title={site.title} color={color} ctx={{ room: branch.slug, albums: here.albums.map((a) => a.slug) }} onClose={() => setSite(null)} />}
+      {lift && branch && (
+        <RoomTerminal title={`${name} // lift`} color={color} onClose={() => setLift(null)}>
+          <div data-testid="lift-panel">{lift.options.length ? <ul className="rt-list">{lift.options.map((o) => <li key={o.slug}><button type="button" className="rt-track" data-testid={`lift-to-${o.slug}`} onClick={() => startLift(o.slug, o.name)}><span className="rt-t">&gt; {o.name}</span></button></li>)}</ul> : <p className="rt-dim">No open room to ride to yet.</p>}</div>
+        </RoomTerminal>
+      )}
       {card && branch && <RoomTerminal title={`${name} // milestone`} color={color} onClose={() => setCard(null)}><MilestoneView m={card} /></RoomTerminal>}
       {term && branch && here && (() => {
         const close = () => { setTerm(null); setPick(null); if (term.kind === "terminal" && branch.channel?.slug) void api<unknown>(`/api/channels/${branch.channel.slug}/messages?limit=3`).then((m) => { const l = previewLines(m); if (l.length) { here.world.chat = l; setTick((t) => t + 1); } }).catch(() => undefined); };

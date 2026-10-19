@@ -1,6 +1,6 @@
 // Draws the room from the eye: 2D canvas, painter's order, no 3D library. Everything is lines and flat fills.
 // Built to make no garbage while painting: all the geometry, colour strings and labels of a room are prepared once (RoomPainter), and a frame only fills typed scratch buffers.
-import { DOOR_H, type RoomDoor, type RoomProp, type RoomWorld } from "./roomWorld";
+import { DOOR_H, LIFT_H, type RoomDoor, type RoomProp, type RoomWorld } from "./roomWorld";
 import { corrTop, type Corridor, type Link } from "./roomScene";
 import { elevLayer } from "./roomElevator";
 import type { EchoField } from "./roomEcho";
@@ -96,7 +96,7 @@ export class RoomPainter {
   private order: Int16Array; private dist: Float64Array; private itemD = new Float64Array(64); private itemI = new Int16Array(64);
   private fd = new Float64Array(4); private fi = new Int8Array(4); private pcx = new Float64Array(4); private pcz = new Float64Array(4);
   private readonly n: number; private readonly v: [number, number][]; private readonly H3: number;
-  private C: { floor: string; ceil: string; wallA: string; wallB: string; grid: string; line: string; edge: string; doorOpen: string; doorOpenHot: string; spike: string; spikeStroke: string; doorEdge: string; doorEdgeHot: string; hotFill: string; map: string; mapLine: string; cross: string; scan: string; propHotFill: string };
+  private C: { floor: string; ceil: string; wallA: string; wallB: string; grid: string; line: string; edge: string; doorOpen: string; doorOpenHot: string; spike: string; spikeStroke: string; doorEdge: string; doorEdgeHot: string; doorGate: string; hotFill: string; map: string; mapLine: string; cross: string; scan: string; propHotFill: string };
   private propCol: string[]; private propLabel: string[]; private doorLabel: string[]; private wallLen: number[]; private wallMid: Float64Array;
   private personCol = new Map<string, string>();
   private fx: FxView | null = null;
@@ -108,11 +108,11 @@ export class RoomPainter {
     this.C = {
       floor: rgba(color, 0.09), ceil: rgba(color, 0.05), wallA: rgba(color, 0.13), wallB: rgba(color, 0.1), grid: rgba(color, 0.22), line: rgba(color, 0.2), edge: rgba(color, 0.8),
       doorOpen: rgba(color, 0.2), doorOpenHot: rgba(color, 0.34), spike: rgba(color, 0.32), spikeStroke: rgba(color, 0.9), doorEdge: rgba(color, 0.85), doorEdgeHot: rgba(color, 1),
-      hotFill: rgba(color, 0.42), map: rgba(color, 0.8), mapLine: rgba(color, 0.8), cross: rgba(color, 0.7), scan: rgba("#9fe9ff", 0.35), propHotFill: rgba(color, 0.28),
+      hotFill: rgba(color, 0.42), map: rgba(color, 0.8), mapLine: rgba(color, 0.8), cross: rgba(color, 0.7), scan: rgba("#9fe9ff", 0.35), propHotFill: rgba(color, 0.28), doorGate: "#ff7a7a",
     };
     this.propCol = world.props.map((p) => (p.kind === "terminal" ? hueColor(p.hue, 58) : p.kind === "more" ? color : hueColor(p.hue, 62)));
     this.propLabel = world.props.map((p) => (p.kind === "terminal" ? "TALK" : p.kind === "computer" ? "SITE" : p.label.length > 22 ? p.label.slice(0, 21) + "…" : p.label));
-    this.doorLabel = world.doors.map((d) => (d.state === "open" ? d.name ?? "" : "sealed"));
+    this.doorLabel = world.doors.map((d) => (d.state === "open" ? d.name ?? "" : d.gated ? "gated" : "sealed"));
     this.wallLen = []; this.wallMid = new Float64Array(this.n * 2);
     for (let i = 0; i < this.n; i++) { const a = this.v[i], b = this.v[(i + 1) % this.n]; this.wallLen.push(Math.hypot(b[0] - a[0], b[1] - a[1])); this.wallMid[i * 2] = (a[0] + b[0]) / 2; this.wallMid[i * 2 + 1] = (a[1] + b[1]) / 2; }
   }
@@ -167,7 +167,7 @@ export class RoomPainter {
     this.view(ctx, W, H, eye); this.fx = fx;
     ctx.fillStyle = BG; ctx.fillRect(0, 0, W, H);
     if (sp && sp.link && sp.corridor) { this.corridorView(eye, sp); this.grade(corrLayer.doc?.grade ?? null); }
-    else { this.tilesLeft = actorLayer.budget; this.shell(eye, -1, target, sp && sp.link ? sp : null); this.floorPaint(eye); this.ceilPaint(eye); this.shafts(eye); this.actors(eye); this.things(eye, target, others); this.flock(eye); this.grade(); }
+    else { this.tilesLeft = actorLayer.budget; this.shell(eye, -1, target, sp && sp.link ? sp : null); this.floorPaint(eye); this.lift(); this.ceilPaint(eye); this.shafts(eye); this.actors(eye); this.things(eye, target, others); this.flock(eye); this.grade(); }
     if (fx?.echo) this.echo(fx.echo, fx.now);
     if (lock) this.bracket(lock);
     if (fx?.scan && fx.scan.p > 0) this.scanRing(fx.scan);
@@ -283,6 +283,20 @@ export class RoomPainter {
   }
   // ---- light shafts: slanted additive wedges from the ceiling to the floor, seeded per room; they breathe slowly (≈0.15 Hz, never a flash)
   private shaftPos: Float32Array | null = null; private shaftKey = "";
+  /** The lift pad: a ring on the floor where you step on, and above it a ring and four posts that frame the cabin. It pulses. */
+  private lift(): void {
+    const L = this.world.lift; if (!L) return;
+    const ctx = this.ctx, N = 18, glow = 0.5 + 0.35 * Math.sin(actorLayer.now * 2.4);
+    ctx.save(); ctx.strokeStyle = this.color; ctx.lineWidth = 2; ctx.globalAlpha = glow;
+    for (let i = 0; i < N; i++) {
+      const a0 = (i / N) * Math.PI * 2, a1 = ((i + 1) / N) * Math.PI * 2;
+      const x0 = L.x + Math.cos(a0) * L.r, z0 = L.z + Math.sin(a0) * L.r, x1 = L.x + Math.cos(a1) * L.r, z1 = L.z + Math.sin(a1) * L.r;
+      ctx.beginPath(); this.seg(x0, 0.02, z0, x1, 0.02, z1); this.seg(x0, LIFT_H, z0, x1, LIFT_H, z1); ctx.stroke();
+    }
+    ctx.beginPath();
+    for (let k = 0; k < 4; k++) { const a = (k / 4) * Math.PI * 2 + Math.PI / 4, x = L.x + Math.cos(a) * L.r, z = L.z + Math.sin(a) * L.r; this.seg(x, 0.02, z, x, LIFT_H, z); }
+    ctx.stroke(); ctx.restore();
+  }
   private shafts(eye: Eye): void {
     const L = actorLayer, doc = L.doc; if (!doc || L.slug !== this.world.slug || !doc.shafts || L.budget === 0) return;
     const w = this.world, key = w.slug + "|" + this.n; const K = 4;
@@ -826,7 +840,7 @@ export class RoomPainter {
     const ax = d.x - d.tx * hw + ox, az = d.z - d.tz * hw + oz, bx = d.x + d.tx * hw + ox, bz = d.z + d.tz * hw + oz;
     const dist = Math.hypot(d.x - e.x, d.z - e.z), linked = !!sp && !!sp.link && sp.link.door.id === d.id && sp.open > 0.02;
     if (!this.quad(ax, 0, az, bx, 0, bz, bx, DOOR_H, bz, ax, DOOR_H, az)) return;
-    ctx.fillStyle = open ? (hot ? C.doorOpenHot : C.doorOpen) : "rgba(8,14,20,.9)"; ctx.fill();
+    ctx.fillStyle = open ? (hot ? C.doorOpenHot : C.doorOpen) : d.gated ? "rgba(48,20,20,.92)" : "rgba(8,14,20,.9)"; ctx.fill();
     // a door that is opening shows the corridor behind it
     if (linked && this.clipDoor(d, 0, 0)) { this.inCorr(sp!.link!, () => { this.corridorShell(sp!.link!, e, false); this.corrActors(e); this.elevActors(e); }); this.beyond(sp!, e); ctx.restore(); }
     // the iris: shut for a door that leads somewhere or is sealed, pulled back as it opens. Only when all four corners are in front and the door is near.
@@ -835,7 +849,7 @@ export class RoomPainter {
     if (allFront) {
       ctx.save(); this.quad(ax, 0, az, bx, 0, bz, bx, DOOR_H, bz, ax, DOOR_H, az); ctx.clip();
       const set = linked ? PETALS[Math.max(0, Math.min(LEVELS, Math.round(sp!.open * LEVELS)))] : open ? PETALS[0] : SPIKES.closed, hwid = this.W / 2, hh = this.H / 2, f = this.f;
-      ctx.fillStyle = open ? C.spike : "rgba(70,95,115,.55)"; ctx.strokeStyle = open ? C.spikeStroke : "rgba(111,135,152,.6)"; ctx.lineWidth = 1;
+      ctx.fillStyle = open ? C.spike : d.gated ? "rgba(255,122,122,.4)" : "rgba(70,95,115,.55)"; ctx.strokeStyle = open ? C.spikeStroke : d.gated ? C.doorGate : "rgba(111,135,152,.6)"; ctx.lineWidth = 1;
       for (let s = 0; s < set.length; s++) {
         const pts = set[s]; ctx.beginPath();
         for (let k = 0; k < pts.length; k += 2) { this.cam(d.x + d.tx * pts[k] + ox, pts[k + 1], d.z + d.tz * pts[k] + oz); const x = hwid + (this.qx * f) / this.qz, y = hh - (this.qy * f) / this.qz; if (k) ctx.lineTo(x, y); else ctx.moveTo(x, y); }
@@ -843,9 +857,9 @@ export class RoomPainter {
       }
       ctx.restore();
     }
-    this.quad(ax, 0, az, bx, 0, bz, bx, DOOR_H, bz, ax, DOOR_H, az); ctx.lineWidth = hot ? 3.5 : 2; ctx.strokeStyle = open ? (hot ? C.doorEdgeHot : C.doorEdge) : hot ? "rgba(111,135,152,1)" : "rgba(111,135,152,.85)"; ctx.stroke();
+    this.quad(ax, 0, az, bx, 0, bz, bx, DOOR_H, bz, ax, DOOR_H, az); ctx.lineWidth = hot ? 3.5 : 2; ctx.strokeStyle = open ? (hot ? C.doorEdgeHot : C.doorEdge) : d.gated ? C.doorGate : hot ? "rgba(111,135,152,1)" : "rgba(111,135,152,.85)"; ctx.stroke();
     // a sealed door that the ping has reached answers: it lights in its own colour and says its note
-    let label = this.doorLabel[di], lcol = open ? this.C.doorEdgeHot : "#8aa0b0";
+    let label = this.doorLabel[di], lcol = open ? this.C.doorEdgeHot : d.gated ? this.C.doorGate : "#8aa0b0";
     const fe = this.fx?.echo;
     if (fe) for (let i = 0; i < fe.n; i++) if (fe.door[i] === di && fe.seal[i]) {
       const g = fe.glow(i, this.fx!.now);

@@ -1082,3 +1082,10 @@ No schema change, no server code. Doors between branch rooms no longer play the 
 - Homepage: an "Enter the game" card with a picture of the Core room, above the branches.
 - Profiles: "Find in room" on every profile, unless the member is Hidden. The room's Visible/Hidden switch is saved to the account while signed in.
 - Schema change: `User.roomHidden`.
+
+## fix406 (map links: corridors, gated corridors, lift destinations)
+- Map layout (admin): a room's links list, with a gate for each, and an add form. Walls that meet within 0.1 m link by themselves (on by default), and walls snap onto each other while you drag. Room sizes now match the Scan map.
+- Scan map: a corridor behind a milestone not yet reached is drawn red.
+- Rooms: a corridor behind an unreached milestone is a red, locked door labelled "gated". Its card is that milestone.
+- Lift: a room that has lift destinations in the Map layout offers exactly those (each behind its gate). A room without any keeps every open room.
+- Schema change: `MapLink` (`map_links`). Deploy with `migrate deploy` (see `docs/ROOM_EDITOR_STATE.md`, fix406).

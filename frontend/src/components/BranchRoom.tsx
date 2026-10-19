@@ -77,6 +77,8 @@ interface Props {
   onSite?: (path: string, title: string) => void;
   /** A milestone door was walked into or used: the page shows that milestone's card. */
   onMilestone?: (m: Milestone) => void;
+  /** You stepped onto a lift pad (or used it): the page opens the cabin's panel. */
+  onLift?: () => void;
   /** A small line over the corner of the room (the branch chat, heard from here). Decorative: the chat itself is a terminal in the room. */
   ticker?: ReactNode;
 }
@@ -93,13 +95,20 @@ function bossNear(rt: WireRuntime | null, ready: boolean, e: Eye, editing: boole
   return best;
 }
 /** The first-person room. Input is read into refs and the canvas is only drawn while something moves or changes, so a parked room costs nothing. */
-export function BranchRoom({ tick, world, color, next, wantNext, onAdvance, go, mapHref, backHref, onLocked, onProp, paused, onDrone, visor, lore, onLogbook, ticker, onSite, onMilestone }: Props) {
+export function BranchRoom({ tick, world, color, next, wantNext, onAdvance, go, mapHref, backHref, onLocked, onProp, paused, onDrone, visor, lore, onLogbook, ticker, onSite, onMilestone, onLift }: Props) {
   const stage = useRef<HTMLDivElement>(null), canvas = useRef<HTMLCanvasElement>(null), prompt = useRef<HTMLDivElement>(null), toast = useRef<HTMLDivElement>(null);
   const onMsRef = useRef(onMilestone), milBump = useRef(false); // the milestone card: one per walk into a door, not one per frame
   onMsRef.current = onMilestone;
   const alive = useRef(true), toastT = useRef(0); // alive: false once the room has unmounted (no frame may be requested after that)
   const wref = useRef(world), linkRef = useRef<RoomLink | null>(null), nextRef = useRef(next), wantedRef = useRef<string | null>(null), waitRef = useRef(0), spaceRef = useRef("cur");
   const sp = useRef(new ScenePaint()), wantNextRef = useRef(wantNext), advanceRef = useRef(onAdvance); nextRef.current = next; wantNextRef.current = wantNext; advanceRef.current = onAdvance;
+  const onLiftRef = useRef(onLift); onLiftRef.current = onLift; // the cabin's panel
+  const liftArmed = useRef(false), rideDone = useRef(false), arriving = useRef<string | null>(null); // a pad fires once you step onto it, not when you arrive on it; the ride is done at its platform; the far door hands over once
+  /** Out of a lift: the far door leads on to the room the page has waiting, and the ride hands over in place. */
+  const liftOut = useCallback((W: RoomWorld, to: string): boolean => {
+    if (!W.ride || nextRef.current?.slug !== to || arriving.current === to) return false;
+    arriving.current = to; advanceRef.current(to); return true;
+  }, []);
   const shotRef = useRef<{ l: Lock; until: number } | null>(null), tpRef = useRef<{ x: number; z: number } | null>(null), moveAnim = useRef(false), surveyed = useRef(""), fyRef = useRef(0), jumpReq = useRef(false), carryRef = useRef<{ id: string; slug: string; x: number; z: number } | null>(null),[hasHeight, setHasHeight] = useState(false), [elevHere, setElevHere] = useState(false); // feet height (for the collision), a queued jump, whether this room has anything to climb
   const rtRef = useRef<WireRuntime | null>(null), docSlug = useRef(""), pushed = useRef({ x: 0, z: 0 });
   const solve = useRef((x: number, z: number) => {
@@ -278,7 +287,7 @@ export function BranchRoom({ tick, world, color, next, wantNext, onAdvance, go, 
 
   useEffect(() => { // a different room from outside (not one we walked into): start at its spawn
     if (world === wref.current) return;
-    wref.current = world; linkRef.current = null; sp.current.nextPainter = null; spaceRef.current = "cur"; wantedRef.current = null; waitRef.current = 0; lock.current = null;
+    wref.current = world; linkRef.current = null; sp.current.nextPainter = null; spaceRef.current = "cur"; wantedRef.current = null; waitRef.current = 0; lock.current = null; liftArmed.current = false; rideDone.current = false; arriving.current = null;
     eye.current = { ...world.spawn, pitch: 0 }; drone.current = startDrone(eye.current); dview.current.d = drone.current; dirty.current = true; wakeRef.current();
   }, [world]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -356,18 +365,21 @@ export function BranchRoom({ tick, world, color, next, wantNext, onAdvance, go, 
     if (traveling.current || pausedRef.current) return;
     const W = wref.current, bn = bossNear(rtRef.current, docSlug.current === wref.current.slug, eye.current, editRef.current && !playRef.current);
     if (bn) { setBoss(bn); keys.current.clear(); return; }
-    const t = facing(W, eye.current); if (!t) return;
+    if (W.ride && !rideDone.current) return; // riding: nothing to use until the platform
+    const t = facing(W, eye.current);
+    if (!t) { const pad = W.lift; if (pad && Math.hypot(eye.current.x - pad.x, eye.current.z - pad.z) < pad.r + 0.6) { liftArmed.current = false; onLiftRef.current?.(); } return; } // nothing in front of you: on the pad, the cabin
     if (t.kind === "door") {
       const d = t.door;
       if (d.milestone && !(d.state === "open" && d.toSlug)) { onMsRef.current?.(d.milestone); return; } // a milestone door shows its card; an open way to another room is walked through
       if (d.state === "open" && d.toSlug) {
+        if (liftOut(W, d.toSlug)) return; // out of a lift: the room is waiting, the ride hands over
         if (linkRef.current && linkRef.current.door.id === d.id) return; // it is opening: walk in
         if (openLink(d)) { wakeRef.current(); return; }
         if (!nextRef.current || nextRef.current.slug !== d.toSlug) { wantedRef.current = d.toSlug; wantNextRef.current(d.toSlug); showToast("Opening…"); waitRef.current = waitRef.current || performance.now(); return; }
         traveling.current = true; go(`/branch/${d.toSlug}/room?from=${encodeURIComponent(W.slug)}`, true); // no corridor possible: the old way
       } else { showToast("Sealed. You have not found that room yet."); onLocked(); }
     } else onProp(t.prop);
-  }, [go, onLocked, onProp, showToast, openLink]);
+  }, [go, onLocked, onProp, showToast, openLink, liftOut]);
 
   const turnTo = useCallback((yaw: number) => { eye.current = { ...eye.current, yaw: wrapYaw(yaw) }; dirty.current = true; wake(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -380,7 +392,8 @@ export function BranchRoom({ tick, world, color, next, wantNext, onAdvance, go, 
     if (!still) for (const code of k) { const v = KEYS[code]; if (v) { f += v[0]; s += v[1]; tr += v[2]; lk += v[3]; } }
     if (!still) { f += stick.current.y; s += stick.current.x; }
     let W = wref.current;
-    const run = k.has("ShiftLeft") || k.has("ShiftRight") || Math.hypot(stick.current.x, stick.current.y) > 0.93;
+    let run = k.has("ShiftLeft") || k.has("ShiftRight") || Math.hypot(stick.current.x, stick.current.y) > 0.93;
+    const riding = !!W.ride && !rideDone.current && !still; if (riding) { f = 1; s = 0; tr = 0; lk = 0; run = true; } // the lift carries you: forward, running, to the platform
     const la = lookAcc.current; lookAcc.current = { yaw: 0, pitch: 0 };
     let e = eye.current;
     if (lock.current && !still) { // locked on: the view follows the target, keys and drags no longer turn it
@@ -402,6 +415,7 @@ export function BranchRoom({ tick, world, color, next, wantNext, onAdvance, go, 
       slow = h.slow;
     }
     const r = still ? { eye: e, into: null as { nx: number; nz: number; edge: number } | null, moved: false } : stepEye(W, e, { forward: clamp(f, -1, 1) * slow, strafe: clamp(s, -1, 1) * slow, turn: clamp(tr, -1, 1), look: clamp(lk, -1, 1), run }, dt, solve);
+    if (riding && W.ride && r.eye.x >= W.ride.end) rideDone.current = true; // the platform: the ride ends here and the far door is yours
     let linkMoved = false, docMoved = false;
     if (hzOn) {
       const h = hz.current;
@@ -484,7 +498,7 @@ export function BranchRoom({ tick, world, color, next, wantNext, onAdvance, go, 
         r.eye = { ...r.eye, x: r.eye.x - L0.offx, z: r.eye.z - L0.offz, y: (r.eye.y ?? 0) + L0.curLev - L0.farLev }; r.into = null; r.moved = true; // the feet keep their height above the floor
         drone.current.x -= L0.offx; drone.current.z -= L0.offz;
         linkRef.current = flipLink(L0, old); sp.current.nextPainter = painterFor(old, old.color ?? color);
-        wref.current = nxt; W = nxt; wantedRef.current = null; waitRef.current = 0; lock.current = null; setLocked(false); others.current.clear(); ghosts.current = []; gpool.current.count = 0;
+        wref.current = nxt; W = nxt; liftArmed.current = false; wantedRef.current = null; waitRef.current = 0; lock.current = null; setLocked(false); others.current.clear(); ghosts.current = []; gpool.current.count = 0;
         advanceRef.current(nxt.slug);
       }
       const L = linkRef.current, space = eyeSpace(W, L, r.eye.x, r.eye.z); spaceRef.current = space;
@@ -535,6 +549,7 @@ export function BranchRoom({ tick, world, color, next, wantNext, onAdvance, go, 
     const tick = (animating && now - lastPaint.current >= 90) || (scrolling && now - lastPaint.current >= 66) || (movers && !document.hidden && now - lastPaint.current >= 33);
     if (tpRef.current) { r.eye = { ...r.eye, x: tpRef.current.x, z: tpRef.current.z, y: 0, vy: 0 }; r.moved = true; tpRef.current = null; }
     const changed = r.moved || !!la.yaw || !!la.pitch || gliding || droneMoved || tick || aimMoved || linkMoved || echoTick || scanTick || ghostTick || docMoved; eye.current = r.eye;
+    if (W.lift && !still) { const dp = Math.hypot(r.eye.x - W.lift.x, r.eye.z - W.lift.z); if (dp > W.lift.r + 0.8) liftArmed.current = true; else if (dp < W.lift.r && liftArmed.current) { liftArmed.current = false; onLiftRef.current?.(); } }
     if (!traveling.current && !still) {
       const md = milestoneDoorAt(W, r.eye, r.into); // a milestone door (lit or dark): its card, once per walk into it
       if (md?.milestone) { if (!milBump.current) { milBump.current = true; onMsRef.current?.(md.milestone); } }
@@ -542,6 +557,7 @@ export function BranchRoom({ tick, world, color, next, wantNext, onAdvance, go, 
       const d = md ? null : doorWalkedInto(W, r.eye, r.into);
       if (d?.toSlug) { // walked into a door whose corridor is not there yet: wait for the room behind it, and only if it never comes, cut to it the old way
         if (linkRef.current) { /* opening */ }
+        else if (liftOut(W, d.toSlug)) { /* the lift hands over */ }
         else if (nextRef.current?.slug === d.toSlug && openLink(d)) { /* opens now */ }
         else if (!waitRef.current) { waitRef.current = now; wantedRef.current = d.toSlug; wantNextRef.current(d.toSlug); showToast("Opening…"); }
         else if (now - waitRef.current > 2500) { traveling.current = true; go(`/branch/${d.toSlug}/room?from=${encodeURIComponent(W.slug)}`, true); }
@@ -551,10 +567,10 @@ export function BranchRoom({ tick, world, color, next, wantNext, onAdvance, go, 
     }
     if (changed || dirty.current || pendingPaint.current) {
       const bn = bossNear(rtRef.current, docSlug.current === W.slug, r.eye, editRef.current && !playRef.current), t = bn ? null : facing(W, r.eye); tgt.current = t;
-      const label = bn ? (rtRef.current?.done.has(bn.id) ? `${bn.text || "The Unnamed Sound"} (echo): play its voice` : `Answer: ${bn.text || "The Unnamed Sound"}`) : t ? t.label : lock.current ? `Locked: ${lock.current.label}` : "";
+      const label = bn ? (rtRef.current?.done.has(bn.id) ? `${bn.text || "The Unnamed Sound"} (echo): play its voice` : `Answer: ${bn.text || "The Unnamed Sound"}`) : t ? t.label : W.lift && Math.hypot(r.eye.x - W.lift.x, r.eye.z - W.lift.z) < W.lift.r + 0.6 ? "Lift: use to ride" : lock.current ? `Locked: ${lock.current.label}` : "";
       if (label !== shown.current) { shown.current = label; if (prompt.current) { prompt.current.textContent = label; prompt.current.style.opacity = label ? "1" : "0"; } }
       link.current?.sendPose(r.eye.x, r.eye.z, r.eye.yaw);
-      if (now - dsAt.current > 100) { dsAt.current = now; st.dataset.x = r.eye.x.toFixed(2); st.dataset.z = r.eye.z.toFixed(2); st.dataset.yaw = r.eye.yaw.toFixed(3); st.dataset.pitch = r.eye.pitch.toFixed(3); st.dataset.y = (r.eye.y ?? 0).toFixed(2); st.dataset.target = label; st.dataset.lock = lock.current ? lock.current.id : ""; st.dataset.space = spaceRef.current; st.dataset.link = linkRef.current ? `${linkRef.current.next.slug}:${linkRef.current.open.toFixed(2)}` : ""; st.dataset.room = W.slug; st.dataset.ghosts = String(gpool.current.count); st.dataset.chat = String(W.chat?.length ?? 0); st.dataset.echo = echoBusy ? "1" : ""; st.dataset.scan = scanSt.current ? scanView.current.p.toFixed(2) : ""; }
+      if (now - dsAt.current > 100) { dsAt.current = now; st.dataset.ride = riding ? "1" : ""; st.dataset.lift = W.lift ? "1" : ""; st.dataset.x = r.eye.x.toFixed(2); st.dataset.z = r.eye.z.toFixed(2); st.dataset.yaw = r.eye.yaw.toFixed(3); st.dataset.pitch = r.eye.pitch.toFixed(3); st.dataset.y = (r.eye.y ?? 0).toFixed(2); st.dataset.target = label; st.dataset.lock = lock.current ? lock.current.id : ""; st.dataset.space = spaceRef.current; st.dataset.link = linkRef.current ? `${linkRef.current.next.slug}:${linkRef.current.open.toFixed(2)}` : ""; st.dataset.room = W.slug; st.dataset.ghosts = String(gpool.current.count); st.dataset.chat = String(W.chat?.length ?? 0); st.dataset.echo = echoBusy ? "1" : ""; st.dataset.scan = scanSt.current ? scanView.current.p.toFixed(2) : ""; }
       if (gov.current.minGap && now - lastPaint.current < gov.current.minGap) pendingPaint.current = true; // slow device: paint at ~30 fps
       else {
         pendingPaint.current = false; dirty.current = false;
@@ -741,7 +757,8 @@ export function BranchRoom({ tick, world, color, next, wantNext, onAdvance, go, 
             </button>
           </li>
         ))}
-        {world.plaque && <li><button type="button" data-testid="face-plaque" onClick={() => turnTo(Math.atan2(world.plaque!.z - eye.current.z, world.plaque!.x - eye.current.x))}>Face the inscription on the wall</button></li>}
+        {world.lift && <li><button type="button" data-testid="lift-pad" onClick={() => { const p = wref.current.lift; if (!p) return; liftArmed.current = false; eye.current = { ...eye.current, x: p.x, z: p.z }; dirty.current = true; wakeRef.current(); onLiftRef.current?.(); }}>Step onto the lift</button></li>}
+            {world.plaque && <li><button type="button" data-testid="face-plaque" onClick={() => turnTo(Math.atan2(world.plaque!.z - eye.current.z, world.plaque!.x - eye.current.x))}>Face the inscription on the wall</button></li>}
         {world.props.map((p) => (
           <li key={p.id}>
             <button type="button" data-prop={p.id} onClick={() => { const L = Math.hypot(p.x, p.z) || 1, ux = p.x / L, uz = p.z / L; const x = p.x - ux * 1.7, z = p.z - uz * 1.7; eye.current = { x, z, yaw: wrapYaw(Math.atan2(uz, ux)), pitch: 0 }; dirty.current = true; wakeRef.current(); }}>Walk up to: {p.label}</button>

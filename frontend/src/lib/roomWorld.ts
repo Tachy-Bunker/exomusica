@@ -14,6 +14,8 @@ export interface RoomDoor {
   key?: string;
   /** A door that stands for a community milestone. Walking into it, or using it, shows that milestone's card (unless it is an open door to another room). */
   milestone?: Milestone;
+  /** A corridor's door locked by a gate not yet reached (fix406): painted amber, not grey. */
+  gated?: boolean;
 }
 export interface RoomProp { id: string; kind: "album" | "terminal" | "computer" | "more"; x: number; z: number; r: number; label: string; href: string; hue: number }
 export interface RoomWorld {
@@ -29,6 +31,10 @@ export interface RoomWorld {
   map: { x: number; z: number };
   /** The floor this room stands on (the hull's height, metres; a corridor to another floor is an elevator). */
   floorY?: number;
+  /** The lift in this room: a pad on the floor to step onto (walkable, blocks nothing). Every room has one. */
+  lift?: { x: number; z: number; r: number };
+  /** A lift ride (the tube between rooms): the local x where the ride ends (the far door), and the branch it leads to. The ride is walked by the engine. */
+  ride?: { to: string; end: number };
   /** Slugs of the branches above this one, nearest first (for themes); set by the page. */
   lineage?: string[];
   /** The branch's colour; set by the page once the theme is known. */
@@ -63,7 +69,7 @@ export function wallPoint(n: number, R: number, rot: number, angle: number): { x
   return { x: Math.cos(angle) * d, z: Math.sin(angle) * d, edge: k };
 }
 
-interface Want { slug: string | null; name: string | null; state: "open" | "locked"; kind: RoomDoor["kind"]; angle: number; key?: string; milestone?: Milestone }
+interface Want { slug: string | null; name: string | null; state: "open" | "locked"; kind: RoomDoor["kind"]; angle: number; key?: string; milestone?: Milestone; gated?: boolean }
 
 /** The direction (radians) with the most room around it, among the given directions. */
 function widestGap(angles: number[]): number {
@@ -83,12 +89,54 @@ function wantedDoors(hull: Hull, me: HullRoom, states: Map<number, RoomState> | 
     if (l.from !== me.id && l.to !== me.id) continue;
     const other = byId.get(l.from === me.id ? l.to : l.from); if (!other) continue;
     const st = states?.get(other.id) ?? "unseen";
-    // a sealed room's gate: the milestone that must be reached before its door opens. With no list to read, the gate stays shut.
-    const gate: Milestone | undefined = other.outer && other.gate ? (milestones?.find((m) => m.key === other.gate) ?? { ...GATE_FALLBACK, key: other.gate }) : undefined;
-    const open = (st === "visited" || st === "heard") && !!other.slug && (!gate || gate.reached);
-    out.push({ slug: open ? other.slug : null, name: open ? other.name : null, state: open ? "open" : "locked", kind: other.outer ? "sealed" : l.to === me.id ? "parent" : "child", angle: Math.atan2(other.z - me.z, other.x - me.x), key: open ? undefined : other.key || String(other.id), milestone: gate });
+    // gates: a sealed room's gate, and a corridor's gate (fix406). Each is the milestone that must be reached before the door opens. With no list to read, a gate stays shut.
+    const milestoneOf = (key: string): Milestone => milestones?.find((m) => m.key === key) ?? { ...GATE_FALLBACK, key };
+    const sealed: Milestone | undefined = other.outer && other.gate ? milestoneOf(other.gate) : undefined;
+    const corr: Milestone | undefined = l.corridor && l.gate ? milestoneOf(l.gate) : undefined;
+    const open = (st === "visited" || st === "heard") && !!other.slug && (!sealed || sealed.reached) && (!corr || corr.reached);
+    out.push({ slug: open ? other.slug : null, name: open ? other.name : null, state: open ? "open" : "locked", kind: other.outer ? "sealed" : l.corridor ? "child" : l.to === me.id ? "parent" : "child", angle: Math.atan2(other.z - me.z, other.x - me.x), key: open ? undefined : other.key || String(other.id), milestone: corr && !corr.reached ? corr : sealed ?? corr, gated: !!corr && !corr.reached });
   }
   return out;
+}
+
+/** The lift pad's radius (metres). */
+export const LIFT_R = 0.9;
+
+/** The room with its lift pad: a clear floor spot (away from the doors, the props and the spawn), off the lines you walk from the spawn to the doors. A narrow hall cannot keep off them all, so it takes the best it has. */
+export function withLift(w: RoomWorld): RoomWorld {
+  const walls = wallsOf(w), r = LIFT_R, inside = (x: number, z: number, m: number): boolean => walls.every((wl) => x * wl.nx + z * wl.nz <= wl.d - m);
+  // the walking lines: from where you arrive to each door. A pad off them is not walked over by accident.
+  const lines = w.doors.map((d) => ({ ax: w.spawn.x, az: w.spawn.z, bx: d.x, bz: d.z }));
+  const lineDist = (x: number, z: number, s: { ax: number; az: number; bx: number; bz: number }): number => {
+    const dx = s.bx - s.ax, dz = s.bz - s.az, L2 = dx * dx + dz * dz || 1;
+    const t = Math.max(0, Math.min(1, ((x - s.ax) * dx + (z - s.az) * dz) / L2));
+    return Math.hypot(x - (s.ax + dx * t), z - (s.az + dz * t));
+  };
+  // every spot on a 0.25 m grid; a clear spot (door 2.2 m, props, spawn 2.6 m) beats any that is not, then the one farthest from the walking lines, then nearest the middle
+  const step = 0.25, span = Math.ceil(w.R / step);
+  let best: { x: number; z: number; r: number } = { x: 0, z: 0, r }, bestScore = -Infinity;
+  for (let i = -span; i <= span; i++) for (let j = -span; j <= span; j++) {
+    const x = i * step, z = j * step;
+    if (!inside(x, z, r + 0.4)) continue;
+    const dDoor = Math.min(99, ...w.doors.map((d) => Math.hypot(d.x - x, d.z - z)));
+    const dProp = Math.min(99, ...w.props.map((p) => Math.hypot(p.x - x, p.z - z) - p.r));
+    const dSpawn = Math.hypot(w.spawn.x - x, w.spawn.z - z);
+    const dLine = Math.min(3, ...lines.map((l) => lineDist(x, z, l)));
+    const clear = (dDoor >= 2.2 ? 1 : 0) + (dProp >= r + 1.0 ? 1 : 0) + (dSpawn >= 2.6 ? 1 : 0);
+    const score = clear * 10 + dLine * 2 - Math.hypot(x, z) * 0.2;
+    if (score > bestScore) { bestScore = score; best = { x, z, r }; }
+  }
+  return { ...w, lift: best };
+}
+
+/** The ride's tube: its length, half-width and height (metres). */
+export const LIFT_LEN = 18, LIFT_HW = 1.3, LIFT_H = 3.2;
+/** The lift's ride: a tube from the pad you stepped onto to its far end, where a door leads to the branch you chose. The engine walks it; you only look. */
+export function buildLiftRoom(o: { from: RoomWorld; to: string; name: string }): RoomWorld {
+  const L = LIFT_LEN, W = LIFT_HW;
+  const verts: [number, number][] = [[-L, -W], [L, -W], [L, W], [-L, W]]; // counter-clockwise, as the other rooms
+  const far: RoomDoor = { id: "far", toSlug: o.to, name: o.name, state: "open", kind: "child", x: L, z: 0, nx: 1, nz: 0, tx: 0, tz: 1, hw: DOOR_W / 2, edge: 1, angle: 0 };
+  return { slug: `lift.${o.from.slug}.${o.to}`, name: "Lift", sides: 4, rot: 0, R: Math.hypot(L, W), inr: W, H: LIFT_H, verts, doors: [far], props: [], spawn: { x: -L + 2.5, z: 0, yaw: 0 }, plaque: null, map: o.from.map, floorY: o.from.floorY ?? 0, ride: { to: o.to, end: L - 1.2 } };
 }
 
 export function buildRoom(o: BuildOpts): RoomWorld {
@@ -124,7 +172,7 @@ export function buildRoom(o: BuildOpts): RoomWorld {
   const doors: RoomDoor[] = items.map(({ w, s }) => {
     const k = Math.min(n - 1, Math.floor(s / E)), t = (s - k * E) / E, a = verts[k], b = verts[(k + 1) % n];
     const x = a[0] + (b[0] - a[0]) * t, z = a[1] + (b[1] - a[1]) * t, mid = rot + (k + 0.5) * ((Math.PI * 2) / n);
-    return { id: w.slug === HULL_SLUG ? "hull" : `d${own++}`, toSlug: w.slug, name: w.name, state: w.state, kind: w.kind, x, z, nx: Math.cos(mid), nz: Math.sin(mid), tx: -Math.sin(mid), tz: Math.cos(mid), hw, edge: k, angle: Math.atan2(z, x), key: w.key, milestone: w.milestone };
+    return { id: w.slug === HULL_SLUG ? "hull" : `d${own++}`, toSlug: w.slug, name: w.name, state: w.state, kind: w.kind, x, z, nx: Math.cos(mid), nz: Math.sin(mid), tx: -Math.sin(mid), tz: Math.cos(mid), hw, edge: k, angle: Math.atan2(z, x), key: w.key, milestone: w.milestone, gated: w.gated };
   });
 
   // things to look at: one pedestal per album on a ring, a chat terminal against the emptiest wall
@@ -176,7 +224,7 @@ export function buildRoom(o: BuildOpts): RoomWorld {
   const via = o.from ? doors.find((d) => d.toSlug === o.from) : undefined;
   const spawn = via ? { x: via.x - via.nx * 2, z: via.z - via.nz * 2, yaw: Math.atan2(-via.nz, -via.nx) }
     : { x: 0, z: 0, yaw: doors.length ? Math.atan2(doors[0].z, doors[0].x) : 0 };
-  return { slug: o.slug, name: o.name, sides: n, rot, R, inr, H, verts, doors, props, spawn, plaque, map: { x: me?.x ?? 0, z: me?.z ?? 0 }, floorY: me?.y ?? 0 };
+  return withLift({ slug: o.slug, name: o.name, sides: n, rot, R, inr, H, verts, doors, props, spawn, plaque, map: { x: me?.x ?? 0, z: me?.z ?? 0 }, floorY: me?.y ?? 0 });
 }
 
 /** A wall of a room: its outward unit normal (nx, nz) and the distance from the middle to it along that normal. */
@@ -223,5 +271,5 @@ export function buildHullRoom(o: { core: RoomWorld; door: RoomDoor; milestones: 
   const f0 = doors[0], spawn = { x: f0.x - f0.nx * 2, z: f0.z - f0.nz * 2, yaw: Math.atan2(-f0.nz, -f0.nx) }; // in front of the back door, looking in
   // the hall's middle lies a unit beyond the Core's door, so the corridor between them is short (only the direction matters to the link)
   const map = { x: o.core.map.x + o.door.nx, z: o.core.map.z + o.door.nz };
-  return { slug: HULL_SLUG, name: "The Hull", sides: verts.length, rot: 0, R: Math.hypot(Lh, Wh), inr: Wh, H: 4.2, verts, doors, props: [], spawn, plaque: null, map, floorY: o.core.floorY ?? 0 };
+  return withLift({ slug: HULL_SLUG, name: "The Hull", sides: verts.length, rot: 0, R: Math.hypot(Lh, Wh), inr: Wh, H: 4.2, verts, doors, props: [], spawn, plaque: null, map, floorY: o.core.floorY ?? 0 });
 }

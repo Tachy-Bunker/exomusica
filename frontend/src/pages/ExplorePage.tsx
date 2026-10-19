@@ -12,6 +12,7 @@ import { loadHome, type HomeData } from "../lib/home";
 import { loadMilestones } from "../lib/milestones";
 import { layoutHull, type HullNode, type MapOverride } from "../lib/hullLayout";
 import { loadMapOverrides } from "../lib/mapOverrides";
+import { loadMapLinks, type MapLink } from "../lib/mapLinks";
 import { useAudioStore } from "../lib/audioStore";
 import { BranchExplorer } from "../components/BranchExplorer";
 import { Loading } from "../components/Loading";
@@ -27,6 +28,7 @@ export function ExplorePage() {
   const [home, setHome] = useState<HomeData | null>(null);
   const [failed, setFailed] = useState(false);
   const [outer, setOuter] = useState(false);
+  const [reached, setReached] = useState<ReadonlySet<string>>(new Set());
   const [pulses, setPulses] = useState<Record<string, number>>({});
   const visited = useMemo(() => { const v = visitedSlugs(); for (const k of keysOf(scannedIds())) if (k.startsWith("branch:")) v.add(k.slice(7)); return v; }, []);
   const found = useMemo(() => new Set([...visited].map(hashStr)), [visited]);
@@ -40,6 +42,7 @@ export function ExplorePage() {
     loadMilestones().then(async (l) => {
       if (!alive) return;
       setOuter(!!l.find((m) => m.key === "m-ring")?.reached); // Second ring: sealed rooms get an outer ring
+      setReached(new Set(l.filter((m) => m.reached).map((m) => m.key))); // corridors behind a gate
       if (SHOW_PULSES && l.find((m) => m.key === "m-chart")?.reached) { // Chart layer: rooms others looked at this week
         const r = await api<{ locked: boolean; pulses: Record<string, number> }>("/api/chart/pulse").catch(() => null);
         if (alive && r && !r.locked) setPulses(r.pulses ?? {});
@@ -56,12 +59,14 @@ export function ExplorePage() {
 
   const [ovr, setOvr] = useState<MapOverride[]>([]);
   useEffect(() => { let on = true; loadMapOverrides().then((r) => { if (on) setOvr(r); }); return () => { on = false; }; }, []);
+  const [links, setLinks] = useState<MapLink[]>([]);
+  useEffect(() => { let on = true; loadMapLinks().then((r) => { if (on) setLinks(r); }); return () => { on = false; }; }, []);
   const hull = useMemo(() => {
     if (!list) return null;
     const by = new Map((home?.branches ?? []).map((b) => [b.slug, b]));
     const nodes: HullNode[] = list.map((b) => ({ id: b.id, parentId: b.parentId, slug: b.slug, name: b.name, secret: b.secret, key: b.key, tracks: by.get(b.slug)?.tracks ?? 0, albums: by.get(b.slug)?.albums ?? 0 }));
-    return layoutHull(nodes, { outer, overrides: ovr });
-  }, [list, home, outer, ovr]);
+    return layoutHull(nodes, { outer, overrides: ovr, links });
+  }, [list, home, outer, ovr, links]);
   const states = useMemo(() => (list ? roomStates(list, visited, found) : null), [list, visited, found]);
 
   return (
@@ -69,7 +74,7 @@ export function ExplorePage() {
       {failed ? <p className="home-dim" style={{ padding: "2rem" }}>The map could not be read. <button type="button" className="btn" onClick={exit}>Back</button></p>
         : !hull || !states ? <Loading />
         : hull.rooms.length === 0 ? <p className="home-dim" style={{ padding: "2rem" }}>Nothing to map yet. <button type="button" className="btn" onClick={exit}>Back</button></p>
-        : <BranchExplorer hull={hull} states={states} lastSlug={last?.branchSlug ?? null} playingSlug={playingSlug} pulses={pulses} onExit={exit} />}
+        : <BranchExplorer hull={hull} states={states} lastSlug={last?.branchSlug ?? null} playingSlug={playingSlug} pulses={pulses} onExit={exit} reached={reached} />}
     </div>
   );
 }

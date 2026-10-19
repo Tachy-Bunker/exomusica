@@ -1789,6 +1789,19 @@ model MapOverride {
   @@map("map_overrides")
 }
 
+/// Map links (fix406): a corridor joins two rooms on the Scan map (doors on both walls; a gate locks it); a lift row lists a destination in that room's cabin.
+model MapLink {
+  id        Int      @id @default(autoincrement())
+  fromSlug  String
+  toSlug    String
+  kind      String   @default("corridor")
+  gate      String   @default("")
+  updatedAt DateTime @updatedAt
+
+  @@unique([fromSlug, toSlug, kind])
+  @@map("map_links")
+}
+
 // A texture the owner uploaded for the room editor: a small square PNG (64, 128 or 256 px), made by the browser from whatever image or zip the owner chose. Rooms refer to it as material kind "u<id>".
 model TextureAsset {
   id        Int      @id @default(autoincrement())

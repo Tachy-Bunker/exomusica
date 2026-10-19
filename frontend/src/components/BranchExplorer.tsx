@@ -7,17 +7,19 @@ import type { RoomState } from "../lib/chart";
 
 /** The branch explorer: the world from hullLayout drawn as a wireframe, in the manner of a ship's scan map. One canvas, a tiny projector, no 3D library.
  *  It draws only when something changes (a drag, a key, a resize), and while you are dragging it leaves out the translucent fills, which come back when you let go. */
-interface Props { hull: Hull; states: ReadonlyMap<number, RoomState>; lastSlug: string | null; playingSlug: string | null; pulses: Record<string, number>; onExit: () => void }
+interface Props { hull: Hull; states: ReadonlyMap<number, RoomState>; lastSlug: string | null; playingSlug: string | null; pulses: Record<string, number>; onExit: () => void; /** the milestone keys reached (a corridor's gate) */ reached: ReadonlySet<string> }
 
 const EDGE: Record<RoomState, string> = { visited: "#ffb347", heard: "#8fd8ff", unseen: "rgba(100,135,165,0.55)", sealed: "#c79bff" };
+/** A corridor whose gate (a milestone) is not reached yet (fix406). */
+const GATE_EDGE = "#ff7a7a";
 const FILL: Record<RoomState, string> = { visited: "rgba(214,110,20,0.30)", heard: "rgba(60,140,200,0.14)", unseen: "rgba(0,0,0,0)", sealed: "rgba(150,90,220,0.12)" };
 const FADE = [1, 0.72, 0.46];
 const STATE_WORD: Record<RoomState, string> = { visited: "Visited", heard: "Heard of", unseen: "Not found yet", sealed: "Sealed" };
 
 interface Geo { room: HullRoom; mesh: ReturnType<typeof roomMesh>; wv: Float32Array }
-interface PipeGeo { from: number; to: number; seg: Float32Array; dashed: boolean; shaft: { x: number; z: number; y: number } | null; a: [number, number, number]; b: [number, number, number] }
+interface PipeGeo { from: number; to: number; seg: Float32Array; dashed: boolean; gated: boolean; shaft: { x: number; z: number; y: number } | null; a: [number, number, number]; b: [number, number, number] }
 
-export function BranchExplorer({ hull, states, lastSlug, playingSlug, pulses, onExit }: Props) {
+export function BranchExplorer({ hull, states, lastSlug, playingSlug, pulses, onExit, reached }: Props) {
   const barRef = useRef<HTMLDivElement>(null), wrap = useRef<HTMLDivElement>(null), canvas = useRef<HTMLCanvasElement>(null);
   const cam = useRef<Cam>(defaultCam(hull.radius));
   useEffect(() => { // the card sits just above the button bar, however many rows it wraps to
@@ -40,8 +42,8 @@ export function BranchExplorer({ hull, states, lastSlug, playingSlug, pulses, on
   }), [hull]);
   const pipes = useMemo<PipeGeo[]>(() => hull.links.map((l) => {
     const a = l.pts[0], b = l.pts[l.pts.length - 1];
-    return { from: l.from, to: l.to, seg: new Float32Array(pipeSegments(l.pts)), dashed: l.dashed, shaft: l.shaft ? { x: l.shaft.x, z: l.shaft.z, y: (l.shaft.y0 + l.shaft.y1) / 2 } : null, a, b };
-  }), [hull]);
+    return { from: l.from, to: l.to, seg: new Float32Array(pipeSegments(l.pts)), dashed: l.dashed, gated: !!l.corridor && !!l.gate && !reached.has(l.gate), shaft: l.shaft ? { x: l.shaft.x, z: l.shaft.z, y: (l.shaft.y0 + l.shaft.y1) / 2 } : null, a, b };
+  }), [hull, reached]);
   const byId = useMemo(() => new Map(hull.rooms.map((r) => [r.id, r])), [hull]);
   const order = useMemo(() => [...hull.rooms].sort((a, b) => a.depth - b.depth || a.angle - b.angle).map((r) => r.id), [hull]);
   const pickables = useMemo(() => hull.rooms.map((r) => ({ id: r.id, x: r.x, y: r.y + r.h / 2, z: r.z, r: Math.max(r.w, r.d, r.h) / 2 })), [hull]);
@@ -64,7 +66,7 @@ export function BranchExplorer({ hull, states, lastSlug, playingSlug, pulses, on
     // corridors
     for (const l of pipes) {
       const st = linkState(l), mid = project(c, (l.a[0] + l.b[0]) / 2, (l.a[1] + l.b[1]) / 2, (l.a[2] + l.b[2]) / 2, w, h, p)[2];
-      const q = path(`${st}:${bucket(mid)}:${l.dashed ? 1 : 0}`), s = l.seg, a: [number, number, number] = [0, 0, 0];
+      const q = path(`${l.gated ? "gate" : st}:${bucket(mid)}:${l.dashed ? 1 : 0}`), s = l.seg, a: [number, number, number] = [0, 0, 0];
       for (let i = 0; i < s.length; i += 6) {
         project(c, s[i], s[i + 1], s[i + 2], w, h, a); const ax = a[0], ay = a[1], az = a[2];
         project(c, s[i + 3], s[i + 4], s[i + 5], w, h, a);
@@ -100,7 +102,7 @@ export function BranchExplorer({ hull, states, lastSlug, playingSlug, pulses, on
     ctx.lineWidth = 1; ctx.lineJoin = "round";
     for (const [k, q] of strokes) {
       const [name, b, d] = k.split(":"), st = name as RoomState;
-      ctx.globalAlpha = FADE[Number(b)]; ctx.strokeStyle = EDGE[st]; ctx.setLineDash(d === "1" ? [5, 5] : []); ctx.stroke(q);
+      ctx.globalAlpha = FADE[Number(b)]; ctx.strokeStyle = name === "gate" ? GATE_EDGE : EDGE[st]; ctx.setLineDash(d === "1" ? [5, 5] : []); ctx.stroke(q);
     }
     ctx.globalAlpha = 1; ctx.setLineDash([]);
 
@@ -293,7 +295,7 @@ export function BranchExplorer({ hull, states, lastSlug, playingSlug, pulses, on
       {legend && (
         <ul className="hx-legend" data-testid="explorer-legend" aria-label="Key">
           <li><i className="hx-sw hx-visited" /> Visited</li><li><i className="hx-sw hx-heard" /> Heard of</li><li><i className="hx-sw hx-unseen" /> Not found yet</li>
-          <li><i className="hx-sw hx-sealed" /> Sealed room (outer ring)</li><li><i className="hx-key">E</i> Elevator: a pipe that changes floor</li>
+          <li><i className="hx-sw hx-sealed" /> Sealed room (outer ring)</li><li><i className="hx-key">E</i> Elevator: a pipe that changes floor</li><li><i className="hx-sw" style={{ background: GATE_EDGE }} /> Corridor behind a gate (not reached yet)</li>
           <li><i className="hx-dot" /> Door between two visited rooms</li><li><i className="hx-diamond" /> Where you last listened</li><li><i className="hx-ring" /> Playing now</li>
         </ul>
       )}

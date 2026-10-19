@@ -5,8 +5,45 @@ export interface HullNode { id: number; parentId: number | null; slug: string; n
 export type Shape = "box" | "oct" | "tower" | "slab" | "ring";
 export interface HullRoom { id: number; slug: string; name: string; secret: boolean; key: string; gate: string; x: number; y: number; z: number; w: number; d: number; h: number; shape: Shape; depth: number; parentId: number | null; angle: number; outer: boolean; tracks: number; albums: number }
 export type V3 = [number, number, number];
-export interface HullLink { from: number; to: number; pts: V3[]; shaft: { x: number; z: number; y0: number; y1: number } | null; dashed: boolean }
+export interface HullLink { from: number; to: number; pts: V3[]; shaft: { x: number; z: number; y0: number; y1: number } | null; dashed: boolean; /** a corridor from the map links (fix406): its gate, and whether it is a stored corridor rather than a tree link */ gate?: string; corridor?: boolean }
 export interface Hull { rooms: HullRoom[]; links: HullLink[]; radius: number }
+/** A stored map link (fix406). A corridor joins two rooms both ways (stored once); a lift row lists a destination in the cabin of `fromSlug`. */
+export interface MapLink { id: number; fromSlug: string; toSlug: string; kind: "corridor" | "lift"; gate: string }
+
+/** A wall of a room's footprint. */
+export type Side = "N" | "E" | "S" | "W";
+const OPPOSITE: Record<Side, Side> = { N: "S", S: "N", E: "W", W: "E" };
+/** Two walls whose middles are this close (metres) join by position: the rooms get a corridor (fix406). */
+export const DOCK_TOL = 0.1;
+/** A room dragged this close to another room's wall snaps onto it (metres). */
+export const SNAP_DIST = 1.5;
+type Footprint = Pick<HullRoom, "x" | "z" | "w" | "d">;
+/** The middle of one wall of a room, on the footprint the room is drawn with. */
+export function dockOf(r: Footprint, s: Side): [number, number] {
+  return s === "N" ? [r.x, r.z - r.d / 2] : s === "S" ? [r.x, r.z + r.d / 2] : s === "E" ? [r.x + r.w / 2, r.z] : [r.x - r.w / 2, r.z];
+}
+/** The offset from a room's middle to the middle of its wall on side s. */
+function offsetOf(s: Side, w: number, d: number): [number, number] {
+  return s === "N" ? [0, -d / 2] : s === "S" ? [0, d / 2] : s === "E" ? [w / 2, 0] : [-w / 2, 0];
+}
+/** Opposite walls of a and b that meet within DOCK_TOL: [a's side, b's side]. Null when no two walls meet. */
+export function alignedDocks(a: Footprint, b: Footprint): [Side, Side] | null {
+  for (const s of ["N", "E", "S", "W"] as Side[]) {
+    const [ax, az] = dockOf(a, s), [bx, bz] = dockOf(b, OPPOSITE[s]);
+    if (Math.hypot(ax - bx, az - bz) <= DOCK_TOL) return [s, OPPOSITE[s]];
+  }
+  return null;
+}
+/** Where a room of this size dragged to (x, z) would meet a wall of one of the fixed rooms: the nearest such spot within SNAP_DIST, exactly aligned. Null when none is near. */
+export function dockSnap(x: number, z: number, mover: { w: number; d: number }, fixed: readonly (Footprint & { slug: string })[]): { x: number; z: number; to: string; side: Side } | null {
+  let best: { x: number; z: number; to: string; side: Side; dist: number } | null = null;
+  for (const f of fixed) for (const s of ["N", "E", "S", "W"] as Side[]) {
+    const [px, pz] = dockOf(f, s), [ox, oz] = offsetOf(OPPOSITE[s], mover.w, mover.d);
+    const cx = px - ox, cz = pz - oz, dist = Math.hypot(cx - x, cz - z);
+    if (dist <= SNAP_DIST && (!best || dist < best.dist)) best = { x: cx, z: cz, to: f.slug, side: s, dist };
+  }
+  return best ? { x: best.x, z: best.z, to: best.to, side: best.side } : null;
+}
 
 const FLOOR = 1.7;       // height between floors
 const GAP = 9;           // least distance between rings
@@ -23,7 +60,7 @@ export function shapeOf(seed: string): Shape { return (["box", "oct", "tower", "
  *  A node whose parent is missing (or sealed and left out) hangs from the nearest ancestor that is there; cycles and orphans cannot hang it. */
 export interface MapOverride { slug: string; x: number | null; z: number | null; level: number | null }
 export const FLOOR_H = FLOOR;
-export function layoutHull(nodes: HullNode[], opts: { outer: boolean; overrides?: readonly MapOverride[] | null }): Hull {
+export function layoutHull(nodes: HullNode[], opts: { outer: boolean; overrides?: readonly MapOverride[] | null; links?: readonly MapLink[] | null }): Hull {
   const byId = new Map(nodes.map((n) => [n.id, n]));
   const shown = (n: HullNode): boolean => !n.secret;
   const real = nodes.filter(shown), realIds = new Set(real.map((n) => n.id));
@@ -122,6 +159,23 @@ export function layoutHull(nodes: HullNode[], opts: { outer: boolean; overrides?
   for (const r of rooms) {
     if (r.outer) { const a = anc(byId.get(r.id)!); const p = a != null ? roomOf.get(a) : undefined; if (p) links.push(link(p, r, true)); continue; }
     const p = parentOf(byId.get(r.id)!); const pr = p != null ? roomOf.get(p) : undefined; if (pr) links.push(link(pr, r, false));
+  }
+  // corridors (fix406): a stored link between two rooms. Walls that meet on the same level join straight; anything else takes the same pipe as a tree link. A pair already joined by the tree is not doubled.
+  if (opts.links?.length) {
+    const joined = new Set(links.map((l) => [Math.min(l.from, l.to), Math.max(l.from, l.to)].join(":")));
+    const bySlug = new Map(rooms.map((r) => [r.slug, r]));
+    for (const row of opts.links) {
+      if (row.kind !== "corridor") continue;
+      const a = bySlug.get(row.fromSlug), b = bySlug.get(row.toSlug); if (!a || !b || a.id === b.id) continue;
+      const key = [Math.min(a.id, b.id), Math.max(a.id, b.id)].join(":"); if (joined.has(key)) continue; joined.add(key);
+      const hit = alignedDocks(a, b);
+      let hl: HullLink;
+      if (hit && Math.abs(a.y - b.y) < 0.2) {
+        const y = a.y + Math.min(a.h * 0.4, 0.8), p = dockOf(a, hit[0]), q = dockOf(b, hit[1]);
+        hl = { from: a.id, to: b.id, pts: [[p[0], y, p[1]], [q[0], y, q[1]]], shaft: null, dashed: false };
+      } else hl = link(a, b, false);
+      links.push({ ...hl, gate: row.gate || "", corridor: true });
+    }
   }
   const far = rooms.reduce((m, r) => Math.max(m, Math.hypot(r.x, r.z) + Math.max(r.w, r.d)), 8);
   return { rooms, links, radius: far };
