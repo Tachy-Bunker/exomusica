@@ -109,6 +109,8 @@ function ConversationsRedirect() {
 }
 
 const OutreachPage = lazy(() => import("./pages/OutreachPage").then((m) => ({ default: m.OutreachPage })));
+const CalendarPage = lazy(() => import("./pages/CalendarPage").then((m) => ({ default: m.CalendarPage })));
+const CalendarIndexPage = lazy(() => import("./pages/CalendarIndexPage").then((m) => ({ default: m.CalendarIndexPage })));
 const VoiceLabPage = lazy(() => import("./pages/VoiceLabPage").then((m) => ({ default: m.VoiceLabPage })));
 
 /** A resource or open call has its own address (for sharing and for link previews); it opens in XenoLab, scrolled to that card. */
@@ -133,6 +135,8 @@ export default function App() {
               <Route path="chat-window" element={<MiniChatWindowPage />} />
               <Route path="outreach" element={<Suspense fallback={null}><OutreachPage /></Suspense>} />
               <Route path="outreach/:slug" element={<Suspense fallback={null}><OutreachPage /></Suspense>} />
+              <Route path="calendar" element={<Suspense fallback={null}><CalendarIndexPage /></Suspense>} />
+              <Route path="calendar/:slug" element={<Suspense fallback={null}><CalendarPage /></Suspense>} />
               <Route path="embed/playlist/:slug" element={<EmbedPlaylistPage />} />
               <Route path="embed/main-spacemap" element={<EmbedMainSpacemapPage />} />
               <Route element={<Layout />}>

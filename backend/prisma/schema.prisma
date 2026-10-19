@@ -1777,6 +1777,79 @@ model RoomDocVersion {
   @@map("room_doc_versions")
 }
 
+// Trash for deleted rooms, prefabs, themes and pictures (P35). `kind` is "doc" (`key` is the slug; `doc` is the room as saved,
+// `meta` its version and history) or "texture" (`key` is the picture's id; `png` is the picture, `meta` its name and id).
+// Kept for 30 days (lib/trash.ts); the hourly sweep in routes/trash.ts deletes what is older.
+model TrashEntry {
+  id        Int      @id @default(autoincrement())
+  kind      String
+  key       String
+  label     String
+  meta      String   @db.Text
+  doc       String?  @db.Text
+  png       Bytes?
+  deletedAt DateTime @default(now())
+
+  @@index([deletedAt])
+  @@map("trash_entries")
+}
+
+// Collaborative calendars (fix412, Outreach's pattern): an address (slug), open or behind a password that travels in the link (`#password`), and events.
+model Calendar {
+  id           Int             @id @default(autoincrement())
+  slug         String          @unique
+  name         String
+  timezone     String          @default("Europe/Paris")
+  passwordHash String?
+  tokenVersion Int             @default(1) // bumped to sign everyone out
+  editMode     String          @default("guests") // "guests": anyone who can open it changes events; "members": only the creator, the admin and the members below
+  members      String[]        @default([]) // usernames of site accounts that may change events in "members" mode (and may open a protected one without its password)
+  pictureCap   Int             @default(200) // pictures kept; past the cap the picture of the oldest event goes (set by the admin)
+  createdBy    String          @default("") // the creator's username when they were signed in: the creator may change the settings
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+  events       CalendarEvent[]
+  images       CalendarImage[]
+
+  @@map("calendars")
+}
+
+// One event: what, where, when, a link, a text and a preview picture. `addedBy` is the name a guest typed, not an account.
+model CalendarEvent {
+  id         Int            @id @default(autoincrement())
+  calendarId Int
+  calendar   Calendar       @relation(fields: [calendarId], references: [id], onDelete: Cascade)
+  title      String
+  text       String         @default("")
+  url        String?
+  location   String         @default("")
+  startsAt   DateTime
+  endsAt     DateTime?
+  allDay     Boolean        @default(false)
+  imageId    Int?
+  image      CalendarImage? @relation(fields: [imageId], references: [id], onDelete: SetNull)
+  addedBy    String         @default("")
+  createdAt  DateTime       @default(now())
+  updatedAt  DateTime       @updatedAt
+
+  @@index([calendarId, startsAt])
+  @@map("calendar_events")
+}
+
+// A preview picture (PNG, JPEG or WebP, up to 1 MB). Served by its id and a random key that only the event readers have.
+model CalendarImage {
+  id         Int             @id @default(autoincrement())
+  calendarId Int
+  calendar   Calendar        @relation(fields: [calendarId], references: [id], onDelete: Cascade)
+  key        String
+  mime       String
+  bytes      Bytes
+  createdAt  DateTime        @default(now())
+  events     CalendarEvent[]
+
+  @@map("calendar_images")
+}
+
 // Where the owner has moved a room on the explorable map (the Scan map and the 3D rooms' doors follow it). Every field is optional; empty = the automatic layout decides. Keyed by branch slug.
 model MapOverride {
   id        Int      @id @default(autoincrement())

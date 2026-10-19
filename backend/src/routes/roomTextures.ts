@@ -1,9 +1,27 @@
+import { createHash } from "node:crypto";
 import type { FastifyInstance } from "fastify";
 import { prisma } from "../lib/prisma.js";
 import { requireAdmin } from "../lib/auth.js";
 import { checkTexture, checkSky, imageType } from "../lib/png.js";
+import { encodeTexMeta } from "../lib/trashEntries.js";
+
+// SHA-256 of each library picture, by id. A picture never changes for its id, so each one is hashed once per process.
+const digests = new Map<number, string>();
 
 export async function roomTextureRoutes(app: FastifyInstance): Promise<void> {
+  // Admin: the digests of the library, so a package import can reuse a picture the library already has without downloading the library.
+  app.get("/api/admin/room-textures/digests", { preHandler: requireAdmin }, async () => {
+    const ids = (await prisma.textureAsset.findMany({ select: { id: true } })).map((r) => r.id);
+    const live = new Set(ids);
+    for (const id of digests.keys()) if (!live.has(id)) digests.delete(id);
+    const missing = ids.filter((id) => !digests.has(id));
+    for (let i = 0; i < missing.length; i += 25) {
+      const rows = await prisma.textureAsset.findMany({ where: { id: { in: missing.slice(i, i + 25) } }, select: { id: true, png: true } });
+      for (const r of rows) digests.set(r.id, createHash("sha256").update(r.png).digest("hex"));
+    }
+    return ids.map((id) => ({ id, sha256: digests.get(id) ?? "" }));
+  });
+
   // Public: the picture itself. It never changes for an id, so browsers keep it for good.
   app.get<{ Params: { id: string } }>("/api/room-textures/:id", async (req, reply) => {
     const id = Number(req.params.id);
@@ -26,8 +44,16 @@ export async function roomTextureRoutes(app: FastifyInstance): Promise<void> {
     return reply.code(201).send(row);
   });
 
+  // Deleting moves the picture to the trash for 30 days, under its own id, so the rooms that use it show it again when it is restored.
   app.delete<{ Params: { id: string } }>("/api/admin/room-textures/:id", { preHandler: requireAdmin }, async (req, reply) => {
-    await prisma.textureAsset.deleteMany({ where: { id: Number(req.params.id) } });
+    const id = Number(req.params.id);
+    const row = Number.isInteger(id) ? await prisma.textureAsset.findUnique({ where: { id }, select: { id: true, name: true, png: true, createdAt: true } }) : null;
+    if (row) {
+      await prisma.$transaction([
+        prisma.trashEntry.create({ data: { kind: "texture", key: String(row.id), label: `Picture “${row.name.replace(/^sky:/, "")}”`, meta: encodeTexMeta({ id: row.id, name: row.name, sky: row.name.startsWith("sky:"), createdAt: row.createdAt.toISOString() }), png: new Uint8Array(row.png) } }),
+        prisma.textureAsset.deleteMany({ where: { id } }),
+      ]);
+    }
     return reply.code(204).send();
   });
 }

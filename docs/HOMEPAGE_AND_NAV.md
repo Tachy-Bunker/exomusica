@@ -1089,3 +1089,19 @@ No schema change, no server code. Doors between branch rooms no longer play the 
 - Rooms: a corridor behind an unreached milestone is a red, locked door labelled "gated". Its card is that milestone.
 - Lift: a room that has lift destinations in the Map layout offers exactly those (each behind its gate). A room without any keeps every open room.
 - Schema change: `MapLink` (`map_links`). Deploy with `migrate deploy` (see `docs/ROOM_EDITOR_STATE.md`, fix406).
+
+## fix407 (counter and switch actors)
+- Room editor: "+ counter" counts the wires that reach it and sends "reached" once when it has its number (1..99), until "reset". "+ switch" is an on/off that drives other things. Both are invisible in the room and show in the plan.
+- No schema change (room document).
+
+## fix411 (admin trash for rooms, prefabs, themes and pictures)
+- Admin only. The Trash page lists rooms, prefabs, themes and pictures deleted in the last 30 days, each with Restore and Delete now. Nothing changes for visitors.
+
+## fix413 (the Calendar page, for visitors)
+- `/calendar` lists the open calendars with their event counts and time zones. Choosing one opens it.
+- `/calendar/<slug>` shows a calendar with its events: month, week, agenda, discover, places and search. Tapping an event opens it with its picture, text, link, place and time.
+- A protected calendar asks for its password at a gate. Its link carries the password after the `#`; the page takes it, cleans the address bar and remembers the calendar in this browser for 30 days.
+- "Add event" takes a line such as "Vernissage at Le Trianon, 2 Nov 20:00" (French or English) or a pasted link, and fills in the rest for you to check before saving.
+- The page is in English; add `?fr` to the address (or press "Français") for French. The choice stays in the link.
+- Some calendars are members-only: then only the people listed (and the creator and the admin) can add or change events; everyone else reads them.
+- Not linked from the menu yet: visitors reach it by its address.

@@ -8,8 +8,8 @@ export const MAX_PER_ACTOR_TICK = 8;       // per target, so a loop cannot run a
 export const MAX_DELAY = 600;              // seconds
 export const RANGE = 200;                  // metres, positions are clamped to +-RANGE
 
-export type Kind = "solid" | "ghost" | "trigger" | "light" | "marker" | "pool" | "artifact" | "hazard" | "boss" | "decal";
-export const KINDS: Kind[] = ["solid", "ghost", "trigger", "light", "marker", "pool", "artifact", "hazard", "boss", "decal"];
+export type Kind = "solid" | "ghost" | "trigger" | "light" | "marker" | "pool" | "artifact" | "hazard" | "boss" | "decal" | "counter" | "switch";
+export const KINDS: Kind[] = ["solid", "ghost", "trigger", "light", "marker", "pool", "artifact", "hazard", "boss", "decal", "counter", "switch"];
 
 /** Events an actor can emit, per kind. "start" fires once when the room loads. */
 export const EVENTS: Record<Kind, string[]> = {
@@ -23,6 +23,8 @@ export const EVENTS: Record<Kind, string[]> = {
   hazard: ["enter", "exit", "shown", "hidden", "start"],
   boss: ["engaged", "defeated", "shown", "hidden", "start"],
   decal: ["shown", "hidden", "start"],
+  counter: ["reached", "start"],   // reached: the count was reached (once per run, until reset)
+  switch: ["shown", "hidden", "start"],
 };
 /** Messages an actor accepts. */
 export const MESSAGES: Record<Kind, string[]> = {
@@ -36,6 +38,8 @@ export const MESSAGES: Record<Kind, string[]> = {
   hazard: ["show", "hide", "toggle", "setcolor"],
   boss: ["show", "hide", "toggle", "setcolor"],
   decal: ["show", "hide", "toggle", "setcolor"],
+  counter: ["count", "reset"],    // count: one more; reset: back to zero
+  switch: ["show", "hide", "toggle"],
 };
 /** Messages that need a value (`Wire.arg`): a colour, a line of text, a sound name. */
 export const ARG_KIND: Record<string, "color" | "text" | "sound" | "secs"> = { setcolor: "color", say: "text", play: "sound", shot: "secs" };
@@ -67,6 +71,7 @@ export interface Actor {
   ptime: number;                       // seconds for one way (1..120); 0 = stands still
   lift: number;                        // solid/ghost: height of its underside above the floor (a platform, a low ceiling), 0..12 m
   season: number;                      // shows only in one season of the visitor's calendar: 0 any, 1 spring, 2 summer, 3 autumn, 4 winter (see seasonOf)
+  count: number;                       // counter only: how many counts reach it, 1..99 (0 for other kinds)
 }
 export const MAX_LORE = 1500, MAX_TEXT = 60;
 /** Catalogue props (shapes in `roomProps.ts`): id -> blocks you? Frames, arches and the like are walk-through. */
@@ -160,6 +165,7 @@ export function cleanDoc(raw: unknown): RoomDoc {
       prop: (kind === "solid" || kind === "ghost") && typeof o.prop === "string" && Object.hasOwn(PROP_BLOCKS, o.prop) ? o.prop : "",
       gate: typeof o.gate === "string" && GATE.test(o.gate) ? o.gate : "", gateOff: typeof o.gate === "string" && GATE.test(o.gate) && o.gateOff === true,
       lift: kind === "solid" || kind === "ghost" ? Math.round(num(o.lift, 0, 12, 0) * 4) / 4 : 0, season: Math.round(num(o.season, 0, MAX_SEASON, 0)),
+      count: kind === "counter" ? Math.round(num(o.count, 1, 99, 3)) : 0,
       ...pathOf(kind, o),
     });
   }
@@ -228,6 +234,9 @@ export class WireRuntime {
   private byEvent = new Map<string, Wire[]>();
   private spent = new Set<Wire>();
   private q: { due: number; w: Wire }[] = [];
+  /** Counters: counts so far, and the ones that have reached their count (until a reset). */
+  private hits = new Map<string, number>();
+  private reached = new Set<string>();
   /** Actors whose state changed since the last `drain`; the painter and collision read this. */
   changed: string[] = [];
   /** Called whenever a message reaches a marker/trigger "fire". */
@@ -292,6 +301,13 @@ export class WireRuntime {
       const v = msg === "enable"; if (this.enabled.get(id) !== v) { this.enabled.set(id, v); this.changed.push(id); } return;
     }
     if (a.kind === "marker") { if (msg === "fire") { this.onFire?.(id); this.emit(id, "scanned", t); } else this.onAct?.(id, msg, arg); return; }
+    if (a.kind === "counter") { // counts up to `count`, says "reached" once, and starts again on "reset"
+      if (msg === "reset") { this.hits.delete(id); this.reached.delete(id); return; }
+      if (msg !== "count" || this.reached.has(id)) return;
+      const n = (this.hits.get(id) ?? 0) + 1; this.hits.set(id, n);
+      if (n >= a.count) { this.reached.add(id); this.emit(id, "reached", t); }
+      return;
+    }
     if (msg === "setcolor") { if (arg && this.col.get(id) !== arg) { this.col.set(id, arg); this.changed.push(id); } return; }
     if (msg === "move") { // a called platform goes to the far end; the next call brings it back
       if (a.ptime && a.pmode === 1) { const cur = this.fracOf(a), m = this.mv.get(id), to = m && m.to === 1 ? 0 : 1; this.mv.set(id, { t0: t, from: cur, to }); this.moving.add(id); this.changed.push(id); }
@@ -362,6 +378,19 @@ export function pushOut(doc: RoomDoc, rt: WireRuntime, x: number, z: number, r: 
     out.x = a.x + nx * c2 - nz * s2; out.z = a.z + nx * s2 + nz * c2; moved = true;
   }
   return moved;
+}
+/** The moving solid under (x, z) whose top is the floor for feet at `fy` (within a step), or null. Fixed blocks and open floor give null: only moving solids carry you. Returns the stored actor, not the scratch copy. */
+export function carrierAt(doc: RoomDoc, rt: WireRuntime, x: number, z: number, fy: number): Actor | null {
+  let g = 0, best: Actor | null = null;
+  for (const a0 of doc.actors) {
+    if (a0.kind !== "solid" || !a0.ptime || !rt.isOn(a0.id)) continue;
+    const a = atNow(a0, rt); if (!insideBox(a, x, z)) continue;
+    const slope = a.prop ? PROP_SLOPE[a.prop] !== undefined : false;
+    if (a.prop && !PROP_BLOCKS[a.prop] && !slope) continue;
+    const top = slope ? slopeTop(a, x, z) : a.lift + a.h;
+    if (top <= fy + STEP + 1e-6 && top > g) { g = top; best = a0; }
+  }
+  return best;
 }
 /** The floor under (x, z) for someone whose feet are at `fy`: 0, or the top of a solid / slope they can step onto. */
 export function groundAt(doc: RoomDoc, rt: WireRuntime, x: number, z: number, fy: number): number {

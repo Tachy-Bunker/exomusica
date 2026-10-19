@@ -541,7 +541,7 @@ export class RoomPainter {
     if (!L.doc || !L.rt) return;
     const acts = L.doc.actors, rt = L.rt; let m = 0;
     for (let i = 0; i < acts.length && i < 160; i++) {
-      const a = acts[i]; if (!L.edit && (a.kind === "trigger" || a.kind === "marker" || !rt.isOn(a.id) || (a.visor && !actorLayer.visor))) continue;
+      const a = acts[i]; if (a.kind === "counter" || a.kind === "switch" || (!L.edit && (a.kind === "trigger" || a.kind === "marker" || !rt.isOn(a.id) || (a.visor && !actorLayer.visor)))) continue; // logic only: no picture in the room
       const d = (a.x - eye.x) * (a.x - eye.x) + (a.z - eye.z) * (a.z - eye.z);
       let j = m; while (j > 0 && this.aD[j - 1] < d) { this.aD[j] = this.aD[j - 1]; this.aOrd[j] = this.aOrd[j - 1]; j--; } this.aD[j] = d; this.aOrd[j] = i; m++;
     }

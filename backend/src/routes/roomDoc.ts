@@ -2,6 +2,7 @@ import type { FastifyInstance, FastifyReply } from "fastify";
 import { prisma } from "../lib/prisma.js";
 import { requireAdmin } from "../lib/auth.js";
 import { cleanDoc, emptyDoc } from "../lib/roomDoc.js";
+import { docLabel, encodeDocMeta } from "../lib/trashEntries.js";
 
 // a room slug, "low~high" for the corridor between two rooms, "theme~slug" (a branch theme) or "prefab~name" (a saved group of things)
 const SLUG = /^((theme|prefab)~)?[a-z0-9][a-z0-9-]{0,80}(~[a-z0-9][a-z0-9-]{0,80})?$/; // "theme~slug" is a branch's theme
@@ -63,9 +64,18 @@ export async function roomDocRoutes(app: FastifyInstance): Promise<void> {
     return saveDoc(slug, cleanDoc(JSON.parse(old.doc)), Number(req.body?.baseVersion ?? 0), reply);
   });
 
+  // Deleting moves the room (a prefab, a theme) and its saved versions to the trash for 30 days; an admin can restore it from there.
   app.delete<{ Params: { slug: string } }>("/api/admin/room-doc/:slug", { preHandler: requireAdmin }, async (req, reply) => {
-    await prisma.roomDoc.deleteMany({ where: { slug: req.params.slug } });
-    await prisma.roomDocVersion.deleteMany({ where: { slug: req.params.slug } });
+    const { slug } = req.params;
+    const row = await prisma.roomDoc.findUnique({ where: { slug } });
+    if (row) {
+      const versions = await prisma.roomDocVersion.findMany({ where: { slug }, orderBy: { id: "desc" }, take: ROOM_HISTORY, select: { version: true, doc: true, savedAt: true } });
+      await prisma.$transaction([
+        prisma.trashEntry.create({ data: { kind: "doc", key: slug, label: docLabel(slug), meta: encodeDocMeta({ version: row.version, history: versions.map((v) => ({ version: v.version, doc: v.doc, savedAt: v.savedAt.toISOString() })) }), doc: row.doc } }),
+        prisma.roomDoc.deleteMany({ where: { slug } }),
+        prisma.roomDocVersion.deleteMany({ where: { slug } }),
+      ]);
+    }
     return reply.code(204).send();
   });
 }

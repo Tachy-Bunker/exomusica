@@ -14,6 +14,9 @@ import { surveyDraft } from "../lib/roomLore";
 import { freqOf, motifOf, voiceOf } from "../lib/roomBoss";
 import { tone } from "../lib/roomSfx";
 import { groupOf, makePrefab, placePrefab, prefabKey, prefabSlug } from "../lib/roomPrefab";
+import { MS_LABEL, MS_MODES, type MsMode } from "../lib/milestoneMode";
+import { readPackage, type Package, type Scope } from "../lib/roomPackage";
+import { exportRoom, importRoom, previewImport } from "../lib/roomPackageNet";
 
 const SNAP = 0.25, PLAN = 300;
 const NO_CLIMB: Actor[] = [];
@@ -21,6 +24,7 @@ const PALETTE = ["#7a8cff", "#ff7ab6", "#7affc8", "#ffd27a", "#c07aff", "#7ad7ff
 const DEFAULTS: Record<Kind, Partial<Actor>> = {
   solid: { w: 2, d: 2, h: 1.5 }, ghost: { w: 2, d: 2, h: 1.5 }, trigger: { w: 3, d: 3, h: 2 }, light: { w: 1, d: 1, h: 2.4 }, marker: { w: 0.6, d: 0.6, h: 1.6 }, pool: { w: 4, d: 4, h: 0 }, artifact: { w: 1.6, d: 0.1, h: 1 }, hazard: { w: 4, d: 4, h: 0, mode: 0, color: "#ff9a5c" }, boss: { w: 2.6, d: 2.6, h: 2.4, mode: 0, color: "#ff7ab6", text: "The Unnamed Sound" },
   decal: { w: 1.2, d: 0.1, h: 1, mode: 0 },
+  counter: { w: 1, d: 1, h: 0 }, switch: { w: 1, d: 1, h: 0 },
 };
 const KIND_HELP: Record<Kind, string> = {
   solid: "Blocks you. Can be shown or hidden by wires.", ghost: "You walk through it. Cosmetic.", trigger: "A zone that sends “enter” and “exit” when you step in or out.",
@@ -29,6 +33,8 @@ const KIND_HELP: Record<Kind, string> = {
   hazard: "A zone on the floor that slows you, drifts you along, or drains your integrity. Integrity refills by itself; at zero you are drawn gently back to the start of the room. Never a game-over.",
   decal: "A picture or words stuck to a surface: on a wall, on the floor or turning to face you. Not scannable, nothing to walk into. Wires can show, hide or recolour it. Up to 64 a room.",
   artifact: "A panel with words and/or a picture, on a wall, on the floor or turning to face you. Can be scanned: it writes a Logbook entry and sends “scanned” (to open a door, say). Can be visible only through the scan visor.",
+  counter: "Counts the wires that reach it (“count”). When it has counted to its number it sends “reached” once; “reset” starts it again. Invisible in the room; shows in the plan.",
+  switch: "Turns on and off (“show”, “hide”, “toggle”) and sends “shown” or “hidden”, so one thing can drive another. Invisible in the room; shows in the plan.",
 };
 const snap = (v: number) => Math.round(v / SNAP) * SNAP;
 
@@ -38,11 +44,12 @@ interface Props {
   sel: string | null; setSel: (id: string | null) => void;
   where: () => { x: number; z: number; yaw: number };
   dirty: boolean; busy: boolean; error: string; playing: boolean; onPlay: (on: boolean) => void; preview: boolean; onPreview: (on: boolean) => void; onRestored: (d: RoomDoc) => void;
+  msMode: MsMode; onMsMode: (m: MsMode) => void;
   onSave: () => void; onRevert: () => void; onClose: () => void;
 }
 
 /** The room editor: a plan view of the room, a list of what is in it, and wires between things. Pure form UI, no logic of its own: every change is a new document handed up. */
-export function RoomEditor({ themeNote = "", hasTheme = false, themeMsg = "", onTheme = () => {}, world, cx = 0, cz = 0, corridor = false, climb = NO_CLIMB, doc, onDoc, onUndo, onRedo, canUndo, canRedo, sel, setSel, where, dirty, busy, error, playing, onPlay, preview, onPreview, onRestored, onSave, onRevert, onClose }: Props) {
+export function RoomEditor({ themeNote = "", hasTheme = false, themeMsg = "", onTheme = () => {}, world, cx = 0, cz = 0, corridor = false, climb = NO_CLIMB, doc, onDoc, onUndo, onRedo, canUndo, canRedo, sel, setSel, where, dirty, busy, error, playing, onPlay, preview, onPreview, onRestored, msMode, onMsMode, onSave, onRevert, onClose }: Props) {
   const painting = useRef(false), cv = useRef<HTMLCanvasElement>(null), drag = useRef<{ id: string; dx: number; dz: number } | null>(null);
   const scale = (PLAN / 2 - 8) / (world.inr + 1.5);
   const toPx = (x: number, z: number): [number, number] => [PLAN / 2 + (x - cx) * scale, PLAN / 2 + (z - cz) * scale];
@@ -166,8 +173,8 @@ export function RoomEditor({ themeNote = "", hasTheme = false, themeMsg = "", on
     for (const o of doc.actors) {
       const [px, py] = toPx(o.x, o.z); g.save(); g.translate(px, py); g.rotate(o.rot);
       const hw = (o.w * scale) / 2, hd = Math.max(o.kind === "artifact" ? 2 : 0, (o.d * scale) / 2);
-      g.globalAlpha = o.on ? 1 : 0.4; g.fillStyle = o.color + (o.kind === "ghost" || o.kind === "trigger" ? "33" : "99"); g.strokeStyle = o.id === sel ? "#fff" : o.color; g.lineWidth = o.id === sel ? 2.5 : 1.5;
-      if (o.kind === "trigger") g.setLineDash([4, 3]);
+      g.globalAlpha = o.on ? 1 : 0.4; g.fillStyle = o.color + (o.kind === "ghost" || o.kind === "trigger" || o.kind === "counter" || o.kind === "switch" ? "33" : "99"); g.strokeStyle = o.id === sel ? "#fff" : o.color; g.lineWidth = o.id === sel ? 2.5 : 1.5;
+      if (o.kind === "trigger" || o.kind === "counter" || o.kind === "switch") g.setLineDash([4, 3]);
       if (o.kind === "light" || o.kind === "marker") { g.beginPath(); g.arc(0, 0, o.kind === "light" ? 5 : 4, 0, 7); g.fill(); g.stroke(); }
       else if (o.sides >= 3) { g.beginPath(); const r = Math.min(hw, hd); for (let k = 0; k < o.sides; k++) { const t = (k * Math.PI * 2) / o.sides; if (k) g.lineTo(Math.cos(t) * r, Math.sin(t) * r); else g.moveTo(Math.cos(t) * r, Math.sin(t) * r); } g.closePath(); g.fill(); g.stroke(); }
       else { g.fillRect(-hw, -hd, hw * 2, hd * 2); g.strokeRect(-hw, -hd, hw * 2, hd * 2); }
@@ -193,7 +200,7 @@ export function RoomEditor({ themeNote = "", hasTheme = false, themeMsg = "", on
         if (o.kind === "pool" || o.kind === "hazard") { lo = 0; hi = 0.05; } else if (o.kind === "light") { lo = Math.max(0, o.h - 0.1); hi = o.h + 0.1; } else if (o.kind === "marker") hi = 1.6;
         else if (o.kind === "artifact" || o.kind === "decal") { lo = o.mode === 1 ? 0 : 0.6; hi = o.mode === 1 ? 0.05 : 0.6 + o.h; } else if (o.prop === "drifter") { const k = Math.min(1, o.h / 1.8); lo = 0.3 * k + o.h * 0.2; hi = lo + o.h * 0.75; }
         const x0 = px - Math.max(half, 0.1) * scale, w = Math.max(3, Math.max(half, 0.1) * 2 * scale), over = hi > world.H + 0.01;
-        sg.globalAlpha = o.on ? 1 : 0.4; sg.fillStyle = over ? "#ff6a6a99" : o.color + (o.kind === "ghost" || o.kind === "trigger" ? "33" : "99"); sg.strokeStyle = o.id === sel ? "#fff" : over ? "#ff6a6a" : o.color; sg.lineWidth = o.id === sel ? 2.5 : 1.2;
+        sg.globalAlpha = o.on ? 1 : 0.4; sg.fillStyle = over ? "#ff6a6a99" : o.color + (o.kind === "ghost" || o.kind === "trigger" || o.kind === "counter" || o.kind === "switch" ? "33" : "99"); sg.strokeStyle = o.id === sel ? "#fff" : over ? "#ff6a6a" : o.color; sg.lineWidth = o.id === sel ? 2.5 : 1.2;
         sg.fillRect(x0, Y(hi), w, Math.max(2, Y(lo) - Y(hi))); sg.strokeRect(x0, Y(hi), w, Math.max(2, Y(lo) - Y(hi))); sg.globalAlpha = 1;
       }
       if (tab === "walls") for (const b of doc.bands.filter((q) => q.e === edge)) { const t = doc.tex[b.m - 1]; if (!t) continue; sg.fillStyle = t.tint + "aa"; sg.fillRect(PLAN - 10, Y(Math.min(b.y1, world.H)), 8, Math.max(2, Y(b.y0) - Y(Math.min(b.y1, world.H)))); }
@@ -235,7 +242,7 @@ export function RoomEditor({ themeNote = "", hasTheme = false, themeMsg = "", on
     if (kind === "decal" && doc.actors.filter((x) => x.kind === "decal").length >= MAX_DECALS) return;
     if (doc.actors.length >= MAX_ACTORS) return;
     const e = where(), id = newId(doc.actors.map((x) => x.id)), n = doc.actors.filter((x) => x.kind === kind).length + 1;
-    const o: Actor = { id, kind, name: `${kind} ${n}`, x: snap(e.x + Math.cos(e.yaw) * 3), z: snap(e.z + Math.sin(e.yaw) * 3), w: 2, d: 2, h: 1.5, rot: 0, sides: 0, color: PALETTE[doc.actors.length % PALETTE.length], on: true, pulse: 0, text: "", lore: "", img: 0, mode: 0, visor: false, prop: "", gate: "", gateOff: false, lift: 0, season: 0, pdx: 0, pdz: 0, pdy: 0, ptime: 0, pmode: 0, ...DEFAULTS[kind] };
+    const o: Actor = { id, kind, count: kind === "counter" ? 3 : 0, name: `${kind} ${n}`, x: snap(e.x + Math.cos(e.yaw) * 3), z: snap(e.z + Math.sin(e.yaw) * 3), w: 2, d: 2, h: 1.5, rot: 0, sides: 0, color: PALETTE[doc.actors.length % PALETTE.length], on: true, pulse: 0, text: "", lore: "", img: 0, mode: 0, visor: false, prop: "", gate: "", gateOff: false, lift: 0, season: 0, pdx: 0, pdz: 0, pdy: 0, ptime: 0, pmode: 0, ...DEFAULTS[kind] };
     if (kind === "artifact" || kind === "decal") o.rot = e.yaw + Math.PI; // faces you
     if (kind === "boss") o.img = 1 + Math.floor(Math.random() * 999999);
     commit([...doc.actors, o]); setSel(id);
@@ -244,7 +251,7 @@ export function RoomEditor({ themeNote = "", hasTheme = false, themeMsg = "", on
   const addProp = (pid: string) => {
     const def = PROP_BY_ID.get(pid); if (!def || doc.actors.length >= MAX_ACTORS) return;
     const e = where(), id = newId(doc.actors.map((x) => x.id)), n = doc.actors.filter((x) => x.prop === pid).length + 1;
-    const o: Actor = { id, kind: "solid", name: `${def.name} ${n}`, x: snap(e.x + Math.cos(e.yaw) * 3.5), z: snap(e.z + Math.sin(e.yaw) * 3.5), w: def.w, d: def.d, h: def.h, rot: e.yaw + Math.PI / 2, sides: def.sides, color: PALETTE[doc.actors.length % PALETTE.length], on: true, pulse: 0, text: "", lore: "", img: 0, mode: 0, visor: false, prop: pid, gate: "", gateOff: false, lift: 0, season: 0, pdx: 0, pdz: 0, pdy: 0, ptime: 0, pmode: 0 };
+    const o: Actor = { id, kind: "solid", count: 0, name: `${def.name} ${n}`, x: snap(e.x + Math.cos(e.yaw) * 3.5), z: snap(e.z + Math.sin(e.yaw) * 3.5), w: def.w, d: def.d, h: def.h, rot: e.yaw + Math.PI / 2, sides: def.sides, color: PALETTE[doc.actors.length % PALETTE.length], on: true, pulse: 0, text: "", lore: "", img: 0, mode: 0, visor: false, prop: pid, gate: "", gateOff: false, lift: 0, season: 0, pdx: 0, pdz: 0, pdy: 0, ptime: 0, pmode: 0 };
     commit([...doc.actors, o]); setSel(id);
   };
   const dup = () => { if (!a || doc.actors.length >= MAX_ACTORS) return; const id = newId(doc.actors.map((x) => x.id)); commit([...doc.actors, { ...a, id, name: a.name + " copy", x: a.x + 1, z: a.z + 1 }]); setSel(id); };
@@ -257,6 +264,40 @@ export function RoomEditor({ themeNote = "", hasTheme = false, themeMsg = "", on
     setVerMsg("Restoring…");
     try { const r = await api<{ version: number; doc: RoomDoc }>(`/api/admin/room-doc/${world.slug}/restore/${id}`, { method: "POST", body: JSON.stringify({ baseVersion: doc.version }) }); onRestored(r.doc); await loadVers(); setVerMsg(`Restored. Saved again as version ${r.version}.`); }
     catch (e) { setVerMsg(e instanceof Error ? e.message : "Could not restore"); }
+  };
+  // room packages (P1): this room's saved version as a .exoroom file, and a file put on this room (its previous version stays in the history)
+  const scope: Scope = corridor ? "corridor" : "room";
+  const [pkgPre, setPkgPre] = useState(true), [pkgMsg, setPkgMsg] = useState(""), [pkgBusy, setPkgBusy] = useState(false);
+  const [pkgPend, setPkgPend] = useState<{ pkg: Package; file: string; reused: number; upload: number; prefabsNew: number } | null>(null);
+  const doExport = async () => {
+    setPkgBusy(true); setPkgMsg("");
+    try {
+      const r = await exportRoom(world.slug, scope, pkgPre, setPkgMsg);
+      const url = URL.createObjectURL(r.blob), a = document.createElement("a");
+      a.href = url; a.download = r.file; document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 4000);
+      setPkgMsg([`Exported ${r.file}.`, ...r.notes].join(" "));
+    } catch (e) { setPkgMsg(e instanceof Error ? e.message : "Could not export"); }
+    finally { setPkgBusy(false); }
+  };
+  const pickPkg = async (f: File | undefined) => {
+    if (!f) return;
+    setPkgPend(null); setPkgMsg("Opening the package…");
+    try {
+      const pkg = await readPackage(new Uint8Array(await f.arrayBuffer()));
+      if (pkg.manifest.scope !== scope) throw new Error(`This package is for a ${pkg.manifest.scope}. Open a ${pkg.manifest.scope} to put it on.`);
+      setPkgPend({ pkg, file: f.name, ...(await previewImport(pkg)) }); setPkgMsg("");
+    } catch (e) { setPkgMsg(e instanceof Error ? e.message : "Could not open the package"); }
+  };
+  const applyPkg = async () => {
+    if (!pkgPend) return;
+    setPkgBusy(true);
+    try {
+      const r = await importRoom(pkgPend.pkg, world.slug, doc.version, setPkgMsg);
+      onRestored(r.doc); setPkgPend(null); await loadVers();
+      setPkgMsg([`Put on the room. Saved as version ${r.version}.`, ...r.notes].join(" "));
+    } catch (e) { setPkgMsg(e instanceof Error ? e.message : "Could not import"); }
+    finally { setPkgBusy(false); }
   };
   // prefabs: groups of things saved on the server, placeable anywhere
   const [pfs, setPfs] = useState<string[]>([]), [pfName, setPfName] = useState(""), [pfPick, setPfPick] = useState(""), [pfMsg, setPfMsg] = useState("");
@@ -303,6 +344,7 @@ export function RoomEditor({ themeNote = "", hasTheme = false, themeMsg = "", on
         <span className="re-sp" />
         <button type="button" className="re-b" data-testid="re-undo" disabled={!canUndo} onClick={onUndo} title="Undo (Ctrl+Z)">↶</button>
         <button type="button" className="re-b" data-testid="re-redo" disabled={!canRedo} onClick={onRedo} title="Redo (Ctrl+Shift+Z)">↷</button>
+        {!corridor && <select className="re-b" data-testid="re-ms" value={msMode} aria-label="Milestone state for the test" title="The milestone state the test uses: the doors and the wires with milestone gates. The draft is not saved." onChange={(e) => onMsMode(e.target.value as MsMode)}>{MS_MODES.map((m) => <option key={m} value={m}>{MS_LABEL[m]}</option>)}</select>}
         <button type="button" className="re-b" data-testid="re-play" aria-pressed={playing} onClick={() => onPlay(!playing)}>{playing ? "■ Stop test" : "▶ Test play"}</button>
         <button type="button" className="re-b" data-testid="re-preview" aria-pressed={preview} title="Test play on the lowest graphics step, with the seasons and gates a visitor gets today" onClick={() => onPreview(!preview)}>{preview ? "■ Stop visitor view" : "◉ Visitor view"}</button>
         <button type="button" className="re-b" data-testid="re-close" onClick={onClose} aria-label="Close editor">✕</button>
@@ -448,6 +490,27 @@ export function RoomEditor({ themeNote = "", hasTheme = false, themeMsg = "", on
             {vers && <ul className="re-wires">{vers.map((v) => <li key={v.id} data-testid="re-ver"><span>version {v.version} · {new Date(v.savedAt).toLocaleString()}</span><button type="button" className="re-b" data-testid={`re-verrestore-${v.id}`} disabled={dirty || busy || v.version === doc.version} title={dirty ? "Save or undo your changes first" : "Make this version the room again (it is saved as the newest)"} onClick={() => void restoreVer(v.id)}>Restore</button></li>)}{!vers.length && <li className="re-empty">No earlier saves yet.</li>}</ul>}
             {verMsg && <p className="re-note" data-testid="re-vermsg">{verMsg}</p>}
           </div>
+          <div className="re-insp" data-testid="re-package">
+            <div className="re-row"><b>Room package (.exoroom)</b></div>
+            <p className="re-note">The room, the pictures it uses, and the prefab library if ticked. Export takes the saved version; import saves the room as a new version.</p>
+            <label className="re-chk"><input type="checkbox" data-testid="re-pkg-prefabs" checked={pkgPre} onChange={(e) => setPkgPre(e.target.checked)} />Include the prefab library</label>
+            <div className="re-row">
+              <button type="button" className="re-b" data-testid="re-pkg-export" disabled={dirty || busy || pkgBusy} title={dirty ? "Save or undo your changes first, so the package matches the room" : "Download the saved version of this room"} onClick={doExport}>Export this room</button>
+              <label className="re-b">Import a package<input data-testid="re-pkg-file" type="file" accept=".exoroom,.zip,application/zip" hidden disabled={dirty || busy || pkgBusy} onChange={(e) => { void pickPkg(e.target.files?.[0]); e.target.value = ""; }} /></label>
+            </div>
+            {pkgPend && (
+              <div className="re-insp" data-testid="re-pkg-pend">
+                <p className="re-note">{pkgPend.file}: {pkgPend.reused + pkgPend.upload} picture{pkgPend.reused + pkgPend.upload === 1 ? "" : "s"} ({pkgPend.upload} new to the library), {pkgPend.pkg.prefabs.length} prefab{pkgPend.pkg.prefabs.length === 1 ? "" : "s"} ({pkgPend.prefabsNew} new).</p>
+                <p className="re-note">This replaces “{world.slug}” (now version {doc.version}). The version it replaces stays in its history.</p>
+                {pkgPend.pkg.warnings.map((w) => <p className="re-note" key={w}>{w}</p>)}
+                <div className="re-row">
+                  <button type="button" className="re-b" data-testid="re-pkg-apply" disabled={pkgBusy} onClick={applyPkg}>Replace the room</button>
+                  <button type="button" className="re-b" data-testid="re-pkg-cancel" onClick={() => setPkgPend(null)}>Cancel</button>
+                </div>
+              </div>
+            )}
+            {pkgMsg && <p className="re-note" data-testid="re-pkgmsg">{pkgMsg}</p>}
+          </div>
           <button type="button" className="re-b" onClick={() => onDoc(cleanDoc({ ...doc, grade: null }))}>Clear mood</button>
         </div>
       )}
@@ -537,6 +600,7 @@ export function RoomEditor({ themeNote = "", hasTheme = false, themeMsg = "", on
           <label title="Visitors see it only in that season (their own clock)">Shows in<select data-testid="re-season" value={a.season} onChange={(e) => patch(a.id, { season: Number(e.target.value) })}>{SEASONS.map((s, i) => <option key={s} value={i}>{s === "any" ? "any season" : s}</option>)}</select></label>
           <label>Colour<input type="color" value={a.color} onChange={(e) => patch(a.id, { color: e.target.value })} /></label>
           <label className="re-chk"><input type="checkbox" data-testid="re-on" checked={a.on} onChange={(e) => patch(a.id, { on: e.target.checked })} />{a.kind === "trigger" ? "Starts enabled" : "Starts visible"}</label>
+          {a.kind === "counter" && <label className="re-chk">Reached at <input type="number" data-testid="re-count" min={1} max={99} value={a.count} onChange={(e) => patch(a.id, { count: Math.max(1, Math.min(99, Math.round(Number(e.target.value) || 1))) })} /> counts</label>}
           <div className="re-row"><button type="button" className="re-b" onClick={dup}>Duplicate</button><button type="button" className="re-b re-del" data-testid="re-delete" onClick={del}>Delete</button></div>
 
           <h4>Wires</h4>

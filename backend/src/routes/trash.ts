@@ -4,6 +4,7 @@ import { requireAdmin } from "../lib/auth.js";
 import { deleteMessageAttachments } from "../lib/attachmentCleanup.js";
 import { daysLeft, trashCutoff } from "../lib/trash.js";
 import { mergeInbox, type InboxItem } from "../lib/inbox.js";
+import { decodeDocMeta, decodeTexMeta, docKindOf, LIBRARY_MAX } from "../lib/trashEntries.js";
 
 /** Messages whose 30 days ran out: files go for good, the tombstone row stays (replies point at it). */
 export async function sweepTrash(): Promise<number> {
@@ -12,6 +13,8 @@ export async function sweepTrash(): Promise<number> {
     await deleteMessageAttachments(prisma, m.id).catch(() => undefined);
     await prisma.message.update({ where: { id: m.id }, data: { deletedAt: null, contentRaw: "" } });
   }
+  // rooms, prefabs, themes and pictures that ran out their 30 days (P35)
+  await prisma.trashEntry.deleteMany({ where: { deletedAt: { lt: trashCutoff() } } });
   return old.length;
 }
 
@@ -37,6 +40,54 @@ export async function trashRoutes(app: FastifyInstance): Promise<void> {
     await deleteMessageAttachments(prisma, id).catch(() => undefined);
     await prisma.message.update({ where: { id }, data: { deletedAt: null, contentRaw: "" } });
     await prisma.auditLog.create({ data: { actorId: req.user!.id, action: "message.purge", targetType: "Message", targetId: id } });
+    return { ok: true };
+  });
+
+  // Rooms, prefabs, themes and pictures in the trash, newest first (P35).
+  app.get("/api/admin/trash/items", { preHandler: requireAdmin }, async () => {
+    const rows = await prisma.trashEntry.findMany({ where: { deletedAt: { gte: trashCutoff() } }, orderBy: { deletedAt: "desc" }, take: 200, select: { id: true, kind: true, key: true, label: true, deletedAt: true } });
+    return rows.map((r) => ({ id: r.id, type: r.kind === "texture" ? "picture" : docKindOf(r.key), label: r.label, deletedAt: r.deletedAt.toISOString(), daysLeft: daysLeft(r.deletedAt) }));
+  });
+
+  // Restore: the room, prefab, theme or picture comes back as it was. A room gets its saved versions back too; a picture its own id.
+  app.post<{ Params: { id: string } }>("/api/admin/trash/items/:id/restore", { preHandler: requireAdmin }, async (req, reply) => {
+    const id = Number(req.params.id);
+    const e = Number.isInteger(id) ? await prisma.trashEntry.findUnique({ where: { id } }) : null;
+    if (!e || e.deletedAt < trashCutoff()) return reply.code(404).send({ error: "That is not in the trash any more." });
+    try {
+      if (e.kind === "doc") {
+        if (!e.doc) return reply.code(409).send({ error: "Nothing to restore: the saved room is missing." });
+        if (await prisma.roomDoc.findUnique({ where: { slug: e.key }, select: { id: true } })) return reply.code(409).send({ error: `${e.label} exists again. Rename or delete it first.` });
+        const meta = decodeDocMeta(e.meta);
+        await prisma.$transaction([
+          prisma.roomDoc.create({ data: { slug: e.key, doc: e.doc, version: meta.version } }),
+          prisma.roomDocVersion.createMany({ data: meta.history.map((h) => ({ slug: e.key, version: h.version, doc: h.doc, savedAt: new Date(h.savedAt) })) }),
+          prisma.trashEntry.delete({ where: { id } }),
+        ]);
+      } else if (e.kind === "texture") {
+        const m = decodeTexMeta(e.meta);
+        if (!m || !e.png) return reply.code(409).send({ error: "This picture cannot be restored: its saved data is damaged." });
+        if ((await prisma.textureAsset.count()) >= LIBRARY_MAX) return reply.code(409).send({ error: `The picture library is full (${LIBRARY_MAX}). Delete some first.` });
+        if (await prisma.textureAsset.findUnique({ where: { id: m.id }, select: { id: true } })) return reply.code(409).send({ error: "Its id is taken now, so it cannot come back under the same id." });
+        await prisma.$transaction([
+          prisma.textureAsset.create({ data: { id: m.id, name: m.name, png: new Uint8Array(e.png), createdAt: new Date(m.createdAt) } }),
+          prisma.trashEntry.delete({ where: { id } }),
+        ]);
+      } else return reply.code(409).send({ error: "This kind of item cannot be restored." });
+    } catch {
+      return reply.code(409).send({ error: "It was restored or removed a moment ago. Reload the trash." });
+    }
+    await prisma.auditLog.create({ data: { actorId: req.user!.id, action: "trash.restore", targetType: "TrashEntry", targetId: id, meta: { kind: e.kind, key: e.key, label: e.label } } });
+    return { ok: true };
+  });
+
+  // Delete now: the room, prefab, theme or picture can no longer be restored.
+  app.post<{ Params: { id: string } }>("/api/admin/trash/items/:id/purge", { preHandler: requireAdmin }, async (req, reply) => {
+    const id = Number(req.params.id);
+    const e = Number.isInteger(id) ? await prisma.trashEntry.findUnique({ where: { id }, select: { kind: true, key: true, label: true } }) : null;
+    if (!e) return reply.code(404).send({ error: "That is not in the trash any more." });
+    await prisma.trashEntry.delete({ where: { id } }).catch(() => undefined);
+    await prisma.auditLog.create({ data: { actorId: req.user!.id, action: "trash.purge", targetType: "TrashEntry", targetId: id, meta: { kind: e.kind, key: e.key, label: e.label } } });
     return { ok: true };
   });
 

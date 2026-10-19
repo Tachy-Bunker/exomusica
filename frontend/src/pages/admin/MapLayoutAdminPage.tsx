@@ -6,8 +6,10 @@ import { loadMapLinks, type MapLink } from "../../lib/mapLinks";
 import { loadHome, type HomeData } from "../../lib/home";
 import { loadMilestones, type Milestone } from "../../lib/milestones";
 import { Loading } from "../../components/Loading";
+import { checkMap, countChecks } from "../../lib/roomCheck";
+import type { RoomDoc } from "../../lib/roomDoc";
 
-interface ChartNode { id: number; parentId: number | null; slug?: string; name?: string; secret?: boolean }
+interface ChartNode { id: number; parentId: number | null; slug?: string; name?: string; secret?: boolean; key?: string; gate?: string }
 const SZ = 640, snap = (v: number) => Math.round(v * 2) / 2;
 
 /** Move rooms on the explorable map: drag a dot, or type its place. Walls snap onto each other, and walls that meet link by themselves (auto-link). Corridors and lift destinations are added in the panel (fix406). */
@@ -27,12 +29,29 @@ export function MapLayoutAdminPage() {
     loadMilestones().then(setMilestones).catch(() => undefined);
   }, []);
 
+  // every room's stored document, for the checks (a room with no content stores version 0)
+  useEffect(() => {
+    if (!chart) return; let live = true;
+    Promise.all(chart.map((c) => api<{ version: number; doc: unknown }>(`/api/room-doc/${c.slug}`).then((r) => [c.slug, r.version > 0 ? (r.doc as RoomDoc) : null] as const).catch(() => [c.slug, null] as const)))
+      .then((pairs) => { if (live) { const m = new Map<string, RoomDoc | null>(); for (const [k, v] of pairs) if (k) m.set(k, v); setDocs(m); setDocsReady(true); } });
+    return () => { live = false; };
+  }, [chart]);
+
   const nodes = useMemo<HullNode[] | null>(() => {
     if (!chart) return null;
     const by = new Map((home?.branches ?? []).map((b) => [b.slug, b]));
     return chart.filter((n) => !n.secret && n.slug).map((n) => ({ id: n.id, parentId: n.parentId, slug: n.slug!, name: n.name ?? n.slug!, tracks: by.get(n.slug!)?.tracks ?? 0, albums: by.get(n.slug!)?.albums ?? 0 }));
   }, [chart, home]);
   const hull = useMemo(() => (nodes ? layoutHull(nodes, { outer: false, overrides: ovr, links }) : null), [nodes, ovr, links]);
+  // the checks see every room, sealed ones too (the editing hull above leaves them out)
+  const checkNodes = useMemo<HullNode[] | null>(() => {
+    if (!chart) return null;
+    const by = new Map((home?.branches ?? []).map((b) => [b.slug, b]));
+    return chart.filter((n) => n.slug).map((n) => ({ id: n.id, parentId: n.parentId, slug: n.slug!, name: n.name ?? n.slug!, secret: !!n.secret, key: n.key, gate: n.gate, tracks: by.get(n.slug!)?.tracks ?? 0, albums: by.get(n.slug!)?.albums ?? 0 }));
+  }, [chart, home]);
+  const checkHull = useMemo(() => (checkNodes ? layoutHull(checkNodes, { outer: true, overrides: ovr, links }) : null), [checkNodes, ovr, links]);
+  const [docs, setDocs] = useState<Map<string, RoomDoc | null>>(new Map()), [docsReady, setDocsReady] = useState(false);
+  const checks = useMemo(() => (checkHull && docsReady ? checkMap({ hull: checkHull, links, milestones, docs }) : null), [checkHull, docsReady, links, milestones, docs]);
   const auto = useMemo(() => (nodes ? layoutHull(nodes, { outer: false }) : null), [nodes]);
   const scale = hull ? (SZ / 2 - 24) / Math.max(20, hull.radius) : 1, toPx = (x: number, z: number): [number, number] => [SZ / 2 + x * scale, SZ / 2 + z * scale];
   const reached = useMemo(() => new Set(milestones.filter((m) => m.reached).map((m) => m.key)), [milestones]);
@@ -122,6 +141,7 @@ export function MapLayoutAdminPage() {
       {room && (
         <section data-testid="maplink-panel" style={{ marginTop: "0.8rem" }}>
           <h3 style={{ margin: "0 0 0.4rem" }}>Links from {room.name}</h3>
+          <p style={{ margin: "0 0 0.5rem" }}><a data-testid="maplayout-warp" href={`/branch/${room.slug}/room`} target="_blank" rel="noopener">Warp into {room.name}</a> <span className="home-dim">(new tab, spawns in the middle of the room; Edit room there, then test a draft)</span></p>
           {mine.length === 0 && <p className="home-dim">No corridors or lift destinations yet. Without lift destinations, the cabin offers every open room.</p>}
           <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "grid", gap: "0.35rem" }}>
             {mine.map((l) => {
@@ -158,6 +178,22 @@ export function MapLayoutAdminPage() {
       )}
       {msg && <p role="alert" className="home-dim">{msg}</p>}
       <p className="home-dim">{ovr.length} moved. {links.length} links stored. {sel ? "" : "Pick a room."}</p>
+      <section data-testid="maplayout-checks" style={{ marginTop: "0.8rem" }}>
+        <h3 style={{ margin: "0 0 0.4rem" }}>Checks{checks ? ` · ${countChecks(checks).error} errors, ${countChecks(checks).warn} warnings, ${countChecks(checks).info} notes` : ""}</h3>
+        {!checks && <p className="home-dim">Checking the rooms…</p>}
+        {checks && checks.length === 0 && <p className="home-dim" data-testid="maplayout-checks-clear">Nothing to report.</p>}
+        {checks && checks.length > 0 && (
+          <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "grid", gap: "0.3rem" }}>
+            {checks.map((c, i) => (
+              <li key={i} data-testid={`maplayout-check-${i}`} data-level={c.level} style={{ display: "flex", gap: "0.5rem", alignItems: "baseline", flexWrap: "wrap" }}>
+                <span style={{ minWidth: "3.2rem", color: c.level === "error" ? "#ff7a7a" : c.level === "warn" ? "#ffd27a" : "#9ab" }}>{c.level}</span>
+                <span style={{ flex: 1, minWidth: "12rem" }}>{c.text}</span>
+                {c.room && <button type="button" className="btn" data-testid={`maplayout-check-open-${i}`} onClick={() => setSel(c.room)}>Open {c.room}</button>}
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
     </div>
   );
 }
