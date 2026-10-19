@@ -1,9 +1,9 @@
 // The branch explorer's world: rooms of different shapes on rings around a central hall, joined by pipe corridors and elevator shafts. Pure (no DOM), so it is tested without a browser.
 // Units are arbitrary "metres"; x/z are the floor plan, y is up.
 
-export interface HullNode { id: number; parentId: number | null; slug: string; name: string; secret?: boolean; key?: string; tracks: number; albums: number }
+export interface HullNode { id: number; parentId: number | null; slug: string; name: string; secret?: boolean; key?: string; /** sealed rooms: the milestone key that gates the door */ gate?: string | null; tracks: number; albums: number }
 export type Shape = "box" | "oct" | "tower" | "slab" | "ring";
-export interface HullRoom { id: number; slug: string; name: string; secret: boolean; key: string; x: number; y: number; z: number; w: number; d: number; h: number; shape: Shape; depth: number; parentId: number | null; angle: number; outer: boolean; tracks: number; albums: number }
+export interface HullRoom { id: number; slug: string; name: string; secret: boolean; key: string; gate: string; x: number; y: number; z: number; w: number; d: number; h: number; shape: Shape; depth: number; parentId: number | null; angle: number; outer: boolean; tracks: number; albums: number }
 export type V3 = [number, number, number];
 export interface HullLink { from: number; to: number; pts: V3[]; shaft: { x: number; z: number; y0: number; y1: number } | null; dashed: boolean }
 export interface Hull { rooms: HullRoom[]; links: HullLink[]; radius: number }
@@ -88,7 +88,7 @@ export function layoutHull(nodes: HullNode[], opts: { outer: boolean; overrides?
     if (shape === "slab") { w *= 1.3; d = w * 0.9; h *= 0.5; }
     if (shape === "ring") { w = 11; d = 11; h = 2.4; }
     const y = outer ? 0.8 : lvl * FLOOR;
-    return { id: n.id, slug: n.slug, name: n.name, secret: !!n.secret, key: n.key ?? "", x: Math.cos(angle) * r + 0, y, z: Math.sin(angle) * r + 0, w, d, h, shape, depth, parentId: n.parentId, angle, outer, tracks: n.tracks, albums: n.albums };
+    return { id: n.id, slug: n.slug, name: n.name, secret: !!n.secret, key: n.key ?? "", gate: n.gate ?? "", x: Math.cos(angle) * r + 0, y, z: Math.sin(angle) * r + 0, w, d, h, shape, depth, parentId: n.parentId, angle, outer, tracks: n.tracks, albums: n.albums };
   };
   for (const n of real) { const i = info.get(n.id)!; rooms.push(make(n, i.depth, i.angle, radius[i.depth] ?? 0, false, i.level)); }
   const roomOf = new Map(rooms.map((r) => [r.id, r]));

@@ -4,6 +4,7 @@ import { requireAdmin } from "../lib/auth.js";
 import { identityProblem, normalizeColor } from "../lib/branchIdentity.js";
 import { collectBranchImages } from "../lib/branchImages.js";
 import { trackToDTO } from "../lib/embeds.js";
+import { MILESTONES } from "../lib/milestonesCore.js";
 
 interface CreateBranchBody {
   slug: string;
@@ -206,6 +207,7 @@ export async function branchRoutes(app: FastifyInstance): Promise<void> {
       parentId: number | null;
       isAnchor: boolean;
       chartHidden: boolean;
+      sealedGate: string | null;
       guideAssetId: number | null;
       voiceoverText: string;
       ogTitle: string | null;
@@ -233,6 +235,10 @@ export async function branchRoutes(app: FastifyInstance): Promise<void> {
     }
     const data = { ...(req.body ?? {}) };
     if (data.chartHidden !== undefined && typeof data.chartHidden !== "boolean") return reply.code(400).send({ error: "chartHidden must be true or false" });
+    if (data.sealedGate !== undefined) { // the milestone that opens this sealed room: a real milestone key, or none
+      if (data.sealedGate !== null && (typeof data.sealedGate !== "string" || !MILESTONES.some((m) => m.key === data.sealedGate))) return reply.code(400).send({ error: "sealedGate must be a milestone key or null" });
+      data.sealedGate = data.sealedGate || null;
+    }
     if (typeof data.longDescription === "string") data.longDescription = data.longDescription.trim() || null; // an empty box means none
     if (typeof data.identityColor === "string") data.identityColor = normalizeColor(data.identityColor)!;
     const branch = await prisma.branch.update({ where: { id: Number(req.params.id) }, data });

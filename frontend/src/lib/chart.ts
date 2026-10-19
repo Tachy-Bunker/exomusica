@@ -1,5 +1,5 @@
 // The branch chart, the testable part: where rooms sit, and what you know about each. No DOM here.
-export interface ChartBranch { id: number; slug: string; name: string; parentId: number | null; secret?: boolean; key?: string }
+export interface ChartBranch { id: number; slug: string; name: string; parentId: number | null; secret?: boolean; key?: string; /** a sealed room: the milestone key that gates its door */ gate?: string | null }
 export interface Room extends ChartBranch { col: number; row: number }
 export type RoomState = "visited" | "heard" | "unseen" | "sealed";
 

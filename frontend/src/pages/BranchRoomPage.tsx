@@ -107,7 +107,7 @@ function RoomInner({ slug }: { slug: string }) {
     const vis = new Set(visited.current); vis.add(s);
     const states = g.chart.length ? roomStates(g.chart, vis, new Set([...vis].map(hashStr))) : null;
     const color = theme ? neon(theme.color) : "#5fd3ee";
-    const mile = s === HULL_HOST ? await loadMilestones().catch(() => [] as Milestone[]) : null; // the Core is where the Hull's door is, and that door depends on the milestones
+    const mile = await loadMilestones().catch(() => [] as Milestone[]); // the Core's Hull door and every sealed room's gate depend on the milestones
     const world = buildRoom({ hull: g.hull, slug: s, name: branch.name, states, albums: (albums ?? []).map((a) => ({ slug: a.slug, title: a.title })), channelSlug: branch.channel?.slug ?? null, from: via, milestones: mile });
     world.color = color; world.blurb = branch.description ?? undefined; world.lineage = lineageOf(g.chart, s);
     if (branch.channel?.slug) { const m = await getJson<unknown>(`/api/channels/${branch.channel.slug}/messages?limit=3`).catch(() => null); const l = previewLines(m); if (l.length) world.chat = l; }
@@ -126,7 +126,7 @@ function RoomInner({ slug }: { slug: string }) {
     Promise.all([loadChartBranches(visited.current).catch(() => null), loadHome().catch(() => null), loadMilestones().then((l) => !!l.find((m) => m.key === "m-ring")?.reached).catch(() => false), loadMapOverrides()]).then(async ([chart, home, outer, overrides]) => {
       if (!alive.current) return;
       const by = new Map((home ? home.branches : []).map((b) => [b.slug, b]));
-      const nodes: HullNode[] = (chart || []).map((b) => ({ id: b.id, parentId: b.parentId, slug: b.slug, name: b.name, secret: b.secret, key: b.key, tracks: by.get(b.slug)?.tracks ?? 0, albums: by.get(b.slug)?.albums ?? 0 }));
+      const nodes: HullNode[] = (chart || []).map((b) => ({ id: b.id, parentId: b.parentId, slug: b.slug, name: b.name, secret: b.secret, key: b.key, gate: b.gate, tracks: by.get(b.slug)?.tracks ?? 0, albums: by.get(b.slug)?.albums ?? 0 }));
       const g: Graph = { chart: chart || [], hull: nodes.length ? layoutHull(nodes, { outer, overrides }) : null, outer };
       graphRef.current = g; setGraph(g);
       const d = await loadRoom(slug, from);

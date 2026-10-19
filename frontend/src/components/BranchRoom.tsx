@@ -116,6 +116,7 @@ export function BranchRoom({ tick, world, color, next, wantNext, onAdvance, go, 
   const fxv = useRef<FxView>({ echo: null, now: 0, scan: null }), scanSt = useRef<{ s: Scannable; t0: number } | null>(null), scanView = useRef({ x: 0, y: 0, z: 0, p: 0 });
   const [boss, setBoss] = useState<Actor | null>(null);
   // the scan visor is a mode you stay in; its result (and the logbook entry one level deeper) opens over the room, which stands still meanwhile
+  const coarseRef = useRef(typeof window !== "undefined" && typeof window.matchMedia === "function" && window.matchMedia("(pointer: coarse)").matches); // touch screen: no right button, the Scan button scans
   const [scanMode, setScanMode] = useState(false), scanModeRef = useRef(false), [scanRes, setScanRes] = useState<ScanRes | null>(null), scanResRef = useRef<ScanRes | null>(null);
   const eye = useRef<Eye>({ ...world.spawn, pitch: 0 });
   const keys = useRef(new Set<string>()), stick = useRef({ x: 0, y: 0 }), drag = useRef<{ id: number; x: number; y: number; moved: number; type: string } | null>(null);
@@ -583,7 +584,7 @@ export function BranchRoom({ tick, world, color, next, wantNext, onAdvance, go, 
         if (hx) {
           const cor = spaceRef.current === "corridor", list = cor ? corrScan.current : scanList.current, hn = hudN.current;
           if (hn.list !== list || now - hn.at > 1000) { hn.at = now; hn.list = list; if (hn.flags.length !== list.length) hn.flags = new Uint8Array(list.length); const dn = scannedIds(); let c2 = 0; for (let i = 0; i < list.length; i++) { const v = dn.has(scanId("lore", list[i].key)) ? 1 : 0; hn.flags[i] = v; c2 += v; } hn.done = c2; }
-          let hi = hudIn.current; if (!hi) hi = hudIn.current = { x: 0, z: 0, yaw: 0, verts: W.verts, doors: W.doors, scan: list, scanned: hn.flags, others: others.current.values(), integ: 1, done: 0, total: 0, name: "", color: "", t: 0, locked: false, low: false, target: "", tdist: 0, on: 0, mode: "combat", targetScanned: false, scanP: 0, marks: hn.marks };
+          let hi = hudIn.current; if (!hi) hi = hudIn.current = { touch: coarseRef.current, x: 0, z: 0, yaw: 0, verts: W.verts, doors: W.doors, scan: list, scanned: hn.flags, others: others.current.values(), integ: 1, done: 0, total: 0, name: "", color: "", t: 0, locked: false, low: false, target: "", tdist: 0, on: 0, mode: "combat", targetScanned: false, scanP: 0, marks: hn.marks };
           const scanOn = scanModeRef.current, pe = r.eye;
           hi.x = pe.x; hi.z = pe.z; hi.yaw = pe.yaw; hi.verts = W.verts; hi.doors = W.doors; hi.scan = list; hi.scanned = hn.flags; hi.others = others.current.values(); hi.integ = integ.current; hi.done = hn.done; hi.total = list.length; hi.name = W.name; hi.color = W.color ?? color; hi.t = now / 1000; hi.on = hudOnAt.current; hi.low = gov.current.scale < 1;
           hi.mode = scanOn ? "scan" : "combat"; hi.locked = !scanOn && !!lock.current; hi.tdist = lock.current && !scanOn ? Math.hypot(lock.current.x - pe.x, lock.current.z - pe.z) : 0; hi.marks = hn.marks;
@@ -675,7 +676,7 @@ export function BranchRoom({ tick, world, color, next, wantNext, onAdvance, go, 
   const callDrone = () => { if (!droneOnRef.current) { setDroneOn(true); setDroneWanted(true); } onDrone(); };
   callDroneRef.current = callDrone;
   const onStick = useCallback((x: number, y: number) => { stick.current = { x, y }; wakeRef.current(); }, []);
-  const pdown = (e: React.PointerEvent) => { if (pausedRef.current) return; if (e.button === 2) { e.preventDefault(); toggleLockRef.current(); return; } if (drag.current) return; drag.current = { id: e.pointerId, x: e.clientX, y: e.clientY, moved: 0, type: e.pointerType }; try { e.currentTarget.setPointerCapture(e.pointerId); } catch { /* synthetic */ } stage.current?.focus({ preventScroll: true }); };
+  const pdown = (e: React.PointerEvent) => { if (pausedRef.current) return; /* right button: scan on the scan visor, lock-on otherwise */ if (e.button === 2) { e.preventDefault(); if (scanModeRef.current) startScanRef.current(); else toggleLockRef.current(); return; } if (drag.current) return; drag.current = { id: e.pointerId, x: e.clientX, y: e.clientY, moved: 0, type: e.pointerType }; try { e.currentTarget.setPointerCapture(e.pointerId); } catch { /* synthetic */ } stage.current?.focus({ preventScroll: true }); };
   const pmove = (e: React.PointerEvent) => {
     const d = drag.current; if (!d || d.id !== e.pointerId) return;
     const dx = e.clientX - d.x, dy = e.clientY - d.y; d.x = e.clientX; d.y = e.clientY; d.moved += Math.abs(dx) + Math.abs(dy);
@@ -728,7 +729,7 @@ export function BranchRoom({ tick, world, color, next, wantNext, onAdvance, go, 
       {(hasHeight || elevHere) && <button type="button" className="rm-jump" data-testid="room-jump" aria-label="Jump" title="Jump (Space)" onClick={() => { jumpReq.current = true; wakeRef.current(); }} onPointerDown={(e) => e.stopPropagation()}><Glyph name="up" /></button>}
       <button type="button" className="rm-use" data-testid="room-use" onClick={() => { if (scanMode) startScan(); else use(); }} onPointerDown={(e) => e.stopPropagation()}><Glyph name={scanMode ? "scan" : "door"} /><span>{scanMode ? "Scan" : "Use"}</span></button>
       {ticker}
-      <p key={scanMode ? "scan" : "walk"} className="rm-hint">{scanMode ? "W A S D move · Enter scan · Space jump · X combat visor" : "W A S D move · Space jump · F use · X scan visor"}</p>
+      <p key={scanMode ? "scan" : "walk"} className="rm-hint">{scanMode ? (coarseRef.current ? "W A S D move · Scan button scans · Space jump · X combat visor" : "W A S D move · Right click or Enter scans · Space jump · X combat visor") : "W A S D move · Space jump · F use · X scan visor"}</p>
       <ul className="sr-only">
         {world.doors.map((d) => (
           <li key={d.id}>

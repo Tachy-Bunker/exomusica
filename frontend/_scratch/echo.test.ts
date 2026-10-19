@@ -19,7 +19,7 @@ assert.equal(new Set(list.map((s) => s.key)).size, list.length, "keys are unique
 assert.ok(list.every((s) => KEY.test(s.key)), "keys are valid scan addresses");
 const by = (what: string) => list.filter((s) => s.what === what);
 assert.equal(by("wall").length, 1); assert.equal(by("wall")[0].key, "branch:b2"); assert.equal(by("wall")[0].text, "A room about beating tones.");
-assert.equal(by("terminal").length, 1); assert.equal(by("album").length, 2);
+assert.equal(by("terminal").length, w.props.filter((p) => p.kind === "terminal" || p.kind === "computer").length, "every talk terminal and site computer is a scannable terminal"); assert.equal(by("album").length, 2);
 assert.equal(by("door").length + by("seal").length, w.doors.length);
 assert.ok(by("seal").length >= 1, "a sealed door is scannable");
 assert.ok(by("seal").every((s) => s.key.startsWith("room:b2/seal/") && s.key.endsWith("k9abc")), `sealed keys come from the hull key: ${by("seal").map((s) => s.key)}`);

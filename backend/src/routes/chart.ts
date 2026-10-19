@@ -6,7 +6,7 @@ import { buildPulses, PULSE_DAYS } from "../lib/chartPulse.js";
 
 export async function chartRoutes(app: FastifyInstance): Promise<void> {
   app.get("/api/chart", async (_req, reply) => {
-    const rows = await prisma.branch.findMany({ select: { id: true, slug: true, name: true, parentId: true, visibility: true, chartHidden: true }, orderBy: { id: "asc" } });
+    const rows = await prisma.branch.findMany({ select: { id: true, slug: true, name: true, parentId: true, visibility: true, chartHidden: true, sealedGate: true }, orderBy: { id: "asc" } });
     void reply.header("Cache-Control", "public, max-age=60");
     return buildChartNodes(rows);
   });

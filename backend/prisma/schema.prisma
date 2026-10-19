@@ -164,6 +164,7 @@ model Branch {
   longDescription String? @db.Text // the second, longer description: shown when the branch is expanded in Soundbay (the short one is the row's)
   coverArtUrl String?
   chartHidden Boolean  @default(false) // never drawn on the Chart, not even as a sealed room
+  sealedGate  String?  // milestone key that must be reached before this sealed (hidden) room's door opens; null = none
   hidden      Boolean  @default(false) // soft take-down: excluded from public listings, data untouched
   visibility  BranchVisibility @default(VISIBLE) // supersedes `hidden` - kept alongside it rather than migrated destructively; see deploy notes for the backfill
   crystalCount Int @default(5) // number of shard fragments rendered for a Baby Crystals branch, admin-controlled to reflect project progress

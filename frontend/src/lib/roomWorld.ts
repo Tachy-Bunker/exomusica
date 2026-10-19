@@ -35,12 +35,14 @@ export interface RoomWorld {
   color?: string;
 }
 export interface AlbumLite { slug: string; title: string }
-export interface BuildOpts { hull: Hull | null; slug: string; name: string; states: Map<number, RoomState> | null; albums: AlbumLite[]; channelSlug: string | null; from?: string | null; /** the community's milestones: given for the Hull's host room only (it gets the door to the Hull) */ milestones?: Milestone[] | null }
+export interface BuildOpts { hull: Hull | null; slug: string; name: string; states: Map<number, RoomState> | null; albums: AlbumLite[]; channelSlug: string | null; from?: string | null; /** the community's milestones: the Hull's host room gets the door to the Hull; every room reads the gates of its sealed doors from them */ milestones?: Milestone[] | null }
 
 export const DOOR_W = 1.7, DOOR_H = 2.5, MAX_ALBUMS = 10;
 const GAP = 0.9;
 /** The Hull: a ring hall behind a door in the Core room. Its doors: one back to the Core, then one per milestone (lit once reached). The Core's door to it is locked until the Hull milestone is reached. */
 export const HULL_HOST = "core", HULL_SLUG = "hull.core", HULL_KEY = "m-hull", HULL_MAX = 29;
+/** A sealed room's gate when the milestone list can't be read: shown as not reached. */
+const GATE_FALLBACK: Milestone = { key: "", title: "A milestone", perk: "", metric: "REACHED", label: "milestones reached", target: 1, now: 0, reached: false, reachedAt: null, live: true };
 const HULL_FALLBACK: Milestone = { key: HULL_KEY, title: "Hull", perk: "The seed of the explorable ship: a corridor with one lit door per milestone reached.", metric: "REACHED", label: "milestones reached", target: 24, now: 0, reached: false, reachedAt: null, live: true };
 
 function fnv(s: string): number { let h = 2166136261; for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); } return h >>> 0; }
@@ -74,14 +76,17 @@ function widestGap(angles: number[]): number {
 }
 
 /** The doors a room has: one to its parent, one to each child, one to each sealed room hung from it. */
-function wantedDoors(hull: Hull, me: HullRoom, states: Map<number, RoomState> | null): Want[] {
+function wantedDoors(hull: Hull, me: HullRoom, states: Map<number, RoomState> | null, milestones: Milestone[] | null): Want[] {
   const byId = new Map(hull.rooms.map((r) => [r.id, r]));
   const out: Want[] = [];
   for (const l of hull.links) {
     if (l.from !== me.id && l.to !== me.id) continue;
     const other = byId.get(l.from === me.id ? l.to : l.from); if (!other) continue;
-    const st = states?.get(other.id) ?? "unseen", open = (st === "visited" || st === "heard") && !!other.slug;
-    out.push({ slug: open ? other.slug : null, name: open ? other.name : null, state: open ? "open" : "locked", kind: other.outer ? "sealed" : l.to === me.id ? "parent" : "child", angle: Math.atan2(other.z - me.z, other.x - me.x), key: open ? undefined : other.key || String(other.id) });
+    const st = states?.get(other.id) ?? "unseen";
+    // a sealed room's gate: the milestone that must be reached before its door opens. With no list to read, the gate stays shut.
+    const gate: Milestone | undefined = other.outer && other.gate ? (milestones?.find((m) => m.key === other.gate) ?? { ...GATE_FALLBACK, key: other.gate }) : undefined;
+    const open = (st === "visited" || st === "heard") && !!other.slug && (!gate || gate.reached);
+    out.push({ slug: open ? other.slug : null, name: open ? other.name : null, state: open ? "open" : "locked", kind: other.outer ? "sealed" : l.to === me.id ? "parent" : "child", angle: Math.atan2(other.z - me.z, other.x - me.x), key: open ? undefined : other.key || String(other.id), milestone: gate });
   }
   return out;
 }
@@ -89,7 +94,7 @@ function wantedDoors(hull: Hull, me: HullRoom, states: Map<number, RoomState> | 
 export function buildRoom(o: BuildOpts): RoomWorld {
   const me = o.hull?.rooms.find((r) => r.slug === o.slug && !r.secret) ?? null;
   const shape: Shape = me?.shape ?? "oct", { n, rot, H } = SIDES[shape];
-  const want: Want[] = me && o.hull ? wantedDoors(o.hull, me, o.states) : [];
+  const want: Want[] = me && o.hull ? wantedDoors(o.hull, me, o.states, o.milestones ?? null) : [];
   if (o.slug === HULL_HOST && o.milestones) { // the door to the Hull, in the widest gap between the other doors
     const hm = o.milestones.find((m) => m.key === HULL_KEY) ?? HULL_FALLBACK;
     want.push({ slug: HULL_SLUG, name: hm.reached ? "The Hull" : null, state: hm.reached ? "open" : "locked", kind: "child", angle: widestGap(want.map((w) => w.angle)), milestone: hm });

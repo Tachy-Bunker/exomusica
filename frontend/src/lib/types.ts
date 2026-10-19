@@ -47,6 +47,8 @@ export interface Branch {
   hidden?: boolean; // only present on the admin listing, not the public one
   visibility?: "VISIBLE" | "HIDDEN" | "BABY_CRYSTALS";
   chartHidden?: boolean;
+  /** hidden branches: the milestone key that gates the sealed room's door (null: none) */
+  sealedGate?: string | null;
   crystalCount?: number;
   fontId?: number | null;
   font?: { familyName: string; fileUrl: string; format: string } | null;

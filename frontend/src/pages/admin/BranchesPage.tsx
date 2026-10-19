@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { Link } from "react-router-dom";
 import { api, ApiError } from "../../lib/api";
 import type { Branch } from "../../lib/types";
+import { loadMilestones, type Milestone } from "../../lib/milestones";
 import { SeoFieldsEditor } from "../../components/SeoFieldsEditor";
 
 interface Font {
@@ -36,6 +37,12 @@ export function BranchesPage() {
   const [guideAssets, setGuideAssets] = useState<{ id: number; name: string }[]>([]);
   const voiceoverInputRef = useRef<HTMLInputElement>(null);
 
+  const [miles, setMiles] = useState<Milestone[]>([]);
+  useEffect(() => { loadMilestones().then(setMiles).catch(() => undefined); }, []);
+  async function setSealedGate(b: Branch, sealedGate: string) {
+    await api(`/api/admin/branches/${b.id}`, { method: "PATCH", body: JSON.stringify({ sealedGate: sealedGate || null }) });
+    load();
+  }
   function load() {
     api<Branch[]>("/api/admin/branches").then(setBranches);
     api<Font[]>("/api/fonts").then(setFonts);
@@ -331,6 +338,11 @@ export function BranchesPage() {
                   <option value="HIDDEN">Hidden</option>
                   <option value="BABY_CRYSTALS">Baby Crystals</option>
                 </select>
+                {b.visibility === "HIDDEN" && (
+                  <label style={{ display: "block", fontSize: "0.72rem", marginTop: "0.2rem" }} title="The milestone that must be reached before this sealed room's door opens. Its door shows the milestone and its progress.">
+                    Opens with <select value={b.sealedGate ?? ""} onChange={(e) => void setSealedGate(b, e.target.value)} data-testid="sealed-gate"><option value="">Nothing: finding it is enough</option>{miles.filter((m) => m.live).map((m) => <option key={m.key} value={m.key}>{m.title}</option>)}</select>
+                  </label>
+                )}
                 <label style={{ display: "block", fontSize: "0.72rem", marginTop: "0.2rem" }} title="Hidden branches show on the Chart as sealed rooms that reveal themselves when someone finds them. Tick this to keep this one off the Chart completely.">
                   <input type="checkbox" checked={!!b.chartHidden} onChange={(e) => void setChartHidden(b, e.target.checked)} data-testid="chart-hidden" /> Not on the Chart at all
                 </label>

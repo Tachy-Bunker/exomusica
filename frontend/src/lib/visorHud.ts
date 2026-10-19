@@ -18,6 +18,8 @@ export interface HudIn {
   mode: "combat" | "scan";
   /** scan visor: the thing under the reticle is already in the logbook */
   targetScanned: boolean;
+  /** touch screen (no right button): the prompt names the Scan button */
+  touch?: boolean;
   /** scan visor: the scan's progress, 0 when no scan runs */
   scanP: number;
   /** scan visor: what is in view, outlined */
@@ -133,7 +135,8 @@ function scanVisor(c: CanvasRenderingContext2D, w: number, h: number, s: HudIn, 
     c.fillStyle = CY; c.fillRect(cx - 80 * u, cy + R0 + 34 * u, 160 * u * s.scanP, 4 * u);
   } else if (s.target) {
     c.fillStyle = tc; c.fillText(s.target.slice(0, 26).toUpperCase(), cx, cy + R0 + 22 * u);
-    c.fillStyle = CY; c.fillText(s.targetScanned ? "IN LOGBOOK · SPACE TO READ" : "SPACE TO SCAN", cx, cy + R0 + 36 * u);
+    const act = s.touch ? "PRESS SCAN" : "RIGHT CLICK TO SCAN", read = s.touch ? "PRESS SCAN TO READ" : "RIGHT CLICK TO READ";
+    c.fillStyle = CY; c.fillText(s.targetScanned ? `IN LOGBOOK · ${read}` : act, cx, cy + R0 + 36 * u);
   }
   // mode label and scan count, top-left
   c.textAlign = "left"; c.fillStyle = CY; c.font = `700 ${12 * u}px ${FONT}`; c.fillText("SCAN VISOR", m + 12 * u, m + 24 * u);
