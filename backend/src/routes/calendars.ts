@@ -10,10 +10,14 @@ import type { Prisma } from "@prisma/client";
 import { prisma } from "../lib/prisma.js";
 import { bearerOf, verifyToken } from "../lib/auth.js";
 import { slugify } from "../lib/outreachScope.js";
-import { checkCap, checkEditMode, checkEvent, checkMembers, checkName, checkPassword, checkSlug, checkTimezone, checkUrl, checkWindow, sniffImage, newImageKey, type Checked, DEFAULT_PICTURE_CAP, IMAGE_MAX_BYTES, MAX_EVENTS } from "../lib/calendarRules.js";
+import { checkCap, checkDay, checkEditMode, checkEvent, checkMembers, checkName, checkPassword, checkSlug, checkTimezone, checkUrl, checkWindow, dayKeyIn, sniffImage, newImageKey, type Checked, DEFAULT_PICTURE_CAP, IMAGE_MAX_BYTES, MAX_EVENTS, MAX_SKIPS } from "../lib/calendarRules.js";
 import { enterPerIp, enterPerSlug, previewPerIp, previewPerKey, readCalendarToken, signCalendarToken, writePerKey } from "../lib/calendarScope.js";
 import { readBody, safeGet } from "../lib/netGuard.js";
 import { parsePreview } from "../lib/linkPreview.js";
+import { geocode, GeocodeBusy, GeocodeDown } from "../lib/geocode.js";
+import { makeLimiter } from "../lib/resourceAccess.js";
+
+const geocodePerIp = makeLimiter(30, 60_000); // address searches a minute from one visitor
 
 const DUMMY = argon2.hash("not-a-real-password"); // so a wrong address takes as long as a wrong password
 const fail = (reply: FastifyReply, code: number, error: string) => reply.code(code).send({ error });
@@ -42,13 +46,14 @@ async function fetchPage(raw: string, maxBytes: number, accept: (type: string) =
 
 type Cal = { id: number; slug: string; name: string; timezone: string; passwordHash: string | null; tokenVersion: number; editMode: string; members: string[]; pictureCap: number; createdBy: string };
 const CAL = { id: true, slug: true, name: true, timezone: true, passwordHash: true, tokenVersion: true, editMode: true, members: true, pictureCap: true, createdBy: true } as const;
-const EVENT = { id: true, title: true, text: true, url: true, location: true, startsAt: true, endsAt: true, allDay: true, addedBy: true, createdAt: true, updatedAt: true, image: { select: { id: true, key: true } } } as const;
+const EVENT = { id: true, title: true, text: true, url: true, location: true, startsAt: true, endsAt: true, allDay: true, addedBy: true, lat: true, lng: true, recurrence: true, recurUntil: true, exdates: true, createdAt: true, updatedAt: true, image: { select: { id: true, key: true } } } as const;
 type EventRow = Prisma.CalendarEventGetPayload<{ select: typeof EVENT }>;
 
 export const imageUrl = (id: number, key: string): string => `/api/calendar-images/${id}/${key}`;
 const toEvent = (e: EventRow) => ({
   id: e.id, title: e.title, text: e.text, url: e.url, location: e.location,
   startsAt: e.startsAt.toISOString(), endsAt: e.endsAt ? e.endsAt.toISOString() : null, allDay: e.allDay, addedBy: e.addedBy,
+  lat: e.lat, lng: e.lng, recurrence: e.recurrence, recurUntil: e.recurUntil, exdates: e.exdates,
   image: e.image ? { id: e.image.id, url: imageUrl(e.image.id, e.image.key) } : null,
   createdAt: e.createdAt.toISOString(), updatedAt: e.updatedAt.toISOString(),
 });
@@ -236,11 +241,54 @@ export async function calendarRoutes(app: FastifyInstance): Promise<void> {
     const w = checkWindow(req.query.from, req.query.to); if (!w.ok) return fail(reply, 400, w.error);
     const q = String(req.query.q ?? "").replace(/[\u0000-\u001f]/g, " ").trim().slice(0, 80);
     const limit = Math.min(500, Math.max(1, Number(req.query.limit) || 300));
-    const where: Prisma.CalendarEventWhereInput = { calendarId: cal.id };
-    if (w.value.from || w.value.to) where.startsAt = { gte: w.value.from ?? undefined, lte: w.value.to ?? undefined };
-    if (q) where.OR = [{ title: { contains: q, mode: "insensitive" } }, { text: { contains: q, mode: "insensitive" } }, { location: { contains: q, mode: "insensitive" } }];
+    const and: Prisma.CalendarEventWhereInput[] = [];
+    if (w.value.from || w.value.to) {
+      // A repeat that began before the window still has days in it, so it is fetched too; the page works out which of its days fall there.
+      and.push({ OR: [
+        { startsAt: { gte: w.value.from ?? undefined, lte: w.value.to ?? undefined } },
+        { recurrence: { not: null }, startsAt: { lte: w.value.to ?? undefined } },
+      ] });
+    }
+    if (q) and.push({ OR: [{ title: { contains: q, mode: "insensitive" } }, { text: { contains: q, mode: "insensitive" } }, { location: { contains: q, mode: "insensitive" } }] });
+    const where: Prisma.CalendarEventWhereInput = { calendarId: cal.id, AND: and };
     const rows = await prisma.calendarEvent.findMany({ where, orderBy: [{ startsAt: "asc" }, { id: "asc" }], take: limit + 1, select: EVENT });
     return { events: rows.slice(0, limit).map(toEvent), truncated: rows.length > limit, calendar: calOut(cal), canEdit: editsCal(req, cal) };
+  });
+
+  // Address search for the places: the coordinates and a name for what was typed. Editors and guests alike; the answers are kept a week.
+  app.get<{ Params: { slug: string }; Querystring: { q?: string } }>("/api/calendars/:slug/geocode", async (req, reply) => {
+    const cal = await calendarBySlug(req.params.slug);
+    if (!cal) return fail(reply, 404, "No calendar at this address.");
+    if (!allowed(req, cal)) return fail(reply, 401, LOCKED);
+    const q = String(req.query.q ?? "").trim();
+    if (q.length < 2) return fail(reply, 400, "Type at least two letters of the address.");
+    if (!geocodePerIp.hit(`ip:${req.ip}`)) return fail(reply, 429, "Too many address searches. Wait a moment.");
+    try {
+      return { places: await geocode(q) };
+    } catch (e) {
+      if (e instanceof GeocodeBusy) return fail(reply, 503, e.message);
+      if (e instanceof GeocodeDown) return fail(reply, 503, e.message);
+      throw e;
+    }
+  });
+
+  // Skips one day of a repeat (skipped: true), or puts it back (false). A repeat's own day is the day it falls on in the calendar's zone.
+  app.post<{ Params: { slug: string; id: string } }>("/api/calendars/:slug/events/:id/skip", async (req, reply) => {
+    const cal = await calendarBySlug(req.params.slug);
+    if (!cal) return fail(reply, 404, "No calendar at this address.");
+    if (!allowed(req, cal)) return fail(reply, 401, LOCKED);
+    if (!editsCal(req, cal)) return fail(reply, 403, NOT_EDITOR);
+    const id = Number(req.params.id);
+    const ev = Number.isInteger(id) ? await prisma.calendarEvent.findFirst({ where: { id, calendarId: cal.id }, select: EVENT }) : null;
+    if (!ev) return fail(reply, 404, "No such event.");
+    if (!ev.recurrence) return fail(reply, 400, "Only a repeating event has days to skip.");
+    const d = checkDay(body(req).day); if (!d.ok) return fail(reply, 400, d.error);
+    const skipped = body(req).skipped !== false;
+    const set = new Set(ev.exdates);
+    if (skipped) set.add(d.value); else set.delete(d.value);
+    if (set.size > MAX_SKIPS) return fail(reply, 400, "Too many days are skipped in this repeat.");
+    const upd = await prisma.calendarEvent.update({ where: { id: ev.id }, data: { exdates: [...set].sort() }, select: EVENT });
+    return toEvent(upd);
   });
 
   app.post<{ Params: { slug: string } }>("/api/calendars/:slug/events", async (req, reply) => {
@@ -252,9 +300,10 @@ export async function calendarRoutes(app: FastifyInstance): Promise<void> {
     if (writePerKey.blocked(wkey) > 0) return fail(reply, 429, "Too many changes in a short time. Wait a moment.");
     writePerKey.fail(wkey);
     const c = checkEvent(req.body); if (!c.ok) return fail(reply, 400, c.error);
+    if (c.value.recurUntil && c.value.recurUntil < dayKeyIn(c.value.startsAt, cal.timezone)) return fail(reply, 400, "The repeat ends before it starts.");
     if (await prisma.calendarEvent.count({ where: { calendarId: cal.id } }) >= MAX_EVENTS) return fail(reply, 409, "This calendar is full.");
     if (c.value.imageId !== null && !(await prisma.calendarImage.findFirst({ where: { id: c.value.imageId, calendarId: cal.id }, select: { id: true } }))) return fail(reply, 400, "That picture is not in this calendar.");
-    const ev = await prisma.calendarEvent.create({ data: { calendarId: cal.id, title: c.value.title, text: c.value.text, url: c.value.url, location: c.value.location, startsAt: c.value.startsAt, endsAt: c.value.endsAt, allDay: c.value.allDay, addedBy: c.value.addedBy, imageId: c.value.imageId }, select: EVENT });
+    const ev = await prisma.calendarEvent.create({ data: { calendarId: cal.id, title: c.value.title, text: c.value.text, url: c.value.url, location: c.value.location, startsAt: c.value.startsAt, endsAt: c.value.endsAt, allDay: c.value.allDay, addedBy: c.value.addedBy, imageId: c.value.imageId, lat: c.value.lat, lng: c.value.lng, recurrence: c.value.recurrence, recurUntil: c.value.recurUntil }, select: EVENT });
     return reply.code(201).send(toEvent(ev));
   });
 
@@ -267,8 +316,11 @@ export async function calendarRoutes(app: FastifyInstance): Promise<void> {
     if (!Number.isInteger(id)) return fail(reply, 404, "No such event.");
     if (!(await prisma.calendarEvent.findFirst({ where: { id, calendarId: cal.id }, select: { id: true } }))) return fail(reply, 404, "No such event.");
     const c = checkEvent(req.body); if (!c.ok) return fail(reply, 400, c.error);
+    if (c.value.recurUntil && c.value.recurUntil < dayKeyIn(c.value.startsAt, cal.timezone)) return fail(reply, 400, "The repeat ends before it starts.");
     if (c.value.imageId !== null && !(await prisma.calendarImage.findFirst({ where: { id: c.value.imageId, calendarId: cal.id }, select: { id: true } }))) return fail(reply, 400, "That picture is not in this calendar.");
-    const ev = await prisma.calendarEvent.update({ where: { id }, data: { title: c.value.title, text: c.value.text, url: c.value.url, location: c.value.location, startsAt: c.value.startsAt, endsAt: c.value.endsAt, allDay: c.value.allDay, imageId: c.value.imageId, addedBy: c.value.addedBy }, select: EVENT });
+    // A repeat that stops repeating forgets its skipped days; one that keeps repeating keeps them.
+    const data = { title: c.value.title, text: c.value.text, url: c.value.url, location: c.value.location, startsAt: c.value.startsAt, endsAt: c.value.endsAt, allDay: c.value.allDay, imageId: c.value.imageId, addedBy: c.value.addedBy, lat: c.value.lat, lng: c.value.lng, recurrence: c.value.recurrence, recurUntil: c.value.recurUntil, exdates: c.value.recurrence ? undefined : [] };
+    const ev = await prisma.calendarEvent.update({ where: { id }, data, select: EVENT });
     return toEvent(ev);
   });
 

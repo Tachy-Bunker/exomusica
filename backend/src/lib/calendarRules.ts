@@ -52,7 +52,15 @@ export function checkUrl(raw: unknown): Checked<string | null> {
   } catch { return { ok: false, error: "The link must start with https:// (or http://)." }; }
 }
 
-export interface EventInput { title: string; text: string; url: string | null; location: string; startsAt: Date; endsAt: Date | null; allDay: boolean; imageId: number | null; addedBy: string }
+export const RECURRENCES = ["daily", "weekly", "monthly", "yearly"] as const;
+export type Recurrence = (typeof RECURRENCES)[number];
+/** How many days one repeat may skip. A calendar with more skipped days than this is one to tidy up by hand. */
+export const MAX_SKIPS = 1000;
+
+export interface EventInput {
+  title: string; text: string; url: string | null; location: string; startsAt: Date; endsAt: Date | null; allDay: boolean; imageId: number | null; addedBy: string;
+  lat: number | null; lng: number | null; recurrence: Recurrence | null; recurUntil: string | null;
+}
 
 /** One event from a request body. Times are ISO strings; the end is not before the start. */
 export function checkEvent(body: unknown): Checked<EventInput> {
@@ -70,10 +78,52 @@ export function checkEvent(body: unknown): Checked<EventInput> {
   const imageRaw = b.imageId;
   const imageId = imageRaw == null || imageRaw === "" ? null : Number(imageRaw);
   if (imageId !== null && (!Number.isInteger(imageId) || imageId < 1)) return { ok: false, error: "The picture is not valid." };
+  const coords = checkCoords(b.lat, b.lng);
+  if (!coords.ok) return { ok: false, error: coords.error };
+  const rec = checkRecurrence(b.recurrence);
+  if (!rec.ok) return { ok: false, error: rec.error };
+  let recurUntil: string | null = null;
+  if (rec.value !== null && b.recurUntil != null && b.recurUntil !== "") {
+    const d = checkDay(b.recurUntil);
+    if (!d.ok) return { ok: false, error: "The last day of a repeat is written YYYY-MM-DD." };
+    recurUntil = d.value;
+  }
   return { ok: true, value: {
     title, text: clean(b.text, EVENT_LIMITS.text), url: url.value, location: clean(b.location, EVENT_LIMITS.location),
     startsAt, endsAt, allDay: b.allDay === true, imageId, addedBy: clean(b.addedBy, EVENT_LIMITS.addedBy),
+    lat: coords.value?.lat ?? null, lng: coords.value?.lng ?? null, recurrence: rec.value, recurUntil,
   } };
+}
+
+/** "daily", "weekly", "monthly", "yearly", or none (null). */
+export function checkRecurrence(raw: unknown): Checked<Recurrence | null> {
+  if (raw == null || raw === "") return { ok: true, value: null };
+  return (RECURRENCES as readonly string[]).includes(String(raw)) ? { ok: true, value: raw as Recurrence } : { ok: false, error: "A repeat is daily, weekly, monthly or yearly, or none." };
+}
+
+/** A day "YYYY-MM-DD" that is a real date. */
+export function checkDay(raw: unknown): Checked<string> {
+  const s = String(raw ?? "");
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s);
+  if (!m) return { ok: false, error: "A day is written YYYY-MM-DD." };
+  const d = new Date(Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3])));
+  const real = d.getUTCFullYear() === Number(m[1]) && d.getUTCMonth() === Number(m[2]) - 1 && d.getUTCDate() === Number(m[3]);
+  return real ? { ok: true, value: s } : { ok: false, error: "A day is written YYYY-MM-DD." };
+}
+
+/** Both coordinates, or neither (null). A latitude is -90 to 90, a longitude -180 to 180. */
+export function checkCoords(lat: unknown, lng: unknown): Checked<{ lat: number; lng: number } | null> {
+  const empty = (v: unknown) => v === null || v === undefined || v === "";
+  if (empty(lat) && empty(lng)) return { ok: true, value: null };
+  if (empty(lat) || empty(lng)) return { ok: false, error: "The coordinates need both a latitude and a longitude." };
+  const a = Number(lat), o = Number(lng);
+  if (!Number.isFinite(a) || !Number.isFinite(o) || a < -90 || a > 90 || o < -180 || o > 180) return { ok: false, error: "The coordinates are a latitude (-90 to 90) and a longitude (-180 to 180)." };
+  return { ok: true, value: { lat: a, lng: o } };
+}
+
+/** The calendar day ("YYYY-MM-DD") of an instant, in the calendar's zone. */
+export function dayKeyIn(when: Date, tz: string): string {
+  return new Intl.DateTimeFormat("en-CA", { timeZone: tz, year: "numeric", month: "2-digit", day: "2-digit" }).format(when);
 }
 
 /** Who may change events: one of EDIT_MODES. */

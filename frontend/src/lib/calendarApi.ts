@@ -3,6 +3,7 @@ import { api } from "./api";
 import { compressImageToMaxSize } from "./compressImage";
 
 export type EditMode = "guests" | "members";
+export type Recurrence = "daily" | "weekly" | "monthly" | "yearly";
 export interface CalInfo { slug: string; name: string; timezone: string; protected: boolean; editMode: EditMode; members: string[]; pictureCap: number }
 /** A calendar as this caller sees it: locked to them or not, may change its events, may change its settings. */
 export interface CalView extends CalInfo { locked: boolean; canEdit: boolean; canManage: boolean }
@@ -11,12 +12,18 @@ export interface CalImage { id: number; url: string }
 export interface CalEvent {
   id: number; title: string; text: string; url: string | null; location: string;
   startsAt: string; endsAt: string | null; allDay: boolean; addedBy: string;
+  lat: number | null; lng: number | null;
+  /** A repeating event is stored once: `recurrence` says how often, `recurUntil` is its last day, `exdates` the days skipped. */
+  recurrence: Recurrence | null; recurUntil: string | null; exdates: string[];
   image: CalImage | null; createdAt: string; updatedAt: string;
 }
 export interface EventInput {
   title: string; text: string; url: string | null; location: string;
   startsAt: string; endsAt: string | null; allDay: boolean; imageId: number | null; addedBy: string;
+  lat: number | null; lng: number | null; recurrence: Recurrence | null; recurUntil: string | null;
 }
+/** An address search answer: where it is and the name the service gives it. */
+export interface Place { lat: number; lng: number; label: string }
 /** `removed`: how many older pictures went to make room (the calendar's picture limit). */
 export interface LinkPreview { url: string; title: string; description: string | null; siteName: string | null; image: CalImage | null; removed: number }
 export interface UploadedPicture extends CalImage { removed: number }
@@ -64,16 +71,23 @@ export async function signOutEveryone(slug: string): Promise<void> {
 
 export const deleteCalendar = (slug: string) => api<void>(base(slug), { method: "DELETE" });
 
-export function listEvents(slug: string, range: { from?: string; to?: string; q?: string }) {
+export function listEvents(slug: string, range: { from?: string; to?: string; q?: string; limit?: number }) {
   const p = new URLSearchParams();
   if (range.from) p.set("from", range.from);
   if (range.to) p.set("to", range.to);
   if (range.q) p.set("q", range.q);
+  if (range.limit) p.set("limit", String(range.limit));
   return api<{ events: CalEvent[]; truncated: boolean; calendar: CalInfo; canEdit: boolean }>(`${base(slug)}/events?${p}`, { headers: headers(slug) });
 }
 export const addEvent = (slug: string, body: EventInput) => api<CalEvent>(`${base(slug)}/events`, { method: "POST", body: JSON.stringify(body), headers: headers(slug) });
 export const editEvent = (slug: string, id: number, body: EventInput) => api<CalEvent>(`${base(slug)}/events/${id}`, { method: "PUT", body: JSON.stringify(body), headers: headers(slug) });
 export const removeEvent = (slug: string, id: number) => api<void>(`${base(slug)}/events/${id}`, { method: "DELETE", headers: headers(slug) });
+/** Skips one day of a repeat (skipped true), or puts it back (false). */
+export const skipDay = (slug: string, id: number, day: string, skipped: boolean) =>
+  api<CalEvent>(`${base(slug)}/events/${id}/skip`, { method: "POST", body: JSON.stringify({ day, skipped }), headers: headers(slug) });
+/** Address search: the places it finds, at most five, best first. */
+export const geocodeAddress = (slug: string, q: string) =>
+  api<{ places: Place[] }>(`${base(slug)}/geocode?q=${encodeURIComponent(q)}`, { headers: headers(slug) }).then((r) => r.places);
 export const previewLink = (slug: string, url: string) => api<LinkPreview>(`${base(slug)}/link-preview`, { method: "POST", body: JSON.stringify({ url }), headers: headers(slug) });
 
 const ONE_MB = 1_000_000;

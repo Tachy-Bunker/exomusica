@@ -1,25 +1,41 @@
-// Add or change an event. The one line at the top is read first ("Ambient set at Le Trianon, 2 Nov 20:00", or a link), and the fields
-// fill in; the guest checks them and saves. A pasted link is read as well: its title, text and picture come in when the fields are empty.
+// Add or change an event. The line at the top is read first ("Ambient set at Le Trianon, 2 Nov 20:00", or a link) and the fields fill in.
+// A place can be found by address (its coordinates come with it) or typed as "lat, lng". A repeat has an end and days left out.
+// Changing one day of a repeat makes that day its own event and leaves the day out of the series.
 import { useState, type ClipboardEvent, type FormEvent, type KeyboardEvent } from "react";
 import { parseQuickAdd } from "../../lib/calendarQuickAdd";
-import { addDays, dayStartIso, parseKey, timeOf, todayKey, dayKey, zonedToUtc } from "../../lib/calendarTime";
+import { addDays, dayLabel, dayStartIso, parseKey, timeOf, todayKey, dayKey, zonedToUtc } from "../../lib/calendarTime";
+import { parseCoordinates, shortPlace } from "../../lib/calendarPlace";
 import { useCalLang } from "../../lib/calendarI18n";
-import { addEvent, editEvent, previewLink, rememberName, savedName, uploadPicture, type CalEvent, type CalImage, type EventInput } from "../../lib/calendarApi";
+import { addEvent, editEvent, geocodeAddress, messageOf, previewLink, rememberName, savedName, skipDay, uploadPicture, type CalEvent, type CalImage, type EventInput, type Place, type Recurrence } from "../../lib/calendarApi";
 import { ApiError } from "../../lib/api";
 
-interface Props { slug: string; tz: string; event?: CalEvent; day?: string; onDone: (saved: CalEvent | null) => void }
+export type ComposeScope = "one" | "all";
+interface Props {
+  slug: string; tz: string; event?: CalEvent; scope?: ComposeScope; occurrenceDay?: string; day?: string;
+  onDone: (saved: CalEvent | null) => void; onRefresh: () => void;
+}
 const pad = (n: number): string => String(n).padStart(2, "0");
 const ymd = (y: number, m: number, d: number): string => `${y}-${pad(m)}-${pad(d)}`;
+const REPEATS: Recurrence[] = ["daily", "weekly", "monthly", "yearly"];
+const REPEAT_LABEL: Record<Recurrence, string> = { daily: "Every day", weekly: "Every week", monthly: "Every month", yearly: "Every year" };
 
-export function EventComposer({ slug, tz, event, day, onDone }: Props) {
+export function EventComposer({ slug, tz, event, scope = "all", occurrenceDay, day, onDone, onRefresh }: Props) {
   const { t, locale } = useCalLang();
   const fail = (x: unknown): string => (x instanceof ApiError ? t(x.message) : x instanceof Error ? t(x.message) : t("Something went wrong."));
+  const one = !!event && scope === "one" && !!occurrenceDay;          // this day of a repeat only
   const [line, setLine] = useState("");
   const [title, setTitle] = useState(event?.title ?? "");
-  const [date, setDate] = useState(event ? dayKey(event.startsAt, tz) : day ?? todayKey(tz));
+  const [date, setDate] = useState(one ? occurrenceDay! : event ? dayKey(event.startsAt, tz) : day ?? todayKey(tz));
   const [start, setStart] = useState(event && !event.allDay ? timeOf(event.startsAt, tz) : "");
   const [end, setEnd] = useState(event?.endsAt ? timeOf(event.endsAt, tz) : "");
   const [location, setLocation] = useState(event?.location ?? "");
+  const [lat, setLat] = useState(event?.lat != null ? String(event.lat) : "");
+  const [lng, setLng] = useState(event?.lng != null ? String(event.lng) : "");
+  const [found, setFound] = useState<Place[]>([]);
+  const [finding, setFinding] = useState(false);
+  const [rec, setRec] = useState<Recurrence | "">(!one && event?.recurrence ? event.recurrence : "");
+  const [until, setUntil] = useState(!one && event?.recurUntil ? event.recurUntil : "");
+  const [skipped, setSkipped] = useState<string[]>(!one && event ? event.exdates : []);
   const [url, setUrl] = useState(event?.url ?? "");
   const [text, setText] = useState(event?.text ?? "");
   const [image, setImage] = useState<CalImage | null>(event?.image ?? null);
@@ -69,6 +85,35 @@ export function EventComposer({ slug, tz, event, day, onDone }: Props) {
     if (/^https?:\/\/\S+$/i.test(pasted)) { e.preventDefault(); setLine(""); void readLink(pasted, { title, text }); }
   }
 
+  /** The place: typed coordinates are taken as they are; an address is searched, and the answers are listed to choose from. */
+  async function findPlace() {
+    const typed = location.trim();
+    if (!typed) return;
+    const at = parseCoordinates(typed);
+    if (at) { setLat(String(at.lat)); setLng(String(at.lng)); setLocation(""); setFound([]); return; }
+    setFinding(true); setErr(""); setFound([]);
+    try {
+      const places = await geocodeAddress(slug, typed);
+      if (!places.length) setErr(t("Nothing found for that address."));
+      if (places.length === 1) pickPlace(places[0]);
+      else setFound(places);
+    } catch (x) { setErr(fail(x)); }
+    finally { setFinding(false); }
+  }
+  function pickPlace(p: Place) {
+    setLocation(shortPlace(p.label));
+    setLat(String(p.lat)); setLng(String(p.lng));
+    setFound([]);
+  }
+  function clearPlace() { setLat(""); setLng(""); }
+
+  async function putBack(d: string) {
+    if (!event) return;
+    setErr("");
+    try { const r = await skipDay(slug, event.id, d, false); setSkipped(r.exdates); onRefresh(); }
+    catch (x) { setErr(fail(x)); }
+  }
+
   async function pick(f: File | undefined) {
     if (!f) return;
     setBusy(true); setErr(""); setNote("");
@@ -100,22 +145,34 @@ export function EventComposer({ slug, tz, event, day, onDone }: Props) {
         endsAt = zonedToUtc(p.y, p.m, p.d, eh, em, tz).toISOString();
       }
     }
+    const repeat = !one && rec ? rec : null;
     const body: EventInput = {
       title: title.trim(), text: text.trim(), url: url.trim() || null, location: location.trim(),
       startsAt, endsAt, allDay, imageId: image?.id ?? null, addedBy: addedBy.trim(),
+      lat: lat === "" ? null : Number(lat), lng: lng === "" ? null : Number(lng),
+      recurrence: repeat, recurUntil: repeat && until ? until : null,
     };
     setBusy(true);
     try {
       if (addedBy.trim()) rememberName(addedBy.trim());
-      const saved = event ? await editEvent(slug, event.id, body) : await addEvent(slug, body);
-      onDone(saved);
+      if (one) {
+        // This day only: the day becomes its own event, and the repeat leaves it out.
+        const own = await addEvent(slug, body);
+        await skipDay(slug, event!.id, occurrenceDay!, true);
+        onDone(own);
+      } else {
+        const saved = event ? await editEvent(slug, event.id, body) : await addEvent(slug, body);
+        onDone(saved);
+      }
     } catch (x) { setErr(fail(x)); }
     finally { setBusy(false); }
   }
 
+  const skippedWords = skipped.slice().sort();
   return (
     <form className="cal-form" onSubmit={save} aria-busy={busy}>
-      <h2>{event ? t("Change the event") : t("Add an event")}</h2>
+      <h2>{one ? t("Change this day") : event ? t("Change the event") : t("Add an event")}</h2>
+      {one ? <p className="cal-dim cal-small">{t("Only this day of the repeat changes. The other days stay as they are.")}</p> : null}
       <label className="cal-line">
         <span>{t("Quick add: “Ambient set at Le Trianon, 2 Nov 20:00”, “Live samedi de 20h à 23h au Glazart”, or paste a link")}</span>
         <span className="cal-line-row">
@@ -133,9 +190,56 @@ export function EventComposer({ slug, tz, event, day, onDone }: Props) {
         <label>{t("End")}<input type="time" value={end} onChange={(e) => setEnd(e.target.value)} /></label>
       </div>
       <p className="cal-dim cal-small">{t("Times are in this calendar's time zone ({tz}). No start time means all day.", { tz })}</p>
-      <label>{t("Place")}<input value={location} onChange={(e) => setLocation(e.target.value)} maxLength={160} /></label>
+
+      <div className="cal-place-block">
+        <label>{t("Place")}
+          <span className="cal-line-row">
+            <input value={location} onChange={(e) => setLocation(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); void findPlace(); } }} maxLength={160} placeholder={t("An address, or “48.85, 2.35”")} />
+            <button type="button" className="cal-quiet" onClick={() => void findPlace()} disabled={finding || !location.trim()}>{finding ? "…" : t("Find on the map")}</button>
+          </span>
+        </label>
+        {found.length ? (
+          <ul className="cal-found" aria-label={t("Places found")}>
+            {found.map((p) => (
+              <li key={`${p.lat},${p.lng}`}><button type="button" className="cal-place" onClick={() => pickPlace(p)}><span>{shortPlace(p.label)}</span><span className="cal-dim cal-small">{p.label}</span></button></li>
+            ))}
+          </ul>
+        ) : null}
+        <div className="cal-coords">
+          <label>{t("Latitude")}<input type="number" step="any" min={-90} max={90} value={lat} onChange={(e) => setLat(e.target.value)} /></label>
+          <label>{t("Longitude")}<input type="number" step="any" min={-180} max={180} value={lng} onChange={(e) => setLng(e.target.value)} /></label>
+          {lat !== "" || lng !== "" ? <button type="button" className="cal-quiet" onClick={clearPlace}>{t("No place on the map")}</button> : null}
+        </div>
+      </div>
+
       <label>{t("Link")}<input type="url" value={url} onChange={(e) => setUrl(e.target.value)} onPaste={(e) => { const p = e.clipboardData.getData("text").trim(); if (/^https?:\/\/\S+$/i.test(p)) { e.preventDefault(); setUrl(p); void readLink(p, { title, text }); } }} placeholder="https://" /></label>
       <label>{t("Text")}<textarea value={text} onChange={(e) => setText(e.target.value)} maxLength={2000} rows={4} /></label>
+
+      {!one ? (
+        <div className="cal-repeat-block">
+          <label>{t("Repeats")}
+            <select value={rec} onChange={(e) => setRec(e.target.value as Recurrence | "")}>
+              <option value="">{t("Does not repeat")}</option>
+              {REPEATS.map((r) => <option key={r} value={r}>{t(REPEAT_LABEL[r])}</option>)}
+            </select>
+          </label>
+          {rec ? <label>{t("Until (optional)")}<input type="date" value={until} min={date} onChange={(e) => setUntil(e.target.value)} /></label> : null}
+          {skippedWords.length ? (
+            <div className="cal-skips">
+              <p className="cal-dim cal-small">{t("Days left out of this repeat:")}</p>
+              <ul>
+                {skippedWords.map((d) => (
+                  <li key={d}>
+                    <span>{dayLabel(d, { weekday: "short", day: "numeric", month: "short", year: "numeric" }, locale)}</span>{" "}
+                    <button type="button" className="cal-quiet" onClick={() => void putBack(d)}>{t("Put it back")}</button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
+        </div>
+      ) : null}
+
       <div className="cal-picture">
         {image ? <img src={image.url} alt="" /> : null}
         <label className="cal-quiet">{image ? t("Change the picture") : t("Add a picture")}<input type="file" accept="image/*" onChange={(e) => void pick(e.target.files?.[0])} /></label>
@@ -144,7 +248,7 @@ export function EventComposer({ slug, tz, event, day, onDone }: Props) {
       <label>{t("Your name (shown as “added by”)")}<input value={addedBy} onChange={(e) => setAddedBy(e.target.value)} maxLength={40} /></label>
 
       <div className="cal-actions">
-        <button type="submit" className="cal-primary" disabled={busy}>{busy ? "…" : event ? t("Save changes") : t("Add event")}</button>
+        <button type="submit" className="cal-primary" disabled={busy}>{busy ? "…" : one ? t("Save this day") : event ? t("Save changes") : t("Add event")}</button>
         <button type="button" className="cal-quiet" onClick={() => onDone(null)}>{t("Cancel")}</button>
       </div>
     </form>

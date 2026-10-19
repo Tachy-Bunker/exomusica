@@ -1,15 +1,14 @@
-// Filters over the events a view has loaded: words, one place, only the ones with a picture. Pure.
+// The page's search and the places list (fix414: the place and picture filters are gone; the page has one search). Pure.
 import type { CalEvent } from "./calendarApi";
 
-export interface Filter { q: string; place: string; withPicture: boolean }
-export const EMPTY_FILTER: Filter = { q: "", place: "", withPicture: false };
-
-export function filterEvents(events: CalEvent[], f: Filter): CalEvent[] {
-  const q = f.q.trim().toLowerCase();
-  return events.filter((e) =>
-    (!f.place || e.location === f.place) &&
-    (!f.withPicture || e.image !== null) &&
-    (!q || `${e.title} ${e.text} ${e.location} ${e.addedBy}`.toLowerCase().includes(q)));
+/** The events whose title, text, place or author contain every word typed (ignoring case). An empty search keeps everything. */
+export function filterEvents<T extends CalEvent>(events: T[], q: string): T[] {
+  const words = q.trim().toLowerCase().split(/\s+/).filter(Boolean);
+  if (!words.length) return events;
+  return events.filter((e) => {
+    const hay = `${e.title} ${e.text} ${e.location} ${e.addedBy}`.toLowerCase();
+    return words.every((w) => hay.includes(w));
+  });
 }
 
 /** The places in these events, the busiest first, then by name. */

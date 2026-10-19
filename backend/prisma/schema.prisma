@@ -1829,6 +1829,11 @@ model CalendarEvent {
   imageId    Int?
   image      CalendarImage? @relation(fields: [imageId], references: [id], onDelete: SetNull)
   addedBy    String         @default("")
+  lat        Float?         // where it is on the map (set from an address search, or typed); both or neither
+  lng        Float?
+  recurrence String?        // "daily" | "weekly" | "monthly" | "yearly": the event repeats; null = happens once
+  recurUntil String?        // the last day a repeat may fall on, "YYYY-MM-DD" in the calendar's zone; null = no end
+  exdates    String[]       @default([]) // days skipped in the repeat, "YYYY-MM-DD" in the calendar's zone
   createdAt  DateTime       @default(now())
   updatedAt  DateTime       @updatedAt
 
