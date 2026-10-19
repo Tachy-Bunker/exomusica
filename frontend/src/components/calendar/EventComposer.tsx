@@ -1,7 +1,7 @@
 // Add or change an event. The line at the top is read first ("Ambient set at Le Trianon, 2 Nov 20:00", or a link) and the fields fill in.
-// A place can be found by address (its coordinates come with it) or typed as "lat, lng". A repeat has an end and days left out.
-// Changing one day of a repeat makes that day its own event and leaves the day out of the series.
-import { useState, type ClipboardEvent, type FormEvent, type KeyboardEvent } from "react";
+// The place is searched as it is typed: one answer sets the coordinates, several are listed to pick from; typed "lat, lng" is taken as it is.
+// A repeat has an end and days left out. Changing one day of a repeat makes that day its own event and leaves the day out of the series.
+import { useEffect, useState, type ClipboardEvent, type FormEvent, type KeyboardEvent } from "react";
 import { parseQuickAdd } from "../../lib/calendarQuickAdd";
 import { addDays, dayLabel, dayStartIso, parseKey, timeOf, todayKey, dayKey, zonedToUtc } from "../../lib/calendarTime";
 import { parseCoordinates, shortPlace } from "../../lib/calendarPlace";
@@ -18,6 +18,8 @@ const pad = (n: number): string => String(n).padStart(2, "0");
 const ymd = (y: number, m: number, d: number): string => `${y}-${pad(m)}-${pad(d)}`;
 const REPEATS: Recurrence[] = ["daily", "weekly", "monthly", "yearly"];
 const REPEAT_LABEL: Record<Recurrence, string> = { daily: "Every day", weekly: "Every week", monthly: "Every month", yearly: "Every year" };
+/** How long the place is left alone after the last key, before it is searched. */
+const PLACE_PAUSE_MS = 600;
 
 export function EventComposer({ slug, tz, event, scope = "all", occurrenceDay, day, onDone, onRefresh }: Props) {
   const { t, locale } = useCalLang();
@@ -29,6 +31,10 @@ export function EventComposer({ slug, tz, event, scope = "all", occurrenceDay, d
   const [start, setStart] = useState(event && !event.allDay ? timeOf(event.startsAt, tz) : "");
   const [end, setEnd] = useState(event?.endsAt ? timeOf(event.endsAt, tz) : "");
   const [location, setLocation] = useState(event?.location ?? "");
+  // The place text that is settled (picked, or found for a single answer): it is not searched again.
+  const [chosen, setChosen] = useState<string | null>(event?.location?.trim() || null);
+  // The coordinates came from a search or a pick: a new place text clears them, until the new place is found.
+  const [autoCoords, setAutoCoords] = useState(!!event && event.lat !== null);
   const [lat, setLat] = useState(event?.lat != null ? String(event.lat) : "");
   const [lng, setLng] = useState(event?.lng != null ? String(event.lng) : "");
   const [found, setFound] = useState<Place[]>([]);
@@ -85,27 +91,42 @@ export function EventComposer({ slug, tz, event, scope = "all", occurrenceDay, d
     if (/^https?:\/\/\S+$/i.test(pasted)) { e.preventDefault(); setLine(""); void readLink(pasted, { title, text }); }
   }
 
-  /** The place: typed coordinates are taken as they are; an address is searched, and the answers are listed to choose from. */
-  async function findPlace() {
+  /** The place, searched as it is typed (after a short pause). Typed coordinates are taken as they are. */
+  useEffect(() => {
     const typed = location.trim();
-    if (!typed) return;
+    if (!typed || typed === chosen) { setFound([]); return; }
     const at = parseCoordinates(typed);
-    if (at) { setLat(String(at.lat)); setLng(String(at.lng)); setLocation(""); setFound([]); return; }
-    setFinding(true); setErr(""); setFound([]);
-    try {
-      const places = await geocodeAddress(slug, typed);
-      if (!places.length) setErr(t("Nothing found for that address."));
-      if (places.length === 1) pickPlace(places[0]);
-      else setFound(places);
-    } catch (x) { setErr(fail(x)); }
-    finally { setFinding(false); }
+    if (at) { setLat(String(at.lat)); setLng(String(at.lng)); setAutoCoords(false); setFound([]); return; }
+    if (typed.length < 3) { setFound([]); return; }
+    let alive = true;
+    const timer = window.setTimeout(async () => {
+      setFinding(true); setErr("");
+      try {
+        const places = await geocodeAddress(slug, typed);
+        if (!alive) return;
+        if (!places.length) setErr(t("Nothing found for that address."));
+        else if (places.length === 1) {
+          setLat(String(places[0].lat)); setLng(String(places[0].lng));
+          setAutoCoords(true); setChosen(typed); setFound([]);
+        } else setFound(places);
+      } catch (x) { if (alive) setErr(t(messageOf(x))); }
+      finally { if (alive) setFinding(false); }
+    }, PLACE_PAUSE_MS);
+    return () => { alive = false; window.clearTimeout(timer); setFinding(false); };
+  }, [location, chosen, slug, t]);
+
+  /** Typing a new place drops the coordinates that came from the last search. */
+  function onPlaceType(v: string) {
+    setLocation(v);
+    if (autoCoords && v.trim() !== chosen) { setLat(""); setLng(""); setAutoCoords(false); }
   }
+  /** One of several answers is picked: its name and coordinates are the place. */
   function pickPlace(p: Place) {
-    setLocation(shortPlace(p.label));
+    const label = shortPlace(p.label);
+    setLocation(label); setChosen(label);
     setLat(String(p.lat)); setLng(String(p.lng));
-    setFound([]);
+    setAutoCoords(true); setFound([]);
   }
-  function clearPlace() { setLat(""); setLng(""); }
 
   async function putBack(d: string) {
     if (!event) return;
@@ -193,11 +214,10 @@ export function EventComposer({ slug, tz, event, scope = "all", occurrenceDay, d
 
       <div className="cal-place-block">
         <label>{t("Place")}
-          <span className="cal-line-row">
-            <input value={location} onChange={(e) => setLocation(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); void findPlace(); } }} maxLength={160} placeholder={t("An address, or “48.85, 2.35”")} />
-            <button type="button" className="cal-quiet" onClick={() => void findPlace()} disabled={finding || !location.trim()}>{finding ? "…" : t("Find on the map")}</button>
-          </span>
+          <input value={location} onChange={(e) => onPlaceType(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") e.preventDefault(); }}
+            maxLength={160} placeholder={t("An address, or “48.85, 2.35”")} />
         </label>
+        {finding ? <p className="cal-dim cal-small" role="status">{t("Searching…")}</p> : null}
         {found.length ? (
           <ul className="cal-found" aria-label={t("Places found")}>
             {found.map((p) => (
@@ -206,9 +226,8 @@ export function EventComposer({ slug, tz, event, scope = "all", occurrenceDay, d
           </ul>
         ) : null}
         <div className="cal-coords">
-          <label>{t("Latitude")}<input type="number" step="any" min={-90} max={90} value={lat} onChange={(e) => setLat(e.target.value)} /></label>
-          <label>{t("Longitude")}<input type="number" step="any" min={-180} max={180} value={lng} onChange={(e) => setLng(e.target.value)} /></label>
-          {lat !== "" || lng !== "" ? <button type="button" className="cal-quiet" onClick={clearPlace}>{t("No place on the map")}</button> : null}
+          <label>{t("Latitude")}<input type="number" step="any" min={-90} max={90} value={lat} onChange={(e) => { setLat(e.target.value); setAutoCoords(false); }} /></label>
+          <label>{t("Longitude")}<input type="number" step="any" min={-180} max={180} value={lng} onChange={(e) => { setLng(e.target.value); setAutoCoords(false); }} /></label>
         </div>
       </div>
 

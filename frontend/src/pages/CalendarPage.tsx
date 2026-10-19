@@ -1,25 +1,27 @@
-// The calendar page (fix414): one page, stacked. Month, Week, Agenda and Places are sections under one search bar; no tabs.
+// The calendar page (fix415): one page, stacked. Month and Agenda are sections under one search bar, then Places; no tabs, no week.
 // The server sends the events of a window; the page works out the days of the repeats and draws each section from that.
 import { lazy, Suspense, useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { ApiError } from "../lib/api";
-import { addDays, dayKey, dayStartIso, parseKey, todayKey, weekStart } from "../lib/calendarTime";
+import { addDays, dayKey, dayLabel, dayStartIso, parseKey, todayKey, weekStart } from "../lib/calendarTime";
 import { filterEvents } from "../lib/calendarFilter";
+import { agendaSpan, customDays, type AgendaChoice } from "../lib/calendarAgenda";
+import { downloadIcs, icsName, icsOf } from "../lib/calendarIcs";
 import { occurrencesIn, type Occurrence } from "../lib/calendarRepeat";
 import { dropToken, enterCalendar, getCalendar, listEvents, messageOf, removeEvent, skipDay, type CalEvent, type CalView } from "../lib/calendarApi";
-import { AgendaView, MonthView, WeekView } from "../components/calendar/CalendarViews";
+import { AgendaView, MonthView } from "../components/calendar/CalendarViews";
 import { EventComposer, type ComposeScope } from "../components/calendar/EventComposer";
 import { EventSheet, type Scope } from "../components/calendar/EventSheet";
 import { CalendarSettings } from "../components/calendar/CalendarSettings";
 import { ShareDialog } from "../components/calendar/ShareDialog";
+import { CogIcon, FlagFR, FlagGB, LinkIcon } from "../components/calendar/Icons";
 import { CalLangProvider, useCalLang, useCalLangState } from "../lib/calendarI18n";
 import "../components/calendar/calendar.css";
 
-// The map is only fetched when the Places section is there (Leaflet is about 40 KB; a phone that never opens it never loads it).
+// The map is only fetched when the Places section is reached (Leaflet is about 40 KB; a phone that never gets there never loads it).
 const PlacesSection = lazy(() => import("../components/calendar/PlacesSection"));
 
-/** Renders its children once it is near the screen, and keeps them after. The map is fetched only then: a phone that never scrolls
- *  to Places never downloads it. Until then, a box of the map's size holds the place. */
+/** Renders its children once it is near the screen, and keeps them after. Until then, a box of the map's size holds the place. */
 function WhenNear({ children, height }: { children: ReactNode; height: string }) {
   const ref = useRef<HTMLDivElement | null>(null);
   const [seen, setSeen] = useState(false);
@@ -44,32 +46,32 @@ function hashPassword(): string | null {
 /** Takes the password out of the address bar, so it is not left on screen or copied by accident. */
 const clearHash = (): void => history.replaceState(null, "", window.location.pathname + window.location.search);
 
-/** The window the server is asked for: everything the month grid, the week, the agenda (60 days) and the places (120 days) show,
- *  or, while searching, a month back and a year ahead. */
-function windowOf(today: string, monthCursor: string, weekCursor: string, searching: boolean, tz: string): [string, string] {
+/** The window the server is asked for: everything the month grid and the agenda's days show, and the places (120 days); or, while
+ *  searching, a month back and a year ahead. */
+function windowOf(today: string, monthCursor: string, agenda: [string, string], searching: boolean, tz: string): [string, string] {
   if (searching) return [dayStartIso(addDays(today, -30), tz), dayStartIso(addDays(today, 395), tz)];
   const mFirst = weekStart(monthCursor.slice(0, 8) + "01");
   const mEnd = addDays(mFirst, 42);
-  const wFirst = weekStart(weekCursor);
-  const from = [today, mFirst, wFirst].sort()[0];
-  const to = [addDays(today, 120), mEnd, addDays(wFirst, 7)].sort().reverse()[0];
+  const from = [today, mFirst, agenda[0]].sort()[0];
+  const to = [addDays(today, 120), mEnd, agenda[1]].sort().reverse()[0];
   return [dayStartIso(from, tz), dayStartIso(to, tz)];
 }
 const shiftMonth = (key: string, n: number): string => { const { y, m } = parseKey(key); return new Date(Date.UTC(y, m - 1 + n, 1)).toISOString().slice(0, 10); };
 // Errors are kept as the English sentence the server sends; they are shown in the calendar's language.
 const fail = messageOf;
 
-/** The language button: "Français" or "English". It rewrites the link's ?fr, so the choice can be shared. */
+/** The language button: the two flags, the one in use lit. A click switches, and the link is rewritten (?fr), so the choice can be shared. */
 function LangToggle() {
-  const { lang, setLang } = useCalLang();
-  return <button type="button" className="cal-quiet cal-lang" onClick={() => setLang(lang === "fr" ? "en" : "fr")}>{lang === "fr" ? "English" : "Français"}</button>;
+  const { lang, setLang, t } = useCalLang();
+  const next = lang === "fr" ? "en" : "fr";
+  const label = next === "fr" ? t("Switch to French") : t("Switch to English");
+  return (
+    <button type="button" className="cal-lang" onClick={() => setLang(next)} aria-label={label} title={label}>
+      <FlagGB on={lang === "en"} />
+      <FlagFR on={lang === "fr"} />
+    </button>
+  );
 }
-
-const LinkIcon = () => (
-  <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
-    <path d="M10 13.5a4.5 4.5 0 0 0 6.36 0l3-3a4.5 4.5 0 0 0-6.36-6.36l-1.2 1.2M14 10.5a4.5 4.5 0 0 0-6.36 0l-3 3a4.5 4.5 0 0 0 6.36 6.36l1.2-1.2" stroke="currentColor" strokeWidth="2" strokeLinecap="round" fill="none" />
-  </svg>
-);
 
 export function CalendarPage() {
   const L = useCalLangState();
@@ -79,7 +81,7 @@ export function CalendarPage() {
 function CalendarView() {
   const { slug = "" } = useParams();
   const nav = useNavigate();
-  const { t, lang } = useCalLang();
+  const { t, lang, locale } = useCalLang();
   const back = lang === "fr" ? "/calendar?fr" : "/calendar";
   const [cal, setCal] = useState<CalView | null>(null);
   const [editable, setEditable] = useState(false);     // may add, change and remove events here (from the server)
@@ -87,13 +89,14 @@ function CalendarView() {
   const [loadErr, setLoadErr] = useState("");
   const [today, setToday] = useState("");
   const [monthCursor, setMonthCursor] = useState("");
-  const [weekCursor, setWeekCursor] = useState("");
   const [day, setDay] = useState<string | null>(null);
   const [raw, setRaw] = useState<CalEvent[]>([]);      // the events as the server sent them (a repeat once)
   const [win, setWin] = useState<[string, string] | null>(null);
   const [truncated, setTruncated] = useState(false);
   const [text, setText] = useState("");                 // the search box as typed
   const [q, setQ] = useState("");                       // the search, a moment after typing stops
+  const [agendaChoice, setAgendaChoice] = useState<AgendaChoice>("30");
+  const [agendaCustom, setAgendaCustom] = useState(""); // a number of days typed in; it takes over the period
   const [open, setOpen] = useState<Occurrence | null>(null);
   const [editing, setEditing] = useState<{ event?: CalEvent; scope?: ComposeScope; occurrenceDay?: string; day?: string } | null>(null);
   const [settings, setSettings] = useState(false);
@@ -122,8 +125,7 @@ function CalendarView() {
         if (!alive) return;
         if (info.locked) dropToken(slug);            // an old token no longer works: ask again
         setCal(info); setEditable(info.canEdit);
-        const k = todayKey(info.timezone);
-        setToday(k); setMonthCursor(k); setWeekCursor(k);
+        setToday(todayKey(info.timezone)); setMonthCursor(todayKey(info.timezone));
       } catch (x) {
         if (!alive) return;
         if (x instanceof ApiError && x.status === 404) setMissing(true);
@@ -136,11 +138,15 @@ function CalendarView() {
   // The search, after a short pause.
   useEffect(() => { const t = setTimeout(() => setQ(text), 300); return () => clearTimeout(t); }, [text]);
 
+  // The agenda's days: 30 by default, this week, next week, or the number typed in.
+  const agendaRange = useMemo<[string, string]>(() => (today ? agendaSpan(today, agendaChoice, agendaCustom) : ["", ""]), [today, agendaChoice, agendaCustom]);
+  const agendaActive: AgendaChoice | "custom" = customDays(agendaCustom) !== null ? "custom" : agendaChoice;
+
   // The events of the window. Refreshed every minute while the page is visible, so guests see each other's additions.
   useEffect(() => {
     if (!cal || cal.locked || !today || !monthCursor) return;
     let alive = true;
-    const [from, to] = windowOf(today, monthCursor, weekCursor, searching, cal.timezone);
+    const [from, to] = windowOf(today, monthCursor, agendaRange, searching, cal.timezone);
     listEvents(cal.slug, { from, to, limit: 500 })
       .then((r) => { if (alive) { setRaw(r.events); setWin([from, to]); setTruncated(r.truncated); setEditable(r.canEdit); setLoadErr(""); } })
       .catch((x) => {
@@ -149,7 +155,7 @@ function CalendarView() {
         else setLoadErr(fail(x));
       });
     return () => { alive = false; };
-  }, [cal, today, monthCursor, weekCursor, searching, tick]);
+  }, [cal, today, monthCursor, agendaRange, searching, tick]);
   useEffect(() => {
     if (!cal || cal.locked) return;
     const t = setInterval(() => { if (!document.hidden) setTick((n) => n + 1); }, 60_000);
@@ -159,8 +165,10 @@ function CalendarView() {
   // Repeats become their days inside the window; the search narrows them.
   const occ = useMemo(() => (win && cal ? occurrencesIn(raw, win[0], win[1], cal.timezone) : []), [raw, win, cal]);
   const shown = useMemo(() => filterEvents(occ, q), [occ, q]);
-  const agendaTo = today ? addDays(today, 60) : "";
-  const agenda = useMemo(() => (searching ? shown : shown.filter((e) => e.day >= today && e.day < agendaTo)), [shown, searching, today, agendaTo]);
+  const agenda = useMemo(() => (searching ? shown : shown.filter((e) => e.day >= agendaRange[0] && e.day < agendaRange[1])), [shown, searching, agendaRange]);
+  const rangeText = today
+    ? `${dayLabel(agendaRange[0], { day: "numeric", month: "short" }, locale)} – ${dayLabel(addDays(agendaRange[1], -1), { day: "numeric", month: "short", year: "numeric" }, locale)}`
+    : "";
 
   async function unlock(e: FormEvent) {
     e.preventDefault(); if (!cal) return;
@@ -197,6 +205,14 @@ function CalendarView() {
     try { await removeEvent(cal.slug, master.id); setOpen(null); setTick((n) => n + 1); }
     catch (x) { setLoadErr(fail(x)); }
   }
+  /** Downloads the event as a calendar file. A repeat comes as its whole series, with its last day and the days left out. */
+  function addToCalendar(e: Occurrence) {
+    if (!cal) return;
+    const master = masterOf(e);
+    if (!master) return;
+    const host = window.location.hostname || "exomusica";
+    downloadIcs(icsName(master), icsOf(master, cal.timezone, { uid: `${master.id}.${cal.slug}@${host}` }));
+  }
 
   if (missing) return <div className="cal-page"><p className="cal-empty">{t("There is no calendar at this address.")} <Link to={back}>{t("See the open calendars")}</Link>.</p></div>;
   if (!cal) return <div className="cal-page"><p className="cal-dim">{t(loadErr || "Loading…")}</p></div>;
@@ -223,20 +239,17 @@ function CalendarView() {
       <header className="cal-head">
         <div className="cal-brand">
           <h1>{cal.name}</h1>
-          <p className="cal-meta">
-            <span>{cal.timezone}</span>
-            <span aria-hidden="true">·</span>
-            <span>{cal.protected ? t("with a password") : t("open")}</span>
-            <button type="button" className="cal-icon" onClick={() => setSharing(true)} aria-label={t("Share this calendar")} title={t("Share this calendar")}><LinkIcon /></button>
-            <LangToggle />
-          </p>
           {!editable && cal.editMode === "members" ? <p className="cal-dim cal-small">{t("Read only for you: only its members change it.")}</p> : null}
         </div>
         <div className="cal-actions">
           {editable ? (
             <button type="button" className="cal-plus" onClick={() => setEditing({ day: day ?? today })} aria-label={t("Add an event")} title={t("Add an event")}>+</button>
           ) : null}
-          {editable ? <button type="button" className="cal-quiet" aria-expanded={settings} onClick={() => setSettings((s) => !s)}>{t("Settings")}</button> : null}
+          {editable ? (
+            <button type="button" className="cal-icon" aria-expanded={settings} aria-label={t("Settings")} title={t("Settings")} onClick={() => setSettings((s) => !s)}><CogIcon /></button>
+          ) : null}
+          <button type="button" className="cal-icon" onClick={() => setSharing(true)} aria-label={t("Share this calendar")} title={t("Share this calendar")}><LinkIcon size={36} /></button>
+          <LangToggle />
           <Link className="cal-quiet" to={back}>{t("All calendars")}</Link>
         </div>
       </header>
@@ -253,15 +266,11 @@ function CalendarView() {
         {monthCursor ? (
           <MonthView cursor={monthCursor} today={today} day={day} tz={cal.timezone} events={shown}
             onDay={(k) => setDay(k === day ? null : k)} onOpen={setOpen}
-            onMove={(n) => setMonthCursor(shiftMonth(monthCursor, n))} onToday={() => { setMonthCursor(today); setWeekCursor(today); setDay(today); }} />
+            onMove={(n) => setMonthCursor(shiftMonth(monthCursor, n))} onToday={() => { setMonthCursor(today); setDay(today); }} />
         ) : null}
-        {weekCursor ? (
-          <WeekView start={weekStart(weekCursor)} today={today} tz={cal.timezone} events={shown} canEdit={editable}
-            onAdd={(d) => setEditing({ day: d })} onOpen={setOpen}
-            onMove={(n) => setWeekCursor(addDays(weekCursor, n))} onToday={() => setWeekCursor(today)} />
-        ) : null}
-        <AgendaView events={agenda} tz={cal.timezone} onOpen={setOpen}
-          empty={searching ? t("Nothing matches that.") : t("Nothing in the next 60 days yet.")} />
+        <AgendaView events={agenda} tz={cal.timezone} onOpen={setOpen} range={rangeText}
+          active={agendaActive} custom={agendaCustom} onPick={(c) => { setAgendaChoice(c); setAgendaCustom(""); }} onCustom={setAgendaCustom}
+          empty={searching ? t("Nothing matches that.") : t("Nothing in this period yet.")} />
         <WhenNear height="min(420px, 60vh)">
           <Suspense fallback={<p className="cal-dim">{t("Loading…")}</p>}>
             <PlacesSection slug={cal.slug} tz={cal.timezone} events={shown} onOpen={setOpen} />
@@ -271,7 +280,7 @@ function CalendarView() {
 
       {open ? (
         <EventSheet e={open} tz={cal.timezone} canEdit={editable} onClose={() => setOpen(null)}
-          onEdit={onEdit} onDelete={(scope) => void onDelete(scope)} />
+          onEdit={onEdit} onDelete={(scope) => void onDelete(scope)} onCalendar={() => addToCalendar(open)} />
       ) : null}
       {editing && editable ? (
         <div className="cal-sheet-back" onClick={() => setEditing(null)}>
@@ -289,4 +298,3 @@ function CalendarView() {
     </div>
   );
 }
-

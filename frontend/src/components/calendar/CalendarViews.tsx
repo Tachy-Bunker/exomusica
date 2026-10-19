@@ -1,9 +1,10 @@
-// The calendar's sections, stacked: Month, Week, Agenda. Each gets the events already expanded (repeats included) and already searched,
-// and draws them; the page loads and filters. The Places section is its own file (lazy: the map loads only when it is opened).
+// The calendar's sections, stacked: Month, then Agenda. Each gets the events already expanded (repeats included) and already searched,
+// and draws them; the page loads and filters. The Places section is its own file (lazy: the map loads only when it is reached).
 import { useMemo } from "react";
-import { addDays, dayLabel, monthCells, parseKey, timeOf } from "../../lib/calendarTime";
+import { dayLabel, monthCells, parseKey, timeOf } from "../../lib/calendarTime";
 import { useCalLang } from "../../lib/calendarI18n";
 import type { Occurrence } from "../../lib/calendarRepeat";
+import type { AgendaChoice } from "../../lib/calendarAgenda";
 
 /** The events grouped by their day, in the order they came. */
 export function byDay(events: Occurrence[]): Map<string, Occurrence[]> {
@@ -30,7 +31,7 @@ function EventRow({ e, tz, onOpen }: { e: Occurrence; tz: string; onOpen: (e: Oc
 }
 
 /** A section's heading row: the title in the middle, the buttons either side. */
-export function SectionBar({ title, prev, next, nowLabel, onNow, prevLabel, nextLabel }: {
+function SectionBar({ title, prev, next, nowLabel, onNow, prevLabel, nextLabel }: {
   title: string; prev: () => void; next: () => void; nowLabel: string; onNow: () => void; prevLabel: string; nextLabel: string;
 }) {
   return (
@@ -50,8 +51,8 @@ interface MonthProps {
   onDay: (k: string) => void; onOpen: (e: Occurrence) => void; onMove: (n: number) => void; onToday: () => void;
 }
 
-/** Six Monday-first weeks. An empty day is a small number; a day with events is tinted, with its count. On a phone the titles hide
- *  and the count stays; tapping a day lists its events under the grid. */
+/** Six Monday-first weeks. An empty day is a small number; a day with events is filled, with its count. Today is a filled circle.
+ *  On a phone the titles hide and the count stays; tapping a day lists its events under the grid. */
 export function MonthView({ cursor, today, day, tz, events, onDay, onOpen, onMove, onToday }: MonthProps) {
   const { t, locale } = useCalLang();
   const { y, m } = parseKey(cursor);
@@ -105,45 +106,37 @@ export function MonthView({ cursor, today, day, tz, events, onDay, onOpen, onMov
   );
 }
 
-interface WeekProps {
-  start: string; today: string; tz: string; events: Occurrence[]; canEdit: boolean;
-  onAdd: (day: string) => void; onOpen: (e: Occurrence) => void; onMove: (n: number) => void; onToday: () => void;
+/** The agenda's periods. The number box takes over when a number is typed. */
+const PERIODS: { key: AgendaChoice; label: string }[] = [
+  { key: "30", label: "Next 30 days" },
+  { key: "week", label: "This week" },
+  { key: "next", label: "Next week" },
+];
+
+interface AgendaProps {
+  events: Occurrence[]; tz: string; empty: string; range: string;
+  active: AgendaChoice | "custom"; custom: string;
+  onPick: (c: AgendaChoice) => void; onCustom: (text: string) => void; onOpen: (e: Occurrence) => void;
 }
 
-/** Seven days from a Monday. On a phone, one day under the other. */
-export function WeekView({ start, today, tz, events, canEdit, onAdd, onOpen, onMove, onToday }: WeekProps) {
-  const { t, locale } = useCalLang();
-  const days = useMemo(() => byDay(events), [events]);
-  const keys = useMemo(() => Array.from({ length: 7 }, (_, i) => addDays(start, i)), [start]);
-  const title = t("Week of {date}", { date: dayLabel(start, { day: "numeric", month: "long" }, locale) });
-  return (
-    <section className="cal-section" aria-labelledby="cal-h-week">
-      <h2 id="cal-h-week">{t("Week")}</h2>
-      <SectionBar title={title} prev={() => onMove(-7)} next={() => onMove(7)} nowLabel={t("This week")} onNow={onToday} prevLabel={t("Previous week")} nextLabel={t("Next week")} />
-      <div className="cal-week">
-        {keys.map((k) => {
-          const list = days.get(k) ?? [];
-          return (
-            <div key={k} className={`cal-week-day${k === today ? " is-today" : ""}`}>
-              <h3>{dayLabel(k, { weekday: "short", day: "numeric", month: "short" }, locale)}</h3>
-              {list.length ? list.map((e) => <EventRow key={`${e.id}:${e.day}`} e={e} tz={tz} onOpen={onOpen} />) : <p className="cal-dim cal-small">{t("Nothing yet.")}</p>}
-              {canEdit ? <button type="button" className="cal-quiet cal-add-day" onClick={() => onAdd(k)}>{t("+ Add on this day")}</button> : null}
-            </div>
-          );
-        })}
-      </div>
-    </section>
-  );
-}
-
-/** The next weeks as a list, day by day, earliest first. */
-export function AgendaView({ events, tz, onOpen, empty }: { events: Occurrence[]; tz: string; onOpen: (e: Occurrence) => void; empty: string }) {
+/** The days as a list, earliest first. 30 days unless another period is picked or a number of days is typed. */
+export function AgendaView({ events, tz, empty, range, active, custom, onPick, onCustom, onOpen }: AgendaProps) {
   const { t, locale } = useCalLang();
   const days = useMemo(() => byDay(events), [events]);
   const keys = [...days.keys()];
   return (
     <section className="cal-section" aria-labelledby="cal-h-agenda">
       <h2 id="cal-h-agenda">{t("Agenda")}</h2>
+      <div className="cal-periods">
+        {PERIODS.map((p) => (
+          <button key={p.key} type="button" className="cal-period" aria-pressed={active === p.key} onClick={() => onPick(p.key)}>{t(p.label)}</button>
+        ))}
+        <label className="cal-days-input">
+          <span>{t("Or number of days")}</span>
+          <input type="number" inputMode="numeric" min={1} max={366} step={1} placeholder="30" value={custom} onChange={(e) => onCustom(e.target.value)} />
+        </label>
+      </div>
+      <p className="cal-dim cal-small">{range}</p>
       {keys.length ? (
         <div className="cal-agenda">
           {keys.map((k) => (
@@ -157,4 +150,3 @@ export function AgendaView({ events, tz, onOpen, empty }: { events: Occurrence[]
     </section>
   );
 }
-
