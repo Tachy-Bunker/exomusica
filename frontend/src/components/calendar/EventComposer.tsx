@@ -3,6 +3,7 @@
 // A repeat has an end and days left out. Changing one day of a repeat makes that day its own event and leaves the day out of the series.
 import { useEffect, useState, type ClipboardEvent, type FormEvent, type KeyboardEvent } from "react";
 import { parseQuickAdd } from "../../lib/calendarQuickAdd";
+import { venueNamed, type VenueMemo } from "../../lib/calendarToday";
 import { addDays, dayLabel, dayStartIso, parseKey, timeOf, todayKey, dayKey, zonedToUtc } from "../../lib/calendarTime";
 import { parseCoordinates, shortPlace } from "../../lib/calendarPlace";
 import { useCalLang } from "../../lib/calendarI18n";
@@ -13,6 +14,8 @@ export type ComposeScope = "one" | "all";
 interface Props {
   slug: string; tz: string; event?: CalEvent; scope?: ComposeScope; occurrenceDay?: string; day?: string;
   onDone: (saved: CalEvent | null) => void; onRefresh: () => void;
+  /** The places this calendar knows (idea 15): a typed place that is one of them fills what it has. */
+  venues?: VenueMemo[];
 }
 const pad = (n: number): string => String(n).padStart(2, "0");
 const ymd = (y: number, m: number, d: number): string => `${y}-${pad(m)}-${pad(d)}`;
@@ -21,7 +24,7 @@ const REPEAT_LABEL: Record<Recurrence, string> = { daily: "Every day", weekly: "
 /** How long the place is left alone after the last key, before it is searched. */
 const PLACE_PAUSE_MS = 600;
 
-export function EventComposer({ slug, tz, event, scope = "all", occurrenceDay, day, onDone, onRefresh }: Props) {
+export function EventComposer({ slug, tz, event, scope = "all", occurrenceDay, day, onDone, onRefresh, venues = [] }: Props) {
   const { t, locale } = useCalLang();
   const fail = (x: unknown): string => (x instanceof ApiError ? t(x.message) : x instanceof Error ? t(x.message) : t("Something went wrong."));
   const one = !!event && scope === "one" && !!occurrenceDay;          // this day of a repeat only
@@ -30,6 +33,8 @@ export function EventComposer({ slug, tz, event, scope = "all", occurrenceDay, d
   const [date, setDate] = useState(one ? occurrenceDay! : event ? dayKey(event.startsAt, tz) : day ?? todayKey(tz));
   const [start, setStart] = useState(event && !event.allDay ? timeOf(event.startsAt, tz) : "");
   const [end, setEnd] = useState(event?.endsAt ? timeOf(event.endsAt, tz) : "");
+  // A remembered place may fill the start of a new event, until the start is set by hand (or by the line at the top).
+  const [autoStart, setAutoStart] = useState(!event);
   const [location, setLocation] = useState(event?.location ?? "");
   // The place text that is settled (picked, or found for a single answer): it is not searched again.
   const [chosen, setChosen] = useState<string | null>(event?.location?.trim() || null);
@@ -71,9 +76,9 @@ export function EventComposer({ slug, tz, event, scope = "all", occurrenceDay, d
     const r = parseQuickAdd(raw, parseKey(todayKey(tz)));
     if (r.url) setUrl(r.url);
     if (r.ok) setTitle(r.title);
-    if (r.location) setLocation(r.location);
+    if (r.location) { setLocation(r.location); applyVenue(r.location, !r.start); }
     if (r.date) setDate(ymd(r.date.y, r.date.m, r.date.d));
-    if (r.start) setStart(r.start);
+    if (r.start) { setStart(r.start); setAutoStart(false); }
     if (r.end) setEnd(r.end);
     const got = [r.ok && t("title “{v}”", { v: r.title }), r.location && t("place “{v}”", { v: r.location }), r.date && t("day"), r.start && t("start {v}", { v: r.start }), r.end && t("end {v}", { v: r.end }), r.url && t("link")].filter(Boolean);
     setNote(got.length ? t("Read: {parts}. Check it, then save.", { parts: got.join(", ") }) : t("Nothing was read from that line."));
@@ -115,10 +120,27 @@ export function EventComposer({ slug, tz, event, scope = "all", occurrenceDay, d
     return () => { alive = false; window.clearTimeout(timer); setFinding(false); };
   }, [location, chosen, slug, t]);
 
+  /** A remembered place (idea 15), typed exactly: it fills the coordinates it has, when this place has none or they came from a search;
+   *  and for a new event with no start yet, its usual start. Its coordinates settle the name, so the name is not searched again. */
+  function applyVenue(typed: string, allowStart: boolean) {
+    const known = venueNamed(venues, typed);
+    if (!known) return;
+    let got = "";
+    if (known.lat !== null && known.lng !== null && (lat === "" || autoCoords)) {
+      setLat(String(known.lat)); setLng(String(known.lng)); setAutoCoords(true); setChosen(typed.trim());
+      got = t("Known place: coordinates filled in.");
+    }
+    if (allowStart && autoStart && known.start) {
+      setStart(known.start);
+      got = got ? t("Known place: coordinates and usual start filled in.") : t("Known place: usual start filled in.");
+    }
+    if (got) setNote(got);
+  }
   /** Typing a new place drops the coordinates that came from the last search. */
   function onPlaceType(v: string) {
     setLocation(v);
     if (autoCoords && v.trim() !== chosen) { setLat(""); setLng(""); setAutoCoords(false); }
+    applyVenue(v, true);
   }
   /** One of several answers is picked: its name and coordinates are the place. */
   function pickPlace(p: Place) {
@@ -207,7 +229,7 @@ export function EventComposer({ slug, tz, event, scope = "all", occurrenceDay, d
       <label>{t("Title")}<input value={title} onChange={(e) => setTitle(e.target.value)} maxLength={120} required /></label>
       <div className="cal-form-times">
         <label>{t("Day")}<input type="date" value={date} onChange={(e) => setDate(e.target.value)} required /></label>
-        <label>{t("Start")}<input type="time" value={start} onChange={(e) => setStart(e.target.value)} /></label>
+        <label>{t("Start")}<input type="time" value={start} onChange={(e) => { setStart(e.target.value); setAutoStart(false); }} /></label>
         <label>{t("End")}<input type="time" value={end} onChange={(e) => setEnd(e.target.value)} /></label>
       </div>
       <p className="cal-dim cal-small">{t("Times are in this calendar's time zone ({tz}). No start time means all day.", { tz })}</p>

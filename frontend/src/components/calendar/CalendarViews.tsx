@@ -1,11 +1,12 @@
 // The calendar's sections, stacked: Month, then Agenda. Each gets the events already expanded (repeats included) and already searched,
 // and draws them; the page loads and filters. The Places section is its own file (lazy: the map loads only when it is reached).
 // fix416: a repeat fades as its dates get further from today (the echo view), and the agenda can also read as one sentence a day.
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import { dayLabel, monthCells, parseKey, timeOf } from "../../lib/calendarTime";
 import { useCalLang } from "../../lib/calendarI18n";
 import type { Occurrence } from "../../lib/calendarRepeat";
 import type { AgendaChoice } from "../../lib/calendarAgenda";
+import type { AgendaMode } from "../../lib/calendarView";
 import { echoOpacity } from "../../lib/calendarEcho";
 import "./calendarViz.css";
 
@@ -120,14 +121,14 @@ const PERIODS: { key: AgendaChoice; label: string }[] = [
 
 interface AgendaProps {
   events: Occurrence[]; tz: string; today: string; empty: string; range: string;
-  active: AgendaChoice | "custom"; custom: string;
-  onPick: (c: AgendaChoice) => void; onCustom: (text: string) => void; onOpen: (e: Occurrence) => void;
+  active: AgendaChoice | "custom"; custom: string; mode: AgendaMode;
+  onPick: (c: AgendaChoice) => void; onCustom: (text: string) => void; onMode: (m: AgendaMode) => void; onOpen: (e: Occurrence) => void;
 }
 
-/** The days as a list, earliest first, or as one sentence a day. 30 days unless another period is picked or a number of days is typed. */
-export function AgendaView({ events, tz, today, empty, range, active, custom, onPick, onCustom, onOpen }: AgendaProps) {
+/** The days as a list, earliest first, or as one sentence a day (the page keeps which, see calendarView). 30 days unless another period
+ *  is picked or a number of days is typed. */
+export function AgendaView({ events, tz, today, empty, range, active, custom, mode, onPick, onCustom, onMode, onOpen }: AgendaProps) {
   const { t, locale } = useCalLang();
-  const [mode, setMode] = useState<"list" | "sentences">("list");
   const days = useMemo(() => byDay(events), [events]);
   const echo = useMemo(() => echoOpacity(events, today), [events, today]);
   const keys = [...days.keys()];
@@ -151,8 +152,8 @@ export function AgendaView({ events, tz, today, empty, range, active, custom, on
         </label>
       </div>
       <div className="cal-periods cal-show" role="group" aria-label={t("Show as")}>
-        <button type="button" className="cal-period" aria-pressed={mode === "list"} onClick={() => setMode("list")}>{t("List")}</button>
-        <button type="button" className="cal-period" aria-pressed={mode === "sentences"} onClick={() => setMode("sentences")}>{t("Sentences")}</button>
+        <button type="button" className="cal-period" aria-pressed={mode === "list"} onClick={() => onMode("list")}>{t("List")}</button>
+        <button type="button" className="cal-period" aria-pressed={mode === "sentences"} onClick={() => onMode("sentences")}>{t("Sentences")}</button>
       </div>
       <p className="cal-dim cal-small">{range}</p>
       {keys.length ? (

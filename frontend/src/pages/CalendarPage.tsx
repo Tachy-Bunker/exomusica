@@ -4,13 +4,18 @@ import { lazy, Suspense, useEffect, useMemo, useRef, useState, type FormEvent, t
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { ApiError } from "../lib/api";
 import { addDays, dayKey, dayLabel, dayStartIso, parseKey, todayKey, weekStart } from "../lib/calendarTime";
-import { filterEvents } from "../lib/calendarFilter";
+import { searchEvents } from "../lib/calendarSearch";
+import { memoryOf, tonightOf, venuesOf } from "../lib/calendarToday";
+import { dayStepOf, isTyping } from "../lib/calendarKeys";
+import { readViewPrefs, writeViewPrefs, type AgendaMode } from "../lib/calendarView";
 import { agendaSpan, customDays, type AgendaChoice } from "../lib/calendarAgenda";
 import { downloadIcs, icsName, icsOf } from "../lib/calendarIcs";
 import { occurrencesIn, type Occurrence } from "../lib/calendarRepeat";
 import { dropToken, enterCalendar, getCalendar, listEvents, listTape, messageOf, removeEvent, skipDay, type CalEvent, type CalView, type TapeChange } from "../lib/calendarApi";
 import { AgendaView, MonthView } from "../components/calendar/CalendarViews";
 import { ChangeTape } from "../components/calendar/ChangeTape";
+import { TonightStrip } from "../components/calendar/TonightStrip";
+import { VenueIndex } from "../components/calendar/VenueIndex";
 import { EventComposer, type ComposeScope } from "../components/calendar/EventComposer";
 import { EventSheet, type Scope } from "../components/calendar/EventSheet";
 import { CalendarSettings } from "../components/calendar/CalendarSettings";
@@ -76,7 +81,9 @@ function LangToggle() {
 
 export function CalendarPage() {
   const L = useCalLangState();
-  return <CalLangProvider value={L}><CalendarView /></CalLangProvider>;
+  const { slug = "" } = useParams();
+  // Keyed by the calendar: moving to another one starts its page fresh, with its own remembered view.
+  return <CalLangProvider value={L}><CalendarView key={slug} /></CalLangProvider>;
 }
 
 function CalendarView() {
@@ -96,8 +103,12 @@ function CalendarView() {
   const [truncated, setTruncated] = useState(false);
   const [text, setText] = useState("");                 // the search box as typed
   const [q, setQ] = useState("");                       // the search, a moment after typing stops
-  const [agendaChoice, setAgendaChoice] = useState<AgendaChoice>("30");
-  const [agendaCustom, setAgendaCustom] = useState(""); // a number of days typed in; it takes over the period
+  // The agenda's view, as this browser last left it for this calendar (idea 7): the period, a number of days typed in, list or sentences.
+  const [prefs] = useState(() => readViewPrefs(slug));
+  const [agendaChoice, setAgendaChoice] = useState<AgendaChoice>(prefs.period);
+  const [agendaCustom, setAgendaCustom] = useState(prefs.custom); // a number of days typed in; it takes over the period
+  const [mode, setMode] = useState<AgendaMode>(prefs.mode);
+  useEffect(() => { writeViewPrefs(slug, { period: agendaChoice, custom: agendaCustom, mode }); }, [slug, agendaChoice, agendaCustom, mode]);
   const [open, setOpen] = useState<Occurrence | null>(null);
   const [editing, setEditing] = useState<{ event?: CalEvent; scope?: ComposeScope; occurrenceDay?: string; day?: string } | null>(null);
   const [settings, setSettings] = useState(false);
@@ -107,6 +118,7 @@ function CalendarView() {
   const [busy, setBusy] = useState(false);
   const [tick, setTick] = useState(0);
   const [tape, setTape] = useState<TapeChange[]>([]);   // the change tape: the latest changes, newest first
+  const searchRef = useRef<HTMLInputElement | null>(null);
   const searching = q.trim() !== "";
 
   // The calendar itself. A password in the link is used once, then the address bar is cleaned.
@@ -174,7 +186,41 @@ function CalendarView() {
 
   // Repeats become their days inside the window; the search narrows them.
   const occ = useMemo(() => (win && cal ? occurrencesIn(raw, win[0], win[1], cal.timezone) : []), [raw, win, cal]);
-  const shown = useMemo(() => filterEvents(occ, q), [occ, q]);
+  const shown = useMemo(() => searchEvents(occ, q, today), [occ, q, today]);
+  // Today, marked against the clock (idea 1): redone when the window changes and each minute with the tick.
+  const tonight = useMemo(() => (today ? tonightOf(occ, today, Date.now()) : null), [occ, today, tick]);
+  // The places still to come (idea 4). The search narrows them, so a search shows only its places.
+  const venues = useMemo(() => venuesOf(shown, today), [shown, today]);
+  // The places the calendar knows, from the events on the page (idea 15): the form fills a typed one from them.
+  const memory = useMemo(() => (cal ? memoryOf(raw, cal.timezone) : []), [raw, cal]);
+  // The keyboard (idea 8): "/" focuses the search; the left and right arrows walk the picked day by one, the up and down by a week;
+  // Enter opens the first event of the picked day. A typed field keeps its keys, the map keeps its arrows, and an open sheet, form or
+  // share dialog keeps everything.
+  useEffect(() => {
+    if (!cal || cal.locked || !today) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.defaultPrevented || e.ctrlKey || e.metaKey || e.altKey || open || editing || sharing) return;
+      const el = e.target as HTMLElement | null;
+      if (el?.closest?.(".leaflet-container")) return;
+      if (e.key === "/" && !isTyping(el)) { e.preventDefault(); searchRef.current?.focus(); searchRef.current?.select(); return; }
+      if (isTyping(el)) return;
+      const step = dayStepOf(e.key);
+      if (step !== null) {
+        e.preventDefault();
+        const next = addDays(day ?? today, step);
+        setDay(next);
+        if (next.slice(0, 7) !== monthCursor.slice(0, 7)) setMonthCursor(next);
+        return;
+      }
+      // A button or link keeps its own Enter (it presses itself); the page takes the Enter everywhere else.
+      if (e.key === "Enter" && !(el && (el.tagName === "BUTTON" || el.tagName === "A"))) {
+        const first = shown.find((x) => x.day === (day ?? today));
+        if (first) { e.preventDefault(); setOpen(first); }
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [cal, today, day, monthCursor, shown, open, editing, sharing]);
   const agenda = useMemo(() => (searching ? shown : shown.filter((e) => e.day >= agendaRange[0] && e.day < agendaRange[1])), [shown, searching, agendaRange]);
   const rangeText = today
     ? `${dayLabel(agendaRange[0], { day: "numeric", month: "short" }, locale)} – ${dayLabel(addDays(agendaRange[1], -1), { day: "numeric", month: "short", year: "numeric" }, locale)}`
@@ -264,8 +310,11 @@ function CalendarView() {
         </div>
       </header>
 
+      {tonight ? <TonightStrip tonight={tonight} tz={cal.timezone} onOpen={setOpen} /> : null}
+
       <div className="cal-search-row">
-        <input type="search" className="cal-find" placeholder={t("Search the calendar…")} aria-label={t("Search the calendar")} value={text} onChange={(e) => setText(e.target.value)} />
+        <input ref={searchRef} type="search" className="cal-find" placeholder={t("Search the calendar…")} aria-label={t("Search the calendar")} value={text} onChange={(e) => setText(e.target.value)}
+          title={t("Press / to search. Arrows walk the days, Enter opens the day's first event.")} />
       </div>
 
       {loadErr ? <p className="cal-err" role="alert">{t(loadErr)}</p> : null}
@@ -279,8 +328,10 @@ function CalendarView() {
             onMove={(n) => setMonthCursor(shiftMonth(monthCursor, n))} onToday={() => { setMonthCursor(today); setDay(today); }} />
         ) : null}
         <AgendaView events={agenda} tz={cal.timezone} today={today} onOpen={setOpen} range={rangeText}
-          active={agendaActive} custom={agendaCustom} onPick={(c) => { setAgendaChoice(c); setAgendaCustom(""); }} onCustom={setAgendaCustom}
+          active={agendaActive} custom={agendaCustom} mode={mode} onMode={setMode}
+          onPick={(c) => { setAgendaChoice(c); setAgendaCustom(""); }} onCustom={setAgendaCustom}
           empty={searching ? t("Nothing matches that.") : t("Nothing in this period yet.")} />
+        <VenueIndex venues={venues} onPick={(place) => setText(place)} />
         <ChangeTape changes={tape} tz={cal.timezone} />
         <WhenNear height="min(420px, 60vh)">
           <Suspense fallback={<p className="cal-dim">{t("Loading…")}</p>}>
@@ -301,7 +352,7 @@ function CalendarView() {
             </button>
             <EventComposer key={`${editing.event?.id ?? "new"}:${editing.scope ?? ""}:${editing.occurrenceDay ?? editing.day ?? ""}`} slug={cal.slug} tz={cal.timezone}
               event={editing.event} scope={editing.scope} occurrenceDay={editing.occurrenceDay} day={editing.day}
-              onDone={onSaved} onRefresh={() => setTick((n) => n + 1)} />
+              venues={memory} onDone={onSaved} onRefresh={() => setTick((n) => n + 1)} />
           </div>
         </div>
       ) : null}

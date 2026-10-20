@@ -10,3 +10,16 @@
 .cal-tape-mark.is-cancelled { background: var(--accent-danger); }
 .cal-tape-list { margin: 10px 0 0; padding-left: 1.2em; font-size: 0.9rem; }
 .cal-tape-list li { margin: 4px 0; overflow-wrap: anywhere; }
+
+/* fix418: the tonight strip (idea 1) and the venue index (idea 4). Flat tokens, as the rest of the calendar. */
+.cal-tonight { margin: 0 0 12px; padding: 10px 12px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--bg-inset); }
+.cal-tonight h2 { margin: 0 0 6px; }
+.cal-tonight-list { list-style: none; margin: 0; padding: 0; }
+.cal-tonight-row.is-over { opacity: 0.55; }
+.cal-badge { display: inline-block; margin-left: 6px; padding: 0 6px; border: 1px solid var(--border); border-radius: 999px; color: var(--text-dim); font-size: 0.72rem; font-weight: 600; vertical-align: middle; }
+.cal-badge.is-now { border-color: var(--accent-audio); color: var(--accent-audio); }
+.cal-badge.is-next { border-color: var(--text); color: var(--text); }
+.cal-link { margin: 0; padding: 0; border: 0; background: none; color: inherit; font: inherit; text-decoration: underline; cursor: pointer; text-align: left; overflow-wrap: anywhere; }
+.cal-venues { list-style: none; margin: 6px 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; }
+.cal-venue { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; max-width: 100%; margin: 0; padding: 6px 10px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--bg-inset); color: var(--text); font: inherit; text-align: left; cursor: pointer; }
+.cal-venue-name { font-weight: 600; overflow-wrap: anywhere; }

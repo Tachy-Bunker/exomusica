@@ -1,6 +1,7 @@
 // The one-line add for calendars: "X à Y le 12 novembre à 20h", "Ambient set at Le Trianon, 2 Nov 20:00", "Vernissage demain 18h30 chez Léa",
 // "Live samedi de 20h à 23h au Glazart", or a line with a link in it. French first, English too. Pure: no clock and no zone here.
 // The caller passes today's date in the calendar's zone, and turns the result into an instant with zonedToUtc.
+// fix418: the date reading is its own function (takeDate), so the calendar's search reads dates the same way.
 
 export interface Ymd { y: number; m: number; d: number }
 export interface QuickAdd {
@@ -12,6 +13,8 @@ export interface QuickAdd {
   end: string | null;
   ok: boolean;           // a title was found
 }
+/** A date a line names: the day, the weekday number when the line named only a weekday (0 = Sunday), and the line without that date. */
+export interface TakenDate { date: Ymd; weekday: number | null; text: string }
 
 const MAX_LINE = 300;
 
@@ -40,7 +43,8 @@ const RE_URL = /https?:\/\/\S+/i;
 const RE_ISO = /(?<!\p{N})(\d{4})-(\d{1,2})-(\d{1,2})(?!\p{N})/u;
 const RE_DAY_MONTH = /(?<!\p{L}\p{N})(?:(?:le|on)\s+)?(\d{1,2})(?:er|st|nd|rd|th)?\s+(?:de\s+)?(\p{L}+\.?)(?:\s+(\d{4}))?(?![\p{L}\p{N}])/giu;
 const RE_MONTH_DAY = /(?<!\p{L}\p{N})(\p{L}+\.?)\s+(\d{1,2})(?:st|nd|rd|th)?(?:,?\s+(\d{4}))?(?!\p{N})/giu;
-const RE_DMY = /(?<!\p{N})(\d{1,2})[/.](\d{1,2})(?:[/.](\d{4}|\d{2}))?(?!\p{N})/u;
+// A number stuck to a word ('v1.2') is not a day: the day and month must stand apart.
+const RE_DMY = /(?<![\p{L}\p{N}])(\d{1,2})[/.](\d{1,2})(?:[/.](\d{4}|\d{2}))?(?!\p{N})/u;
 const RE_RELATIVE = /(?<!\p{L})(aujourd['’]?hui|ce\s+soir|ce\s+matin|today|tonight|demain|tomorrow|apr[eè]s-?demain|after\s*tomorrow)(?!\p{L})/iu;
 const RE_WEEKDAY = /(?<!\p{L})(?:ce\s+|this\s+|next\s+|prochain\s+|prochaine\s+|le\s+)?(lundi|mardi|mercredi|jeudi|vendredi|samedi|dimanche|monday|tuesday|wednesday|thursday|friday|saturday|sunday)(?!\p{L})/iu;
 // am/pm first, so '7:30 pm' is not read as 07:30 with a stray 'pm' left behind.
@@ -68,6 +72,58 @@ function hm(h: number, min: number): string | null {
   return h >= 0 && h < 24 && min >= 0 && min < 60 ? `${String(h).padStart(2, "0")}:${String(min).padStart(2, "0")}` : null;
 }
 
+/** The date a line names, and the line with that date taken out. The first kind found wins, in this order: a full date, a day and a
+ *  month, a month and a day, a day/month number, 'today' or 'tomorrow', then a weekday (the next one; `weekday` is then its number, so
+ *  a search can take every one of them). Null when the line names no real day. */
+export function takeDate(line: string, today: Ymd): TakenDate | null {
+  let t = line;
+  const cut = (m: RegExpExecArray | RegExpMatchArray) => { t = t.slice(0, m.index) + " " + t.slice((m.index ?? 0) + m[0].length); };
+
+  const iso = RE_ISO.exec(t);
+  if (iso) {
+    const got = resolve(Number(iso[3]), Number(iso[2]), Number(iso[1]), today);
+    if (!got) return null;
+    cut(iso);
+    return { date: got, weekday: null, text: t };
+  }
+  for (const m of t.matchAll(RE_DAY_MONTH)) {
+    const mon = MONTHS[plain(m[2])];
+    if (!mon) continue;
+    const got = resolve(Number(m[1]), mon, m[3] ? Number(m[3]) : undefined, today);
+    if (got) return { date: got, weekday: null, text: t.replace(m[0], " ") };
+    break;
+  }
+  for (const m of t.matchAll(RE_MONTH_DAY)) {
+    const mon = MONTHS[plain(m[1])];
+    if (!mon) continue;
+    const got = resolve(Number(m[2]), mon, m[3] ? Number(m[3]) : undefined, today);
+    if (got) return { date: got, weekday: null, text: t.replace(m[0], " ") };
+    break;
+  }
+  const dmy = RE_DMY.exec(t);
+  if (dmy) {
+    const yr = dmy[3] === undefined ? undefined : Number(dmy[3]) < 100 ? 2000 + Number(dmy[3]) : Number(dmy[3]);
+    const got = resolve(Number(dmy[1]), Number(dmy[2]), yr, today);
+    if (got) { cut(dmy); return { date: got, weekday: null, text: t }; }
+  }
+  const rel = RE_RELATIVE.exec(t);
+  if (rel) {
+    const w = plain(rel[1]).replace(/\s+/g, "");
+    const days = /apres?demain|aftertomorrow/.test(w) ? 2 : /demain|tomorrow/.test(w) ? 1 : 0;
+    cut(rel);
+    return { date: ymdOf(utc(today.y, today.m, today.d) + days * DAY), weekday: null, text: t };
+  }
+  const wd = RE_WEEKDAY.exec(t);
+  if (wd) {
+    const want = WEEKDAYS[plain(wd[1])];
+    const base = utc(today.y, today.m, today.d);
+    const todayWd = new Date(base).getUTCDay();
+    cut(wd);
+    return { date: ymdOf(base + ((want - todayWd + 7) % 7) * DAY), weekday: want, text: t };
+  }
+  return null;
+}
+
 /** One line, as the owner types it. */
 export function parseQuickAdd(line: string, today: Ymd): QuickAdd {
   const out: QuickAdd = { title: "", location: "", url: null, date: null, start: null, end: null, ok: false };
@@ -77,57 +133,9 @@ export function parseQuickAdd(line: string, today: Ymd): QuickAdd {
   const url = RE_URL.exec(t);
   if (url) { out.url = url[0].replace(/[),.;]+$/, ""); t = t.replace(url[0], " "); }
 
-  // The date: the first kind that appears, in this order; only that text is taken out of the title.
-  const cut = (m: RegExpExecArray | RegExpMatchArray) => { t = t.slice(0, m.index) + " " + t.slice((m.index ?? 0) + m[0].length); };
-  const iso = RE_ISO.exec(t);
-  if (iso) {
-    const got = resolve(Number(iso[3]), Number(iso[2]), Number(iso[1]), today);
-    if (got) { out.date = got; cut(iso); }
-  } else {
-    let named = false;
-    for (const m of t.matchAll(RE_DAY_MONTH)) {
-      const mon = MONTHS[plain(m[2])];
-      if (!mon) continue;
-      const got = resolve(Number(m[1]), mon, m[3] ? Number(m[3]) : undefined, today);
-      if (got) { out.date = got; t = t.replace(m[0], " "); named = true; }
-      break;
-    }
-    if (!named) for (const m of t.matchAll(RE_MONTH_DAY)) {
-      const mon = MONTHS[plain(m[1])];
-      if (!mon) continue;
-      const got = resolve(Number(m[2]), mon, m[3] ? Number(m[3]) : undefined, today);
-      if (got) { out.date = got; t = t.replace(m[0], " "); named = true; }
-      break;
-    }
-    if (!named) {
-      const dmy = RE_DMY.exec(t);
-      if (dmy) {
-        const yr = dmy[3] === undefined ? undefined : Number(dmy[3]) < 100 ? 2000 + Number(dmy[3]) : Number(dmy[3]);
-        const got = resolve(Number(dmy[1]), Number(dmy[2]), yr, today);
-        if (got) { out.date = got; cut(dmy); named = true; }
-      }
-    }
-    if (!named) {
-      const rel = RE_RELATIVE.exec(t);
-      if (rel) {
-        const w = plain(rel[1]).replace(/\s+/g, "");
-        const days = /apres?demain|aftertomorrow/.test(w) ? 2 : /demain|tomorrow/.test(w) ? 1 : 0;
-        out.date = ymdOf(utc(today.y, today.m, today.d) + days * DAY);
-        cut(rel);
-        named = true;
-      }
-    }
-    if (!named) {
-      const wd = RE_WEEKDAY.exec(t);
-      if (wd) {
-        const want = WEEKDAYS[plain(wd[1])];
-        const base = utc(today.y, today.m, today.d);
-        const todayWd = new Date(base).getUTCDay();
-        out.date = ymdOf(base + ((want - todayWd + 7) % 7) * DAY);
-        cut(wd);
-      }
-    }
-  }
+  // The date: only the text it names is taken out of the title.
+  const dt = takeDate(t, today);
+  if (dt) { out.date = dt.date; t = dt.text; }
 
   // The times: the first is the start, a second one the end ("de 20h à 23h", "20h-23h"). The leading word goes with it.
   const times: { h: number; m: number; at: RegExpMatchArray }[] = [];

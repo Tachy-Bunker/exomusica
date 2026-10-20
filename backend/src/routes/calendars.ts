@@ -12,6 +12,7 @@ import { bearerOf, verifyToken } from "../lib/auth.js";
 import { slugify } from "../lib/outreachScope.js";
 import { checkCap, checkDay, checkEditMode, checkEvent, checkMembers, checkName, checkPassword, checkSlug, checkTimezone, checkUrl, checkWindow, dayKeyIn, sniffImage, newImageKey, type Checked, DEFAULT_PICTURE_CAP, IMAGE_MAX_BYTES, MAX_EVENTS, MAX_SKIPS } from "../lib/calendarRules.js";
 import { enterPerIp, enterPerSlug, previewPerIp, previewPerKey, readCalendarToken, signCalendarToken, writePerKey } from "../lib/calendarScope.js";
+import { feedOf, keyMatches, newFeedKey, type FeedEvent } from "../lib/calendarFeed.js";
 import { readBody, safeGet } from "../lib/netGuard.js";
 import { parsePreview } from "../lib/linkPreview.js";
 import { geocode, GeocodeBusy, GeocodeDown } from "../lib/geocode.js";
@@ -44,8 +45,8 @@ async function fetchPage(raw: string, maxBytes: number, accept: (type: string) =
   return { url: finalUrl.toString(), body };
 }
 
-type Cal = { id: number; slug: string; name: string; timezone: string; passwordHash: string | null; tokenVersion: number; editMode: string; members: string[]; pictureCap: number; createdBy: string };
-const CAL = { id: true, slug: true, name: true, timezone: true, passwordHash: true, tokenVersion: true, editMode: true, members: true, pictureCap: true, createdBy: true } as const;
+type Cal = { id: number; slug: string; name: string; timezone: string; passwordHash: string | null; tokenVersion: number; editMode: string; members: string[]; pictureCap: number; createdBy: string; feedKey: string | null };
+const CAL = { id: true, slug: true, name: true, timezone: true, passwordHash: true, tokenVersion: true, editMode: true, members: true, pictureCap: true, createdBy: true, feedKey: true } as const;
 const EVENT = { id: true, title: true, text: true, url: true, location: true, startsAt: true, endsAt: true, allDay: true, addedBy: true, lat: true, lng: true, recurrence: true, recurUntil: true, exdates: true, createdAt: true, updatedAt: true, image: { select: { id: true, key: true } } } as const;
 type EventRow = Prisma.CalendarEventGetPayload<{ select: typeof EVENT }>;
 
@@ -56,6 +57,17 @@ const toEvent = (e: EventRow) => ({
   lat: e.lat, lng: e.lng, recurrence: e.recurrence, recurUntil: e.recurUntil, exdates: e.exdates,
   image: e.image ? { id: e.image.id, url: imageUrl(e.image.id, e.image.key) } : null,
   createdAt: e.createdAt.toISOString(), updatedAt: e.updatedAt.toISOString(),
+});
+// The subscription feed (fix420): the fields it writes, the most events it writes, and a row as the feed's pure writer reads it.
+const FEED_MAX = 2000;
+const FEED_EVENT = { id: true, title: true, text: true, url: true, location: true, startsAt: true, endsAt: true, allDay: true, lat: true, lng: true, recurrence: true, recurUntil: true, exdates: true, updatedAt: true } as const;
+const FEED_RECURS = ["daily", "weekly", "monthly", "yearly"] as const;
+const feedRow = (e: Prisma.CalendarEventGetPayload<{ select: typeof FEED_EVENT }>): FeedEvent => ({
+  id: e.id, title: e.title, text: e.text, url: e.url, location: e.location,
+  startsAt: e.startsAt.toISOString(), endsAt: e.endsAt ? e.endsAt.toISOString() : null, allDay: e.allDay,
+  lat: e.lat, lng: e.lng,
+  recurrence: (FEED_RECURS as readonly string[]).includes(e.recurrence ?? "") ? (e.recurrence as FeedEvent["recurrence"]) : null,
+  recurUntil: e.recurUntil, exdates: e.exdates, updatedAt: e.updatedAt.toISOString(),
 });
 const calOut = (c: Cal) => ({ slug: c.slug, name: c.name, timezone: c.timezone, protected: !!c.passwordHash, editMode: c.editMode, members: c.members, pictureCap: c.pictureCap });
 /** What a calendar says about this caller: whether it is locked to them, whether they may change events, whether they may change its settings. */
@@ -231,6 +243,31 @@ export async function calendarRoutes(app: FastifyInstance): Promise<void> {
     if (!editsCal(req, cal)) return fail(reply, 403, NOT_EDITOR);
     const upd = await prisma.calendar.update({ where: { id: cal.id }, data: { tokenVersion: { increment: 1 } }, select: CAL });
     return { token: upd.passwordHash ? signCalendarToken(upd.id, upd.tokenVersion) : undefined };
+  });
+
+  // The subscription feed (idea 10, fix420): the whole calendar as an .ics file that a calendar app keeps in step with the site. An open
+  // calendar's feed is readable by anyone with its address; a protected one needs its key (the `k` in the link) or a way in as usual.
+  app.get<{ Params: { slug: string }; Querystring: { k?: string } }>("/api/calendars/:slug/feed.ics", async (req, reply) => {
+    const cal = await calendarBySlug(req.params.slug);
+    if (!cal) return reply.code(404).type("text/plain; charset=utf-8").send("No calendar at this address.");
+    if (cal.passwordHash && !keyMatches(cal.feedKey, req.query.k) && !allowed(req, cal)) return reply.code(401).type("text/plain; charset=utf-8").send(LOCKED);
+    const rows = await prisma.calendarEvent.findMany({ where: { calendarId: cal.id }, orderBy: [{ startsAt: "asc" }, { id: "asc" }], take: FEED_MAX, select: FEED_EVENT });
+    const text = feedOf(rows.map(feedRow), { slug: cal.slug, name: cal.name, timezone: cal.timezone }, Date.now());
+    reply.header("Cache-Control", cal.passwordHash ? "private, max-age=900" : "public, max-age=900");
+    return reply.type("text/calendar; charset=utf-8").send(text);
+  });
+
+  // The key of a protected calendar's subscription link. Whoever may open the calendar gets it, and it is made on the first request.
+  // Renewing it (a new key, so the old links stop working) is for the creator, the site's admin and the members.
+  app.post<{ Params: { slug: string } }>("/api/calendars/:slug/feed-key", async (req, reply) => {
+    const cal = await calendarBySlug(req.params.slug);
+    if (!cal) return fail(reply, 404, "No calendar at this address.");
+    if (!allowed(req, cal)) return fail(reply, 401, LOCKED);
+    if (cal.feedKey && body(req).renew !== true) return { key: cal.feedKey };
+    if (cal.feedKey && !(managesCal(req, cal) || memberOf(req, cal))) return fail(reply, 403, "Only the creator, the site's admin or a member can renew the link.");
+    const key = newFeedKey();
+    await prisma.calendar.update({ where: { id: cal.id }, data: { feedKey: key }, select: { id: true } });
+    return { key };
   });
 
   // Deleting a calendar removes its events and pictures. The admin only.

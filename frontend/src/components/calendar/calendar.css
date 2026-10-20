@@ -151,6 +151,15 @@
 .cal-share { display: grid; gap: 10px; }
 .cal-share-pw { border-top: 1px solid var(--border); padding-top: 10px; display: grid; gap: 8px; }
 .cal-share-pw h3 { margin: 0; font-family: var(--font-display); font-size: 1.05rem; font-weight: 600; }
+/* The subscription (fix420): the links, the open-in-app button, the renew row, the steps for each app. */
+.cal-feed { border-top: 1px solid var(--border); padding-top: 10px; display: grid; gap: 8px; }
+.cal-feed h3 { margin: 0; font-family: var(--font-display); font-size: 1.05rem; font-weight: 600; }
+.cal-feed input { min-width: 0; }
+.cal-open { justify-self: start; display: inline-flex; align-items: center; text-decoration: none; }
+.cal-feed-renew { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.cal-guide { font-size: 0.9rem; }
+.cal-guide summary { cursor: pointer; }
+.cal-feed-steps { margin: 8px 0 0; padding-left: 1.25em; display: grid; gap: 6px; }
 
 /* the composer */
 .cal-form { display: grid; gap: 10px; }

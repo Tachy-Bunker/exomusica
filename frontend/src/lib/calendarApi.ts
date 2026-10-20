@@ -71,6 +71,10 @@ export async function signOutEveryone(slug: string): Promise<void> {
 
 export const deleteCalendar = (slug: string) => api<void>(base(slug), { method: "DELETE" });
 
+/** The key in a protected calendar's subscription link: made on the first call. `renew` makes a new one; the old links stop working. */
+export const feedKey = (slug: string, renew = false) =>
+  api<{ key: string }>(`${base(slug)}/feed-key`, { method: "POST", body: JSON.stringify({ renew }), headers: headers(slug) });
+
 export function listEvents(slug: string, range: { from?: string; to?: string; q?: string; limit?: number }) {
   const p = new URLSearchParams();
   if (range.from) p.set("from", range.from);

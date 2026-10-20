@@ -1806,6 +1806,7 @@ model Calendar {
   members      String[]        @default([]) // usernames of site accounts that may change events in "members" mode (and may open a protected one without its password)
   pictureCap   Int             @default(200) // pictures kept; past the cap the picture of the oldest event goes (set by the admin)
   createdBy    String          @default("") // the creator's username when they were signed in: the creator may change the settings
+  feedKey      String?         // the key in the subscription link (the .ics feed, idea 10): made on request; renewing it cuts the old links off
   createdAt    DateTime        @default(now())
   updatedAt    DateTime        @updatedAt
   events       CalendarEvent[]
