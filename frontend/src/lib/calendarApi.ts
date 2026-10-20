@@ -82,6 +82,9 @@ export function listEvents(slug: string, range: { from?: string; to?: string; q?
 export const addEvent = (slug: string, body: EventInput) => api<CalEvent>(`${base(slug)}/events`, { method: "POST", body: JSON.stringify(body), headers: headers(slug) });
 export const editEvent = (slug: string, id: number, body: EventInput) => api<CalEvent>(`${base(slug)}/events/${id}`, { method: "PUT", body: JSON.stringify(body), headers: headers(slug) });
 export const removeEvent = (slug: string, id: number) => api<void>(`${base(slug)}/events/${id}`, { method: "DELETE", headers: headers(slug) });
+/** One line of the change tape: what changed, the title, who did it (empty when unknown) and when. */
+export interface TapeChange { id: number; action: "added" | "moved" | "changed" | "cancelled" | "skipped" | "back"; title: string; who: string; at: string }
+export const listTape = (slug: string) => api<{ changes: TapeChange[] }>(`${base(slug)}/changes`, { headers: headers(slug) });
 /** Skips one day of a repeat (skipped true), or puts it back (false). */
 export const skipDay = (slug: string, id: number, day: string, skipped: boolean) =>
   api<CalEvent>(`${base(slug)}/events/${id}/skip`, { method: "POST", body: JSON.stringify({ day, skipped }), headers: headers(slug) });

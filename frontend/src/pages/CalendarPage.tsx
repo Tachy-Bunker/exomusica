@@ -8,8 +8,9 @@ import { filterEvents } from "../lib/calendarFilter";
 import { agendaSpan, customDays, type AgendaChoice } from "../lib/calendarAgenda";
 import { downloadIcs, icsName, icsOf } from "../lib/calendarIcs";
 import { occurrencesIn, type Occurrence } from "../lib/calendarRepeat";
-import { dropToken, enterCalendar, getCalendar, listEvents, messageOf, removeEvent, skipDay, type CalEvent, type CalView } from "../lib/calendarApi";
+import { dropToken, enterCalendar, getCalendar, listEvents, listTape, messageOf, removeEvent, skipDay, type CalEvent, type CalView, type TapeChange } from "../lib/calendarApi";
 import { AgendaView, MonthView } from "../components/calendar/CalendarViews";
+import { ChangeTape } from "../components/calendar/ChangeTape";
 import { EventComposer, type ComposeScope } from "../components/calendar/EventComposer";
 import { EventSheet, type Scope } from "../components/calendar/EventSheet";
 import { CalendarSettings } from "../components/calendar/CalendarSettings";
@@ -105,6 +106,7 @@ function CalendarView() {
   const [gateErr, setGateErr] = useState("");
   const [busy, setBusy] = useState(false);
   const [tick, setTick] = useState(0);
+  const [tape, setTape] = useState<TapeChange[]>([]);   // the change tape: the latest changes, newest first
   const searching = q.trim() !== "";
 
   // The calendar itself. A password in the link is used once, then the address bar is cleaned.
@@ -161,6 +163,14 @@ function CalendarView() {
     const t = setInterval(() => { if (!document.hidden) setTick((n) => n + 1); }, 60_000);
     return () => clearInterval(t);
   }, [cal?.slug, cal?.locked]);
+
+  // The change tape: read with the events (every minute, and after each change made here).
+  useEffect(() => {
+    if (!cal || cal.locked) return;
+    let alive = true;
+    listTape(cal.slug).then((r) => { if (alive) setTape(Array.isArray(r?.changes) ? r.changes : []); }).catch(() => { /* the tape is an extra: the page works without it */ });
+    return () => { alive = false; };
+  }, [cal, tick]);
 
   // Repeats become their days inside the window; the search narrows them.
   const occ = useMemo(() => (win && cal ? occurrencesIn(raw, win[0], win[1], cal.timezone) : []), [raw, win, cal]);
@@ -268,9 +278,10 @@ function CalendarView() {
             onDay={(k) => setDay(k === day ? null : k)} onOpen={setOpen}
             onMove={(n) => setMonthCursor(shiftMonth(monthCursor, n))} onToday={() => { setMonthCursor(today); setDay(today); }} />
         ) : null}
-        <AgendaView events={agenda} tz={cal.timezone} onOpen={setOpen} range={rangeText}
+        <AgendaView events={agenda} tz={cal.timezone} today={today} onOpen={setOpen} range={rangeText}
           active={agendaActive} custom={agendaCustom} onPick={(c) => { setAgendaChoice(c); setAgendaCustom(""); }} onCustom={setAgendaCustom}
           empty={searching ? t("Nothing matches that.") : t("Nothing in this period yet.")} />
+        <ChangeTape changes={tape} tz={cal.timezone} />
         <WhenNear height="min(420px, 60vh)">
           <Suspense fallback={<p className="cal-dim">{t("Loading…")}</p>}>
             <PlacesSection slug={cal.slug} tz={cal.timezone} events={shown} onOpen={setOpen} />

@@ -2,7 +2,7 @@ import type { FastifyInstance } from "fastify";
 import { prisma } from "../lib/prisma.js";
 import { requireAdmin } from "../lib/auth.js";
 import { trackToDTO } from "../lib/embeds.js";
-import { autoBlock, blockFor, locate, loopElapsed, orderCrate, orderTracks, runEnd, runStart, type Block, type RTrack } from "../lib/radio.js";
+import { autoBlock, blockFor, locate, loopElapsed, orderAlbums, orderCrate, orderTracks, runEnd, runStart, type Block, type RTrack } from "../lib/radio.js";
 import { getMilestones } from "../lib/milestones.js";
 
 // A branch's playable catalogue changes rarely; a minute of memory keeps the endpoint cheap when many people are tuned in.
@@ -84,7 +84,7 @@ export async function radioRoutes(app: FastifyInstance): Promise<void> {
     const branch = branches.find((b) => b.slug === block.branchSlug)!;
     const start = runStart(block, now);
     const day = new Date(start).toISOString().slice(0, 10);
-    const ordered = orderTracks<Row>(await tracksOf(branch.slug), `${branch.slug}-${day}-${block.startHour}`);
+    const ordered = orderAlbums<Row>(await tracksOf(branch.slug), `${branch.slug}-${day}-${block.startHour}`);
     const at = locate<Row>(ordered, (now - start) / 1000);
     if (!at) return reply.code(404).send({ error: "nothing to play yet" });
     reply.header("Cache-Control", "no-store");

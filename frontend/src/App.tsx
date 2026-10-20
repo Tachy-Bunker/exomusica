@@ -135,12 +135,12 @@ export default function App() {
               <Route path="chat-window" element={<MiniChatWindowPage />} />
               <Route path="outreach" element={<Suspense fallback={null}><OutreachPage /></Suspense>} />
               <Route path="outreach/:slug" element={<Suspense fallback={null}><OutreachPage /></Suspense>} />
-              <Route path="calendar" element={<Suspense fallback={null}><CalendarIndexPage /></Suspense>} />
-              <Route path="calendar/:slug" element={<Suspense fallback={null}><CalendarPage /></Suspense>} />
               <Route path="embed/playlist/:slug" element={<EmbedPlaylistPage />} />
               <Route path="embed/main-spacemap" element={<EmbedMainSpacemapPage />} />
               <Route element={<Layout />}>
                 <Route index element={<HomePage />} />
+                <Route path="calendar" element={<Suspense fallback={null}><CalendarIndexPage /></Suspense>} />
+                <Route path="calendar/:slug" element={<Suspense fallback={null}><CalendarPage /></Suspense>} />
                 <Route path="login" element={<LoginPage />} />
             <Route path="join" element={<JoinPage />} />
             <Route path="about" element={<Navigate to="/wiki" replace />} />

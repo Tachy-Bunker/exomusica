@@ -1,10 +1,13 @@
 // The calendar's sections, stacked: Month, then Agenda. Each gets the events already expanded (repeats included) and already searched,
 // and draws them; the page loads and filters. The Places section is its own file (lazy: the map loads only when it is reached).
-import { useMemo } from "react";
+// fix416: a repeat fades as its dates get further from today (the echo view), and the agenda can also read as one sentence a day.
+import { useMemo, useState } from "react";
 import { dayLabel, monthCells, parseKey, timeOf } from "../../lib/calendarTime";
 import { useCalLang } from "../../lib/calendarI18n";
 import type { Occurrence } from "../../lib/calendarRepeat";
 import type { AgendaChoice } from "../../lib/calendarAgenda";
+import { echoOpacity } from "../../lib/calendarEcho";
+import "./calendarViz.css";
 
 /** The events grouped by their day, in the order they came. */
 export function byDay(events: Occurrence[]): Map<string, Occurrence[]> {
@@ -16,11 +19,11 @@ export function byDay(events: Occurrence[]): Map<string, Occurrence[]> {
   return m;
 }
 
-function EventRow({ e, tz, onOpen }: { e: Occurrence; tz: string; onOpen: (e: Occurrence) => void }) {
+function EventRow({ e, tz, onOpen, fade }: { e: Occurrence; tz: string; onOpen: (e: Occurrence) => void; fade: number }) {
   const { t } = useCalLang();
   const clock = e.allDay ? t("all day") : timeOf(e.startsAt, tz);
   return (
-    <button type="button" className="cal-row" onClick={() => onOpen(e)}>
+    <button type="button" className="cal-row" onClick={() => onOpen(e)} style={{ opacity: fade }}>
       {e.image ? <img className="cal-thumb" src={e.image.url} alt="" loading="lazy" decoding="async" /> : null}
       <span className="cal-row-main">
         <span className="cal-row-title">{e.title}</span>
@@ -58,6 +61,7 @@ export function MonthView({ cursor, today, day, tz, events, onDay, onOpen, onMov
   const { y, m } = parseKey(cursor);
   const cells = useMemo(() => monthCells(y, m), [y, m]);
   const days = useMemo(() => byDay(events), [events]);
+  const echo = useMemo(() => echoOpacity(events, today), [events, today]);
   const picked = day ? days.get(day) ?? [] : [];
   const clockOf = (e: Occurrence) => (e.allDay ? t("all day") : timeOf(e.startsAt, tz));
   const title = dayLabel(cursor, { month: "long", year: "numeric" }, locale);
@@ -84,7 +88,8 @@ export function MonthView({ cursor, today, day, tz, events, onDay, onOpen, onMov
                 {list.length ? (
                   <span className="cal-chips">
                     {list.slice(0, CHIPS).map((e, i) => (
-                      <button key={`${e.id}:${e.day}:${i}`} type="button" className="cal-chip" title={`${clockOf(e)} ${e.title}`} onClick={() => onOpen(e)}>
+                      <button key={`${e.id}:${e.day}:${i}`} type="button" className="cal-chip" title={`${clockOf(e)} ${e.title}`} onClick={() => onOpen(e)}
+                        style={{ opacity: echo.get(`${e.id}:${e.day}`) ?? 1 }}>
                         <span className="cal-chip-clock">{clockOf(e)}</span> <span className="cal-chip-title">{e.title}</span>
                       </button>
                     ))}
@@ -98,7 +103,7 @@ export function MonthView({ cursor, today, day, tz, events, onDay, onOpen, onMov
         {day ? (
           <section className="cal-day-list" aria-label={dayLabel(day, { weekday: "long", day: "numeric", month: "long" }, locale)}>
             <h3>{dayLabel(day, { weekday: "long", day: "numeric", month: "long" }, locale)}</h3>
-            {picked.length ? picked.map((e) => <EventRow key={`${e.id}:${e.day}`} e={e} tz={tz} onOpen={onOpen} />) : <p className="cal-dim">{t("Nothing on this day yet.")}</p>}
+            {picked.length ? picked.map((e) => <EventRow key={`${e.id}:${e.day}`} e={e} tz={tz} onOpen={onOpen} fade={echo.get(`${e.id}:${e.day}`) ?? 1} />) : <p className="cal-dim">{t("Nothing on this day yet.")}</p>}
           </section>
         ) : null}
       </div>
@@ -114,16 +119,25 @@ const PERIODS: { key: AgendaChoice; label: string }[] = [
 ];
 
 interface AgendaProps {
-  events: Occurrence[]; tz: string; empty: string; range: string;
+  events: Occurrence[]; tz: string; today: string; empty: string; range: string;
   active: AgendaChoice | "custom"; custom: string;
   onPick: (c: AgendaChoice) => void; onCustom: (text: string) => void; onOpen: (e: Occurrence) => void;
 }
 
-/** The days as a list, earliest first. 30 days unless another period is picked or a number of days is typed. */
-export function AgendaView({ events, tz, empty, range, active, custom, onPick, onCustom, onOpen }: AgendaProps) {
+/** The days as a list, earliest first, or as one sentence a day. 30 days unless another period is picked or a number of days is typed. */
+export function AgendaView({ events, tz, today, empty, range, active, custom, onPick, onCustom, onOpen }: AgendaProps) {
   const { t, locale } = useCalLang();
+  const [mode, setMode] = useState<"list" | "sentences">("list");
   const days = useMemo(() => byDay(events), [events]);
+  const echo = useMemo(() => echoOpacity(events, today), [events, today]);
   const keys = [...days.keys()];
+  const sentence = (k: string): string => {
+    const items = days.get(k)!.map((e) => {
+      const head = e.allDay ? t("{title}, all day", { title: e.title }) : t("{title} at {clock}", { title: e.title, clock: timeOf(e.startsAt, tz) });
+      return e.location ? `${head}, ${e.location}` : head;
+    });
+    return t("{day}: {items}.", { day: dayLabel(k, { weekday: "long", day: "numeric", month: "long" }, locale), items: items.join("; ") });
+  };
   return (
     <section className="cal-section" aria-labelledby="cal-h-agenda">
       <h2 id="cal-h-agenda">{t("Agenda")}</h2>
@@ -136,16 +150,26 @@ export function AgendaView({ events, tz, empty, range, active, custom, onPick, o
           <input type="number" inputMode="numeric" min={1} max={366} step={1} placeholder="30" value={custom} onChange={(e) => onCustom(e.target.value)} />
         </label>
       </div>
+      <div className="cal-periods cal-show" role="group" aria-label={t("Show as")}>
+        <button type="button" className="cal-period" aria-pressed={mode === "list"} onClick={() => setMode("list")}>{t("List")}</button>
+        <button type="button" className="cal-period" aria-pressed={mode === "sentences"} onClick={() => setMode("sentences")}>{t("Sentences")}</button>
+      </div>
       <p className="cal-dim cal-small">{range}</p>
       {keys.length ? (
-        <div className="cal-agenda">
-          {keys.map((k) => (
-            <section key={k}>
-              <h3>{dayLabel(k, { weekday: "long", day: "numeric", month: "long", year: "numeric" }, locale)}</h3>
-              {days.get(k)!.map((e) => <EventRow key={`${e.id}:${e.day}`} e={e} tz={tz} onOpen={onOpen} />)}
-            </section>
-          ))}
-        </div>
+        mode === "sentences" ? (
+          <div className="cal-sentences">
+            {keys.map((k) => <p key={k}>{sentence(k)}</p>)}
+          </div>
+        ) : (
+          <div className="cal-agenda">
+            {keys.map((k) => (
+              <section key={k}>
+                <h3>{dayLabel(k, { weekday: "long", day: "numeric", month: "long", year: "numeric" }, locale)}</h3>
+                {days.get(k)!.map((e) => <EventRow key={`${e.id}:${e.day}`} e={e} tz={tz} onOpen={onOpen} fade={echo.get(`${e.id}:${e.day}`) ?? 1} />)}
+              </section>
+            ))}
+          </div>
+        )
       ) : <p className="cal-empty">{empty}</p>}
     </section>
   );

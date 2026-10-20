@@ -1,0 +1,12 @@
+/* fix416: the calendar's two visual extras, the change tape and the sentence view. The calendar's own tokens: flat colours, no gradients. */
+.cal-show { margin-top: 6px; }
+.cal-sentences p { margin: 0 0 12px; line-height: 1.55; overflow-wrap: anywhere; }
+
+.cal-tape { display: flex; gap: 2px; height: 18px; padding: 2px; background: var(--bg-inset); border: 1px solid var(--border); border-radius: var(--radius); }
+.cal-tape-mark { flex: 1 1 0; min-width: 3px; border-radius: 2px; background: var(--border); }
+.cal-tape-mark.is-added { background: var(--accent-audio); }
+.cal-tape-mark.is-moved { background: var(--text); }
+.cal-tape-mark.is-changed { background: var(--text-dim); }
+.cal-tape-mark.is-cancelled { background: var(--accent-danger); }
+.cal-tape-list { margin: 10px 0 0; padding-left: 1.2em; font-size: 0.9rem; }
+.cal-tape-list li { margin: 4px 0; overflow-wrap: anywhere; }

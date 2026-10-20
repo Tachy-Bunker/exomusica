@@ -1,7 +1,8 @@
 /* The calendar (fix415). The site's own look: Fraunces for headings, Space Grotesk for everything else, the pulsar blue for what is pressed,
    picked or has an event. Flat colours, no gradients. Phone first: the month shows counts; an event opens as a popup over the calendar. */
 
-.cal-page, .cal-index { max-width: 1100px; margin: 0 auto; padding: 16px; color: var(--text); font-family: var(--font-body); }
+/* Inside the site's shell the main column already has its gutter: only the bottom needs room (the player bar sits over it). */
+.cal-page, .cal-index { max-width: 1100px; margin: 0 auto; padding: 0 0 16px; color: var(--text); font-family: var(--font-body); }
 .cal-page h1, .cal-index h1 { font-family: var(--font-display); font-size: clamp(1.6rem, 4vw, 2.1rem); font-weight: 600; line-height: 1.15; margin: 0 0 6px; }
 .cal-page h2 { font-family: var(--font-display); font-size: 1.3rem; font-weight: 600; margin: 0 0 10px; }
 .cal-page h3 { font-size: 0.95rem; font-weight: 600; margin: 12px 0 6px; }

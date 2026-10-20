@@ -27,7 +27,7 @@ export function InstrumentView({ data, rows, onRefresh, refreshing, showAll, onS
                 {shown.map((c) => (
                   <li key={c.slug} className="inst-row sig-card" data-kind={c.kind} data-slug={c.slug}>
                     <span className="sig-glyph inst-glyph"><SpaceGlyph kind={c.kind} /></span>
-                    <span className="inst-row-name"><Link className="sig-link" to={c.href} onClick={(e) => onOpen(e, { slug: c.slug, name: c.name, branchSlug: c.branch?.slug })}>{c.name}</Link><span className="inst-dim"> {KIND_LABEL[c.kind]}{c.kind === "study" && c.studies[0] ? ` · ${c.studies[0].title}` : ""}</span></span>
+                    <span className="inst-row-name"><Link className="sig-link" data-no-door to={c.href} onClick={(e) => onOpen(e, { slug: c.slug, name: c.name, branchSlug: c.branch?.slug })}>{c.name}</Link><span className="inst-dim"> {KIND_LABEL[c.kind]}{c.kind === "study" && c.studies[0] ? ` · ${c.studies[0].title}` : ""}</span></span>
                     <svg className="inst-spark" viewBox={`0 0 ${SPARK.w} ${SPARK.h}`} role="img" aria-label={`${c.trace.reduce((a, b) => a + b, 0)} messages in the last 14 days`}>
                       <line className="inst-grid" x1="0" x2={SPARK.w} y1={SPARK.h - SPARK.padY} y2={SPARK.h - SPARK.padY} />
                       <path className="inst-spark-line" d={linePath(tracePoints(c.trace, SPARK, Math.max(4, niceMax(Math.max(...c.trace)))))} style={{ stroke: "var(--kind)" }} />
@@ -53,7 +53,7 @@ export function InstrumentView({ data, rows, onRefresh, refreshing, showAll, onS
             {data.recent.map((m) => (
               <li key={m.id}>
                 <span className="inst-feed-time inst-dim">{timeAgo(m.at, now)}</span>
-                <span className="inst-feed-text"><Link to={m.href} className="inst-feed-chan" onClick={(e) => onOpen(e, { slug: m.channelSlug, name: m.channelName, branchSlug: m.branchSlug })}>{m.channelName}</Link> <Username name={m.author} dm /> {m.text}</span>
+                <span className="inst-feed-text"><Link to={m.href} data-no-door className="inst-feed-chan" onClick={(e) => onOpen(e, { slug: m.channelSlug, name: m.channelName, branchSlug: m.branchSlug })}>{m.channelName}</Link> <Username name={m.author} dm /> {m.text}</span>
               </li>
             ))}
           </ol>

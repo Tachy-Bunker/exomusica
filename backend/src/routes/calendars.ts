@@ -85,6 +85,16 @@ function editsCal(req: FastifyRequest, c: Cal): boolean {
 }
 const body = (req: FastifyRequest): Record<string, unknown> => (req.body && typeof req.body === "object" ? (req.body as Record<string, unknown>) : {});
 
+/** The change tape keeps this many lines per calendar; the oldest go as new ones come. */
+const TAPE_KEEP = 300;
+/** Writes one line to the change tape. `who`: the signed-in username, else the name the guest typed, else empty (shown as "a guest"). */
+async function noteChange(calId: number, action: "added" | "moved" | "changed" | "cancelled" | "skipped" | "back", title: string, who: string): Promise<void> {
+  await prisma.calendarChange.create({ data: { calendarId: calId, action, title: title.slice(0, 120), who: who.slice(0, 80) } });
+  const cut = await prisma.calendarChange.findFirst({ where: { calendarId: calId }, orderBy: { id: "desc" }, skip: TAPE_KEEP, select: { id: true } });
+  if (cut) await prisma.calendarChange.deleteMany({ where: { calendarId: calId, id: { lte: cut.id } } });
+}
+const whoOf = (req: FastifyRequest, typed: string): string => userOf(req)?.username || typed;
+
 /** Site accounts by username, in any case; each comes back as the account writes it. A name with no account is refused. */
 async function resolveMembers(raw: unknown): Promise<Checked<string[]>> {
   const c = checkMembers(raw);
@@ -288,7 +298,18 @@ export async function calendarRoutes(app: FastifyInstance): Promise<void> {
     if (skipped) set.add(d.value); else set.delete(d.value);
     if (set.size > MAX_SKIPS) return fail(reply, 400, "Too many days are skipped in this repeat.");
     const upd = await prisma.calendarEvent.update({ where: { id: ev.id }, data: { exdates: [...set].sort() }, select: EVENT });
+    await noteChange(cal.id, skipped ? "skipped" : "back", ev.title, whoOf(req, ""));
     return toEvent(upd);
+  });
+
+  // The change tape: the latest changes to a calendar, newest first. Whoever may open the calendar sees them.
+  app.get<{ Params: { slug: string }; Querystring: { limit?: string } }>("/api/calendars/:slug/changes", async (req, reply) => {
+    const cal = await calendarBySlug(req.params.slug);
+    if (!cal) return fail(reply, 404, "No calendar at this address.");
+    if (!allowed(req, cal)) return fail(reply, 401, LOCKED);
+    const limit = Math.min(100, Math.max(1, Number(req.query.limit) || 40));
+    const rows = await prisma.calendarChange.findMany({ where: { calendarId: cal.id }, orderBy: { id: "desc" }, take: limit, select: { id: true, action: true, title: true, who: true, at: true } });
+    return { changes: rows.map((r) => ({ id: r.id, action: r.action, title: r.title, who: r.who, at: r.at.toISOString() })) };
   });
 
   app.post<{ Params: { slug: string } }>("/api/calendars/:slug/events", async (req, reply) => {
@@ -304,6 +325,7 @@ export async function calendarRoutes(app: FastifyInstance): Promise<void> {
     if (await prisma.calendarEvent.count({ where: { calendarId: cal.id } }) >= MAX_EVENTS) return fail(reply, 409, "This calendar is full.");
     if (c.value.imageId !== null && !(await prisma.calendarImage.findFirst({ where: { id: c.value.imageId, calendarId: cal.id }, select: { id: true } }))) return fail(reply, 400, "That picture is not in this calendar.");
     const ev = await prisma.calendarEvent.create({ data: { calendarId: cal.id, title: c.value.title, text: c.value.text, url: c.value.url, location: c.value.location, startsAt: c.value.startsAt, endsAt: c.value.endsAt, allDay: c.value.allDay, addedBy: c.value.addedBy, imageId: c.value.imageId, lat: c.value.lat, lng: c.value.lng, recurrence: c.value.recurrence, recurUntil: c.value.recurUntil }, select: EVENT });
+    await noteChange(cal.id, "added", ev.title, whoOf(req, c.value.addedBy));
     return reply.code(201).send(toEvent(ev));
   });
 
@@ -314,13 +336,15 @@ export async function calendarRoutes(app: FastifyInstance): Promise<void> {
     if (!editsCal(req, cal)) return fail(reply, 403, NOT_EDITOR);
     const id = Number(req.params.id);
     if (!Number.isInteger(id)) return fail(reply, 404, "No such event.");
-    if (!(await prisma.calendarEvent.findFirst({ where: { id, calendarId: cal.id }, select: { id: true } }))) return fail(reply, 404, "No such event.");
+    const before = await prisma.calendarEvent.findFirst({ where: { id, calendarId: cal.id }, select: { id: true, startsAt: true } });
+    if (!before) return fail(reply, 404, "No such event.");
     const c = checkEvent(req.body); if (!c.ok) return fail(reply, 400, c.error);
     if (c.value.recurUntil && c.value.recurUntil < dayKeyIn(c.value.startsAt, cal.timezone)) return fail(reply, 400, "The repeat ends before it starts.");
     if (c.value.imageId !== null && !(await prisma.calendarImage.findFirst({ where: { id: c.value.imageId, calendarId: cal.id }, select: { id: true } }))) return fail(reply, 400, "That picture is not in this calendar.");
     // A repeat that stops repeating forgets its skipped days; one that keeps repeating keeps them.
     const data = { title: c.value.title, text: c.value.text, url: c.value.url, location: c.value.location, startsAt: c.value.startsAt, endsAt: c.value.endsAt, allDay: c.value.allDay, imageId: c.value.imageId, addedBy: c.value.addedBy, lat: c.value.lat, lng: c.value.lng, recurrence: c.value.recurrence, recurUntil: c.value.recurUntil, exdates: c.value.recurrence ? undefined : [] };
     const ev = await prisma.calendarEvent.update({ where: { id }, data, select: EVENT });
+    await noteChange(cal.id, before.startsAt.getTime() !== new Date(c.value.startsAt).getTime() ? "moved" : "changed", ev.title, whoOf(req, c.value.addedBy));
     return toEvent(ev);
   });
 
@@ -329,7 +353,9 @@ export async function calendarRoutes(app: FastifyInstance): Promise<void> {
     if (!cal) return fail(reply, 404, "No calendar at this address.");
     if (!allowed(req, cal)) return fail(reply, 401, LOCKED);
     if (!editsCal(req, cal)) return fail(reply, 403, NOT_EDITOR);
+    const gone = await prisma.calendarEvent.findFirst({ where: { id: Number(req.params.id), calendarId: cal.id }, select: { title: true } });
     await prisma.calendarEvent.deleteMany({ where: { id: Number(req.params.id), calendarId: cal.id } });
+    if (gone) await noteChange(cal.id, "cancelled", gone.title, whoOf(req, ""));
     return reply.code(204).send();
   });
 

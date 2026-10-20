@@ -81,6 +81,9 @@ function RoomsWeather() {
   return <p className="home-rooms-live" data-testid="rooms-live">{n === 1 ? "1 person" : `${n.toLocaleString()} people`} in the rooms right now</p>;
 }
 
+/** Hidden for now. Set to true to show the "Enter the game" block again. */
+const SHOW_CORE_CARD = false;
+
 /** The Core room as a picture: the way into the game from the front page. The picture is a static file (public/img/core-room.jpg). The card is left out when the Core is not on the map. */
 function CoreRoomCard({ branches }: { branches: HomeBranch[] }) {
   const core = branches.find((b) => b.slug === "core") ?? branches.find((b) => b.parentSlug === null && !b.anchor);
@@ -162,7 +165,7 @@ export function HomePage() {
         </header>
       )}
 
-      {home && <CoreRoomCard branches={home.branches} />}
+      {SHOW_CORE_CARD && home && <CoreRoomCard branches={home.branches} />}
 
       <div data-tour="branches">{home ? (
         <HomeExplore branches={home.branches} openFull={params.get("map") === "full"} initialSlug={params.get("branch")} />

@@ -40,6 +40,24 @@ export function orderTracks<T extends RTrack>(tracks: T[], seed: string): T[] {
   return list;
 }
 
+export interface RAlbumTrack extends RTrack { albumId: number; position: number }
+/** Album by album: the albums come in a shuffled order (the same for everyone for the same seed), and each album plays its tracks in its own order.
+ *  Every album is heard once before any album comes round again, so the queue never repeats an album back to back or in pieces. Tracks without a known length are left out. */
+export function orderAlbums<T extends RAlbumTrack>(tracks: T[], seed: string): T[] {
+  const byAlbum = new Map<number, T[]>();
+  for (const t of tracks) {
+    if ((t.durationSeconds ?? 0) < 1) continue;
+    const list = byAlbum.get(t.albumId);
+    if (list) list.push(t); else byAlbum.set(t.albumId, [t]);
+  }
+  const albums = [...byAlbum.keys()].sort((a, b) => a - b);
+  const r = rng(hashStr(seed));
+  for (let i = albums.length - 1; i > 0; i--) { const j = Math.floor(r() * (i + 1)); [albums[i], albums[j]] = [albums[j], albums[i]]; }
+  const out: T[] = [];
+  for (const id of albums) out.push(...byAlbum.get(id)!.sort((a, b) => a.position - b.position || a.id - b.id));
+  return out;
+}
+
 /** Where `elapsed` seconds into the loop falls: which track, how far in, how long is left of it, and the next ones. */
 export function locate<T extends RTrack>(ordered: T[], elapsed: number): { track: T; offset: number; remaining: number; upcoming: T[] } | null {
   if (ordered.length === 0) return null;

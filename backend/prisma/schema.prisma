@@ -1810,6 +1810,7 @@ model Calendar {
   updatedAt    DateTime        @updatedAt
   events       CalendarEvent[]
   images       CalendarImage[]
+  changes      CalendarChange[]
 
   @@map("calendars")
 }
@@ -1853,6 +1854,21 @@ model CalendarImage {
   events     CalendarEvent[]
 
   @@map("calendar_images")
+}
+
+// The change tape (fix416): one line per change to a calendar. `action` is added | moved | changed | cancelled | skipped | back.
+// `who` is the signed-in username, or the name a guest typed, or empty when unknown. The app keeps the latest 300 per calendar.
+model CalendarChange {
+  id         Int      @id @default(autoincrement())
+  calendarId Int
+  calendar   Calendar @relation(fields: [calendarId], references: [id], onDelete: Cascade)
+  action     String
+  title      String
+  who        String   @default("")
+  at         DateTime @default(now())
+
+  @@index([calendarId, at])
+  @@map("calendar_changes")
 }
 
 // Where the owner has moved a room on the explorable map (the Scan map and the 3D rooms' doors follow it). Every field is optional; empty = the automatic layout decides. Keyed by branch slug.

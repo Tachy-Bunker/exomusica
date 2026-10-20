@@ -33,6 +33,9 @@ export function MobileAccountHook(props: LoggedInProps | LoggedOutProps) {
       </button>
       {open && (
         <div className="mobile-hook-panel">
+          <Link to="/calendar" onClick={() => setOpen(false)}>
+            Calendar
+          </Link>
           {props.loggedIn ? (
             <>
               <span className="mobile-hook-online">{onlineCount} online</span>

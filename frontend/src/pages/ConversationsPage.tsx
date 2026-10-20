@@ -147,7 +147,7 @@ export function ConversationsPage() {
                         <li key={c.slug} className="tlist-row sig-card" data-kind={c.kind} data-slug={c.slug}>
                           <span className="sig-glyph"><SpaceGlyph kind={c.kind} /></span>
                           <span className="tlist-main">
-                            <Link className="sig-link" to={c.href} onClick={(e) => onOpen(e, { slug: c.slug, name: c.name, branchSlug: c.branch?.slug })}>{c.name}</Link>
+                            <Link className="sig-link" data-no-door to={c.href} onClick={(e) => onOpen(e, { slug: c.slug, name: c.name, branchSlug: c.branch?.slug })}>{c.name}</Link>
                             <span className="tlist-desc home-dim" data-testid="conv-desc">{c.blurb}{c.kind === "study" && c.studies[0] ? c.studies[0].title : ""}</span>
                           </span>
                           <span className="tlist-side home-dim">

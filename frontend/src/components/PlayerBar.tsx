@@ -5,7 +5,7 @@ import { createPortal } from "react-dom";
 import { Link } from "react-router-dom";
 import { bindAudioElement, isActiveEl, useAudioStore } from "../lib/audioStore";
 import { initAnalyser, setActiveForAnalyser } from "../lib/audioAnalyser";
-import { EchoRings, EchoToggle } from "./EchoRings";
+import { EchoRings } from "./EchoRings";
 import { startMediaSession } from "../lib/mediaSession";
 import { useIsDesktop } from "../lib/useIsDesktop";
 import { useFixedPortalRoot } from "../lib/useFixedPortalRoot";
@@ -331,7 +331,6 @@ export function PlayerBar() {
       {currentTrack && !expanded && (
         <div className="player-bar-docked">
           <div className={`player-seek-strip${spec ? " has-spec" : ""}`} onClick={handleSeekStripClick} {...seekSliderProps} tabIndex={expanded ? -1 : 0}>
-            <EchoRings pct={progressPct} />
             <div className="player-seek-track">
               {spec ? <SpecLayer strip={spec} color={tint} pct={progressPct} comments={shown} duration={effectiveDuration} activeId={activeId} onPin={pinClick} /> : <div className="player-seek-fill" style={{ width: `${progressPct}%` }} />}
               {AB_TOOLS_ENABLED && <AbRegions duration={effectiveDuration} />}
@@ -496,7 +495,6 @@ export function PlayerBar() {
               <button className={`btn ${repeatMode !== "off" ? "btn-primary" : ""}`} onClick={cycleRepeat} title="Repeat: off/all/one">
                 {repeatMode === "one" ? <LoopOneIcon size={18} /> : <LoopIcon size={18} />}
               </button>
-              <EchoToggle />
               <button type="button" className="btn" data-testid="player-morph" onClick={() => setBall(true)} title="Roll a ball along this track">Morph ball</button>
             </div>
 

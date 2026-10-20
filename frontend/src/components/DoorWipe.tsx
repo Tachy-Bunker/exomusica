@@ -10,6 +10,7 @@ import { setDoorReplay } from "../lib/doorReplay";
 import { neon } from "../lib/legibleColor";
 import { doorTexture } from "../lib/doorTexture";
 import { BLADES, blade, cornerMask, frameOctagon, isPortrait } from "../lib/doorShape";
+import { useIsDesktop } from "../lib/useIsDesktop";
 
 type Phase = "idle" | "closing" | "closed" | "opening";
 /** The site's main colour right now (it follows the era and the chosen skin). */
@@ -34,12 +35,14 @@ const SWIRL = Array.from({ length: 28 }, (_, k) => { const t = k / 27, a = t * M
 const SWIRLS: [number, number, number][] = [[-62, -30, 1], [60, -34, 0.8], [-66, 28, 0.9], [64, 30, 1.1], [-30, -42, 0.6], [34, 42, 0.7], [0, -44, 0.5], [-4, 44, 0.6]];
 const HEX = [0, 1, 2, 3, 4, 5].map((i) => pt(i * 60, 26)).join(" ");
 
-/** A hexagonal six-panel door between sections. It closes over the page, waits behind it until the next page has finished loading, then opens. One fixed SVG, CSS animations only; classic mode and reduced motion never show it. */
+/** A hexagonal six-panel door between sections. It closes over the page, waits behind it until the next page has finished loading, then opens. One fixed SVG, CSS animations only; classic mode, reduced motion and phones never show it (on a phone it only slowed the next page down). */
 export function DoorWipe() {
   const { pathname } = useLocation();
   const navigate = useNavigate();
   const classic = useClassicMode((s) => s.classic);
   const style = useDoorStyle((s) => s.style);
+  const desktop = useIsDesktop();
+  const desktopRef = useRef(desktop); desktopRef.current = desktop; // read inside the listeners, which are set up once
   const [portrait, setPortrait] = useState(false);
   const [phase, setPhase] = useState<Phase>("idle");
   const [color, setColor] = useState<string | null>(null);
@@ -50,7 +53,7 @@ export function DoorWipe() {
   const bypass = useRef(false);
   const closedAt = useRef(0);
   const set = (p: Phase) => { if (p === "closing") setPortrait(isPortrait(window.innerWidth, window.innerHeight)); phaseRef.current = p; setPhase(p); };
-  const off = (): boolean => classic || (typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches);
+  const off = (): boolean => classic || !desktopRef.current || (typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches);
   path.current = pathname;
 
   const aim = (to: string) => {
